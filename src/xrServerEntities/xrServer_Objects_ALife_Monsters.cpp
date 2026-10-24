@@ -30,6 +30,7 @@
 #	include "ef_primary.h"
 #	include "string_table.h"
 #	include "alife_online_offline_group_brain.h"
+#	include "coop/coop_world.h"
 #	include "alife_simulator.h"
 #	include "alife_object_registry.h"
 #	include "date_time.h"
@@ -1068,6 +1069,7 @@ void CSE_ALifeCreatureAbstract::on_death(CSE_Abstract* killer)
 	//VERIFY						(!m_game_death_time);
 	m_game_death_time = ai().get_alife() ? alife().time_manager().game_time() : Level().GetGameTime();
 	fHealth = -1.f;
+	coop::on_creature_death(this, killer);
 }
 #endif // XRGAME_EXPORTS
 

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "coop_net.h"
 #include "coop_map.h"
+#include "coop_world.h"
 #include "Level.h"
 #include "Actor.h"
 
@@ -39,6 +40,7 @@ namespace coop
 		bool welcomed() const { return m_welcomed; }
 		u32 id() const { return m_client_id; }
 		const peers_t& peers() const { return m_peers; }
+		void send(NET_Packet& P);
 
 		virtual void _BCL OnFrame();
 
@@ -46,7 +48,6 @@ namespace coop
 		void worker();
 		void close();
 		bool recv_all(void* dst, u32 size);
-		void send(NET_Packet& P);
 		void handle(NET_Packet& P);
 		void send_actor_state();
 
@@ -274,6 +275,9 @@ namespace coop
 				Msg("[coop] '%s' (id=%u) is on %s", peer.name.c_str(), id, peer.level.c_str());
 			break;
 		}
+		case M_ENTITY_DEATH:
+			apply_entity_death(P);
+			break;
 		case M_PEER_LEFT:
 		{
 			u32 id = P.r_u32();
@@ -385,6 +389,7 @@ namespace coop
 	}
 
 	bool is_connected() { return g_client.welcomed(); }
+	void send(NET_Packet& P) { g_client.send(P); }
 	u32 my_id() { return g_client.id(); }
 	const peers_t& peers() { return g_client.peers(); }
 }

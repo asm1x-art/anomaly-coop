@@ -16,9 +16,10 @@ namespace coop
 		M_ACTOR_STATE = 5, // c->s: stringZ level, vec3 position, float yaw
 		M_PEER_STATE = 6,  // s->c: u32 id, stringZ name, then M_ACTOR_STATE payload
 		M_PEER_LEFT = 7,   // s->c: u32 id
+		M_ENTITY_DEATH = 8, // c->s->others: u16 object id, stringZ section, u16 killer id
 	};
 
-	const u16 PROTOCOL_VERSION = 2;
+	const u16 PROTOCOL_VERSION = 3;
 
 	struct SPeer
 	{
@@ -36,6 +37,7 @@ namespace coop
 	void print_status();
 
 	bool is_connected();
+	void send(NET_Packet& P); // dropped unless connected
 	u32 my_id();
 	const peers_t& peers();
 

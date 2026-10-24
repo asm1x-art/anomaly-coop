@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const M = {
   HELLO: 1,   // c->s: u16 protocol version, stringZ name
@@ -11,6 +11,7 @@ export const M = {
   ACTOR_STATE: 5, // c->s: stringZ level, vec3 position (f32 x, y, z), f32 yaw
   PEER_STATE: 6,  // s->c: u32 id, stringZ name, then ACTOR_STATE payload
   PEER_LEFT: 7,   // s->c: u32 id
+  ENTITY_DEATH: 8, // c->s->others: u16 object id, stringZ section, u16 killer id
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit

@@ -2007,6 +2007,7 @@
     <ClInclude Include="xr_level_controller.h" />
     <ClInclude Include="coop\coop_map.h" />
     <ClInclude Include="coop\coop_net.h" />
+    <ClInclude Include="coop\coop_world.h" />
     <ClInclude Include="xr_time.h" />
     <ClInclude Include="ZoneCampfire.h" />
     <ClInclude Include="ZoneVisual.h" />
@@ -3106,6 +3107,7 @@
     <ClCompile Include="level_graph_vertex.cpp" />
     <ClCompile Include="coop\coop_map.cpp" />
     <ClCompile Include="coop\coop_net.cpp" />
+    <ClCompile Include="coop\coop_world.cpp" />
     <ClCompile Include="coop\coop_script.cpp">
       <PrecompiledHeaderFile>pch_script.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName)_script.pch</PrecompiledHeaderOutputFile>

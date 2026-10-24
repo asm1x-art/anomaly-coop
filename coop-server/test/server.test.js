@@ -143,3 +143,32 @@ test('messages before HELLO are rejected', async () => {
     server.close();
   }
 });
+
+test('entity death is relayed to everyone except the sender', async () => {
+  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('друг'));
+    await a.next();
+    await b.next();
+
+    const death = Buffer.concat([Buffer.from([0x39, 0x05]), Buffer.from('esc_wolf\0'), Buffer.from([0xff, 0xff])]);
+    a.send(M.ENTITY_DEATH, death);
+    const got = await b.next();
+    assert.equal(got.type, M.ENTITY_DEATH);
+    assert.deepEqual(got.payload, death);
+
+    // a must not get its own death back: the next message it receives is the reply to this ping
+    const t = Buffer.alloc(4);
+    a.send(M.PING, t);
+    assert.equal((await a.next()).type, M.PONG);
+
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

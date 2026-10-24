@@ -47,6 +47,9 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
           client.state = Buffer.from(payload);
           broadcast(id, M.PEER_STATE, peerState(id, client));
           break;
+        case M.ENTITY_DEATH:
+          broadcast(id, type, Buffer.from(payload));
+          break;
         default:
           log(`[${id}] unknown message type ${type}`);
       }
