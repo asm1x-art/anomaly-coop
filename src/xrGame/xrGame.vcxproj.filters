@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="coop">
+      <UniqueIdentifier>{d5298316-61fb-4943-8db3-1f94df914338}</UniqueIdentifier>
+    </Filter>
     <Filter Include="AI">
       <UniqueIdentifier>{f34c5d00-338a-43c5-a944-caabce922e2b}</UniqueIdentifier>
     </Filter>
@@ -6489,6 +6492,9 @@
     <ClInclude Include="game_sv_item_respawner.h">
       <Filter>Core\Server\Games\server</Filter>
     </ClInclude>
+    <ClInclude Include="coop\coop_net.h">
+      <Filter>coop</Filter>
+    </ClInclude>
     <ClInclude Include="xr_time.h">
       <Filter>Core\Server\Games\server</Filter>
     </ClInclude>
@@ -8935,6 +8941,9 @@
     </ClCompile>
     <ClCompile Include="level_map_locations.cpp">
       <Filter>Core\Client\Level</Filter>
+    </ClCompile>
+    <ClCompile Include="coop\coop_net.cpp">
+      <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="Level_network.cpp">
       <Filter>Core\Client\Level</Filter>

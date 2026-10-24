@@ -38,6 +38,7 @@
 #include "../xrSound/Sound.h"
 #include "ui/UIStatic.h"
 #include "zone_effector.h"
+#include "coop/coop_net.h"
 #include "GameTask.h"
 #include "MainMenu.h"
 #include "saved_game_wrapper.h"
@@ -406,6 +407,49 @@ static void full_memory_stats()
 	dump_file_mappings();
 #endif // DEBUG
 }
+
+class CCC_CoopConnect : public IConsole_Command
+{
+public:
+	CCC_CoopConnect(LPCSTR N) : IConsole_Command(N) {}
+
+	// coop_connect <host>[:port] [name]
+	virtual void Execute(LPCSTR args)
+	{
+		string256 address = "", name = "";
+		sscanf(args, "%255s %255s", address, name);
+		if (!xr_strlen(address))
+		{
+			Msg("! usage: coop_connect <host>[:port] [name]");
+			return;
+		}
+
+		u16 port = 7777;
+		if (char* colon = strchr(address, ':'))
+		{
+			*colon = 0;
+			port = (u16)atoi(colon + 1);
+		}
+		if (!xr_strlen(name))
+			xr_strcpy(name, xr_strlen(Core.UserName) ? Core.UserName : "stalker");
+
+		coop::connect(address, port, name);
+	}
+};
+
+class CCC_CoopDisconnect : public IConsole_Command
+{
+public:
+	CCC_CoopDisconnect(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { coop::disconnect(); }
+};
+
+class CCC_CoopStatus : public IConsole_Command
+{
+public:
+	CCC_CoopStatus(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { coop::print_status(); }
+};
 
 class CCC_MemStats : public IConsole_Command
 {
@@ -3323,4 +3367,8 @@ void CCC_RegisterCommands()
 	CMD1(CCC_MovePathQueryPosThreshold, "movement_manager_move_along_path_query_pos_threshold");
     CMD4(CCC_Integer, "show_actor_body", &showActorBody, 0, 2);
     CMD4(CCC_Integer, "disable_actor_body_rotation_delay", &disableActorBodyRotationDelay, 0, 1);
+
+	CMD1(CCC_CoopConnect, "coop_connect");
+	CMD1(CCC_CoopDisconnect, "coop_disconnect");
+	CMD1(CCC_CoopStatus, "coop_status");
 }
