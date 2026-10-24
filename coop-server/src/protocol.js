@@ -1,7 +1,11 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
+
+// engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
+export const ID_BLOCK_COUNT = 256;
+export const NO_BLOCK = 0xffff;
 
 export const M = {
   HELLO: 1,   // c->s: u16 protocol version, stringZ name
@@ -12,6 +16,8 @@ export const M = {
   PEER_STATE: 6,  // s->c: u32 id, stringZ name, then ACTOR_STATE payload
   PEER_LEFT: 7,   // s->c: u32 id
   ENTITY_DEATH: 8, // c->s->others: u16 object id, stringZ section, u16 killer id
+  ID_BLOCK_REQUEST: 9, // c->s: u16 free ids per id block, for all ID_BLOCK_COUNT blocks
+  ID_BLOCK_GRANT: 10,  // s->c: u16 block leased to this player, NO_BLOCK when none are left
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
@@ -41,6 +47,12 @@ export function createDecoder(onMessage) {
 
 export function stringZ(str) {
   return Buffer.concat([Buffer.from(str, 'utf8'), Buffer.from([0])]);
+}
+
+export function u16(value) {
+  const b = Buffer.alloc(2);
+  b.writeUInt16LE(value, 0);
+  return b;
 }
 
 export function u32(value) {

@@ -3,6 +3,8 @@
 // Co-op network channel: TCP connection to the coop world server.
 // Wire format: u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
+#include <functional>
+
 struct lua_State;
 
 namespace coop
@@ -17,9 +19,11 @@ namespace coop
 		M_PEER_STATE = 6,  // s->c: u32 id, stringZ name, then M_ACTOR_STATE payload
 		M_PEER_LEFT = 7,   // s->c: u32 id
 		M_ENTITY_DEATH = 8, // c->s->others: u16 object id, stringZ section, u16 killer id
+		M_ID_BLOCK_REQUEST = 9, // c->s: u16 free ids per id block (all blocks, as the client sees them)
+		M_ID_BLOCK_GRANT = 10,  // s->c: u16 block leased to this player, u16(-1) when none are left
 	};
 
-	const u16 PROTOCOL_VERSION = 3;
+	const u16 PROTOCOL_VERSION = 4;
 
 	struct SPeer
 	{
@@ -37,7 +41,12 @@ namespace coop
 	void print_status();
 
 	bool is_connected();
+	bool is_link_up(); // connecting or connected, welcomed or not
 	void send(NET_Packet& P); // dropped unless connected
+
+	// Exchange messages right now instead of on the next frame (frames don't run while a level loads).
+	// Only the given message types are handled, the rest stays queued; false on timeout or lost link.
+	bool wait_for_messages(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
 	u32 my_id();
 	const peers_t& peers();
 

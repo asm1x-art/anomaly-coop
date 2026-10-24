@@ -2005,6 +2005,7 @@
     <ClInclude Include="xr_dsa_signer.h" />
     <ClInclude Include="xr_dsa_verifyer.h" />
     <ClInclude Include="xr_level_controller.h" />
+    <ClInclude Include="coop\coop_ids.h" />
     <ClInclude Include="coop\coop_map.h" />
     <ClInclude Include="coop\coop_net.h" />
     <ClInclude Include="coop\coop_world.h" />
@@ -3105,6 +3106,7 @@
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName)_script.pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <ClCompile Include="level_graph_vertex.cpp" />
+    <ClCompile Include="coop\coop_ids.cpp" />
     <ClCompile Include="coop\coop_map.cpp" />
     <ClCompile Include="coop\coop_net.cpp" />
     <ClCompile Include="coop\coop_world.cpp" />

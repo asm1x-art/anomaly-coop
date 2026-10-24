@@ -172,3 +172,47 @@ test('entity death is relayed to everyone except the sender', async () => {
     server.close();
   }
 });
+
+function freeCounts(map) {
+  const b = Buffer.alloc(256 * 2);
+  for (const [block, count] of Object.entries(map)) b.writeUInt16LE(count, Number(block) * 2);
+  return b;
+}
+
+test('id blocks: most free unleased block, never shared, kept across reconnect', async () => {
+  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('друг'));
+    await a.next();
+    await b.next();
+
+    // both see the same world: block 7 is the emptiest, then 3; full blocks are never handed out
+    const view = freeCounts({ 3: 200, 7: 250, 9: 10 });
+    a.send(M.ID_BLOCK_REQUEST, view);
+    assert.equal((await a.next()).payload.readUInt16LE(0), 7);
+    b.send(M.ID_BLOCK_REQUEST, view);
+    assert.equal((await b.next()).payload.readUInt16LE(0), 3);
+    a.send(M.ID_BLOCK_REQUEST, view);
+    assert.equal((await a.next()).payload.readUInt16LE(0), 9);
+    b.send(M.ID_BLOCK_REQUEST, view);
+    assert.equal((await b.next()).payload.readUInt16LE(0), 0xffff);
+
+    // a reconnects under the same name and gets its blocks back right after WELCOME
+    a.socket.destroy();
+    await b.next(); // PEER_LEFT
+    const a2 = await connect(port);
+    a2.send(M.HELLO, hello('artem'));
+    assert.equal((await a2.next()).type, M.WELCOME);
+    const regranted = [(await a2.next()).payload.readUInt16LE(0), (await a2.next()).payload.readUInt16LE(0)];
+    assert.deepEqual(regranted.sort((x, y) => x - y), [7, 9]);
+
+    a2.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

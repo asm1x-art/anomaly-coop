@@ -2,6 +2,7 @@
 #include "coop_net.h"
 #include "coop_map.h"
 #include "coop_world.h"
+#include "coop_ids.h"
 #include "Level.h"
 #include "Actor.h"
 
@@ -11,6 +12,7 @@
 #include <mutex>
 #include <atomic>
 #include <deque>
+#include <functional>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -41,6 +43,7 @@ namespace coop
 		u32 id() const { return m_client_id; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
+		bool wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
 
 		virtual void _BCL OnFrame();
 
@@ -49,6 +52,7 @@ namespace coop
 		void close();
 		bool recv_all(void* dst, u32 size);
 		void handle(NET_Packet& P);
+		void send_hello();
 		void send_actor_state();
 
 		SOCKET m_socket = INVALID_SOCKET;
@@ -137,6 +141,7 @@ namespace coop
 		m_welcomed = false;
 		m_peers.clear();
 		clear_map_markers();
+		reset_id_blocks();
 	}
 
 	void CClient::status() const
@@ -150,6 +155,7 @@ namespace coop
 			for (const auto& [id, peer] : m_peers)
 				Msg("[coop]   peer %u '%s' on %s at [%.1f %.1f %.1f]", id, peer.name.c_str(), peer.level.c_str(),
 				    VPUSH(peer.position));
+			print_id_status();
 			break;
 		case eFailed: Msg("[coop] status: failed (%s)", m_error.c_str()); break;
 		}
@@ -275,6 +281,9 @@ namespace coop
 				Msg("[coop] '%s' (id=%u) is on %s", peer.name.c_str(), id, peer.level.c_str());
 			break;
 		}
+		case M_ID_BLOCK_GRANT:
+			on_id_block_granted(P);
+			break;
 		case M_ENTITY_DEATH:
 			apply_entity_death(P);
 			break;
@@ -308,6 +317,61 @@ namespace coop
 		send(P);
 	}
 
+	void CClient::send_hello()
+	{
+		NET_Packet P;
+		P.w_begin(M_HELLO);
+		P.w_u16(PROTOCOL_VERSION);
+		P.w_stringZ(m_name.c_str());
+		send(P);
+		m_hello_sent = true;
+	}
+
+	// Level loading runs without frames, so OnFrame can't talk to the server then. This does it in place:
+	// handles only the given message types (others stay queued for OnFrame) until done() or timeout.
+	bool CClient::wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types)
+	{
+		const u32 start = GetTickCount(); // Device time doesn't advance while loading
+		while (true)
+		{
+			if (m_state == eConnected)
+			{
+				if (!m_hello_sent)
+					send_hello();
+
+				std::deque<xr_vector<u8>> matched;
+				{
+					std::lock_guard<std::mutex> lock(m_inbox_lock);
+					for (auto it = m_inbox.begin(); it != m_inbox.end();)
+					{
+						const u16 type = *(const u16*)it->data();
+						if (std::find(types.begin(), types.end(), type) != types.end())
+						{
+							matched.push_back(std::move(*it));
+							it = m_inbox.erase(it);
+						}
+						else
+							++it;
+					}
+				}
+				for (const xr_vector<u8>& msg : matched)
+				{
+					NET_Packet P;
+					P.construct(msg.data(), (u32)msg.size());
+					handle(P);
+				}
+			}
+			else if (m_state != eConnecting)
+				return false;
+
+			if (done())
+				return true;
+			if (GetTickCount() - start >= timeout_ms)
+				return false;
+			Sleep(1);
+		}
+	}
+
 	void CClient::OnFrame()
 	{
 		if (m_state == eFailed)
@@ -319,6 +383,7 @@ namespace coop
 			m_welcomed = false;
 			m_peers.clear();
 			clear_map_markers();
+			reset_id_blocks();
 			return;
 		}
 
@@ -326,14 +391,7 @@ namespace coop
 			return;
 
 		if (!m_hello_sent)
-		{
-			NET_Packet P;
-			P.w_begin(M_HELLO);
-			P.w_u16(PROTOCOL_VERSION);
-			P.w_stringZ(m_name.c_str());
-			send(P);
-			m_hello_sent = true;
-		}
+			send_hello();
 
 		std::deque<xr_vector<u8>> inbox;
 		{
@@ -347,6 +405,7 @@ namespace coop
 			handle(P);
 		}
 		update_map_markers();
+		update_id_blocks();
 
 		if (!m_welcomed)
 			return;
@@ -389,6 +448,11 @@ namespace coop
 	}
 
 	bool is_connected() { return g_client.welcomed(); }
+	bool is_link_up() { return g_client.busy(); }
+	bool wait_for_messages(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types)
+	{
+		return g_client.wait_for(done, timeout_ms, types);
+	}
 	void send(NET_Packet& P) { g_client.send(P); }
 	u32 my_id() { return g_client.id(); }
 	const peers_t& peers() { return g_client.peers(); }

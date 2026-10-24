@@ -103,6 +103,23 @@ public:
 		return (tfGetFromBlock(*I, tValueID));
 	}
 
+	// co-op: clients hand out new ids only from blocks leased to them by the coop server
+	static constexpr u32 block_count() { return m_tBlockCount; }
+
+	IC CHUNK_ID free_in_block(u32 block) const
+	{
+		R_ASSERT2(block < m_tBlockCount, "Requesting block is invalid!");
+		return (m_tppBlocks[block].m_tCount);
+	}
+
+	IC VALUE_ID tfGetIDFromBlock(u32 block)
+	{
+		R_ASSERT2(block < m_tBlockCount, "Requesting block is invalid!");
+		if (!m_tppBlocks[block].m_tCount)
+			return (tInvalidValueID);
+		return (tfGetFromBlock(m_tppBlocks[block], tInvalidValueID));
+	}
+
 	IC void vfFreeID(VALUE_ID tValueID, TIME_ID tTimeID)
 	{
 		BLOCK_ID l_tBlockID = tfGetBlockByValue(tValueID);

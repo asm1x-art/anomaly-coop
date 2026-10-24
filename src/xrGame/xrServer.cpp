@@ -20,6 +20,7 @@
 #include "file_transfer.h"
 #include "screenshot_server.h"
 #include "xrServer_info.h"
+#include "coop/coop_ids.h"
 #include <functional>
 
 #pragma warning(push)
@@ -1307,4 +1308,16 @@ void xrServer::SendPlayersInfo(ClientID const& to_client)
 	tmp_functor.dest = &tmp_packet;
 	ForEachClientDo(tmp_functor);
 	SendTo(to_client, tmp_packet, net_flags(TRUE, TRUE));
+}
+
+u16 xrServer::PerformIDgen(u16 ID)
+{
+	// a brand new id: in co-op it must come from a block this client owns
+	if (ID == u16(-1))
+	{
+		u16 coop_id = coop::allocate_id(*this);
+		if (coop_id != u16(-1))
+			return (coop_id);
+	}
+	return (m_tID_Generator.tfGetID(ID));
 }
