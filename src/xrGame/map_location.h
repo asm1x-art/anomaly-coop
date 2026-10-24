@@ -111,7 +111,7 @@ public:
 	virtual void UpdateLevelMap(CUICustomMap* map);
 
 	void CalcPosition();
-	const Fvector2& CalcDirection();
+	virtual const Fvector2& CalcDirection();
 	IC const shared_str& GetLevelName() { return m_cached.m_LevelName; }
 	const Fvector2& GetPosition() { return m_cached.m_Position; }
 

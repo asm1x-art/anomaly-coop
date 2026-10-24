@@ -1,0 +1,40 @@
+-- Co-op: PDA spot for other players (used by the engine, src/xrGame/coop/coop_map.cpp).
+-- Same figure and view arrow as the actor's own spots, tinted so they can't be mistaken for yourself.
+
+-- the engine picks the variant by screen aspect ratio (ui_core::get_xml_name), _16 also serves 21:9
+local targets = {
+	[ [[ui\map_spots.xml]] ] = true,
+	[ [[ui\map_spots_16.xml]] ] = true,
+}
+
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		if not targets[xml_file_name] then
+			return
+		end
+
+		xml_obj:insertFromXMLString([[
+<coop_peer_location>
+	<level_map spot="coop_peer_spot" pointer="quest_pointer"/>
+	<mini_map spot="coop_peer_mini_spot" pointer="quest_pointer"/>
+</coop_peer_location>
+<coop_peer_spot width="26" height="26" alignment="c" location_level="1">
+	<texture r="90" g="200" b="255">ui_icons_newPDA_man</texture>
+</coop_peer_spot>
+<coop_peer_mini_spot width="16" height="16" stretch="1" alignment="c" location_level="1">
+	<texture r="90" g="200" b="255">ui_icons_newPDA_man</texture>
+</coop_peer_mini_spot>
+
+<coop_peer_location_p hint="disable_hint">
+	<level_map spot="coop_peer_spot_p"/>
+	<mini_map spot="coop_peer_mini_spot_p"/>
+</coop_peer_location_p>
+<coop_peer_spot_p width="49" height="49" heading="1" alignment="c" location_level="0">
+	<texture r="90" g="200" b="255">ui_icons_newPDA_manArrow</texture>
+</coop_peer_spot_p>
+<coop_peer_mini_spot_p width="30" height="30" stretch="1" heading="1" alignment="c" location_level="0">
+	<texture r="90" g="200" b="255">ui_icons_newPDA_manArrow</texture>
+</coop_peer_mini_spot_p>
+]])
+	end)
+end

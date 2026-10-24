@@ -632,6 +632,11 @@ void Startup()
 		LPCSTR pStartup = strstr(Core.Params, "-load ");
 		if (pStartup) Console->Execute(pStartup + 1);
 	}
+	{
+		// -coop_connect <host>[:port] [name], keep it before -load on the command line
+		LPCSTR pCoop = strstr(Core.Params, "-coop_connect ");
+		if (pCoop) Console->Execute(pCoop + 1);
+	}
 
 	// Initialize APP
 	Device.Create();

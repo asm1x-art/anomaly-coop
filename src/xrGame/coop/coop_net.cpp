@@ -1,5 +1,8 @@
 #include "stdafx.h"
 #include "coop_net.h"
+#include "coop_map.h"
+#include "Level.h"
+#include "Actor.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -13,13 +16,7 @@
 namespace coop
 {
 	const u32 PING_INTERVAL_MS = 1000;
-	const u32 MAX_MESSAGE_SIZE = 1024 * 1024;
-
-	struct SMessage
-	{
-		u16 type;
-		xr_vector<u8> data;
-	};
+	const u32 ACTOR_STATE_INTERVAL_MS = 100;
 
 	enum EState
 	{
@@ -39,6 +36,9 @@ namespace coop
 		void stop();
 		void status() const;
 		bool busy() const { return m_state != eIdle; }
+		bool welcomed() const { return m_welcomed; }
+		u32 id() const { return m_client_id; }
+		const peers_t& peers() const { return m_peers; }
 
 		virtual void _BCL OnFrame();
 
@@ -46,8 +46,9 @@ namespace coop
 		void worker();
 		void close();
 		bool recv_all(void* dst, u32 size);
-		void send(u16 type, const void* payload, u32 size);
-		void handle(const SMessage& msg);
+		void send(NET_Packet& P);
+		void handle(NET_Packet& P);
+		void send_actor_state();
 
 		SOCKET m_socket = INVALID_SOCKET;
 		std::thread m_thread;
@@ -55,8 +56,9 @@ namespace coop
 		bool m_hello_sent = false;
 		bool m_welcomed = false;
 
+		// raw NET_Packet bytes, parsed on the main thread
 		std::mutex m_inbox_lock;
-		std::deque<SMessage> m_inbox;
+		std::deque<xr_vector<u8>> m_inbox;
 
 		xr_string m_host;
 		u16 m_port = 0;
@@ -65,7 +67,10 @@ namespace coop
 
 		u32 m_client_id = 0;
 		u32 m_last_ping = 0;
+		u32 m_last_actor_state = 0;
 		u32 m_rtt = 0;
+
+		peers_t m_peers;
 	};
 
 	static CClient g_client;
@@ -93,6 +98,7 @@ namespace coop
 		m_client_id = 0;
 		m_rtt = 0;
 		m_inbox.clear();
+		m_peers.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -128,6 +134,8 @@ namespace coop
 		Device.seqFrame.Remove(this);
 		m_state = eIdle;
 		m_welcomed = false;
+		m_peers.clear();
+		clear_map_markers();
 	}
 
 	void CClient::status() const
@@ -138,6 +146,9 @@ namespace coop
 		case eConnecting: Msg("[coop] status: connecting to %s:%u", m_host.c_str(), m_port); break;
 		case eConnected:
 			Msg("[coop] status: connected to %s:%u, id=%u, rtt=%u ms", m_host.c_str(), m_port, m_client_id, m_rtt);
+			for (const auto& [id, peer] : m_peers)
+				Msg("[coop]   peer %u '%s' on %s at [%.1f %.1f %.1f]", id, peer.name.c_str(), peer.level.c_str(),
+				    VPUSH(peer.position));
 			break;
 		case eFailed: Msg("[coop] status: failed (%s)", m_error.c_str()); break;
 		}
@@ -180,17 +191,14 @@ namespace coop
 			u32 size;
 			if (!recv_all(&size, sizeof(size)))
 				break;
-			if (size < sizeof(u16) || size > MAX_MESSAGE_SIZE)
+			if (size < sizeof(u16) || size > NET_PacketSizeLimit)
 			{
 				m_error = "bad message size";
 				break;
 			}
 
-			SMessage msg;
-			if (!recv_all(&msg.type, sizeof(msg.type)))
-				break;
-			msg.data.resize(size - sizeof(u16));
-			if (!msg.data.empty() && !recv_all(msg.data.data(), (u32)msg.data.size()))
+			xr_vector<u8> msg(size);
+			if (!recv_all(msg.data(), size))
 				break;
 
 			std::lock_guard<std::mutex> lock(m_inbox_lock);
@@ -216,16 +224,14 @@ namespace coop
 		return true;
 	}
 
-	void CClient::send(u16 type, const void* payload, u32 size)
+	void CClient::send(NET_Packet& P)
 	{
 		if (m_state != eConnected)
 			return;
 
-		xr_vector<u8> buf(sizeof(u32) + sizeof(u16) + size);
-		*(u32*)buf.data() = sizeof(u16) + size;
-		*(u16*)(buf.data() + sizeof(u32)) = type;
-		if (size)
-			memcpy(buf.data() + sizeof(u32) + sizeof(u16), payload, size);
+		xr_vector<u8> buf(sizeof(u32) + P.B.count);
+		*(u32*)buf.data() = P.B.count;
+		memcpy(buf.data() + sizeof(u32), P.B.data, P.B.count);
 
 		const char* p = (const char*)buf.data();
 		int left = (int)buf.size();
@@ -239,25 +245,63 @@ namespace coop
 		}
 	}
 
-	void CClient::handle(const SMessage& msg)
+	void CClient::handle(NET_Packet& P)
 	{
-		switch (msg.type)
+		u16 type;
+		P.r_begin(type);
+
+		switch (type)
 		{
 		case M_WELCOME:
-			if (msg.data.size() >= sizeof(u32))
-			{
-				m_client_id = *(const u32*)msg.data.data();
-				m_welcomed = true;
-				Msg("[coop] connected to %s:%u, id=%u", m_host.c_str(), m_port, m_client_id);
-			}
+			m_client_id = P.r_u32();
+			m_welcomed = true;
+			Msg("[coop] connected to %s:%u, id=%u", m_host.c_str(), m_port, m_client_id);
 			break;
 		case M_PONG:
-			if (msg.data.size() >= sizeof(u32))
-				m_rtt = Device.dwTimeContinual - *(const u32*)msg.data.data();
+			m_rtt = Device.dwTimeContinual - P.r_u32();
 			break;
-		default:
-			Msg("! [coop] unknown message type %u", msg.type);
+		case M_PEER_STATE:
+		{
+			u32 id = P.r_u32();
+			auto [it, inserted] = m_peers.try_emplace(id);
+			SPeer& peer = it->second;
+			P.r_stringZ(peer.name);
+			P.r_stringZ(peer.level);
+			P.r_vec3(peer.position);
+			P.r_float(peer.yaw);
+			peer.last_update = Device.dwTimeContinual;
+			if (inserted)
+				Msg("[coop] '%s' (id=%u) is on %s", peer.name.c_str(), id, peer.level.c_str());
+			break;
 		}
+		case M_PEER_LEFT:
+		{
+			u32 id = P.r_u32();
+			auto it = m_peers.find(id);
+			if (it != m_peers.end())
+			{
+				Msg("[coop] '%s' (id=%u) left", it->second.name.c_str(), id);
+				m_peers.erase(it);
+			}
+			break;
+		}
+		default:
+			Msg("! [coop] unknown message type %u", type);
+		}
+	}
+
+	void CClient::send_actor_state()
+	{
+		// g_actor, not Actor(): Actor() goes through Level().game, which is null while a save is loading
+		if (!g_pGameLevel || !g_actor)
+			return;
+
+		NET_Packet P;
+		P.w_begin(M_ACTOR_STATE);
+		P.w_stringZ(Level().name());
+		P.w_vec3(g_actor->Position());
+		P.w_float(Device.vCameraDirection.getH()); // where the player looks, as the actor's own PDA arrow does
+		send(P);
 	}
 
 	void CClient::OnFrame()
@@ -268,6 +312,9 @@ namespace coop
 			Device.seqFrame.Remove(this);
 			close();
 			m_state = eIdle;
+			m_welcomed = false;
+			m_peers.clear();
+			clear_map_markers();
 			return;
 		}
 
@@ -276,26 +323,43 @@ namespace coop
 
 		if (!m_hello_sent)
 		{
-			// first frame after connect: introduce ourselves
-			xr_vector<u8> hello(sizeof(u16) + m_name.size() + 1);
-			*(u16*)hello.data() = PROTOCOL_VERSION;
-			memcpy(hello.data() + sizeof(u16), m_name.c_str(), m_name.size() + 1);
-			send(M_HELLO, hello.data(), (u32)hello.size());
+			NET_Packet P;
+			P.w_begin(M_HELLO);
+			P.w_u16(PROTOCOL_VERSION);
+			P.w_stringZ(m_name.c_str());
+			send(P);
 			m_hello_sent = true;
 		}
 
-		std::deque<SMessage> inbox;
+		std::deque<xr_vector<u8>> inbox;
 		{
 			std::lock_guard<std::mutex> lock(m_inbox_lock);
 			inbox.swap(m_inbox);
 		}
-		for (const SMessage& msg : inbox)
-			handle(msg);
-
-		if (m_welcomed && Device.dwTimeContinual - m_last_ping >= PING_INTERVAL_MS)
+		for (const xr_vector<u8>& msg : inbox)
 		{
-			m_last_ping = Device.dwTimeContinual;
-			send(M_PING, &m_last_ping, sizeof(m_last_ping));
+			NET_Packet P;
+			P.construct(msg.data(), (u32)msg.size());
+			handle(P);
+		}
+		update_map_markers();
+
+		if (!m_welcomed)
+			return;
+
+		const u32 now = Device.dwTimeContinual;
+		if (now - m_last_ping >= PING_INTERVAL_MS)
+		{
+			m_last_ping = now;
+			NET_Packet P;
+			P.w_begin(M_PING);
+			P.w_u32(now);
+			send(P);
+		}
+		if (now - m_last_actor_state >= ACTOR_STATE_INTERVAL_MS)
+		{
+			m_last_actor_state = now;
+			send_actor_state();
 		}
 	}
 
@@ -319,4 +383,8 @@ namespace coop
 	{
 		g_client.status();
 	}
+
+	bool is_connected() { return g_client.welcomed(); }
+	u32 my_id() { return g_client.id(); }
+	const peers_t& peers() { return g_client.peers(); }
 }

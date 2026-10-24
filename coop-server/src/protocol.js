@@ -1,16 +1,19 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
-// u32 size (of type + payload) | u16 type | payload, little-endian.
+// u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export const M = {
   HELLO: 1,   // c->s: u16 protocol version, stringZ name
   WELCOME: 2, // s->c: u32 client id
   PING: 3,    // c->s: u32 client time (ms)
   PONG: 4,    // s->c: u32 echoed client time (ms)
+  ACTOR_STATE: 5, // c->s: stringZ level, vec3 position (f32 x, y, z), f32 yaw
+  PEER_STATE: 6,  // s->c: u32 id, stringZ name, then ACTOR_STATE payload
+  PEER_LEFT: 7,   // s->c: u32 id
 };
 
-const MAX_MESSAGE_SIZE = 1024 * 1024;
+const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
 
 export function encode(type, payload = Buffer.alloc(0)) {
   const frame = Buffer.alloc(6 + payload.length);
@@ -33,6 +36,16 @@ export function createDecoder(onMessage) {
       pending = pending.subarray(4 + size);
     }
   };
+}
+
+export function stringZ(str) {
+  return Buffer.concat([Buffer.from(str, 'utf8'), Buffer.from([0])]);
+}
+
+export function u32(value) {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(value, 0);
+  return b;
 }
 
 export function readStringZ(buf, offset) {

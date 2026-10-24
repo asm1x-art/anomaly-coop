@@ -38,6 +38,7 @@
 #include "ui/UIInventoryUtilities.h"
 #include "alife_object_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
+#include "coop/coop_net.h"
 #include "hudmanager.h"
 #include "ui\UIMainIngameWnd.h"
 #include "ui\UIHudStatesWnd.h"
@@ -3026,4 +3027,6 @@ void CLevel::script_register(lua_State* L)
 
         def("get_actor_alcohol", &GetActorAlcohol)
 	];
+
+	coop::script_register(L);
 }
