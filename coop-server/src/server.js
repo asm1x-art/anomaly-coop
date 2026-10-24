@@ -22,6 +22,13 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
     for (const [id, c] of clients) if (id !== fromId) c.send(type, payload);
   };
   const peerState = (id, c) => Buffer.concat([u32(id), stringZ(c.name), c.state]);
+  // the sim master runs offline A-Life and world spawns for empty levels: the longest-connected
+  // player, i.e. the lowest id, since ids only grow
+  const announceRoles = () => {
+    if (!clients.size) return;
+    const master = Math.min(...clients.keys());
+    for (const c of clients.values()) c.send(M.ROLES, u32(master));
+  };
 
   const server = net.createServer((socket) => {
     socket.setNoDelay(true);
@@ -49,6 +56,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
           log(`[${id}] '${client.name}' joined from ${addr} (${clients.size} online)`);
           send(M.WELCOME, u32(id));
           for (const [block, owner] of idLeases) if (owner === client.name) send(M.ID_BLOCK_GRANT, u16(block));
+          announceRoles();
           // let the newcomer see players who are standing still
           for (const [otherId, other] of clients)
             if (otherId !== id && other.state) send(M.PEER_STATE, peerState(otherId, other));
@@ -76,6 +84,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
         case M.ITEM_PARENT:
         case M.OBJECT_RELEASE:
         case M.OBJECT_SPAWN:
+        case M.SCRIPT_EVENT:
           // receivers need to know whose actor "the sender's actor" is
           broadcast(id, type, Buffer.concat([u32(id), payload]));
           break;
@@ -98,6 +107,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
       if (!clients.delete(id)) return;
       log(`[${id}] '${client.name}' left (${clients.size} online)`);
       broadcast(id, M.PEER_LEFT, u32(id));
+      announceRoles();
     });
   });
 

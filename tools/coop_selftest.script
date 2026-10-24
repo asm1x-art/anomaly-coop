@@ -1,0 +1,120 @@
+-- Dev-only: drives coop_sync's wrapped world logic on its own. Copy to the game's gamedata/scripts
+-- and launch with -coop_selftest (start_coop_test.bat -coop_selftest); results are logged as [coop-selftest].
+
+local started, step
+
+local function log(fmt, ...)
+	printf("[coop-selftest] " .. fmt, ...)
+end
+
+local function run(name, f)
+	local ok, err = pcall(f)
+	if not ok then
+		log("%s FAILED: %s", name, tostring(err))
+	end
+end
+
+local function step1()
+	log("connected=%s master=%s authority(bar)=%s", tostring(coop.connected()), tostring(coop.is_sim_master()),
+		tostring(coop.is_authority(level.name())))
+
+	run("trader", function()
+		local barman = get_story_object("bar_visitors_barman_stalker_trader")
+		log("barman online: %s", tostring(barman ~= nil))
+		if barman then
+			trade_manager.update(barman, true)
+			log("trader restock forced")
+		end
+	end)
+
+	run("world item", function()
+		game_setup.try_spawn_world_item()
+		log("world item spawn tried")
+	end)
+
+	run("artefacts", function()
+		bind_anomaly_zone.force_spawn_artefacts()
+		log("artefact spawn tried")
+	end)
+
+	if coop.is_sim_master() then
+		run("respawn", function()
+			-- smarts on other levels (the sim master runs those) until one actually spawns a squad
+			local tries = 0
+			for id, t in pairs(SIMBOARD.smarts) do
+				local smart = t.smrt
+				if smart and not smart.is_on_actor_level and smart.respawn_params and smart.already_spawned
+					and smart.max_population > smart_terrain.smart_terrain_squad_count(t.squads) then
+					local idle = smart.respawn_idle
+					smart.respawn_idle = -1
+					smart.last_respawn_update = game.get_game_time()
+					local before = smart_terrain.smart_terrain_squad_count(t.squads)
+					smart:try_respawn()
+					smart.respawn_idle = idle
+					local after = smart_terrain.smart_terrain_squad_count(t.squads)
+					tries = tries + 1
+					if after > before then
+						log("respawn at %s: squads %s -> %s after %s tries", smart:name(), before, after, tries)
+						return
+					end
+					if tries >= 40 then
+						break
+					end
+				end
+			end
+			log("no squad respawned after %s tries", tries)
+		end)
+
+		run("stash", function()
+			-- an online, empty stash box near us: reveal it, then open it
+			local target
+			for id, v in pairs(treasure_manager.caches) do
+				if v == false and level.object_by_id(id) then
+					target = id
+					break
+				end
+			end
+			if not target then
+				log("no online empty stash box nearby")
+				return
+			end
+			treasure_manager.set_random_stash(nil, "coop selftest", nil, target)
+			log("stash revealed: box %s caches=%s spot=%s", target, tostring(treasure_manager.caches[target]),
+				level.map_has_object_spot(target, "treasure") ~= 0 and "treasure" or
+				level.map_has_object_spot(target, "treasure_searched") ~= 0 and "treasure_searched" or "none")
+			treasure_manager.try_spawn_treasure(level.object_by_id(target))
+			log("stash box %s opened, caches=%s", target, tostring(treasure_manager.caches[target]))
+		end)
+	end
+end
+
+local function step2()
+	-- the other side reports what arrived
+	for id, v in pairs(treasure_manager.caches) do
+		if v == true then
+			log("box %s: caches=true", id)
+		end
+	end
+end
+
+local function on_update()
+	local t = time_global()
+	if not started then
+		started = t
+		step = 0
+	end
+	if step == 0 and t - started > 20000 then
+		step = 1
+		run("step1", step1)
+	elseif step == 1 and t - started > 40000 then
+		step = 2
+		run("step2", step2)
+	end
+end
+
+function on_game_start()
+	if coop and string.find(command_line(), "-coop_selftest") then
+		RegisterScriptCallback("actor_on_update", on_update)
+		log("armed")
+	end
+end

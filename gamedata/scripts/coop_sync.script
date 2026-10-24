@@ -1,0 +1,314 @@
+-- Co-op: runs Anomaly's world logic on one client only and shares what it spawns.
+--
+-- Every client runs its own A-Life and scripts. Logic that would run in every world (squad respawns,
+-- trader restock, artefacts, world items, offline combat) runs only on the client that is the
+-- authority for that level (coop.is_authority, see src/xrGame/coop/coop_net.h), and what it spawns is
+-- sent to the others at once (coop.begin_shared / coop.end_shared). Spawns caused by a player's action
+-- (opening a stash, looting a corpse) run where the action happens and are shared the same way; the
+-- others are told through coop.send_event so they don't spawn the same thing again.
+-- Vanilla files are not edited: their module functions are wrapped from here.
+
+local function coop_on()
+	return coop and coop.connected()
+end
+
+local function level_of(se_obj)
+	return se_obj and alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+end
+
+local function is_authority(level_name)
+	return not coop_on() or coop.is_authority(level_name)
+end
+
+-- f(...) with everything it spawns shared, errors passed through
+local function shared(f, ...)
+	coop.begin_shared()
+	local res = { pcall(f, ...) }
+	coop.end_shared()
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+-- tbl[name] = wrapper(original, ...)
+local function wrap(tbl, name, where, wrapper)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [coop] %s.%s not found, not wrapped", where, name)
+		return
+	end
+	tbl[name] = function(...)
+		return wrapper(original, ...)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Events from the other players: _G.coop_on_event(name, sender, payload), called by the engine
+
+local handlers = {}
+
+_G.coop_on_event = function(name, sender, payload)
+	local handler = handlers[name]
+	if handler then
+		handler(sender, payload)
+	else
+		printf("! [coop] unknown event %s from %s", name, sender)
+	end
+end
+
+local function send(name, ...)
+	if coop_on() then
+		coop.send_event(name, table.concat({ ... }, "\t"))
+	end
+end
+
+local function fields(payload)
+	return str_explode(payload, "\t")
+end
+
+------------------------------------------------------------------------------------------------
+-- World logic: authority only
+
+local function wrap_world_logic()
+	-- squad respawn at smart terrains: online and offline smarts alike
+	RegisterScriptCallback("on_try_respawn", function(smart, flags)
+		if not is_authority(level_of(smart)) then
+			flags.disabled = true
+		end
+	end)
+	wrap(smart_terrain.se_smart_terrain, "try_respawn", "smart_terrain.se_smart_terrain", function(original, self)
+		if coop_on() then
+			return shared(original, self)
+		end
+		return original(self)
+	end)
+
+	-- offline combat: the sim master's battles reach the others as deaths and releases
+	wrap(sim_offline_combat, "validate_enemy", "sim_offline_combat", function(original, ...)
+		if coop_on() and not coop.is_sim_master() then
+			return false
+		end
+		return original(...)
+	end)
+
+	-- trader restock. update() also sets the trade conditions up, so it must run everywhere: off the
+	-- authority only the trader's buy_supplies condlist comes out empty, so it returns before restocking
+	wrap(trade_manager, "update", "trade_manager", function(original, npc, force_refresh)
+		if not coop_on() then
+			return original(npc, force_refresh)
+		end
+		if is_authority(level.name()) then
+			return shared(original, npc, force_refresh)
+		end
+		local parse = xr_logic.parse_condlist
+		xr_logic.parse_condlist = function(obj, section, field, src)
+			if section == "trader" and field == "buy_supplies" then
+				return nil
+			end
+			return parse(obj, section, field, src)
+		end
+		local ok, err = pcall(original, npc, force_refresh)
+		xr_logic.parse_condlist = parse
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	-- artefacts in anomaly zones: on level load and after an emission
+	wrap(bind_anomaly_zone.anomaly_zone_binder, "spawn_artefact_randomly", "bind_anomaly_zone.anomaly_zone_binder",
+		function(original, self)
+			if not coop_on() then
+				return original(self)
+			end
+			if is_authority(level.name()) then
+				return shared(original, self)
+			end
+		end)
+	wrap(bind_anomaly_zone, "force_spawn_artefacts", "bind_anomaly_zone", function(original, ...)
+		if not coop_on() then
+			return original(...)
+		end
+		if is_authority(level.name()) then
+			return shared(original, ...)
+		end
+	end)
+
+	-- world items lying around the level
+	wrap(game_setup, "try_spawn_world_item", "game_setup", function(original, ...)
+		if not coop_on() then
+			return original(...)
+		end
+		if is_authority(level.name()) then
+			return shared(original, ...)
+		end
+	end)
+
+	-- dynamic anomalies are off in co-op for now: their on/off state isn't synced yet
+	for _, name in ipairs({ "dyn_anomalies_refresh", "dyn_anomalies_spawn", "dyn_anomalies_suffle" }) do
+		wrap(bind_anomaly_field, name, "bind_anomaly_field", function(original, ...)
+			if not coop_on() then
+				return original(...)
+			end
+		end)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Corpse loot: created lazily when a corpse is first searched, by whoever does it first
+
+local function wrap_corpse_loot()
+	wrap(death_manager, "create_release_item", "death_manager", function(original, npc)
+		if not coop_on() then
+			return original(npc)
+		end
+		local id, name = npc:id(), npc:name()
+		local already = se_load_var(id, name, "death_dropped")
+		local res = shared(original, npc)
+		if not already and se_load_var(id, name, "death_dropped") then
+			send("loot_created", id, name)
+		end
+		return res
+	end)
+
+	handlers.loot_created = function(sender, payload)
+		local f = fields(payload)
+		local id, name = tonumber(f[1]), f[2]
+		local se_obj = id and alife_object(id)
+		if se_obj and se_obj:name() == name then
+			se_save_var(id, name, "death_dropped", true)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Stashes. treasure_manager.caches[id]: false = empty box, "sec1,sec2" = revealed, not spawned yet,
+-- true = spawned. A revealed stash's content is the same everywhere; the green spot ("treasure") is
+-- shown to the others at once, the purple one ("treasure_searched", rare) through the PDA menu.
+
+local SHARE_STASH = "Поделиться с отрядом"
+local rare_revealed = {} -- box id -> { content, hint }: rare stashes we can share
+
+local function caches()
+	return treasure_manager.caches -- reassigned on load, never keep the table
+end
+
+local function stash_spot(id)
+	for _, spot in ipairs({ "treasure", "treasure_searched", "treasure_unique" }) do
+		if level.map_has_object_spot(id, spot) ~= 0 then
+			return spot
+		end
+	end
+end
+
+local function announce_stash(id, content, spot, hint)
+	send("stash_revealed", id, content, spot or "", hint or "")
+end
+
+-- runs f, then reports every box that got revealed by it; create_random_stash calls
+-- set_random_stash, both are wrapped: only the outer call reports
+local watch_depth = 0
+local function watch_reveals(f, hint, ...)
+	if watch_depth > 0 then
+		return f(...)
+	end
+	local before = {}
+	for id, v in pairs(caches()) do
+		before[id] = v
+	end
+	watch_depth = watch_depth + 1
+	local res = { pcall(f, ...) }
+	watch_depth = watch_depth - 1
+	if not res[1] then
+		error(res[2], 0)
+	end
+	table.remove(res, 1)
+	for id, v in pairs(caches()) do
+		if type(v) == "string" and before[id] ~= v then
+			local spot = stash_spot(id)
+			if spot == "treasure_searched" then
+				rare_revealed[id] = { content = v, hint = hint }
+			elseif spot then
+				announce_stash(id, v, spot, hint)
+			end
+		end
+	end
+	return unpack(res)
+end
+
+local function wrap_stashes()
+	wrap(treasure_manager, "create_random_stash", "treasure_manager", function(original, no_spot, hint, ...)
+		if not coop_on() then
+			return original(no_spot, hint, ...)
+		end
+		return watch_reveals(original, hint, no_spot, hint, ...)
+	end)
+	wrap(treasure_manager, "set_random_stash", "treasure_manager", function(original, no_spot, hint, ...)
+		if not coop_on() then
+			return original(no_spot, hint, ...)
+		end
+		return watch_reveals(original, hint, no_spot, hint, ...)
+	end)
+
+	-- the box is filled on first use, where the player opens it
+	wrap(treasure_manager, "try_spawn_treasure", "treasure_manager", function(original, box)
+		if not coop_on() then
+			return original(box)
+		end
+		local id = box:id()
+		local was = caches()[id]
+		local res = shared(original, box)
+		if type(was) == "string" and caches()[id] == true then
+			rare_revealed[id] = nil
+			send("stash_opened", id)
+		end
+		return res
+	end)
+
+	handlers.stash_revealed = function(sender, payload)
+		local f = fields(payload)
+		local id, content, spot, hint = tonumber(f[1]), f[2], f[3], f[4]
+		if not (id and content and caches()[id] ~= nil) then
+			return
+		end
+		if caches()[id] ~= true then
+			caches()[id] = content
+		end
+		if spot ~= "" and level.map_has_object_spot(id, spot) == 0 then
+			level.map_add_object_spot_ser(id, spot, hint or "")
+			news_manager.send_treasure(0)
+		end
+		printf("[coop] %s shared a stash: box %s", sender, id)
+	end
+
+	handlers.stash_opened = function(sender, payload)
+		local id = tonumber(fields(payload)[1])
+		-- its content arrives as shared spawns; don't spawn it again here
+		if id and caches()[id] ~= nil then
+			caches()[id] = true
+		end
+	end
+
+	RegisterScriptCallback("map_spot_menu_add_property", function(ui, id, level_name)
+		if coop_on() and rare_revealed[id] and caches()[id] == rare_revealed[id].content then
+			ui:AddItem(SHARE_STASH)
+		end
+	end)
+	RegisterScriptCallback("map_spot_menu_property_clicked", function(property_ui, id, level_name, prop)
+		local stash = rare_revealed[id]
+		if prop == SHARE_STASH and stash then
+			announce_stash(id, stash.content, "treasure_searched", stash.hint)
+			rare_revealed[id] = nil
+		end
+	end)
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	wrap_world_logic()
+	wrap_corpse_loot()
+	wrap_stashes()
+	printf("[coop] world logic wrapped")
+end

@@ -9,14 +9,17 @@ function connect(port) {
   const socket = net.connect(port, '127.0.0.1');
   const queue = [];
   const waiters = [];
+  // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
+  const client = { socket, roles: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
+    if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
-  const next = () => new Promise((r) => (queue.length ? r(queue.shift()) : waiters.push(r)));
-  const send = (type, payload) => socket.write(encode(type, payload));
-  return new Promise((r) => socket.on('connect', () => r({ socket, next, send })));
+  client.next = () => new Promise((r) => (queue.length ? r(queue.shift()) : waiters.push(r)));
+  client.send = (type, payload) => socket.write(encode(type, payload));
+  return new Promise((r) => socket.on('connect', () => r(client)));
 }
 
 function hello(name, version = PROTOCOL_VERSION) {
@@ -249,6 +252,61 @@ test('item, release and spawn events reach others prefixed with the sender id', 
     assert.equal(sp.payload.readUInt32LE(0), idA);
     assert.deepEqual(sp.payload.subarray(4), spawn);
 
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+async function roundTrip(c) {
+  // the server answers in order, so after a PONG everything sent before it has arrived
+  c.send(M.PING, Buffer.alloc(4));
+  assert.equal((await c.next()).type, M.PONG);
+}
+
+test('the longest-connected player is sim master, handed over when it leaves', async () => {
+  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    const idB = (await b.next()).payload.readUInt32LE(0);
+    await roundTrip(a);
+    await roundTrip(b);
+    assert.equal(a.roles.at(-1), idA);
+    assert.equal(b.roles.at(-1), idA);
+
+    a.socket.destroy();
+    assert.equal((await b.next()).type, M.PEER_LEFT);
+    await roundTrip(b);
+    assert.equal(b.roles.at(-1), idB);
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('script events reach others with the sender id', async () => {
+  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('друг'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    await b.next();
+
+    const event = Buffer.from('stash_opened ' + '1234 ');
+    a.send(M.SCRIPT_EVENT, event);
+    const got = await b.next();
+    assert.equal(got.type, M.SCRIPT_EVENT);
+    assert.equal(got.payload.readUInt32LE(0), idA);
+    assert.deepEqual(got.payload.subarray(4), event);
     a.socket.destroy();
     b.socket.destroy();
   } finally {

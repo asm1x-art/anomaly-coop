@@ -22,6 +22,10 @@ namespace coop
 	// called from CALifeSimulatorBase::register_object, which every new A-Life object goes through
 	void on_object_registered(CSE_ALifeDynamicObject* object);
 
+	// for Lua wrappers around Anomaly's world logic
+	void begin_shared_spawns();
+	void end_shared_spawns();
+
 	// from other clients
 	void apply_entity_death(NET_Packet& P);
 	void apply_item_parent(NET_Packet& P);

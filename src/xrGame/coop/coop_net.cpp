@@ -4,6 +4,8 @@
 #include "coop_world.h"
 #include "coop_ids.h"
 #include "coop_shadow.h"
+#include "ai_space.h"
+#include "script_engine.h"
 #include "Level.h"
 #include "Actor.h"
 
@@ -42,6 +44,7 @@ namespace coop
 		bool busy() const { return m_state != eIdle; }
 		bool welcomed() const { return m_welcomed; }
 		u32 id() const { return m_client_id; }
+		u32 master() const { return m_master_id; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
 		bool wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
@@ -72,6 +75,7 @@ namespace coop
 		xr_string m_error;
 
 		u32 m_client_id = 0;
+		u32 m_master_id = 0; // 0: not known yet, ids start at 1
 		u32 m_last_ping = 0;
 		u32 m_last_actor_state = 0;
 		u32 m_rtt = 0;
@@ -80,6 +84,21 @@ namespace coop
 	};
 
 	static CClient g_client;
+
+	// another client's Lua state change: handed to _G.coop_on_event(name, sender_name, payload)
+	static void on_script_event(NET_Packet& P)
+	{
+		const u32 sender = P.r_u32();
+		xr_string name, payload;
+		P.r_stringZ(name);
+		P.r_stringZ(payload);
+
+		::luabind::functor<void> handler;
+		if (!ai().script_engine().functor("_G.coop_on_event", handler))
+			return;
+		auto peer = g_client.peers().find(sender);
+		handler(name.c_str(), peer != g_client.peers().end() ? peer->second.name.c_str() : "", payload.c_str());
+	}
 
 	bool CClient::start(LPCSTR host, u16 port, LPCSTR name)
 	{
@@ -102,6 +121,7 @@ namespace coop
 		m_hello_sent = false;
 		m_welcomed = false;
 		m_client_id = 0;
+		m_master_id = 0;
 		m_rtt = 0;
 		m_inbox.clear();
 		m_peers.clear();
@@ -298,6 +318,21 @@ namespace coop
 		case M_ENTITY_DEATH:
 			apply_entity_death(P);
 			break;
+		case M_ROLES:
+		{
+			const u32 master = P.r_u32();
+			if (master != m_master_id)
+			{
+				auto peer = m_peers.find(master);
+				Msg("[coop] sim master: %s", master == m_client_id ? "this client" :
+				    peer != m_peers.end() ? peer->second.name.c_str() : "another client");
+				m_master_id = master;
+			}
+			break;
+		}
+		case M_SCRIPT_EVENT:
+			on_script_event(P);
+			break;
 		case M_PEER_LEFT:
 		{
 			u32 id = P.r_u32();
@@ -467,5 +502,26 @@ namespace coop
 	}
 	void send(NET_Packet& P) { g_client.send(P); }
 	u32 my_id() { return g_client.id(); }
+
+	bool is_sim_master()
+	{
+		return !is_connected() || g_client.master() == g_client.id();
+	}
+
+	bool is_authority(const shared_str& level_name)
+	{
+		if (!is_connected())
+			return true;
+
+		u32 owner = u32(-1);
+		if (g_pGameLevel && Level().name() == level_name)
+			owner = g_client.id();
+		for (const auto& [id, peer] : g_client.peers())
+			if (peer.level == level_name && id < owner)
+				owner = id;
+		if (owner == u32(-1))
+			owner = g_client.master();
+		return owner == g_client.id();
+	}
 	const peers_t& peers() { return g_client.peers(); }
 }

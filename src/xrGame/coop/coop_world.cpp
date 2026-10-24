@@ -36,18 +36,28 @@ namespace coop
 	// them aren't sent; an object becomes shared - sent as a whole - once our actor takes it.
 	// Scripts that run in every world (corpse loot, respawns) can't produce duplicates that way.
 	static xr_set<u16> g_local_objects;
-	static const void* g_local_objects_world = nullptr;
+	static const void* g_world = nullptr;
+	// > 0 while Lua runs world logic this client is the authority for: what it spawns is shared at once
+	static u32 g_shared_scope = 0;
+
+	static void check_world()
+	{
+		// another save loaded: the ids mean other objects now
+		if (g_world != ai().get_alife())
+		{
+			g_local_objects.clear();
+			g_world = ai().get_alife();
+		}
+	}
 
 	static xr_set<u16>& local_objects()
 	{
-		// another save loaded: those ids mean other objects now
-		if (g_local_objects_world != ai().get_alife())
-		{
-			g_local_objects.clear();
-			g_local_objects_world = ai().get_alife();
-		}
+		check_world();
 		return g_local_objects;
 	}
+
+	void begin_shared_spawns() { ++g_shared_scope; }
+	void end_shared_spawns() { if (g_shared_scope) --g_shared_scope; }
 
 	// ai().alife() is const; the Lua alife() binding does the same (alife_simulator_script.cpp)
 	static CALifeSimulator& alife_rw()
@@ -55,10 +65,16 @@ namespace coop
 		return const_cast<CALifeSimulator&>(ai().alife());
 	}
 
-	// world changes are only sent from a loaded game: loading a save attaches thousands of items
+	// A running level: loading a save attaches thousands of items, and while a level is torn down
+	// (quitting, changing levels) the actor's whole inventory gets detached. bReady is false in both.
+	static bool level_running()
+	{
+		return g_pGameLevel && g_pGameLevel->bReady && g_actor && ai().get_alife();
+	}
+
 	static bool should_send()
 	{
-		return !g_applying && g_actor && is_connected();
+		return !g_applying && level_running() && is_connected();
 	}
 
 	static void skip(LPCSTR what, u16 id, LPCSTR reason)
@@ -96,7 +112,7 @@ namespace coop
 		if (smart_cast<CSE_ALifeCreatureActor*>(victim))
 			return;
 
-		if (!is_connected() || local_objects().count(victim->ID))
+		if (!is_connected() || !level_running() || local_objects().count(victim->ID))
 			return;
 
 		NET_Packet P;
@@ -116,7 +132,7 @@ namespace coop
 		P.r_stringZ(section);
 		P.r_u16(); // killer: not credited locally, rewards stay with whoever made the kill
 
-		if (!g_pGameLevel || !ai().get_alife())
+		if (!level_running())
 			return;
 
 		CSE_ALifeCreatureAbstract* creature =
@@ -231,6 +247,30 @@ namespace coop
 			Msg("[coop] used up %s (id=%u), sent", object->name_replace(), object->ID);
 	}
 
+	static void spawn_online(NET_Packet& spawn_packet)
+	{
+		u16 type;
+		spawn_packet.r_begin(type);
+		ClientID client;
+		client.set(0xffff);
+		alife_rw().server().Process_spawn(spawn_packet, client);
+	}
+
+	// Puts an offline object into an online holder: Process_spawn creates it on the client as well,
+	// as the Lua alife():create() does for an online parent. Done by dropping the local copy first.
+	static void respawn_into(CSE_ALifeDynamicObject* object, CSE_ALifeDynamicObject* holder)
+	{
+		NET_Packet packet;
+		object->ID_Parent = holder->ID;
+		object->Spawn_Write(packet, FALSE);
+		object->ID_Parent = NO_ID;
+
+		g_applying = true;
+		alife_rw().release(object, true); // frees the id, Process_spawn takes it again
+		spawn_online(packet);
+		g_applying = false;
+	}
+
 	void apply_item_parent(NET_Packet& P)
 	{
 		const u32 sender = P.r_u32();
@@ -239,7 +279,7 @@ namespace coop
 		P.r_stringZ(section);
 		const EPlace place = EPlace(P.r_u8());
 
-		if (!g_actor || !ai().get_alife())
+		if (!level_running())
 			return;
 
 		CSE_ALifeDynamicObject* object = local_object(id, section);
@@ -310,7 +350,14 @@ namespace coop
 		if (object->m_bOnline && holder)
 			return skip("move", id, "it is in an online inventory here");
 		if (target && target->m_bOnline)
-			return skip("move", id, "its new holder is online here");
+		{
+			// An offline item going into an online inventory here (e.g. a trader's restock, which spawns
+			// items on the ground and hands them over): recreate it, same id, right inside the holder.
+			if (object->m_bOnline || holder)
+				return skip("move", id, "its new holder is online here");
+			respawn_into(object, target);
+			return;
+		}
 
 		if (is_shadow(target) || is_shadow(holder))
 			Msg("[coop] '%s' %s %s (id=%u)", peer_name(sender), is_shadow(target) ? "took" : "dropped",
@@ -333,8 +380,11 @@ namespace coop
 		if (!should_send())
 			return;
 
-		// created right in our actor's inventory: shared at once, otherwise local until taken
-		if (is_actor(ai().alife().objects().object(object->ID_Parent, true)))
+		// Shared at once when created right in our actor's inventory, or by world logic we are the
+		// authority for - unless it goes into something only we have. Otherwise local until taken.
+		CSE_ALifeDynamicObject* parent = ai().alife().objects().object(object->ID_Parent, true);
+		const bool parent_shared = !parent || !local_objects().count(parent->ID);
+		if (is_actor(parent) || (g_shared_scope && parent_shared))
 			send_spawn(object);
 		else
 			local_objects().insert(object->ID);
@@ -347,7 +397,7 @@ namespace coop
 		NET_Packet spawn;
 		spawn.construct(&P.B.data[P.r_tell()], size);
 
-		if (!g_actor || !ai().get_alife())
+		if (!level_running())
 			return;
 
 		u16 type;
@@ -390,15 +440,27 @@ namespace coop
 			object->o_Position = parent->o_Position;
 		}
 
-		// the same id as on the sender: it is from the sender's block, which we never hand out
-		object->ID = alife_rw().server().PerformIDgen(id);
-		object->m_bOnline = false;
-
+		CSE_ALifeDynamicObject* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
 		g_applying = true;
-		alife_rw().register_object(object, true);
+		if (holder && holder->m_bOnline)
+		{
+			// Into an online inventory here (a trader we both stand next to): the item has to exist
+			// on the client too. Process_spawn does both, as the Lua alife():create() does for that case.
+			NET_Packet packet;
+			object->Spawn_Write(packet, FALSE);
+			F_entity_Destroy(abstract);
+			spawn_online(packet);
+		}
+		else
+		{
+			// the same id as on the sender: it is from the sender's block, which we never hand out
+			object->ID = alife_rw().server().PerformIDgen(id);
+			object->m_bOnline = false;
+			alife_rw().register_object(object, true);
+		}
 		g_applying = false;
 
-		Msg("[coop] '%s' got %s (id=%u)", peer_name(sender), object->name_replace(), id);
+		Msg("[coop] '%s' got %s (id=%u)", peer_name(sender), section, id);
 	}
 
 	static void mark_remote_release(const CSE_ALifeDynamicObject* object)
@@ -416,7 +478,7 @@ namespace coop
 		shared_str section;
 		P.r_stringZ(section);
 
-		if (!g_actor || !ai().get_alife())
+		if (!level_running())
 			return;
 
 		CSE_ALifeDynamicObject* object = local_object(id, section);

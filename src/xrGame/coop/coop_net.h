@@ -25,9 +25,11 @@ namespace coop
 		M_ITEM_PARENT = 11,     // c->s: u16 item, stringZ section, u8 place, place data (coop_world.cpp)
 		M_OBJECT_RELEASE = 12,  // c->s: u16 object, stringZ section
 		M_OBJECT_SPAWN = 13,    // c->s: u16 size, the engine's M_SPAWN packet (CSE_Abstract::Spawn_Write)
+		M_SCRIPT_EVENT = 14,    // c->s: stringZ name, stringZ payload; Lua-level state, see coop.send_event
+		M_ROLES = 15,           // s->c: u32 sim master id, on every join/leave
 	};
 
-	const u16 PROTOCOL_VERSION = 6;
+	const u16 PROTOCOL_VERSION = 7;
 
 	struct SPeer
 	{
@@ -53,6 +55,12 @@ namespace coop
 	bool wait_for_messages(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
 	u32 my_id();
 	const peers_t& peers();
+
+	// Who runs world logic. The sim master (the longest-connected player) runs offline A-Life and the
+	// world of levels nobody is on; a level with players on it is run by the one with the lowest id.
+	// Without a connection this client runs everything.
+	bool is_sim_master();
+	bool is_authority(const shared_str& level_name);
 
 	void script_register(lua_State* L);
 }
