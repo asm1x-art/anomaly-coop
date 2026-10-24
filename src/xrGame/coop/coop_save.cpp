@@ -38,6 +38,8 @@ namespace coop
 		float health;
 	};
 
+	int autosave_interval = 5;
+
 	static xr_string g_seed;
 	static bool g_server_has_world = false;
 	static xr_string g_server_owner;

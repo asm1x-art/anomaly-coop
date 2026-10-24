@@ -3373,4 +3373,5 @@ void CCC_RegisterCommands()
 	CMD1(CCC_CoopConnect, "coop_connect");
 	CMD1(CCC_CoopDisconnect, "coop_disconnect");
 	CMD1(CCC_CoopStatus, "coop_status");
+	CMD4(CCC_Integer, "coop_autosave_interval", &coop::autosave_interval, 0, 120);
 }

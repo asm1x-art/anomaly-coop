@@ -303,6 +303,73 @@ local function wrap_stashes()
 	end)
 end
 
+------------------------------------------------------------------------------------------------
+-- Saving. The world on the server is the sim master's save: it goes up whenever the master saves
+-- (src/xrGame/coop/coop_save.cpp), by hand or every coop_autosave_interval minutes from here.
+-- Another player's save stays on their disk, so the master is asked to save the world.
+
+local AUTOSAVE = "coop_autosave"
+local last_save -- time_global() of the master's last save, nil: not counting yet
+
+local function news(text)
+	db.actor:give_game_news("Кооператив", text, "ui_iconsTotal_grouping", 0, 8000)
+end
+
+local function autosave()
+	if not (coop_on() and coop.is_sim_master()) then
+		last_save = nil
+		return
+	end
+	local now = time_global()
+	last_save = last_save or now
+	local minutes = get_console():get_integer("coop_autosave_interval")
+	if minutes <= 0 or now - last_save < minutes * 60000 then
+		return
+	end
+	-- as a quicksave: not dead, not in a menu, trade or dialog
+	if not (db.actor:alive() and actor_menu.is_hud_free()) then
+		return
+	end
+	actor_menu.set_msg(1, "Автосохранение мира", 3)
+	local force_pause = not device():is_paused()
+	if force_pause then
+		device():pause(true)
+	end
+	exec_console_cmd("save " .. AUTOSAVE)
+	if force_pause then
+		device():pause(false)
+	end
+end
+
+local function wrap_saves()
+	RegisterScriptCallback("actor_on_update", autosave)
+
+	RegisterScriptCallback("save_state", function()
+		if not coop_on() then
+			return
+		end
+		if coop.is_sim_master() then
+			last_save = time_global()
+			send("world_saved")
+		else
+			send("save_request")
+			actor_menu.set_msg(1, "Мастер получил просьбу сохранить мир", 4)
+		end
+	end)
+
+	handlers.save_request = function(sender)
+		if not coop.is_sim_master() then
+			return
+		end
+		local key = dik_to_keyname(bind_to_dik(key_bindings.kQUICK_SAVE), true) or "?"
+		news(string.format("%s просит сохранить мир. Нажми %s, чтобы сохранить.", sender, key))
+	end
+
+	handlers.world_saved = function(sender)
+		news(string.format("%s сохранил мир.", sender))
+	end
+end
+
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
@@ -310,5 +377,6 @@ function on_game_start()
 	wrap_world_logic()
 	wrap_corpse_loot()
 	wrap_stashes()
+	wrap_saves()
 	printf("[coop] world logic wrapped")
 end

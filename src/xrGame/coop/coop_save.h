@@ -11,6 +11,9 @@ namespace coop
 	// seed: a local save to start the world from if the server has none yet (coop_connect's 3rd argument)
 	void set_world_seed(LPCSTR save_name);
 
+	// minutes between the sim master's autosaves, 0: off (coop_autosave_interval; the saving is coop_sync.script's)
+	extern int autosave_interval;
+
 	void on_world_info(NET_Packet& P);
 	void on_world_chunk(NET_Packet& P);
 	void on_world_done(NET_Packet& P);
