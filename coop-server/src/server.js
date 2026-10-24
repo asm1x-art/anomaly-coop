@@ -139,6 +139,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.OBJECT_RELEASE:
         case M.OBJECT_SPAWN:
         case M.SCRIPT_EVENT:
+        case M.ACTOR_ACTION:
           // receivers need to know whose actor "the sender's actor" is
           broadcast(id, type, Buffer.concat([u32(id), payload]));
           break;

@@ -1,4 +1,5 @@
 #include "pch_script.h"
+#include "coop/coop_puppet.h"
 #include "xrEngine/FDemoRecord.h"
 #include "xrEngine/FDemoPlay.h"
 #include "xrEngine/Environment.h"
@@ -286,6 +287,7 @@ extern CAI_Space* g_ai_space;
 
 CLevel::~CLevel()
 {
+	coop::clear_puppets(); // drawn on this level only
 	//crash_saving::save_impl = nullptr; // CLevel not available, disable crash save
 	xr_delete(g_player_hud);
 	delete_data(m_script_attachments);

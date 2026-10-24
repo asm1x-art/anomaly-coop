@@ -1,4 +1,5 @@
 #include "pch_script.h"
+#include "coop/coop_puppet.h"
 
 #include "WeaponMagazined.h"
 #include "actor.h"
@@ -892,6 +893,7 @@ void CWeaponMagazined::PlaySoundShot()
 
 void CWeaponMagazined::OnShot()
 {
+	coop::on_actor_shot(*this, false);
 	// Shot Sound
 	PlaySoundShot();
 

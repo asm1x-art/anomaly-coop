@@ -5,6 +5,7 @@
 #include "coop_ids.h"
 #include "coop_shadow.h"
 #include "coop_save.h"
+#include "coop_puppet.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -176,6 +177,7 @@ namespace coop
 		m_welcomed = false;
 		m_peers.clear();
 		clear_map_markers();
+		clear_puppets();
 		reset_id_blocks();
 		reset_world_sync();
 	}
@@ -314,6 +316,11 @@ namespace coop
 			P.r_stringZ(peer.level);
 			P.r_vec3(peer.position);
 			P.r_float(peer.yaw);
+			if (P.r_elapsed())
+			{
+				read_look(P, peer.look);
+				peer.has_look = true;
+			}
 			peer.last_update = Device.dwTimeContinual;
 			if (inserted)
 			{
@@ -367,6 +374,12 @@ namespace coop
 		case M_SETTINGS:
 			on_settings(P);
 			break;
+		case M_ACTOR_ACTION:
+		{
+			const u32 sender = P.r_u32();
+			on_peer_action(sender, P);
+			break;
+		}
 		case M_PEER_LEFT:
 		{
 			u32 id = P.r_u32();
@@ -396,6 +409,7 @@ namespace coop
 		P.w_stringZ(Level().name());
 		P.w_vec3(g_actor->Position());
 		P.w_float(Device.vCameraDirection.getH()); // where the player looks, as the actor's own PDA arrow does
+		write_look(P);
 		send(P);
 	}
 
@@ -472,6 +486,7 @@ namespace coop
 			m_welcomed = false;
 			m_peers.clear();
 			clear_map_markers();
+			clear_puppets();
 			reset_id_blocks();
 			reset_world_sync();
 			return;
@@ -526,6 +541,7 @@ namespace coop
 			               std::make_move_iterator(deferred.end()));
 		}
 		update_map_markers();
+		update_puppets();
 		update_id_blocks();
 		update_shadows();
 		update_world_sync();

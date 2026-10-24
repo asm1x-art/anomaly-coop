@@ -15,7 +15,7 @@ namespace coop
 		M_WELCOME = 2,     // s->c: u32 client id
 		M_PING = 3,        // c->s: u32 client time (ms)
 		M_PONG = 4,        // s->c: u32 echoed client time (ms)
-		M_ACTOR_STATE = 5, // c->s: stringZ level, vec3 position, float yaw
+		M_ACTOR_STATE = 5, // c->s: stringZ level, vec3 position, float yaw, then SLook (coop_puppet.cpp)
 		M_PEER_STATE = 6,  // s->c: u32 id, stringZ name, then M_ACTOR_STATE payload
 		M_PEER_LEFT = 7,   // s->c: u32 id
 		M_ENTITY_DEATH = 8, // c->s->others: u16 object id, stringZ section, u16 killer id
@@ -35,9 +35,30 @@ namespace coop
 		M_WORLD_DONE = 20,      // c->s: upload complete; s->c: stringZ owner, u32 revision
 		M_CHARACTER = 21,       // both: stringZ level, u16 game vertex, u32 level vertex, vec3 position, float yaw, u32 money, float health
 		M_SETTINGS = 22,        // s->c: stringZ "key=value" lines, world settings and allowed factions (coop-server/src/settings.js)
+		M_ACTOR_ACTION = 23,    // c->s: u8 EActorAction, its data; relayed with the sender's id like M_ITEM_PARENT (coop_puppet.cpp)
 	};
 
-	const u16 PROTOCOL_VERSION = 9;
+	const u16 PROTOCOL_VERSION = 10;
+
+	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
+	struct SLook
+	{
+		enum EFlags : u8
+		{
+			eReloading = 1 << 0, // the weapon in hands reloads: held by the right hand only
+			eTorch = 1 << 1,
+		};
+
+		float look_pitch = 0.f;                             // the camera's, with SPeer::yaw where the player looks
+		float body_yaw = 0.f;                               // the actor's model turns by rotateY(body_yaw)
+		float torso_yaw = 0.f, torso_pitch = 0.f, torso_roll = 0.f; // where it looks: spine and head follow
+		u16 legs = u16(-1), torso = u16(-1), head = u16(-1); // motions, as indices into puppet_motion_names()
+		u8 torso_seq = 0;                                   // bumped whenever the torso motion starts again
+		shared_str visual;                                  // third-person model, the outfit's
+		shared_str item;                                    // section of the item in hands, "" for none
+		u8 item_addons = 0;                                 // CWeapon addon flags
+		u8 flags = 0;
+	};
 
 	struct SPeer
 	{
@@ -46,6 +67,8 @@ namespace coop
 		Fvector position;
 		float yaw;
 		u32 last_update; // Device.dwTimeContinual
+		bool has_look = false;
+		SLook look;
 	};
 
 	using peers_t = xr_map<u32, SPeer>;

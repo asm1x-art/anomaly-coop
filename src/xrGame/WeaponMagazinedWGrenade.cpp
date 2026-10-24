@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "coop/coop_puppet.h"
 #include "weaponmagazinedwgrenade.h"
 #include "entity.h"
 #include "ParticlesObject.h"
@@ -140,6 +141,7 @@ void CWeaponMagazinedWGrenade::OnShot()
 {
 	if (m_bGrenadeMode)
 	{
+		coop::on_actor_shot(*this, true);
 		PlayAnimShoot();
 		PlaySound("sndShotG", get_LastFP2());
 		AddShotEffector();

@@ -6492,6 +6492,9 @@
     <ClInclude Include="game_sv_item_respawner.h">
       <Filter>Core\Server\Games\server</Filter>
     </ClInclude>
+    <ClInclude Include="coop\coop_puppet.h">
+      <Filter>coop</Filter>
+    </ClInclude>
     <ClInclude Include="coop\coop_ids.h">
       <Filter>coop</Filter>
     </ClInclude>
@@ -8956,6 +8959,9 @@
     </ClCompile>
     <ClCompile Include="level_map_locations.cpp">
       <Filter>Core\Client\Level</Filter>
+    </ClCompile>
+    <ClCompile Include="coop\coop_puppet.cpp">
+      <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_ids.cpp">
       <Filter>coop</Filter>

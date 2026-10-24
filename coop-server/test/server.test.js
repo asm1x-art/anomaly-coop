@@ -466,3 +466,27 @@ test('settings: sent after welcome and to everyone when the admin changes them',
     server.close();
   }
 });
+
+test('actor actions reach others with the sender id, not the sender', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('friend'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    await b.next();
+
+    const shot = Buffer.from([0, 2]); // eShot, silenced
+    a.send(M.ACTOR_ACTION, shot);
+    const got = await b.next();
+    assert.equal(got.type, M.ACTOR_ACTION);
+    assert.equal(got.payload.readUInt32LE(0), idA);
+    assert.deepEqual(got.payload.subarray(4), shot);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

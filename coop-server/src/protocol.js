@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -32,6 +32,7 @@ export const M = {
   WORLD_DONE: 20,     // c->s: upload complete; s->c: download complete, stringZ owner, u32 revision
   CHARACTER: 21,      // c->s: the player's own record (opaque here); s->c: that record, right after WELCOME
   SETTINGS: 22,       // s->c: stringZ "key=value" lines (settingsText), after WELCOME and to all when they change
+  ACTOR_ACTION: 23,   // c->s: what the player's actor does (shots...), for the others' puppets; relayed like the above
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
