@@ -31,6 +31,10 @@ namespace coop
 	// set while we change A-Life on behalf of another client, so hooks don't echo it back
 	static bool g_applying = false;
 	static xr_map<xr_string, u32> g_skip_logs; // reason -> times logged
+	// Eating or using an item takes it out of the inventory first (reported as dropped) and destroys
+	// it right after, ownerless by then: remember such items to log what really happened.
+	static xr_set<u16> g_left_actor;  // left our actor's inventory
+	static xr_map<u16, u32> g_left_shadow; // item -> peer: left a shadow here
 
 	// Objects created in this world during the session, which the others don't have. Changes to
 	// them aren't sent; an object becomes shared - sent as a whole - once our actor takes it.
@@ -237,7 +241,10 @@ namespace coop
 		send(P);
 
 		if (is_actor(&parent))
+		{
+			g_left_actor.insert(item->base()->ID);
 			Msg("[coop] dropped %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
+		}
 	}
 
 	void on_object_released(CSE_Abstract* object)
@@ -254,7 +261,7 @@ namespace coop
 		send(P);
 
 		CSE_Abstract* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
-		if (is_actor(holder))
+		if (is_actor(holder) || g_left_actor.erase(object->ID))
 			Msg("[coop] used up %s (id=%u), sent", object->name_replace(), object->ID);
 	}
 
@@ -372,6 +379,8 @@ namespace coop
 		if (is_shadow(target) || is_shadow(holder))
 			Msg("[coop] '%s' %s %s (id=%u)", peer_name(sender), is_shadow(target) ? "took" : "dropped",
 			    object->name_replace(), id);
+		if (is_shadow(holder))
+			g_left_shadow[id] = sender;
 
 		g_applying = true;
 		if (object->m_bOnline && holder)
@@ -502,8 +511,11 @@ namespace coop
 		if (!object)
 			return skip("release", id, "no such object here");
 
-		if (is_shadow(ai().alife().objects().object(object->ID_Parent, true)))
+		auto left = g_left_shadow.find(id);
+		if (is_shadow(ai().alife().objects().object(object->ID_Parent, true)) || left != g_left_shadow.end())
 			Msg("[coop] '%s' used up %s (id=%u)", peer_name(sender), object->name_replace(), id);
+		if (left != g_left_shadow.end())
+			g_left_shadow.erase(left);
 
 		if (object->m_bOnline)
 		{

@@ -13,6 +13,7 @@
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "../xrEngine/XR_IOConsole.h"
+#include <sys/stat.h>
 
 namespace coop
 {
@@ -54,6 +55,11 @@ namespace coop
 	static SCharacter g_record;
 	static u32 g_last_record = 0;
 	static xr_vector<u16> g_starter_kit;  // spawned while loading, shared once the level runs
+
+	// Anomaly writes a save's .scoc after the engine is done with the .scop: the upload waits for it
+	static const u32 UPLOAD_WAIT_MS = 10000;
+	static xr_string g_pending_upload;    // save name without extension
+	static u32 g_pending_since = 0;
 
 	// ai().alife() is const; the Lua alife() binding does the same (alife_simulator_script.cpp)
 	static CALifeSimulator& alife_rw()
@@ -209,6 +215,32 @@ namespace coop
 		send(P);
 	}
 
+	// seconds since the epoch the save file was written, 0 if it isn't there
+	static __time64_t written(LPCSTR save_name_no_ext, LPCSTR ext)
+	{
+		string_path name, path;
+		strconcat(sizeof(name), name, save_name_no_ext, ext);
+		FS.update_path(path, "$game_saves$", name);
+		struct _stat64 st;
+		return _stat64(path, &st) == 0 ? st.st_mtime : 0;
+	}
+
+	static void try_pending_upload()
+	{
+		const LPCSTR name = g_pending_upload.c_str();
+		const __time64_t scop = written(name, WORLD_EXT[0]);
+		if (scop && written(name, WORLD_EXT[1]) >= scop)
+		{
+			upload(name);
+			g_pending_upload.clear();
+		}
+		else if (Device.dwTimeContinual - g_pending_since > UPLOAD_WAIT_MS)
+		{
+			Msg("! [coop] %s%s wasn't written, the world is not uploaded", name, WORLD_EXT[1]);
+			g_pending_upload.clear();
+		}
+	}
+
 	void update_world_sync()
 	{
 		if (g_load_pending)
@@ -222,6 +254,9 @@ namespace coop
 			Console->Execute(command);
 			return;
 		}
+
+		if (!g_pending_upload.empty())
+			try_pending_upload();
 
 		if (!g_in_world || !world_ready())
 			return;
@@ -263,14 +298,15 @@ namespace coop
 		send_record();
 		g_last_record = Device.dwTimeContinual;
 
-		// the sim master's game is the world
+		// the sim master's game is the world; uploaded once its .scoc is written too
 		if (is_sim_master())
 		{
 			string_path name;
 			xr_strcpy(name, save_file_name);
 			if (char* ext = strext(name))
 				*ext = 0;
-			upload(name);
+			g_pending_upload = name;
+			g_pending_since = Device.dwTimeContinual;
 		}
 	}
 
