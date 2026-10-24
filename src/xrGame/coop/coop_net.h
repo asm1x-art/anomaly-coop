@@ -24,9 +24,10 @@ namespace coop
 		// relayed to the others with the sender's client id in front (s->c: u32 sender, then the payload)
 		M_ITEM_PARENT = 11,     // c->s: u16 item, stringZ section, u8 place, place data (coop_world.cpp)
 		M_OBJECT_RELEASE = 12,  // c->s: u16 object, stringZ section
+		M_OBJECT_SPAWN = 13,    // c->s: u16 size, the engine's M_SPAWN packet (CSE_Abstract::Spawn_Write)
 	};
 
-	const u16 PROTOCOL_VERSION = 5;
+	const u16 PROTOCOL_VERSION = 6;
 
 	struct SPeer
 	{

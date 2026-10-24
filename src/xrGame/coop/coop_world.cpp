@@ -32,6 +32,23 @@ namespace coop
 	static bool g_applying = false;
 	static xr_map<xr_string, u32> g_skip_logs; // reason -> times logged
 
+	// Objects created in this world during the session, which the others don't have. Changes to
+	// them aren't sent; an object becomes shared - sent as a whole - once our actor takes it.
+	// Scripts that run in every world (corpse loot, respawns) can't produce duplicates that way.
+	static xr_set<u16> g_local_objects;
+	static const void* g_local_objects_world = nullptr;
+
+	static xr_set<u16>& local_objects()
+	{
+		// another save loaded: those ids mean other objects now
+		if (g_local_objects_world != ai().get_alife())
+		{
+			g_local_objects.clear();
+			g_local_objects_world = ai().get_alife();
+		}
+		return g_local_objects;
+	}
+
 	// ai().alife() is const; the Lua alife() binding does the same (alife_simulator_script.cpp)
 	static CALifeSimulator& alife_rw()
 	{
@@ -79,7 +96,7 @@ namespace coop
 		if (smart_cast<CSE_ALifeCreatureActor*>(victim))
 			return;
 
-		if (!is_connected())
+		if (!is_connected() || local_objects().count(victim->ID))
 			return;
 
 		NET_Packet P;
@@ -128,10 +145,34 @@ namespace coop
 		}
 	}
 
+	static void send_spawn(CSE_ALifeDynamicObject* object)
+	{
+		NET_Packet spawn;
+		object->Spawn_Write(spawn, FALSE);
+
+		NET_Packet P;
+		P.w_begin(M_OBJECT_SPAWN);
+		P.w_u16(u16(spawn.B.count));
+		P.w(spawn.B.data, spawn.B.count);
+		send(P);
+
+		Msg("[coop] got %s (id=%u), sent", object->name_replace(), object->ID);
+	}
+
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item)
 	{
 		if (!should_send() || is_shadow(&parent))
 			return;
+
+		if (local_objects().count(item->base()->ID))
+		{
+			if (is_actor(&parent))
+			{
+				local_objects().erase(item->base()->ID);
+				send_spawn(smart_cast<CSE_ALifeDynamicObject*>(item->base()));
+			}
+			return;
+		}
 
 		NET_Packet P;
 		P.w_begin(M_ITEM_PARENT);
@@ -153,7 +194,7 @@ namespace coop
 
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id)
 	{
-		if (!should_send() || is_shadow(&parent))
+		if (!should_send() || is_shadow(&parent) || local_objects().count(item->base()->ID))
 			return;
 
 		// the item is left where its holder stands
@@ -176,7 +217,7 @@ namespace coop
 	{
 		if (g_remote_releases.erase(object->ID))
 			return;
-		if (!should_send() || is_shadow(object))
+		if (!should_send() || is_shadow(object) || local_objects().erase(object->ID))
 			return;
 
 		NET_Packet P;
@@ -285,6 +326,79 @@ namespace coop
 		else
 			alife_rw().teleport_object(id, game_vertex, level_vertex, position);
 		g_applying = false;
+	}
+
+	void on_object_registered(CSE_ALifeDynamicObject* object)
+	{
+		if (!should_send())
+			return;
+
+		// created right in our actor's inventory: shared at once, otherwise local until taken
+		if (is_actor(ai().alife().objects().object(object->ID_Parent, true)))
+			send_spawn(object);
+		else
+			local_objects().insert(object->ID);
+	}
+
+	void apply_object_spawn(NET_Packet& P)
+	{
+		const u32 sender = P.r_u32();
+		const u16 size = P.r_u16();
+		NET_Packet spawn;
+		spawn.construct(&P.B.data[P.r_tell()], size);
+
+		if (!g_actor || !ai().get_alife())
+			return;
+
+		u16 type;
+		string256 section;
+		spawn.r_begin(type);
+		spawn.r_stringZ(section);
+		if (!pSettings->section_exist(section))
+			return skip("spawn", NO_ID, "unknown section");
+
+		CSE_Abstract* abstract = F_entity_Create(section);
+		CSE_ALifeDynamicObject* object = smart_cast<CSE_ALifeDynamicObject*>(abstract);
+		if (!object)
+		{
+			F_entity_Destroy(abstract);
+			return skip("spawn", NO_ID, "not an A-Life object");
+		}
+		abstract->Spawn_Read(spawn); // reads from the start again, header included
+
+		const u16 id = object->ID;
+		if (!alife_rw().server().is_id_free(id))
+		{
+			F_entity_Destroy(abstract);
+			return skip("spawn", id, "id already taken here, worlds differ?");
+		}
+
+		// whose inventory: the sender's actor is its shadow here
+		if (object->ID_Parent != NO_ID)
+		{
+			CSE_ALifeDynamicObject* parent = ai().alife().objects().object(object->ID_Parent, true);
+			if (is_actor(parent))
+				parent = ai().alife().objects().object(shadow_of(peer_name(sender)), true);
+			if (!parent)
+			{
+				F_entity_Destroy(abstract);
+				return skip("spawn", id, "no such holder here");
+			}
+			object->ID_Parent = parent->ID;
+			object->m_tGraphID = parent->m_tGraphID;
+			object->m_tNodeID = parent->m_tNodeID;
+			object->o_Position = parent->o_Position;
+		}
+
+		// the same id as on the sender: it is from the sender's block, which we never hand out
+		object->ID = alife_rw().server().PerformIDgen(id);
+		object->m_bOnline = false;
+
+		g_applying = true;
+		alife_rw().register_object(object, true);
+		g_applying = false;
+
+		Msg("[coop] '%s' got %s (id=%u)", peer_name(sender), object->name_replace(), id);
 	}
 
 	static void mark_remote_release(const CSE_ALifeDynamicObject* object)

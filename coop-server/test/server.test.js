@@ -217,7 +217,7 @@ test('id blocks: most free unleased block, never shared, kept across reconnect',
   }
 });
 
-test('item and release events reach others prefixed with the sender id', async () => {
+test('item, release and spawn events reach others prefixed with the sender id', async () => {
   const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
   const { port } = server.address();
   try {
@@ -241,6 +241,13 @@ test('item and release events reach others prefixed with the sender id', async (
     assert.equal(rel.type, M.OBJECT_RELEASE);
     assert.equal(rel.payload.readUInt32LE(0), idA);
     assert.deepEqual(rel.payload.subarray(4), release);
+
+    const spawn = Buffer.concat([Buffer.from([3, 0]), Buffer.from([1, 2, 3])]);
+    a.send(M.OBJECT_SPAWN, spawn);
+    const sp = await b.next();
+    assert.equal(sp.type, M.OBJECT_SPAWN);
+    assert.equal(sp.payload.readUInt32LE(0), idA);
+    assert.deepEqual(sp.payload.subarray(4), spawn);
 
     a.socket.destroy();
     b.socket.destroy();

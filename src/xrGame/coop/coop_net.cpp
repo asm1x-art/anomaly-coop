@@ -292,6 +292,9 @@ namespace coop
 		case M_OBJECT_RELEASE:
 			apply_object_release(P);
 			break;
+		case M_OBJECT_SPAWN:
+			apply_object_spawn(P);
+			break;
 		case M_ENTITY_DEATH:
 			apply_entity_death(P);
 			break;

@@ -180,6 +180,7 @@ public:
 	static constexpr u32 id_block_count() { return id_generator_type::block_count(); }
 	u16 free_ids_in_block(u32 block) const { return m_tID_Generator.free_in_block(block); }
 	u16 PerformIDgenFromBlock(u32 block) { return m_tID_Generator.tfGetIDFromBlock(block); }
+	bool is_id_free(u16 ID) const { return ID < u16(-1) && m_tID_Generator.is_free(ID); }
 
 	IC void FreeID(u16 ID, u32 time)
 	{

@@ -17,6 +17,7 @@
 #include "alife_schedule_registry.h"
 #include "alife_smart_terrain_registry.h"
 #include "alife_group_registry.h"
+#include "coop/coop_world.h"
 
 using namespace ALife;
 
@@ -53,6 +54,8 @@ void CALifeSimulatorBase::register_object(CSE_ALifeDynamicObject* object, bool a
 
 	if (can_register_objects())
 		object->on_register();
+
+	coop::on_object_registered(object);
 }
 
 void CALifeSimulatorBase::unregister_object(CSE_ALifeDynamicObject* object, bool alife_query)

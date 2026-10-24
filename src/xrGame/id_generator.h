@@ -112,6 +112,13 @@ public:
 		return (m_tppBlocks[block].m_tCount);
 	}
 
+	IC bool is_free(VALUE_ID tValueID) const
+	{
+		const SID_Block& b = m_tppBlocks[(tValueID - tMinValue) / tBlockSize];
+		const TYPE_ID value = TYPE_ID((tValueID - tMinValue) % tBlockSize);
+		return (std::find(b.m_tpIDs, b.m_tpIDs + b.m_tCount, value) != b.m_tpIDs + b.m_tCount);
+	}
+
 	IC VALUE_ID tfGetIDFromBlock(u32 block)
 	{
 		R_ASSERT2(block < m_tBlockCount, "Requesting block is invalid!");
