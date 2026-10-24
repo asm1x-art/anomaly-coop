@@ -134,6 +134,7 @@ void CALifeStorageManager::load(void* buffer, const u32& buffer_size, LPCSTR fil
 		funct(file_name);
 #endif
 	//-Alundaio
+	coop::on_save_loading(file_name);
 
 	IReader source(buffer, buffer_size);
 	header().load(source);

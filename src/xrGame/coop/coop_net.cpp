@@ -23,6 +23,7 @@
 namespace coop
 {
 	const u32 PING_INTERVAL_MS = 1000;
+	const u32 LOG_FLUSH_INTERVAL_MS = 5000; // the log is kept in memory and written out on exit or "flush"
 	const u32 ACTOR_STATE_INTERVAL_MS = 100;
 
 	enum EState
@@ -79,6 +80,7 @@ namespace coop
 		u32 m_client_id = 0;
 		u32 m_master_id = 0; // 0: not known yet, ids start at 1
 		u32 m_last_ping = 0;
+		u32 m_last_log_flush = 0;
 		u32 m_last_actor_state = 0;
 		u32 m_rtt = 0;
 
@@ -101,6 +103,14 @@ namespace coop
 			return;
 		auto peer = g_client.peers().find(sender);
 		handler(name.c_str(), peer != g_client.peers().end() ? peer->second.name.c_str() : "", payload.c_str());
+	}
+
+	// a peer showed up in the world (its first state) or left: _G.coop_on_peer(name, joined), in a level only
+	static void notify_peer(const xr_string& name, bool joined)
+	{
+		::luabind::functor<void> handler;
+		if (g_pGameLevel && ai().script_engine().functor("_G.coop_on_peer", handler))
+			handler(name.c_str(), joined);
 	}
 
 	bool CClient::start(LPCSTR host, u16 port, LPCSTR name)
@@ -306,7 +316,10 @@ namespace coop
 			P.r_float(peer.yaw);
 			peer.last_update = Device.dwTimeContinual;
 			if (inserted)
+			{
 				Msg("[coop] '%s' (id=%u) is on %s", peer.name.c_str(), id, peer.level.c_str());
+				notify_peer(peer.name, true);
+			}
 			break;
 		}
 		case M_ID_BLOCK_GRANT:
@@ -351,6 +364,9 @@ namespace coop
 		case M_CHARACTER:
 			on_character(P);
 			break;
+		case M_SETTINGS:
+			on_settings(P);
+			break;
 		case M_PEER_LEFT:
 		{
 			u32 id = P.r_u32();
@@ -358,6 +374,7 @@ namespace coop
 			if (it != m_peers.end())
 			{
 				Msg("[coop] '%s' (id=%u) left", it->second.name.c_str(), id);
+				notify_peer(it->second.name, false);
 				m_peers.erase(it);
 			}
 			m_left.insert(id);
@@ -439,6 +456,13 @@ namespace coop
 
 	void CClient::OnFrame()
 	{
+		// co-op sessions are debugged from the log while the games run
+		if (Device.dwTimeContinual - m_last_log_flush >= LOG_FLUSH_INTERVAL_MS)
+		{
+			m_last_log_flush = Device.dwTimeContinual;
+			FlushLog();
+		}
+
 		if (m_state == eFailed)
 		{
 			Msg("! [coop] disconnected: %s", m_error.c_str());

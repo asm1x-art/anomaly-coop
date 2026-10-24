@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<string id="ui_mm_menu_coop">
+		<text>Co-op</text>
+	</string>
+	<string id="ui_mm_coop">
+		<text>Co-op</text>
+	</string>
+	<string id="ui_mm_coop_general_autosave_interval">
+		<text>World autosave, minutes</text>
+	</string>
+	<string id="ui_mm_coop_general_autosave_interval_desc">
+		<text>How often the sim master saves the shared world to the server. 0 turns it off.</text>
+	</string>
+	<string id="ui_mm_coop_general_title_color">
+		<text>Other players on the map</text>
+	</string>
+	<string id="ui_mm_coop_general_color_r">
+		<text>Red</text>
+	</string>
+	<string id="ui_mm_coop_general_color_g">
+		<text>Green</text>
+	</string>
+	<string id="ui_mm_coop_general_color_b">
+		<text>Blue</text>
+	</string>
+	<string id="ui_mm_coop_profile_name">
+		<text>Name</text>
+	</string>
+	<string id="ui_mm_coop_profile_server">
+		<text>Server</text>
+	</string>
+	<string id="ui_mm_coop_profile_save">
+		<text>Save profile</text>
+	</string>
+	<string id="ui_mm_coop_profile_enter">
+		<text>Enter</text>
+	</string>
+	<string id="ui_mm_coop_status_idle">
+		<text>Pick a profile or type a name and a server, then Enter.</text>
+	</string>
+	<string id="ui_mm_coop_status_connected">
+		<text>Connected as %s.</text>
+	</string>
+	<string id="ui_mm_coop_status_fill">
+		<text>Type a name and a server.</text>
+	</string>
+	<string id="ui_mm_coop_status_saved">
+		<text>Profile %s saved.</text>
+	</string>
+	<string id="ui_mm_coop_status_bad_server">
+		<text>The server is address:port, e.g. localhost:7777.</text>
+	</string>
+	<string id="ui_mm_coop_status_connecting">
+		<text>Connecting to %s...</text>
+	</string>
+	<string id="ui_mm_coop_status_failed">
+		<text>Could not connect. Check the address and that the server is running.</text>
+	</string>
+	<string id="ui_mm_coop_status_loading">
+		<text>Your character is in this world. Loading it...</text>
+	</string>
+</string_table>

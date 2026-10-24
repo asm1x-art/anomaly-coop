@@ -370,6 +370,40 @@ local function wrap_saves()
 	end
 end
 
+------------------------------------------------------------------------------------------------
+-- Other players coming into the world and leaving it: _G.coop_on_peer(name, joined), by the engine.
+-- The ones already there when our level starts are not news.
+
+local level_since -- time_global() of our actor's first update
+
+local function watch_peers()
+	RegisterScriptCallback("actor_on_first_update", function()
+		level_since = time_global()
+	end)
+
+	_G.coop_on_peer = function(name, joined)
+		if not (db.actor and level_since) or time_global() - level_since < 5000 then
+			return
+		end
+		news(string.format(joined and "%s вошёл в мир." or "%s вышел из мира.", name))
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Our faction: the world's save holds its owner's actor, the server keeps ours with our character.
+
+local function keep_faction()
+	RegisterScriptCallback("actor_on_first_update", function()
+		local community = coop_on() and coop.character_community() or ""
+		if community == "" or character_community(db.actor) == community then
+			return
+		end
+		db.actor:set_character_community(community, 0, 0)
+		alife_storage_manager.get_state().default_faction = string.gsub(community, "^actor_", "")
+		printf("[coop] our faction: %s", community)
+	end)
+end
+
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
@@ -378,5 +412,7 @@ function on_game_start()
 	wrap_corpse_loot()
 	wrap_stashes()
 	wrap_saves()
+	watch_peers()
+	keep_faction()
 	printf("[coop] world logic wrapped")
 end

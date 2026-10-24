@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<string id="ui_mm_menu_coop">
+		<text>Кооператив</text>
+	</string>
+	<string id="ui_mm_coop">
+		<text>Кооператив</text>
+	</string>
+	<string id="ui_mm_coop_general_autosave_interval">
+		<text>Автосохранение мира, мин</text>
+	</string>
+	<string id="ui_mm_coop_general_autosave_interval_desc">
+		<text>Как часто сим-мастер сохраняет общий мир на сервер. 0 - выключено.</text>
+	</string>
+	<string id="ui_mm_coop_general_title_color">
+		<text>Напарники на карте</text>
+	</string>
+	<string id="ui_mm_coop_general_color_r">
+		<text>Красный</text>
+	</string>
+	<string id="ui_mm_coop_general_color_g">
+		<text>Зелёный</text>
+	</string>
+	<string id="ui_mm_coop_general_color_b">
+		<text>Синий</text>
+	</string>
+	<string id="ui_mm_coop_profile_name">
+		<text>Ник</text>
+	</string>
+	<string id="ui_mm_coop_profile_server">
+		<text>Сервер</text>
+	</string>
+	<string id="ui_mm_coop_profile_save">
+		<text>Сохранить профиль</text>
+	</string>
+	<string id="ui_mm_coop_profile_enter">
+		<text>Войти</text>
+	</string>
+	<string id="ui_mm_coop_status_idle">
+		<text>Выберите профиль или введите ник и сервер, затем «Войти».</text>
+	</string>
+	<string id="ui_mm_coop_status_connected">
+		<text>Подключены как %s.</text>
+	</string>
+	<string id="ui_mm_coop_status_fill">
+		<text>Укажите ник и сервер.</text>
+	</string>
+	<string id="ui_mm_coop_status_saved">
+		<text>Профиль «%s» сохранён.</text>
+	</string>
+	<string id="ui_mm_coop_status_bad_server">
+		<text>Сервер указывается как адрес:порт, например localhost:7777.</text>
+	</string>
+	<string id="ui_mm_coop_status_connecting">
+		<text>Подключение к %s...</text>
+	</string>
+	<string id="ui_mm_coop_status_failed">
+		<text>Не удалось подключиться. Проверьте адрес и что сервер запущен.</text>
+	</string>
+	<string id="ui_mm_coop_status_loading">
+		<text>Ваш персонаж уже есть в этом мире. Загрузка мира...</text>
+	</string>
+</string_table>

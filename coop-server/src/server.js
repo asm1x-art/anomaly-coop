@@ -1,6 +1,7 @@
 import net from 'node:net';
 import { M, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, encode, createDecoder, readStringZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
+import { settingsText } from './settings.js';
 
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log } = {}) {
   const storage = openStorage(dataDir);
@@ -79,6 +80,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (record) send(M.CHARACTER, record);
           for (const [block, owner] of idLeases) if (owner === client.name) send(M.ID_BLOCK_GRANT, u16(block));
           announceRoles();
+          send(M.SETTINGS, stringZ(settingsText(storage.settings())));
           send(M.WORLD_INFO, worldInfo());
           // let the newcomer see players who are standing still
           for (const [otherId, other] of clients)
@@ -162,6 +164,35 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       announceRoles();
     });
   });
+
+  // what the admin page (admin.js) sees and does
+  server.coop = {
+    status() {
+      const master = clients.size ? masterId() : null;
+      return {
+        online: [...clients].map(([cid, c]) =>
+          ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master })),
+        world: storage.worldInfo(),
+      };
+    },
+    settings: () => storage.settings(),
+    adminPassword: () => storage.adminPassword(),
+    saveSettings(settings) {
+      storage.saveSettings(settings);
+      log('settings changed on the admin page');
+      const text = stringZ(settingsText(storage.settings()));
+      for (const c of clients.values()) c.send(M.SETTINGS, text);
+      return storage.settings();
+    },
+    // only with nobody online: their games run the old world
+    resetWorld() {
+      if (clients.size) return false;
+      storage.resetWorld();
+      idLeases.clear();
+      log('world reset on the admin page');
+      return true;
+    },
+  };
 
   return new Promise((resolve) => {
     server.listen(port, host, () => {

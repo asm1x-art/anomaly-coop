@@ -1,6 +1,7 @@
 #include "pch_script.h"
 #include "coop_net.h"
 #include "coop_world.h"
+#include "coop_save.h"
 #include "ai_space.h"
 #include "script_engine.h"
 
@@ -42,11 +43,32 @@ namespace coop
 		send(P);
 	}
 
+	// coop.connect(host, port, name, seed): as coop_connect, for the options page; name "" = the OS user
+	static bool script_connect(LPCSTR host, u16 port, LPCSTR name, LPCSTR seed)
+	{
+		set_world_seed(seed);
+		if (!name || !xr_strlen(name))
+			name = xr_strlen(Core.UserName) ? Core.UserName : "stalker";
+		return connect(host, port, name);
+	}
+
+	static LPCSTR script_my_name() { return my_name().c_str(); }
+	static LPCSTR script_settings() { return world_settings().c_str(); }
+
 	void script_register(lua_State* L)
 	{
 		module(L, "coop")
 		[
+			def("connect", &script_connect),
+			def("disconnect", &disconnect),
 			def("connected", &is_connected),
+			def("link_up", &is_link_up),            // connecting or connected
+			def("my_name", &script_my_name),
+			def("settings", &script_settings),     // "key=value" lines from the server, "" before they come
+			def("world_status", &world_status),    // see coop_save.h
+			def("join_world", &join_world),
+			def("character_community", &character_community),
+
 			def("my_id", &my_id),
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),

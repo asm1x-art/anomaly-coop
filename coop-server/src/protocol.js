@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -31,6 +31,7 @@ export const M = {
   WORLD_CHUNK: 19,    // both: u8 file, u32 offset, data
   WORLD_DONE: 20,     // c->s: upload complete; s->c: download complete, stringZ owner, u32 revision
   CHARACTER: 21,      // c->s: the player's own record (opaque here); s->c: that record, right after WELCOME
+  SETTINGS: 22,       // s->c: stringZ "key=value" lines (settingsText), after WELCOME and to all when they change
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
@@ -59,8 +60,16 @@ export function createDecoder(onMessage) {
   };
 }
 
+// The engine's strings are Windows-1251 bytes (player names can be Cyrillic); here they are JS strings.
+const CP1251 = new TextDecoder('windows-1251');
+const CP1251_BYTE = new Map([...CP1251.decode(Uint8Array.from({ length: 256 }, (_, i) => i))].map((ch, i) => [ch, i]));
+
+export function encodeText(str) {
+  return Buffer.from([...str].map((ch) => CP1251_BYTE.get(ch) ?? 0x3f)); // '?' for what 1251 can't hold
+}
+
 export function stringZ(str) {
-  return Buffer.concat([Buffer.from(str, 'utf8'), Buffer.from([0])]);
+  return Buffer.concat([encodeText(str), Buffer.from([0])]);
 }
 
 export function u16(value) {
@@ -77,5 +86,5 @@ export function u32(value) {
 
 export function readStringZ(buf, offset) {
   const end = buf.indexOf(0, offset);
-  return buf.toString('utf8', offset, end === -1 ? buf.length : end);
+  return CP1251.decode(buf.subarray(offset, end === -1 ? buf.length : end));
 }

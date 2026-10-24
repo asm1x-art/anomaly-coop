@@ -1,0 +1,253 @@
+-- Co-op: the main menu and the new game screen, which makes the player's character.
+-- The menu's New game button is the Co-op button, opening the profile screen (ui_coop_profiles.script),
+-- which connects and then opens the new game screen when a world or a character is to be made.
+-- On a server without a world New game creates it: the new game becomes the world once it runs
+-- (src/xrGame/coop/coop_save.cpp). In a world we have no character in yet the screen opens by itself
+-- and Start loads the world with the character at its start point instead of starting a new game; the
+-- faction, money and loadout are then applied by Anomaly's own new game code (ui_mm_faction_select
+-- on_game_load). Either way the server's world settings replace the screen's options, only the factions
+-- the server allows are offered and the character is named by the co-op name. Without a connection New
+-- game is refused: this build is for co-op.
+
+local FACTION_ORDER = { "stalker", "bandit", "csky", "dolg", "freedom", "killer", "army", "ecolog", "monolith",
+	"renegade", "greh", "isg" }
+
+-- new game screen control -> server setting
+local WORLD_CHECKS = {
+	ck_story = "story",
+	ck_warfare = "warfare",
+	ck_survival = "survival",
+	ck_campfire = "campfire",
+	ck_conditions = "conditions",
+	ck_routes = "opened_routes",
+	ck_hardcore = "ironman",
+}
+
+-- character_creation keys of the new game screen (OnStartGame) that a character joining an existing world
+-- must not apply: the world's settings are in its save; new_game_map: the engine places it (join_world)
+local NOT_FOR_JOINING = { "new_game_difficulty", "new_game_economy", "new_game_economy_treasure",
+	"new_game_hardcore_mode", "new_game_hardcore_mode_lives", "new_game_hardcore_mode_regenerate",
+	"new_game_azazel_mode", "new_game_survival_mode", "new_game_campfire_mode", "new_game_conditions_mode",
+	"new_game_opened_routes", "new_game_warfare", "new_game_timer_mode", "new_game_character_name", "new_game_map" }
+
+local start_locations = ini_file("plugins\\new_game_start_locations.ltx")
+local main_menu -- the main menu object, for opening the screen when the engine asks
+
+local WORLD_CONTROLS = { "scroll_options", "list_difficulty", "list_difficulty_cap", "list_economy", "list_economy_cap" }
+
+local function server_settings()
+	local s = {}
+	for line in string.gmatch(coop.settings(), "[^\n]+") do
+		local key, value = string.match(line, "^([%w_]+)=(.*)$")
+		if key then
+			s[key] = value
+		end
+	end
+	return s
+end
+
+local function allowed_factions(s)
+	local allowed = {}
+	for faction in string.gmatch(s.factions or "", "[^,]+") do
+		allowed[faction] = true
+	end
+	return allowed
+end
+
+-- why New game can't be used now, nil if it can
+local function refusal()
+	if not coop.connected() then
+		return "Сначала подключитесь к серверу: Настройки > Кооператив."
+	end
+	local status = coop.world_status()
+	if status == "exists" then
+		return "На сервере уже есть мир: он загружается сам после подключения."
+	elseif status ~= "none" and status ~= "no_character" then
+		return "Ждём ответа сервера, попробуйте через пару секунд."
+	end
+end
+
+local function entry(list, value)
+	for _, e in ipairs(list) do
+		if e[1] == value then
+			return e
+		end
+	end
+end
+
+-- the server's world settings into the screen's state; OnStartGame writes them for the new game
+local function apply_world(dlg, s)
+	for ctrl, key in pairs(WORLD_CHECKS) do
+		if dlg[ctrl] then
+			dlg[ctrl]:SetCheck(s[key] == "1")
+		end
+	end
+	if dlg.ck_azazel_mode then
+		dlg.ck_azazel_mode:SetCheck(false)
+	end
+	dlg.selected_difficulty = "st_diff_" .. (s.difficulty or "1")
+	dlg.selected_economy = "st_econ_" .. (s.economy or "1")
+	dlg.selected_hardcore_lives = entry(dlg.table_hardcore_lives, tonumber(s.ironman_lives)) or dlg.table_hardcore_lives[1]
+	dlg.selected_hardcore_regen = entry(dlg.table_hardcore_regen, tonumber(s.ironman_regen)) or dlg.table_hardcore_regen[1]
+	dlg.selected_timer = dlg.table_timer[1]
+end
+
+local function first_allowed(allowed)
+	for _, faction in ipairs(FACTION_ORDER) do
+		if allowed[faction] then
+			return faction
+		end
+	end
+end
+
+local function adapt(dlg)
+	local s = server_settings()
+	local allowed = allowed_factions(s)
+	dlg.coop = true
+
+	-- only the allowed factions, packed into the popup's 3-column grid
+	dlg.table_faction = {}
+	local i = 0
+	for _, faction in ipairs(FACTION_ORDER) do
+		if allowed[faction] then
+			dlg.table_faction[faction] = true
+			dlg.faction_cell[faction] = { row = math.floor(i / 3) + 1, col = i % 3 + 1 }
+			i = i + 1
+		end
+	end
+	if not allowed[dlg.selected_faction] then
+		dlg:OnFactionSelect(first_allowed(allowed) or "stalker")
+	end
+
+	for _, name in ipairs(WORLD_CONTROLS) do
+		if dlg[name] then
+			dlg[name]:Show(false)
+		end
+	end
+	apply_world(dlg, s)
+
+	dlg.character_name:SetText(coop.my_name())
+	dlg.character_name:Enable(false)
+end
+
+-- Start, for a character joining an existing world: written by OnStartGame as for a new game, then
+-- the world loads instead
+local function join(dlg)
+	local config = axr_main.config
+	local map = config:r_value("character_creation", "new_game_map")
+	for _, key in ipairs(NOT_FOR_JOINING) do
+		config:w_value("character_creation", key)
+	end
+	config:save()
+
+	local gvid = map and start_locations:r_float_ex(map, "gvid")
+	if not gvid then
+		printf("! [coop] no start location '%s'", tostring(map))
+		return
+	end
+	local position = vector():set(start_locations:r_float_ex(map, "x"), start_locations:r_float_ex(map, "y"),
+		start_locations:r_float_ex(map, "z"))
+	printf("[coop] joining the world as %s at %s", dlg.selected_faction, map)
+	dlg:OnQuit() -- back to the menu while the world downloads
+	coop.join_world(gvid, start_locations:r_float_ex(map, "lvid"), position)
+end
+
+function on_xml_read()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	-- The main menu exists before this runs, and luabind objects keep the methods their class had when
+	-- they were made: the menu object itself is patched, every time one is made.
+	RegisterScriptCallback("main_menu_on_init", function(menu)
+		main_menu = menu
+		menu:AddCallback("btn_coop", ui_events.BUTTON_CLICKED, function()
+			if not menu.coop_profiles then
+				menu.coop_profiles = ui_coop_profiles.UICoopProfiles(menu)
+			end
+			menu.coop_profiles:Open()
+		end, menu)
+		local show_faction_ui = menu.ShowFactionUI
+		menu.ShowFactionUI = function(self)
+			local why = refusal()
+			if why then
+				printf("[coop] new game refused: %s", why)
+				self:SetMsg(why, 6)
+				return
+			end
+			self.new_game_dlg = nil -- built again: the server's settings may have changed
+			show_faction_ui(self)
+			adapt(self.new_game_dlg)
+			self.new_game_dlg.coop_join = coop.world_status() == "no_character"
+			printf("[coop] new game screen: %s, factions: %s", self.new_game_dlg.coop_join and "joining the world"
+				or "creating the world", server_settings().factions or "?")
+		end
+	end)
+
+	-- the world is there and we have no character in it: make one now (the profile screen, when up,
+	-- follows its connection itself)
+	_G.coop_on_character_needed = function()
+		if main_menu and not ui_coop_profiles.is_shown() then
+			main_menu:ShowFactionUI()
+		end
+	end
+
+	-- New game -> Co-op, in every main menu variant that has it
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		if xml_file_name ~= [[ui\ui_mm_main.xml]] and xml_file_name ~= [[ui\ui_mm_main_16.xml]] then
+			return
+		end
+		for _, el in ipairs(xml_obj:query("btn[name=btn_newgame]")) do
+			xml_obj:setElementAttr(el, { name = "btn_coop", caption = "ui_mm_coop" })
+		end
+	end)
+
+	local new_game = ui_mm_faction_select.UINewGame
+	local start_game = new_game.OnStartGame
+	new_game.OnStartGame = function(self)
+		if not self.coop then
+			return start_game(self)
+		end
+		if refusal() then
+			return self:OnQuit()
+		end
+		-- the hidden keys (Z, faction passwords) don't get past the server's list
+		local s = server_settings()
+		local allowed = allowed_factions(s)
+		if not allowed[self.selected_faction] then
+			return self:OnFactionSelect(first_allowed(allowed) or "stalker")
+		end
+		apply_world(self, s)
+		self.character_name:SetText(coop.my_name())
+		if not self.coop_join then
+			return start_game(self)
+		end
+		-- OnStartGame ends with owner:StartGame(), a new game: the world is loaded instead
+		local owner = self.owner
+		local start_new_game = owner.StartGame
+		owner.StartGame = function()
+			join(self)
+		end
+		start_game(self)
+		owner.StartGame = start_new_game
+	end
+
+	local randomize = new_game.OnRandomize
+	new_game.OnRandomize = function(self)
+		randomize(self)
+		if self.coop then
+			apply_world(self, server_settings())
+			self.character_name:SetText(coop.my_name())
+		end
+	end
+
+	-- a quickload would leave the shared world (and disconnect, see coop_save.cpp)
+	local quick_load = level_input.action_quick_load
+	level_input.action_quick_load = function(...)
+		if coop.connected() and coop.world_status() == "exists" then
+			actor_menu.set_msg(1, "В кооперативе быстрая загрузка отключена.", 4)
+			return true
+		end
+		return quick_load(...)
+	end
+end

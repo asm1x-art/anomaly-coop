@@ -40,6 +40,7 @@
 #include "zone_effector.h"
 #include "coop/coop_net.h"
 #include "coop/coop_save.h"
+#include "coop/coop_map.h"
 #include "GameTask.h"
 #include "MainMenu.h"
 #include "saved_game_wrapper.h"
@@ -3374,4 +3375,5 @@ void CCC_RegisterCommands()
 	CMD1(CCC_CoopDisconnect, "coop_disconnect");
 	CMD1(CCC_CoopStatus, "coop_status");
 	CMD4(CCC_Integer, "coop_autosave_interval", &coop::autosave_interval, 0, 120);
+	CMD2(CCC_Color, "coop_peer_color", &coop::peer_color);
 }

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "coop_ids.h"
 #include "coop_net.h"
+#include "coop_save.h"
 #include "Level.h"
 #include "xrServer.h"
 #include "ai_space.h"
@@ -65,7 +66,8 @@ namespace coop
 
 	u16 allocate_id(xrServer& server)
 	{
-		if (!is_link_up())
+		// a new game that is yet to become the world on an empty server makes its objects as usual
+		if (!is_link_up() || !runs_shared_world())
 			return NO_BLOCK;
 
 		if (g_blocks.empty() && !g_gave_up_waiting && !g_server_exhausted)

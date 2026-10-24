@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anomaly co-op · сервер</title>
+<style>
+  :root {
+    --bg: #14150f;
+    --panel: #1d1f17;
+    --line: #34372a;
+    --text: #e4e1d3;
+    --muted: #9a9783;
+    --accent: #c9a24a;
+    --accent-text: #1a1608;
+    --ok: #8fb35a;
+    --danger: #c8553d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 96px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: .02em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 14px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .note { color: var(--muted); font-size: 13px; margin: -6px 0 14px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 14px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  ul.players { list-style: none; margin: 0 0 16px; padding: 0; }
+  ul.players li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+  ul.players li:first-child { border-top: 0; }
+  .tag { font-size: 12px; color: var(--accent-text); background: var(--accent); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
+  .level { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; }
+  label.check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  label.check input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+  label.check small { display: block; color: var(--muted); font-size: 12px; }
+  label.field { display: flex; flex-direction: column; gap: 4px; }
+  label.field span { color: var(--muted); font-size: 13px; }
+  select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 8px; font: inherit;
+  }
+  select:disabled { opacity: .45; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-top: 14px; }
+  .row > * { flex: 1 1 160px; }
+  button {
+    font: inherit; border-radius: 6px; padding: 9px 16px; cursor: pointer; border: 1px solid transparent;
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  button:disabled { opacity: .45; cursor: default; }
+  .savebar {
+    position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line);
+    padding: 12px 16px; display: none;
+  }
+  .savebar.show { display: block; }
+  .savebar div { max-width: 760px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+  #msg { color: var(--muted); font-size: 13px; min-height: 1em; }
+  #msg.error { color: var(--danger); }
+  #msg.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Anomaly co-op · сервер</h1>
+  <p class="sub">Общий мир, настройки и игроки.</p>
+
+  <section>
+    <h2>Мир</h2>
+    <div class="stats">
+      <div class="stat"><b id="revision">—</b><span>ревизия мира</span></div>
+      <div class="stat"><b id="owner">—</b><span>чей сейв</span></div>
+      <div class="stat"><b id="count">0</b><span>онлайн</span></div>
+    </div>
+    <ul class="players" id="players"></ul>
+    <button class="danger" id="reset">Сбросить мир</button>
+    <p class="note" id="reset-note" style="margin:10px 0 0">Удаляет мир, персонажей и выданные id. Только когда никого нет онлайн.</p>
+  </section>
+
+  <section>
+    <h2>Настройки мира</h2>
+    <p class="note">Применяются при создании нового мира: на уже идущий мир не влияют.</p>
+    <div class="grid" id="world-checks"></div>
+    <div class="row">
+      <label class="field"><span>Сложность игры</span>
+        <select id="difficulty"><option value="1">Лёгкая</option><option value="2">Средняя</option><option value="3">Тяжёлая</option></select>
+      </label>
+      <label class="field"><span>Экономика</span>
+        <select id="economy"><option value="1">Лёгкая</option><option value="2">Средняя</option><option value="3">Тяжёлая</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="ironman"><span>Ограниченные жизни<small>Хардкор: после последней смерти персонаж потерян</small></span></label>
+      <label class="field"><span>Жизней</span>
+        <select id="ironman_lives"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+      </label>
+      <label class="field"><span>Жизнь восстанавливается</span>
+        <select id="ironman_regen"><option value="0">никогда</option><option value="24">раз в 1 день</option><option value="72">раз в 3 дня</option><option value="120">раз в 5 дней</option></select>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Фракции</h2>
+    <p class="note">Из каких фракций игроки могут создать персонажа. Хотя бы одна.</p>
+    <div class="grid" id="factions"></div>
+  </section>
+</main>
+
+<div class="savebar" id="savebar">
+  <div>
+    <span id="msg"></span>
+    <button class="primary" id="save">Сохранить</button>
+  </div>
+</div>
+
+<script>
+  const WORLD_CHECKS = [
+    ['story', 'Сюжет', 'Сюжетные задания и закрытые до поры локации'],
+    ['warfare', 'Война группировок', 'Фракции захватывают территории'],
+    ['survival', 'Выживание', 'Жёсткий режим выживания Anomaly'],
+    ['campfire', 'Сохранение у костра', 'Сохраняться можно только у костра'],
+    ['conditions', 'Изношенные предметы', 'Найденные вещи в плохом состоянии'],
+    ['opened_routes', 'Открытые маршруты', 'Все переходы между локациями открыты'],
+  ];
+  const FACTION_NAMES = {
+    stalker: 'Одиночки', dolg: 'Долг', freedom: 'Свобода', csky: 'Чистое Небо', ecolog: 'Учёные',
+    killer: 'Наёмники', army: 'Военные', bandit: 'Бандиты', monolith: 'Монолит', renegade: 'Ренегаты',
+    greh: 'Грех', isg: 'ИСГ',
+  };
+
+  const $ = (id) => document.getElementById(id);
+  let dirty = false;
+
+  function check(id, title, hint) {
+    const label = document.createElement('label');
+    label.className = 'check';
+    label.innerHTML = `<input type="checkbox" id="${id}"><span></span>`;
+    label.querySelector('span').append(title);
+    if (hint) {
+      const small = document.createElement('small');
+      small.textContent = hint;
+      label.querySelector('span').append(small);
+    }
+    return label;
+  }
+
+  function markDirty() {
+    dirty = true;
+    $('savebar').classList.add('show');
+    setMsg('Есть несохранённые изменения');
+  }
+
+  function setMsg(text, kind = '') {
+    $('msg').textContent = text;
+    $('msg').className = kind;
+  }
+
+  function syncIronman() {
+    $('ironman_lives').disabled = $('ironman_regen').disabled = !$('ironman').checked;
+  }
+
+  function renderStatus(state) {
+    $('revision').textContent = state.world ? state.world.revision : '—';
+    $('owner').textContent = state.world ? state.world.owner : 'мира нет';
+    $('count').textContent = state.online.length;
+    const list = $('players');
+    list.replaceChildren();
+    if (!state.online.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Никого нет';
+      list.append(li);
+    }
+    for (const p of state.online) {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = p.name;
+      if (p.master) {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = 'мастер';
+        name.append(tag);
+      }
+      const level = document.createElement('span');
+      level.className = 'level';
+      level.textContent = p.level ?? 'в меню';
+      li.append(name, level);
+      list.append(li);
+    }
+    $('reset').disabled = state.online.length > 0;
+  }
+
+  function renderSettings(state) {
+    const w = state.settings.world;
+    for (const [key] of WORLD_CHECKS) $(key).checked = w[key];
+    for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) $(key).value = String(w[key]);
+    $('ironman').checked = w.ironman;
+    syncIronman();
+    for (const f of state.factions) $('f_' + f).checked = state.settings.factions.includes(f);
+    dirty = false;
+    $('savebar').classList.remove('show');
+  }
+
+  function collect() {
+    const world = {};
+    for (const [key] of WORLD_CHECKS) world[key] = $(key).checked;
+    for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) world[key] = Number($(key).value);
+    world.ironman = $('ironman').checked;
+    const factions = [...document.querySelectorAll('#factions input:checked')].map((i) => i.id.slice(2));
+    return { world, factions };
+  }
+
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+    return data;
+  }
+
+  async function refresh(first = false) {
+    try {
+      const state = await api('GET', '/api/state');
+      if (first) {
+        for (const f of state.factions) {
+          const label = check('f_' + f, FACTION_NAMES[f] ?? f);
+          $('factions').append(label);
+        }
+      }
+      renderStatus(state);
+      if (first || !dirty) renderSettings(state);
+    } catch (e) {
+      if (!dirty) setMsg('Сервер не отвечает', 'error');
+    }
+  }
+
+  for (const [key, title, hint] of WORLD_CHECKS) $('world-checks').append(check(key, title, hint));
+  document.addEventListener('change', (e) => {
+    if (e.target.closest('section')) {
+      syncIronman();
+      markDirty();
+    }
+  });
+
+  $('save').addEventListener('click', async () => {
+    const wanted = collect();
+    if (!wanted.factions.length) return setMsg('Нужна хотя бы одна фракция', 'error');
+    $('save').disabled = true;
+    try {
+      renderSettings(await api('PUT', '/api/settings', wanted));
+      $('savebar').classList.add('show');
+      setMsg('Сохранено', 'ok');
+      setTimeout(() => { if (!dirty) $('savebar').classList.remove('show'); }, 1500);
+    } catch (e) {
+      setMsg('Не сохранилось: ' + e.message, 'error');
+    } finally {
+      $('save').disabled = false;
+    }
+  });
+
+  $('reset').addEventListener('click', async () => {
+    if (!confirm('Удалить общий мир, всех персонажей и выданные id? Это необратимо.')) return;
+    try {
+      renderStatus(await api('POST', '/api/reset-world'));
+      $('reset-note').textContent = 'Мир удалён. Следующий игрок, создавший персонажа, создаст новый мир.';
+    } catch (e) {
+      $('reset-note').textContent = e.status === 409 ? 'Сначала все игроки должны выйти.' : 'Не получилось: ' + e.message;
+    }
+  });
+
+  refresh(true);
+  setInterval(refresh, 5000);
+</script>
+</body>
+</html>

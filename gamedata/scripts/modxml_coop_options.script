@@ -1,0 +1,48 @@
+-- Co-op: the "Co-op" tab in the game options. Connecting is the profile screen's (ui_coop_profiles.script).
+-- The colour sliders are kept by ui_options in axr_options.ltx; the autosave interval and the peer spot
+-- color are console variables (src/xrGame/console_commands.cpp), saved in user.ltx.
+
+local PATH = "coop/general/"
+
+local function value(name)
+	return ui_options.get(PATH .. name)
+end
+
+local function apply_color()
+	exec_console_cmd(string.format("coop_peer_color (%d, %d, %d, 255)",
+		math.floor(value("color_r")), math.floor(value("color_g")), math.floor(value("color_b"))))
+end
+
+local function color_track(id, def)
+	return { id = id, type = "track", val = 2, min = 0, max = 255, step = 1, def = def, functor = { apply_color } }
+end
+
+local GROUP = {
+	id = "coop",
+	gr = {
+		{
+			id = "general",
+			sh = true,
+			gr = {
+				{ id = "autosave_interval", type = "track", val = 2, cmd = "coop_autosave_interval", min = 0, max = 120, step = 1 },
+				{ id = "line_1", type = "line" },
+				{ id = "title_color", type = "title", text = "ui_mm_coop_general_title_color", align = "l" },
+				color_track("color_r", 90),
+				color_track("color_g", 200),
+				color_track("color_b", 255),
+			},
+		},
+	},
+}
+
+function on_xml_read()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local init_opt_base = ui_options.init_opt_base
+	ui_options.init_opt_base = function()
+		init_opt_base()
+		table.insert(ui_options.options, GROUP)
+	end
+	ui_options.init_opt_base()
+end

@@ -5,6 +5,7 @@
 #include "Actor.h"
 #include "map_location.h"
 #include "map_location_defs.h"
+#include "map_spot.h"
 #include "map_manager.h"
 #include "ai_space.h"
 #include "game_graph.h"
@@ -23,6 +24,8 @@ namespace coop
 	static LPCSTR PEER_SPOT_TYPES[eMarkerCount] = {"coop_peer_location", "coop_peer_location_p"};
 	static const u16 NO_OBJECT_ID = u16(-1);
 	static const float REGRAPH_DISTANCE = 10.f;
+
+	u32 peer_color = color_rgba(90, 200, 255, 255);
 
 	class CPeerLocation;
 	using marker_key = std::pair<u32, EMarker>; // peer id, marker kind
@@ -58,6 +61,11 @@ namespace coop
 				m_hint = peer.name.c_str();
 				SetHint(m_hint);
 			}
+
+			if (m_level_spot)
+				m_level_spot->SetTextureColor(peer_color);
+			if (m_minimap_spot)
+				m_minimap_spot->SetTextureColor(peer_color);
 
 			m_yaw = peer.yaw;
 			m_proxy->o_Position = peer.position;

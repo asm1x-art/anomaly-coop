@@ -34,9 +34,10 @@ namespace coop
 		M_WORLD_CHUNK = 19,     // both: u8 file, u32 offset, data
 		M_WORLD_DONE = 20,      // c->s: upload complete; s->c: stringZ owner, u32 revision
 		M_CHARACTER = 21,       // both: stringZ level, u16 game vertex, u32 level vertex, vec3 position, float yaw, u32 money, float health
+		M_SETTINGS = 22,        // s->c: stringZ "key=value" lines, world settings and allowed factions (coop-server/src/settings.js)
 	};
 
-	const u16 PROTOCOL_VERSION = 8;
+	const u16 PROTOCOL_VERSION = 9;
 
 	struct SPeer
 	{

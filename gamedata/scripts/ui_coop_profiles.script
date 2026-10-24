@@ -1,0 +1,241 @@
+-- Co-op: the profile screen, opened by the main menu's Co-op button (modxml_coop_menu.script).
+-- A profile is a player name and a server, kept per player in <profile folder>\coop_profiles.txt (appdata\,
+-- appdata2\ for the second test instance), the last used first. Enter connects with it and follows the
+-- server: no world there -> the new game screen creates it; a world without our character -> the new game
+-- screen makes one; our character is there -> the world loads by itself (src/xrGame/coop/coop_save.cpp).
+
+local FILE = "coop_profiles.txt"
+local DEFAULT_SERVER = "localhost:7777"
+local CONNECT_TIMEOUT_MS = 10000
+
+local function trim(s)
+	return string.match(s or "", "^%s*(.-)%s*$")
+end
+
+local function profiles_path()
+	return getFS():update_path("$app_data_root$", FILE)
+end
+
+-- { { name, server }, ... }, "name<tab>server" lines
+local function load_profiles()
+	local list = {}
+	local f = io.open(profiles_path(), "r")
+	if f then
+		for line in f:lines() do
+			local name, server = string.match(line, "^([^\t]+)\t(.+)$")
+			if name then
+				table.insert(list, { name = name, server = server })
+			end
+		end
+		f:close()
+	end
+	return list
+end
+
+local function save_profiles(list)
+	local f = io.open(profiles_path(), "w")
+	if not f then
+		printf("! [coop] can't write %s", profiles_path())
+		return
+	end
+	for _, p in ipairs(list) do
+		f:write(p.name, "\t", p.server, "\n")
+	end
+	f:close()
+end
+
+-- to the top of the list, replacing the same name and server
+local function remember(list, name, server)
+	for i = #list, 1, -1 do
+		if list[i].name == name and list[i].server == server then
+			table.remove(list, i)
+		end
+	end
+	table.insert(list, 1, { name = name, server = server })
+	save_profiles(list)
+end
+
+local shown = false
+
+-- the screen is up and follows a connection itself
+function is_shown()
+	return shown
+end
+
+class "UICoopProfiles" (CUIScriptWnd)
+
+function UICoopProfiles:__init(owner) super()
+	self.owner = owner
+	self:InitControls()
+	self:InitCallBacks()
+end
+
+function UICoopProfiles:__finalize()
+end
+
+function UICoopProfiles:InitControls()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_profiles.xml")
+
+	xml:InitStatic("background", self)
+	local form = xml:InitStatic("form", self)
+	xml:InitTextWnd("form:caption", form)
+
+	xml:InitFrame("form:list_frame", form)
+	self.list = xml:InitListBox("form:list", form)
+	self.list:ShowSelectedItem(true)
+	self:Register(self.list, "list")
+
+	xml:InitTextWnd("form:cap_name", form)
+	self.edit_name = xml:InitEditBox("form:edit_name", form)
+	self:Register(self.edit_name, "edit_name")
+	xml:InitTextWnd("form:cap_server", form)
+	self.edit_server = xml:InitEditBox("form:edit_server", form)
+	self:Register(self.edit_server, "edit_server")
+
+	self.status = xml:InitTextWnd("form:status", form)
+
+	for _, name in ipairs({ "btn_save", "btn_delete", "btn_enter", "btn_back" }) do
+		self:Register(xml:Init3tButton("form:" .. name, form), name)
+	end
+end
+
+function UICoopProfiles:InitCallBacks()
+	self:AddCallback("btn_save", ui_events.BUTTON_CLICKED, self.OnSave, self)
+	self:AddCallback("btn_delete", ui_events.BUTTON_CLICKED, self.OnDelete, self)
+	self:AddCallback("btn_enter", ui_events.BUTTON_CLICKED, self.OnEnter, self)
+	self:AddCallback("btn_back", ui_events.BUTTON_CLICKED, self.OnBack, self)
+	self:AddCallback("list", ui_events.LIST_ITEM_CLICKED, self.OnSelect, self)
+end
+
+function UICoopProfiles:SetStatus(key, ...)
+	self.status:SetText(strformat(game.translate_string(key), ...))
+end
+
+function UICoopProfiles:Fill()
+	self.profiles = load_profiles()
+	self.list:RemoveAll()
+	for _, p in ipairs(self.profiles) do
+		self.list:AddTextItem(p.name .. "   -   " .. p.server)
+	end
+	local first = self.profiles[1]
+	self.edit_name:SetText(first and first.name or "")
+	self.edit_server:SetText(first and first.server or DEFAULT_SERVER)
+	if first then
+		self.list:SetSelectedIndex(0)
+	end
+end
+
+function UICoopProfiles:Open()
+	self:Fill()
+	self.connect_started = nil
+	self:SetStatus(coop.connected() and "ui_mm_coop_status_connected" or "ui_mm_coop_status_idle", coop.my_name())
+	shown = true
+	self:ShowDialog(true)
+	self.owner:HideDialog()
+	self.owner:Show(false)
+end
+
+function UICoopProfiles:Close()
+	shown = false
+	self.connect_started = nil
+	self.owner:ShowDialog(true)
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	self.owner:Show(true)
+end
+
+function UICoopProfiles:Typed()
+	return trim(self.edit_name:GetText()), trim(self.edit_server:GetText())
+end
+
+function UICoopProfiles:OnSelect()
+	local p = self.profiles[self.list:GetSelectedIndex() + 1]
+	if p then
+		self.edit_name:SetText(p.name)
+		self.edit_server:SetText(p.server)
+	end
+end
+
+function UICoopProfiles:OnSave()
+	local name, server = self:Typed()
+	if name == "" or server == "" then
+		return self:SetStatus("ui_mm_coop_status_fill")
+	end
+	remember(self.profiles, name, server)
+	self:Fill()
+	self:SetStatus("ui_mm_coop_status_saved", name)
+end
+
+function UICoopProfiles:OnDelete()
+	local i = self.list:GetSelectedIndex() + 1
+	if not self.profiles[i] then
+		return
+	end
+	table.remove(self.profiles, i)
+	save_profiles(self.profiles)
+	self:Fill()
+end
+
+function UICoopProfiles:OnEnter()
+	local name, server = self:Typed()
+	if name == "" or server == "" then
+		return self:SetStatus("ui_mm_coop_status_fill")
+	end
+	local host, port = string.match(server, "^([^:]+):?(%d*)$")
+	if not host then
+		return self:SetStatus("ui_mm_coop_status_bad_server")
+	end
+	remember(self.profiles, name, server)
+	self:Fill()
+
+	printf("[coop] profile screen: entering %s as '%s'", server, name)
+	coop.disconnect() -- maybe connected as someone else
+	coop.connect(host, tonumber(port) or 7777, name, "")
+	self.connect_started = device():time_continual()
+	self:SetStatus("ui_mm_coop_status_connecting", server)
+end
+
+function UICoopProfiles:OnBack()
+	self:Close()
+end
+
+function UICoopProfiles:Update()
+	CUIScriptWnd.Update(self)
+	if not self.connect_started then
+		return
+	end
+
+	if not coop.connected() then
+		if not coop.link_up() or device():time_continual() - self.connect_started > CONNECT_TIMEOUT_MS then
+			self.connect_started = nil
+			coop.disconnect()
+			self:SetStatus("ui_mm_coop_status_failed")
+		end
+		return
+	end
+
+	local status = coop.world_status()
+	if status == "none" or status == "no_character" then
+		-- the new game screen creates the world or makes our character (modxml_coop_menu.script)
+		self:Close()
+		self.owner:ShowFactionUI()
+	elseif status == "exists" then
+		self.connect_started = nil
+		self:SetStatus("ui_mm_coop_status_loading")
+	end
+end
+
+function UICoopProfiles:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.DIK_ESCAPE then
+			self:OnBack()
+		elseif dik == DIK_keys.DIK_RETURN then
+			self:OnEnter()
+		end
+	end
+	return res
+end

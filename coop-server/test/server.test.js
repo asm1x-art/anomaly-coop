@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
-import { M, PROTOCOL_VERSION, encode, createDecoder } from '../src/protocol.js';
+import { M, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ } from '../src/protocol.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,11 +18,12 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
     if (type === M.WORLD_INFO) return client.worldInfo.push(msg.payload);
+    if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -32,10 +33,9 @@ function connect(port) {
 }
 
 function hello(name, version = PROTOCOL_VERSION) {
-  const p = Buffer.alloc(2 + Buffer.byteLength(name) + 1);
+  const p = Buffer.alloc(2);
   p.writeUInt16LE(version, 0);
-  p.write(name, 2);
-  return p;
+  return Buffer.concat([p, encodeText(name), Buffer.from([0])]);
 }
 
 test('hello -> welcome with unique ids, ping -> pong echoes time', async () => {
@@ -101,7 +101,7 @@ function actorState(level, x, y, z, yaw) {
 function parsePeerState(payload) {
   const id = payload.readUInt32LE(0);
   const nameEnd = payload.indexOf(0, 4);
-  const name = payload.toString('utf8', 4, nameEnd);
+  const name = readStringZ(payload, 4);
   const levelEnd = payload.indexOf(0, nameEnd + 1);
   const level = payload.toString('utf8', nameEnd + 1, levelEnd);
   const f = (i) => payload.readFloatLE(levelEnd + 1 + i * 4);
@@ -440,6 +440,27 @@ test('characters, leases and the world survive a server restart', async () => {
     assert.equal((await a.next()).payload.readUInt16LE(0), 5); // the block is still ours
     await roundTrip(a);
     assert.deepEqual(worldInfo(a.worldInfo[0]), { has: true, owner: 'artem', revision: 1 });
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('settings: sent after welcome and to everyone when the admin changes them', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next(); // WELCOME
+    await new Promise((r) => setTimeout(r, 20));
+    assert.match(a.settings[0], /^story=1$/m);
+    assert.match(a.settings[0], /^factions=stalker,dolg,/m);
+
+    server.coop.saveSettings({ world: { warfare: true }, factions: ['monolith'] });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.match(a.settings[1], /^warfare=1$/m);
+    assert.match(a.settings[1], /^factions=monolith$/m);
     a.socket.destroy();
   } finally {
     server.close();

@@ -7,6 +7,7 @@
 #include "Actor.h"
 #include "ai_object_location.h"
 #include "ai_space.h"
+#include "script_engine.h"
 #include "game_graph.h"
 #include "alife_simulator.h"
 #include "alife_object_registry.h"
@@ -15,6 +16,8 @@
 #include "../xrEngine/XR_IOConsole.h"
 #include <sys/stat.h>
 
+void set_character_name_script(CSE_ALifeTraderAbstract* ta, LPCSTR str); // xrServer_Objects_ALife_Monsters_script.cpp
+
 namespace coop
 {
 	static LPCSTR WORLD_SAVE = "coop_world";                 // the downloaded world, in the local saves
@@ -22,6 +25,9 @@ namespace coop
 	static const u32 WORLD_FILE_COUNT = 2;
 	static const u32 CHUNK = 15000;                          // file data per M_WORLD_CHUNK
 	static const u32 RECORD_INTERVAL_MS = 10000;
+	// a new game on an empty server becomes the world once it has run this long: the new game's
+	// scripts move the actor to the chosen start level on the first update
+	static const u32 CREATE_AFTER_MS = 10000;
 	static const u32 STARTING_MONEY = 5000;
 	// a player's first visit: their shadow has nothing for them yet
 	static LPCSTR STARTER_KIT[] = {"wpn_knife", "wpn_pm", "ammo_9x18_fmj", "ammo_9x18_fmj", "bandage", "bandage",
@@ -36,11 +42,18 @@ namespace coop
 		float yaw;
 		u32 money;
 		float health;
+		shared_str community; // "actor_<faction>", "" in records from before it was kept
 	};
 
 	int autosave_interval = 5;
 
 	static xr_string g_seed;
+	static xr_string g_settings;
+	static bool g_world_info_received = false;
+	static bool g_creating = false;       // this game is being saved and uploaded as the new world
+	static bool g_join_requested = false; // our new character is made: load the world (join_world)
+	static SCharacter g_join_start;       // where the new character starts; its level is found on load
+	static u32 g_running_since = 0;       // Device.dwTimeContinual when the level last started running, 0: not running
 	static bool g_server_has_world = false;
 	static xr_string g_server_owner;
 	static u32 g_server_revision = 0;
@@ -112,6 +125,15 @@ namespace coop
 		Msg("[coop] world uploaded from %s (%u + %u bytes)", save_name_no_ext, files[0].size(), files[1].size());
 	}
 
+	static bool is_mine(const xr_string& owner);
+	static void request_world();
+
+	// the server has a world we have never been in: a character is made first (Lua, the new game screen)
+	static bool needs_character()
+	{
+		return g_server_has_world && !g_has_record && !is_mine(g_server_owner) && !g_join_requested;
+	}
+
 	void set_world_seed(LPCSTR save_name)
 	{
 		g_seed = save_name ? save_name : "";
@@ -122,6 +144,19 @@ namespace coop
 		g_server_has_world = !!P.r_u8();
 		P.r_stringZ(g_server_owner);
 		g_server_revision = P.r_u32();
+		g_world_info_received = true;
+
+		if (g_creating && g_server_has_world)
+		{
+			g_creating = false;
+			if (is_mine(g_server_owner))
+			{
+				g_in_world = g_server_revision;
+				Msg("[coop] this game is the shared world now (revision %u)", g_in_world);
+				return;
+			}
+			Msg("[coop] '%s' started the world first, switching to it", g_server_owner.c_str());
+		}
 
 		if (!g_server_has_world)
 		{
@@ -140,6 +175,20 @@ namespace coop
 		if (g_in_world || g_downloading || g_load_pending || g_loading)
 			return;
 
+		if (needs_character())
+		{
+			// the new game screen makes it: _G.coop_on_character_needed() opens it, join_world comes back
+			Msg("[coop] no character of ours in this world yet: waiting for one");
+			::luabind::functor<void> handler;
+			if (ai().script_engine().functor("_G.coop_on_character_needed", handler))
+				handler();
+			return;
+		}
+		request_world();
+	}
+
+	static void request_world()
+	{
 		Msg("[coop] downloading the world (revision %u, by '%s')", g_server_revision, g_server_owner.c_str());
 		for (auto& file : g_download)
 			file.clear();
@@ -190,6 +239,66 @@ namespace coop
 		g_load_pending = true;
 	}
 
+	void on_settings(NET_Packet& P)
+	{
+		P.r_stringZ(g_settings);
+	}
+
+	const xr_string& world_settings()
+	{
+		return g_settings;
+	}
+
+	LPCSTR world_status()
+	{
+		if (!g_world_info_received)
+			return "unknown";
+		if (g_creating)
+			return "creating";
+		if (needs_character() && !g_in_world)
+			return "no_character";
+		return g_server_has_world ? "exists" : "none";
+	}
+
+	void join_world(u16 game_vertex, u32 level_vertex, const Fvector& position)
+	{
+		if (!needs_character() || g_in_world || g_downloading || g_load_pending || g_loading)
+			return;
+		g_join_start.game_vertex = game_vertex;
+		g_join_start.level_vertex = level_vertex;
+		g_join_start.position = position;
+		g_join_start.yaw = 0.f;
+		g_join_requested = true;
+		request_world();
+	}
+
+	LPCSTR character_community()
+	{
+		return g_has_record ? g_record.community.c_str() : "";
+	}
+
+	bool runs_shared_world()
+	{
+		return g_in_world || g_loading;
+	}
+
+	// the character is called by our co-op name, whoever's actor the save holds
+	static void name_actor()
+	{
+		if (CSE_ALifeCreatureActor* actor = ai().alife().graph().actor())
+			set_character_name_script(actor, my_name().c_str());
+	}
+
+	static void create_world()
+	{
+		Msg("[coop] the server has no world: this game becomes it");
+		name_actor();
+		g_creating = true;
+		string256 command;
+		xr_sprintf(command, "save %s", WORLD_SAVE);
+		Console->Execute(command); // on_game_saved uploads it
+	}
+
 	void on_character(NET_Packet& P)
 	{
 		P.r_stringZ(g_record.level);
@@ -199,6 +308,10 @@ namespace coop
 		g_record.yaw = P.r_float();
 		g_record.money = P.r_u32();
 		g_record.health = P.r_float();
+		if (P.r_elapsed())
+			P.r_stringZ(g_record.community);
+		else
+			g_record.community = "";
 		g_has_record = true;
 		Msg("[coop] our character is on %s", g_record.level.c_str());
 	}
@@ -214,6 +327,7 @@ namespace coop
 		P.w_float(Device.vCameraDirection.getH());
 		P.w_u32(g_actor->get_money());
 		P.w_float(g_actor->GetfHealth());
+		P.w_stringZ(g_actor->CharacterInfo().Community().id());
 		send(P);
 	}
 
@@ -260,8 +374,21 @@ namespace coop
 		if (!g_pending_upload.empty())
 			try_pending_upload();
 
-		if (!g_in_world || !world_ready())
+		if (!world_ready())
+		{
+			g_running_since = 0;
 			return;
+		}
+		if (!g_running_since)
+			g_running_since = Device.dwTimeContinual;
+
+		if (!g_in_world)
+		{
+			if (is_connected() && g_world_info_received && !g_server_has_world && !g_creating && !g_loading &&
+			    g_actor && g_actor->g_Alive() && Device.dwTimeContinual - g_running_since >= CREATE_AFTER_MS)
+				create_world();
+			return;
+		}
 
 		for (u16 id : g_starter_kit)
 			if (CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true))
@@ -278,6 +405,11 @@ namespace coop
 	void reset_world_sync()
 	{
 		g_server_has_world = false;
+		g_world_info_received = false;
+		g_creating = false;
+		g_join_requested = false;
+		g_has_record = false; // the next connection may be under another name
+		g_settings.clear();
 		g_downloading = false;
 		g_load_pending = false;
 		g_in_world = 0;
@@ -294,14 +426,14 @@ namespace coop
 
 	void on_game_saved(LPCSTR save_file_name)
 	{
-		if (!is_connected() || !g_in_world || !world_ready())
+		if (!is_connected() || !(g_in_world || g_creating) || !world_ready())
 			return;
 
 		send_record();
 		g_last_record = Device.dwTimeContinual;
 
 		// the sim master's game is the world; uploaded once its .scoc is written too
-		if (is_sim_master())
+		if (is_sim_master() || g_creating)
 		{
 			string_path name;
 			xr_strcpy(name, save_file_name);
@@ -325,25 +457,43 @@ namespace coop
 		return owner == my_name();
 	}
 
+	void on_save_loading(LPCSTR file_name)
+	{
+		// another save while the server has a world would be a second world drifting apart: play it alone
+		if (is_link_up() && !g_loading && g_server_has_world)
+		{
+			Msg("[coop] '%s' is not the shared world: disconnecting from the co-op server", file_name);
+			disconnect();
+		}
+	}
+
 	void on_world_objects_loaded()
 	{
-		if (!g_loading || is_mine(g_loading_owner) || !g_has_record)
+		if (!g_loading || is_mine(g_loading_owner) || !(g_has_record || g_join_requested))
 			return;
 
-		// The save's actor is someone else's: put ours where we were. Done before the objects are
-		// registered, so the level that gets loaded is ours.
+		// The save's actor is someone else's: put ours where we were, or a new character at its start.
+		// Done before the objects are registered, so the level that gets loaded is ours.
 		CSE_ALifeCreatureActor* actor = find_actor();
 		const CGameGraph& graph = ai().game_graph();
-		if (!actor || g_record.game_vertex >= graph.header().vertex_count() ||
-			graph.header().level(graph.vertex(g_record.game_vertex)->level_id()).name() != g_record.level)
+		SCharacter& where = g_has_record ? g_record : g_join_start;
+		if (!actor || where.game_vertex >= graph.header().vertex_count())
+		{
+			Msg("! [coop] our position doesn't fit this world, starting where the save is");
+			return;
+		}
+		const shared_str level = graph.header().level(graph.vertex(where.game_vertex)->level_id()).name();
+		if (g_has_record && level != where.level)
 		{
 			Msg("! [coop] our saved position doesn't fit this world, starting where the save is");
 			return;
 		}
-		actor->o_Position = g_record.position;
-		actor->o_Angle.set(0.f, g_record.yaw, 0.f);
-		actor->m_tGraphID = g_record.game_vertex;
-		actor->m_tNodeID = g_record.level_vertex;
+		actor->o_Position = where.position;
+		actor->o_Angle.set(0.f, where.yaw, 0.f);
+		actor->m_tGraphID = where.game_vertex;
+		actor->m_tNodeID = where.level_vertex;
+		if (!g_has_record)
+			Msg("[coop] our new character starts on %s", level.c_str());
 	}
 
 	// all of from's inventory goes to to, offline
@@ -367,6 +517,8 @@ namespace coop
 		g_loading = false;
 		g_in_world = g_loading_revision;
 
+		name_actor();
+
 		if (is_mine(g_loading_owner))
 		{
 			Msg("[coop] world loaded, our own character");
@@ -386,7 +538,7 @@ namespace coop
 		CSE_ALifeDynamicObject* my_shadow = ai().alife().objects().object(find_shadow_of(my_name()), true);
 		if (my_shadow)
 			move_inventory(my_shadow, actor);
-		else
+		else if (!g_join_requested) // a character made on the new game screen gets its loadout from there
 		{
 			// first time in this world: a starter kit, shared with the others once the level runs
 			for (LPCSTR section : STARTER_KIT)
@@ -404,6 +556,6 @@ namespace coop
 			actor->set_health(g_record.health);
 
 		Msg("[coop] world loaded with our character in place of '%s'%s", g_loading_owner.c_str(),
-		    my_shadow ? "" : " (first visit: starter kit)");
+		    my_shadow ? "" : g_join_requested ? " (new character)" : " (first visit: starter kit)");
 	}
 }
