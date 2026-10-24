@@ -16,6 +16,11 @@ namespace coop
 
 	static xr_map<xr_string, u16> g_shadows; // peer name -> id, a cache: ids are checked on every use
 
+	bool is_shadow(const CSE_Abstract* object)
+	{
+		return object && object->s_name == SHADOW_SECTION;
+	}
+
 	static xr_string shadow_name(const xr_string& peer_name)
 	{
 		return xr_string("coop_shadow_") + peer_name;

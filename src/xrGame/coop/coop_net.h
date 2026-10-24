@@ -21,9 +21,12 @@ namespace coop
 		M_ENTITY_DEATH = 8, // c->s->others: u16 object id, stringZ section, u16 killer id
 		M_ID_BLOCK_REQUEST = 9, // c->s: u16 free ids per id block (all blocks, as the client sees them)
 		M_ID_BLOCK_GRANT = 10,  // s->c: u16 block leased to this player, u16(-1) when none are left
+		// relayed to the others with the sender's client id in front (s->c: u32 sender, then the payload)
+		M_ITEM_PARENT = 11,     // c->s: u16 item, stringZ section, u8 place, place data (coop_world.cpp)
+		M_OBJECT_RELEASE = 12,  // c->s: u16 object, stringZ section
 	};
 
-	const u16 PROTOCOL_VERSION = 4;
+	const u16 PROTOCOL_VERSION = 5;
 
 	struct SPeer
 	{

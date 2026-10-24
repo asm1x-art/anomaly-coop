@@ -9,6 +9,7 @@
 #include "stdafx.h"
 #include "alife_graph_registry.h"
 #include "../xrEngine/x_ray.h"
+#include "coop/coop_world.h"
 
 using namespace ALife;
 
@@ -112,6 +113,7 @@ void CALifeGraphRegistry::attach(CSE_Abstract& object, CSE_ALifeInventoryItem* i
 	R_ASSERT2(!alife_query || dynamic_object, "Cannot attach an item to a non-alife object object");
 
 	dynamic_object->attach(item, alife_query, add_children);
+	coop::on_item_attached(object, item);
 }
 
 void CALifeGraphRegistry::detach(CSE_Abstract& object, CSE_ALifeInventoryItem* item,
@@ -152,6 +154,7 @@ void CALifeGraphRegistry::detach(CSE_Abstract& object, CSE_ALifeInventoryItem* i
 #endif // DEBUG
 		//		R_ASSERT2				(value,"Can't detach an item which is not on my own");
 	}
+	coop::on_item_detached(object, item, game_vertex_id);
 }
 
 void CALifeGraphRegistry::add(CSE_ALifeDynamicObject* object, GameGraph::_GRAPH_ID game_vertex_id, bool update)

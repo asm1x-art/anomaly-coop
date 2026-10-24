@@ -26,6 +26,7 @@
 #pragma warning(push)
 #pragma warning(disable:4995)
 #include <malloc.h>
+#include "coop/coop_world.h"
 #pragma warning(pop)
 
 using namespace ALife;
@@ -276,6 +277,12 @@ void CALifeSimulatorBase::release(CSE_Abstract* abstract, bool alife_query)
 	CSE_ALifeDynamicObject* object = objects().object(abstract->ID);
 	VERIFY(object);
 
+	// co-op: report the released object once, its contents go with it
+	static u32 release_depth = 0;
+	if (!release_depth)
+		coop::on_object_released(abstract);
+	++release_depth;
+
 	if (!object->children.empty())
 	{
 		u32 children_count = object->children.size();
@@ -297,6 +304,8 @@ void CALifeSimulatorBase::release(CSE_Abstract* abstract, bool alife_query)
 			release(child, alife_query);
 		}
 	}
+
+	--release_depth;
 
 	unregister_object(object, alife_query);
 

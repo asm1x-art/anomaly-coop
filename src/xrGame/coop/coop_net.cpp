@@ -286,6 +286,12 @@ namespace coop
 		case M_ID_BLOCK_GRANT:
 			on_id_block_granted(P);
 			break;
+		case M_ITEM_PARENT:
+			apply_item_parent(P);
+			break;
+		case M_OBJECT_RELEASE:
+			apply_object_release(P);
+			break;
 		case M_ENTITY_DEATH:
 			apply_entity_death(P);
 			break;

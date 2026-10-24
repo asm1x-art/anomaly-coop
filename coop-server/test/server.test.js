@@ -216,3 +216,35 @@ test('id blocks: most free unleased block, never shared, kept across reconnect',
     server.close();
   }
 });
+
+test('item and release events reach others prefixed with the sender id', async () => {
+  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('друг'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    await b.next();
+
+    const parent = Buffer.concat([Buffer.from([0x10, 0x27]), Buffer.from('medkit\0'), Buffer.from([2])]);
+    a.send(M.ITEM_PARENT, parent);
+    const got = await b.next();
+    assert.equal(got.type, M.ITEM_PARENT);
+    assert.equal(got.payload.readUInt32LE(0), idA);
+    assert.deepEqual(got.payload.subarray(4), parent);
+
+    const release = Buffer.concat([Buffer.from([0x10, 0x27]), Buffer.from('medkit\0')]);
+    a.send(M.OBJECT_RELEASE, release);
+    const rel = await b.next();
+    assert.equal(rel.type, M.OBJECT_RELEASE);
+    assert.equal(rel.payload.readUInt32LE(0), idA);
+    assert.deepEqual(rel.payload.subarray(4), release);
+
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

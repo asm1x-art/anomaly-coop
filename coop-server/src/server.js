@@ -73,6 +73,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', log = console.log }
         case M.ENTITY_DEATH:
           broadcast(id, type, Buffer.from(payload));
           break;
+        case M.ITEM_PARENT:
+        case M.OBJECT_RELEASE:
+          // receivers need to know whose actor "the sender's actor" is
+          broadcast(id, type, Buffer.concat([u32(id), payload]));
+          break;
         default:
           log(`[${id}] unknown message type ${type}`);
       }

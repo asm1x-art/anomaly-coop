@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -18,6 +18,9 @@ export const M = {
   ENTITY_DEATH: 8, // c->s->others: u16 object id, stringZ section, u16 killer id
   ID_BLOCK_REQUEST: 9, // c->s: u16 free ids per id block, for all ID_BLOCK_COUNT blocks
   ID_BLOCK_GRANT: 10,  // s->c: u16 block leased to this player, NO_BLOCK when none are left
+  // world changes relayed with the sender's client id in front (s->c: u32 sender id, then the c->s payload)
+  ITEM_PARENT: 11,    // c->s: u16 item, stringZ section, u8 place (PLACE), place data
+  OBJECT_RELEASE: 12, // c->s: u16 object, stringZ section
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
