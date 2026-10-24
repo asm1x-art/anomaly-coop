@@ -14,9 +14,38 @@ local function run(name, f)
 	end
 end
 
+local function barman_items()
+	local barman = get_story_object("bar_visitors_barman_stalker_trader")
+	if not barman then
+		return "offline"
+	end
+	local n = 0
+	barman:iterate_inventory(function() n = n + 1 end)
+	return n
+end
+
 local function step1()
 	log("connected=%s master=%s authority(bar)=%s", tostring(coop.connected()), tostring(coop.is_sim_master()),
 		tostring(coop.is_authority(level.name())))
+
+	log("barman items after load: %s", barman_items())
+
+	if not coop.is_sim_master() then
+		run("take from online inventory", function()
+			-- like searching a corpse both players stand next to: the item is online in both worlds
+			local barman = get_story_object("bar_visitors_barman_stalker_trader")
+			local item
+			barman:iterate_inventory(function(_, obj)
+				if not item and obj:section() ~= "device_pda_npc" then
+					item = obj
+				end
+			end)
+			if item then
+				barman:transfer_item(item, db.actor)
+				log("took %s (id=%s) out of the barman", item:section(), item:id())
+			end
+		end)
+	end
 
 	run("trader", function()
 		local barman = get_story_object("bar_visitors_barman_stalker_trader")
@@ -89,6 +118,7 @@ local function step1()
 end
 
 local function step2()
+	log("barman items at the end: %s", barman_items())
 	-- the other side reports what arrived
 	for id, v in pairs(treasure_manager.caches) do
 		if v == true then

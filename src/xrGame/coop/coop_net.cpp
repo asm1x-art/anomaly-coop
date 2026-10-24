@@ -444,11 +444,29 @@ namespace coop
 			std::lock_guard<std::mutex> lock(m_inbox_lock);
 			inbox.swap(m_inbox);
 		}
-		for (const xr_vector<u8>& msg : inbox)
+		// World changes that arrive while our level loads wait for it, in order: the other world kept
+		// going meanwhile (a trader restocked on its first update...), and dropping them loses that.
+		const bool ready = world_ready();
+		std::deque<xr_vector<u8>> deferred;
+		for (xr_vector<u8>& msg : inbox)
 		{
+			const u16 type = *(const u16*)msg.data();
+			const bool world_change = type == M_ENTITY_DEATH || type == M_ITEM_PARENT || type == M_OBJECT_RELEASE ||
+				type == M_OBJECT_SPAWN || type == M_SCRIPT_EVENT;
+			if (world_change && !ready)
+			{
+				deferred.push_back(std::move(msg));
+				continue;
+			}
 			NET_Packet P;
 			P.construct(msg.data(), (u32)msg.size());
 			handle(P);
+		}
+		if (!deferred.empty())
+		{
+			std::lock_guard<std::mutex> lock(m_inbox_lock);
+			m_inbox.insert(m_inbox.begin(), std::make_move_iterator(deferred.begin()),
+			               std::make_move_iterator(deferred.end()));
 		}
 		update_map_markers();
 		update_id_blocks();

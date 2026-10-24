@@ -72,6 +72,11 @@ namespace coop
 		return g_pGameLevel && g_pGameLevel->bReady && g_actor && ai().get_alife();
 	}
 
+	bool world_ready()
+	{
+		return level_running();
+	}
+
 	static bool should_send()
 	{
 		return !g_applying && level_running() && is_connected();
@@ -347,14 +352,13 @@ namespace coop
 		// Everything below is done offline. An online item on the ground can be taken offline,
 		// but moving items between online inventories needs client-side transfers: not yet.
 		CSE_ALifeDynamicObject* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
-		if (object->m_bOnline && holder)
-			return skip("move", id, "it is in an online inventory here");
 		if (target && target->m_bOnline)
 		{
-			// An offline item going into an online inventory here (e.g. a trader's restock, which spawns
-			// items on the ground and hands them over): recreate it, same id, right inside the holder.
-			if (object->m_bOnline || holder)
-				return skip("move", id, "its new holder is online here");
+			// An offline item going into an online inventory here (a trader's restock spawns items on
+			// the ground and hands them over; something put out of a shadow into a box next to us):
+			// recreate it, same id, right inside the holder.
+			if (object->m_bOnline)
+				return skip("move", id, "both it and its new holder are online here");
 			respawn_into(object, target);
 			return;
 		}
@@ -364,6 +368,13 @@ namespace coop
 			    object->name_replace(), id);
 
 		g_applying = true;
+		if (object->m_bOnline && holder)
+		{
+			// Taken out of an inventory that is online here (a corpse next to both of us): the server
+			// drops it like a rejected item, then it goes offline like anything else on the ground.
+			alife_rw().server().Perform_reject(object, holder, 0);
+			holder = nullptr;
+		}
 		if (object->m_bOnline)
 			alife_rw().switch_offline(object);
 		if (holder)

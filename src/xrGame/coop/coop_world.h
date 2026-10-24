@@ -22,6 +22,9 @@ namespace coop
 	// called from CALifeSimulatorBase::register_object, which every new A-Life object goes through
 	void on_object_registered(CSE_ALifeDynamicObject* object);
 
+	// a level is running: world changes can be applied and sent (not while loading or tearing down)
+	bool world_ready();
+
 	// for Lua wrappers around Anomaly's world logic
 	void begin_shared_spawns();
 	void end_shared_spawns();
