@@ -88,6 +88,11 @@ namespace coop
 		return id;
 	}
 
+	u16 find_shadow_of(const xr_string& peer_name)
+	{
+		return ai().get_alife() ? find_shadow(shadow_name(peer_name)) : NO_ID;
+	}
+
 	void update_shadows()
 	{
 		if (!g_actor)

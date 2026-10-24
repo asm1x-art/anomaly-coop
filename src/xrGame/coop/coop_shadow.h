@@ -13,6 +13,8 @@ namespace coop
 
 	// id of the peer's shadow, created on first use; u16(-1) while no world is loaded
 	u16 shadow_of(const xr_string& peer_name);
+	// the same without creating it: u16(-1) if the world has none
+	u16 find_shadow_of(const xr_string& peer_name);
 
 	void update_shadows(); // per frame: every known peer gets a shadow
 	void print_shadow_status();

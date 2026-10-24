@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
 import { M, PROTOCOL_VERSION, encode, createDecoder } from '../src/protocol.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// every server gets its own data directory
+function options(dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'))) {
+  return { port: 0, host: '127.0.0.1', dataDir, log: () => {} };
+}
 
 // Minimal client speaking the same wire format as the engine.
 function connect(port) {
@@ -10,10 +18,11 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [] };
+  const client = { socket, roles: [], worldInfo: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
+    if (type === M.WORLD_INFO) return client.worldInfo.push(msg.payload);
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -30,7 +39,7 @@ function hello(name, version = PROTOCOL_VERSION) {
 }
 
 test('hello -> welcome with unique ids, ping -> pong echoes time', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -59,7 +68,7 @@ test('hello -> welcome with unique ids, ping -> pong echoes time', async () => {
 });
 
 test('frames split across chunks are reassembled', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   try {
     const c = await connect(server.address().port);
     const frame = encode(M.HELLO, hello('split'));
@@ -72,7 +81,7 @@ test('frames split across chunks are reassembled', async () => {
 });
 
 test('wrong protocol version is dropped', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   try {
     const c = await connect(server.address().port);
     const closed = new Promise((r) => c.socket.on('close', r));
@@ -100,7 +109,7 @@ function parsePeerState(payload) {
 }
 
 test('actor state is relayed to others, replayed to newcomers, and leave is announced', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -136,7 +145,7 @@ test('actor state is relayed to others, replayed to newcomers, and leave is anno
 });
 
 test('messages before HELLO are rejected', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   try {
     const c = await connect(server.address().port);
     const closed = new Promise((r) => c.socket.on('close', r));
@@ -148,7 +157,7 @@ test('messages before HELLO are rejected', async () => {
 });
 
 test('entity death is relayed to everyone except the sender', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -183,7 +192,7 @@ function freeCounts(map) {
 }
 
 test('id blocks: most free unleased block, never shared, kept across reconnect', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -221,7 +230,7 @@ test('id blocks: most free unleased block, never shared, kept across reconnect',
 });
 
 test('item, release and spawn events reach others prefixed with the sender id', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -266,7 +275,7 @@ async function roundTrip(c) {
 }
 
 test('the longest-connected player is sim master, handed over when it leaves', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -291,7 +300,7 @@ test('the longest-connected player is sim master, handed over when it leaves', a
 });
 
 test('script events reach others with the sender id', async () => {
-  const server = await startServer({ port: 0, host: '127.0.0.1', log: () => {} });
+  const server = await startServer(options());
   const { port } = server.address();
   try {
     const a = await connect(port);
@@ -309,6 +318,129 @@ test('script events reach others with the sender id', async () => {
     assert.deepEqual(got.payload.subarray(4), event);
     a.socket.destroy();
     b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function worldInfo(payload) {
+  const end = payload.indexOf(0, 1);
+  return { has: payload[0] === 1, owner: payload.toString('utf8', 1, end), revision: payload.readUInt32LE(end + 1) };
+}
+
+function chunks(data, file) {
+  const out = [];
+  for (let offset = 0; offset < data.length; offset += 15000)
+    out.push(Buffer.concat([Buffer.from([file]), (() => { const b = Buffer.alloc(4); b.writeUInt32LE(offset); return b; })(), data.subarray(offset, offset + 15000)]));
+  return out;
+}
+
+async function uploadWorld(c, files) {
+  const sizes = Buffer.alloc(8);
+  sizes.writeUInt32LE(files[0].length, 0);
+  sizes.writeUInt32LE(files[1].length, 4);
+  c.send(M.WORLD_UPLOAD, sizes);
+  files.forEach((data, file) => chunks(data, file).forEach((ch) => c.send(M.WORLD_CHUNK, ch)));
+  c.send(M.WORLD_DONE);
+}
+
+test('world: uploaded into an empty server, announced to all, downloaded in chunks', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    await roundTrip(a);
+    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: false, owner: '', revision: 0 });
+
+    const scop = Buffer.alloc(40000, 7);
+    scop.write('scop', 0);
+    const scoc = Buffer.from('lua state');
+    await uploadWorld(a, [scop, scoc]);
+    await roundTrip(a);
+    assert.deepEqual(worldInfo(a.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 1 });
+
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    await b.next();
+    await roundTrip(b);
+    assert.deepEqual(worldInfo(b.worldInfo[0]), { has: true, owner: 'artem', revision: 1 });
+
+    b.send(M.WORLD_REQUEST);
+    const files = [Buffer.alloc(scop.length), Buffer.alloc(scoc.length)];
+    for (;;) {
+      const msg = await b.next();
+      if (msg.type === M.WORLD_DONE) {
+        assert.equal(msg.payload.toString('utf8', 0, msg.payload.indexOf(0)), 'artem');
+        break;
+      }
+      assert.equal(msg.type, M.WORLD_CHUNK);
+      msg.payload.copy(files[msg.payload[0]], msg.payload.readUInt32LE(1), 5);
+    }
+    assert.deepEqual(files[0], scop);
+    assert.deepEqual(files[1], scoc);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('world: only the sim master replaces an existing world', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    await uploadWorld(a, [Buffer.from('first'), Buffer.from('x')]);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    await b.next();
+    await uploadWorld(b, [Buffer.from('second'), Buffer.from('y')]);
+    await roundTrip(b);
+    await roundTrip(a);
+    assert.equal(worldInfo(b.worldInfo.at(-1)).revision, 1);
+    assert.equal(worldInfo(a.worldInfo.at(-1)).owner, 'artem');
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('characters, leases and the world survive a server restart', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  let server = await startServer(options(dataDir));
+  const view = Buffer.alloc(512);
+  view.writeUInt16LE(100, 5 * 2);
+  try {
+    const a = await connect(server.address().port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    a.send(M.CHARACTER, Buffer.from('my record'));
+    a.send(M.ID_BLOCK_REQUEST, view);
+    assert.equal((await a.next()).payload.readUInt16LE(0), 5);
+    await uploadWorld(a, [Buffer.from('world'), Buffer.from('lua')]);
+    await roundTrip(a);
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+
+  server = await startServer(options(dataDir));
+  try {
+    const a = await connect(server.address().port);
+    a.send(M.HELLO, hello('artem'));
+    assert.equal((await a.next()).type, M.WELCOME);
+    const record = await a.next();
+    assert.equal(record.type, M.CHARACTER);
+    assert.equal(record.payload.toString(), 'my record');
+    assert.equal((await a.next()).payload.readUInt16LE(0), 5); // the block is still ours
+    await roundTrip(a);
+    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: true, owner: 'artem', revision: 1 });
+    a.socket.destroy();
   } finally {
     server.close();
   }

@@ -2008,6 +2008,7 @@
     <ClInclude Include="coop\coop_ids.h" />
     <ClInclude Include="coop\coop_map.h" />
     <ClInclude Include="coop\coop_net.h" />
+    <ClInclude Include="coop\coop_save.h" />
     <ClInclude Include="coop\coop_shadow.h" />
     <ClInclude Include="coop\coop_world.h" />
     <ClInclude Include="xr_time.h" />
@@ -3111,6 +3112,7 @@
     <ClCompile Include="coop\coop_map.cpp" />
     <ClCompile Include="coop\coop_net.cpp" />
     <ClCompile Include="coop\coop_world.cpp" />
+    <ClCompile Include="coop\coop_save.cpp" />
     <ClCompile Include="coop\coop_shadow.cpp" />
     <ClCompile Include="coop\coop_script.cpp">
       <PrecompiledHeaderFile>pch_script.h</PrecompiledHeaderFile>

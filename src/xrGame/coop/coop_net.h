@@ -27,9 +27,16 @@ namespace coop
 		M_OBJECT_SPAWN = 13,    // c->s: u16 size, the engine's M_SPAWN packet (CSE_Abstract::Spawn_Write)
 		M_SCRIPT_EVENT = 14,    // c->s: stringZ name, stringZ payload; Lua-level state, see coop.send_event
 		M_ROLES = 15,           // s->c: u32 sim master id, on every join/leave
+		// the shared world, a save kept by the server (coop_save.cpp); files go in chunks
+		M_WORLD_INFO = 16,      // s->c: u8 has world, stringZ owner, u32 revision
+		M_WORLD_REQUEST = 17,   // c->s: send me the world
+		M_WORLD_UPLOAD = 18,    // c->s: u32 size per file (.scop, .scoc)
+		M_WORLD_CHUNK = 19,     // both: u8 file, u32 offset, data
+		M_WORLD_DONE = 20,      // c->s: upload complete; s->c: stringZ owner, u32 revision
+		M_CHARACTER = 21,       // both: stringZ level, u16 game vertex, u32 level vertex, vec3 position, float yaw, u32 money, float health
 	};
 
-	const u16 PROTOCOL_VERSION = 7;
+	const u16 PROTOCOL_VERSION = 8;
 
 	struct SPeer
 	{
@@ -54,6 +61,7 @@ namespace coop
 	// Only the given message types are handled, the rest stays queued; false on timeout or lost link.
 	bool wait_for_messages(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
 	u32 my_id();
+	const xr_string& my_name();
 	const peers_t& peers();
 
 	// Who runs world logic. The sim master (the longest-connected player) runs offline A-Life and the

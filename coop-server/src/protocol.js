@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -24,9 +24,17 @@ export const M = {
   OBJECT_SPAWN: 13,   // c->s: u16 size, the engine's M_SPAWN packet for the new object
   SCRIPT_EVENT: 14,   // c->s: stringZ name, stringZ payload (Lua-level state sync), relayed like the above
   ROLES: 15,          // s->c: u32 sim master id (the longest-connected player), sent to all on every join/leave
+  // The shared world is a save stored on the server (storage.js). Files go in chunks both ways.
+  WORLD_INFO: 16,     // s->c: u8 has world, stringZ owner, u32 revision; after WELCOME and to all on every upload
+  WORLD_REQUEST: 17,  // c->s: send me the world
+  WORLD_UPLOAD: 18,   // c->s: u32 size per world file (WORLD_FILES order); only from the sim master, or into an empty server
+  WORLD_CHUNK: 19,    // both: u8 file, u32 offset, data
+  WORLD_DONE: 20,     // c->s: upload complete; s->c: download complete, stringZ owner, u32 revision
+  CHARACTER: 21,      // c->s: the player's own record (opaque here); s->c: that record, right after WELCOME
 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit
+export const CHUNK_SIZE = 15000; // file data per WORLD_CHUNK, fits a NET_Packet with its header
 
 export function encode(type, payload = Buffer.alloc(0)) {
   const frame = Buffer.alloc(6 + payload.length);

@@ -25,6 +25,9 @@ namespace coop
 	// a level is running: world changes can be applied and sent (not while loading or tearing down)
 	bool world_ready();
 
+	// sends an object to the others as a whole, as when our actor takes something new
+	void share_object(CSE_ALifeDynamicObject* object);
+
 	// for Lua wrappers around Anomaly's world logic
 	void begin_shared_spawns();
 	void end_shared_spawns();

@@ -39,6 +39,7 @@
 #include "ui/UIStatic.h"
 #include "zone_effector.h"
 #include "coop/coop_net.h"
+#include "coop/coop_save.h"
 #include "GameTask.h"
 #include "MainMenu.h"
 #include "saved_game_wrapper.h"
@@ -413,16 +414,17 @@ class CCC_CoopConnect : public IConsole_Command
 public:
 	CCC_CoopConnect(LPCSTR N) : IConsole_Command(N) {}
 
-	// coop_connect <host>[:port] [name]
+	// coop_connect <host>[:port] [name] [save to start the world from, if the server has none]
 	virtual void Execute(LPCSTR args)
 	{
-		string256 address = "", name = "";
-		sscanf(args, "%255s %255s", address, name);
+		string256 address = "", name = "", seed = "";
+		sscanf(args, "%255s %255s %255s", address, name, seed);
 		if (!xr_strlen(address))
 		{
-			Msg("! usage: coop_connect <host>[:port] [name]");
+			Msg("! usage: coop_connect <host>[:port] [name] [seed save]");
 			return;
 		}
+		coop::set_world_seed(seed);
 
 		u16 port = 7777;
 		if (char* colon = strchr(address, ':'))

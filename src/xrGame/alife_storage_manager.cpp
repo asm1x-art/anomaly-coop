@@ -26,6 +26,7 @@
 #ifdef ENGINE_LUA_ALIFE_STORAGE_MANAGER_CALLBACKS
 #include "pch_script.h"
 #include "../../xrServerEntities/script_engine.h"
+#include "coop/coop_save.h"
 #endif
 //-Alundaio
 
@@ -118,6 +119,7 @@ void CALifeStorageManager::save(LPCSTR save_name_no_check, bool update_name)
 		funct2((LPCSTR)m_save_name);
 #endif
 	//-Alundaio
+	coop::on_game_saved(m_save_name);
 
 	if (!update_name)
 		xr_strcpy(m_save_name, save);
@@ -139,6 +141,7 @@ void CALifeStorageManager::load(void* buffer, const u32& buffer_size, LPCSTR fil
 	spawns().load(source, file_name);
 	graph().on_load();
 	objects().load(source);
+	coop::on_world_objects_loaded();
 	spawns().remap_legacy(objects().objects());
 
 	VERIFY(can_register_objects());
@@ -224,6 +227,7 @@ bool CALifeStorageManager::load(LPCSTR save_name_no_check)
 	xr_free(source_data);
 
 	groups().on_after_game_load();
+	coop::on_world_loaded();
 
 	VERIFY(graph().actor());
 

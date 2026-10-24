@@ -180,6 +180,12 @@ namespace coop
 		Msg("[coop] got %s (id=%u), sent", object->name_replace(), object->ID);
 	}
 
+	void share_object(CSE_ALifeDynamicObject* object)
+	{
+		local_objects().erase(object->ID);
+		send_spawn(object);
+	}
+
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item)
 	{
 		if (!should_send() || is_shadow(&parent))

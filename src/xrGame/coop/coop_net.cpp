@@ -4,6 +4,7 @@
 #include "coop_world.h"
 #include "coop_ids.h"
 #include "coop_shadow.h"
+#include "coop_save.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -45,6 +46,7 @@ namespace coop
 		bool welcomed() const { return m_welcomed; }
 		u32 id() const { return m_client_id; }
 		u32 master() const { return m_master_id; }
+		const xr_string& name() const { return m_name; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
 		bool wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
@@ -81,6 +83,7 @@ namespace coop
 		u32 m_rtt = 0;
 
 		peers_t m_peers;
+		xr_set<u32> m_left; // client ids are never reused
 	};
 
 	static CClient g_client;
@@ -125,6 +128,7 @@ namespace coop
 		m_rtt = 0;
 		m_inbox.clear();
 		m_peers.clear();
+		m_left.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -163,6 +167,7 @@ namespace coop
 		m_peers.clear();
 		clear_map_markers();
 		reset_id_blocks();
+		reset_world_sync();
 	}
 
 	void CClient::status() const
@@ -178,6 +183,7 @@ namespace coop
 				    VPUSH(peer.position));
 			print_id_status();
 			print_shadow_status();
+			print_world_status();
 			break;
 		case eFailed: Msg("[coop] status: failed (%s)", m_error.c_str()); break;
 		}
@@ -333,6 +339,18 @@ namespace coop
 		case M_SCRIPT_EVENT:
 			on_script_event(P);
 			break;
+		case M_WORLD_INFO:
+			on_world_info(P);
+			break;
+		case M_WORLD_CHUNK:
+			on_world_chunk(P);
+			break;
+		case M_WORLD_DONE:
+			on_world_done(P);
+			break;
+		case M_CHARACTER:
+			on_character(P);
+			break;
 		case M_PEER_LEFT:
 		{
 			u32 id = P.r_u32();
@@ -342,6 +360,7 @@ namespace coop
 				Msg("[coop] '%s' (id=%u) left", it->second.name.c_str(), id);
 				m_peers.erase(it);
 			}
+			m_left.insert(id);
 			break;
 		}
 		default:
@@ -430,6 +449,7 @@ namespace coop
 			m_peers.clear();
 			clear_map_markers();
 			reset_id_blocks();
+			reset_world_sync();
 			return;
 		}
 
@@ -446,14 +466,27 @@ namespace coop
 		}
 		// World changes that arrive while our level loads wait for it, in order: the other world kept
 		// going meanwhile (a trader restocked on its first update...), and dropping them loses that.
+		// Those relayed with the sender's id also wait until we know the sender (its first PEER_STATE),
+		// since "the sender's actor" is their shadow, found by name. Once one waits, all later world
+		// changes wait too, so they stay in order.
 		const bool ready = world_ready();
+		bool hold = !ready;
 		std::deque<xr_vector<u8>> deferred;
 		for (xr_vector<u8>& msg : inbox)
 		{
 			const u16 type = *(const u16*)msg.data();
-			const bool world_change = type == M_ENTITY_DEATH || type == M_ITEM_PARENT || type == M_OBJECT_RELEASE ||
-				type == M_OBJECT_SPAWN || type == M_SCRIPT_EVENT;
-			if (world_change && !ready)
+			const bool from_sender = type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
+				type == M_SCRIPT_EVENT;
+			const bool world_change = from_sender || type == M_ENTITY_DEATH;
+			if (from_sender && msg.size() >= sizeof(u16) + sizeof(u32))
+			{
+				const u32 sender = *(const u32*)(msg.data() + sizeof(u16));
+				if (m_left.count(sender))
+					continue; // that player is gone: no shadow to apply it to
+				if (!m_peers.count(sender))
+					hold = true;
+			}
+			if (world_change && hold)
 			{
 				deferred.push_back(std::move(msg));
 				continue;
@@ -471,6 +504,7 @@ namespace coop
 		update_map_markers();
 		update_id_blocks();
 		update_shadows();
+		update_world_sync();
 
 		if (!m_welcomed)
 			return;
@@ -520,6 +554,7 @@ namespace coop
 	}
 	void send(NET_Packet& P) { g_client.send(P); }
 	u32 my_id() { return g_client.id(); }
+	const xr_string& my_name() { return g_client.name(); }
 
 	bool is_sim_master()
 	{
