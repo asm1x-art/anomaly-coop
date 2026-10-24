@@ -3,6 +3,7 @@
 #include "coop_map.h"
 #include "coop_world.h"
 #include "coop_ids.h"
+#include "coop_shadow.h"
 #include "Level.h"
 #include "Actor.h"
 
@@ -156,6 +157,7 @@ namespace coop
 				Msg("[coop]   peer %u '%s' on %s at [%.1f %.1f %.1f]", id, peer.name.c_str(), peer.level.c_str(),
 				    VPUSH(peer.position));
 			print_id_status();
+			print_shadow_status();
 			break;
 		case eFailed: Msg("[coop] status: failed (%s)", m_error.c_str()); break;
 		}
@@ -406,6 +408,7 @@ namespace coop
 		}
 		update_map_markers();
 		update_id_blocks();
+		update_shadows();
 
 		if (!m_welcomed)
 			return;

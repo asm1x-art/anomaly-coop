@@ -6501,6 +6501,9 @@
     <ClInclude Include="coop\coop_world.h">
       <Filter>coop</Filter>
     </ClInclude>
+    <ClInclude Include="coop\coop_shadow.h">
+      <Filter>coop</Filter>
+    </ClInclude>
     <ClInclude Include="coop\coop_net.h">
       <Filter>coop</Filter>
     </ClInclude>
@@ -8961,6 +8964,9 @@
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_world.cpp">
+      <Filter>coop</Filter>
+    </ClCompile>
+    <ClCompile Include="coop\coop_shadow.cpp">
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_script.cpp">
