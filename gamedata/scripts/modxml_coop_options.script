@@ -25,6 +25,7 @@ local GROUP = {
 			sh = true,
 			gr = {
 				{ id = "autosave_interval", type = "track", val = 2, cmd = "coop_autosave_interval", min = 0, max = 120, step = 1 },
+				{ id = "fps", type = "check", val = 1, def = true, functor = { function() coop_fps.refresh() end } },
 				{ id = "line_1", type = "line" },
 				{ id = "title_color", type = "title", text = "ui_mm_coop_general_title_color", align = "l" },
 				color_track("color_r", 90),

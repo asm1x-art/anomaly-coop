@@ -22,6 +22,7 @@
 #include "restriction_space.h"
 #include "profiler.h"
 #include "mt_config.h"
+#include "coop/coop_save.h"
 
 using namespace ALife;
 #ifdef	ENGINE_LUA_ALIFE_UPDAGE_MANAGER_CALLBACKS
@@ -158,6 +159,7 @@ void CALifeUpdateManager::init_ef_storage() const
 
 bool CALifeUpdateManager::change_level(NET_Packet& net_packet)
 {
+	coop::on_level_change(); // the save made here loads on the new level: not another world
 	if (m_changing_level)
 		return (false);
 

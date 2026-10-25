@@ -22,6 +22,7 @@
 #include "PHDebug.h"
 #include "game_base_space.h"
 #endif
+#include "coop/coop_projectiles.h"
 
 extern ENGINE_API bool g_dedicated_server;
 
@@ -406,6 +407,7 @@ void CCustomRocket::OnH_A_Independent()
 	setVisible(true);
 	StartFlying();
 	StartEngine();
+	coop::on_projectile_launched(*this, m_pOwner); // it flies in the other games too
 	//	Msg("! CCustomRocket::OnH_A_Independent called, id[%d] frame[%d]",ID(),Device.dwFrame);
 }
 

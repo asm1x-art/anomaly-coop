@@ -137,6 +137,11 @@ public:
 	void ForceTransform(const Fmatrix& m);
 	void set_use_hit_anims(bool v) { m_flags.set(fl_use_hit_anims, (BOOL)v); }
 	bool is_hit_anim_playing() const { return m_hit_animations.is_hit_anim_playing(); }
+	// co-op: the flinch another game's NPC played, on its puppet here (coop_npc.cpp)
+	void play_hit_motion(const Fvector& dir, const Fvector& bone_position, u16 bone)
+	{
+		m_hit_animations.PlayHitMotion(dir, bone_position, bone, m_EntityAlife);
+	}
 	//////////////////base hierarchi methods///////////////////////////////////////////////////
 	void CreateCharacterSafe();
 	void CreateCharacter();

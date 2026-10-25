@@ -5,6 +5,7 @@
 
 #include "stdafx.h"
 #include "coop/coop_puppet.h"
+#include "coop/coop_npc.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -3179,7 +3180,10 @@ void CWeapon::OnStateSwitch(u32 S, u32 oldState)
 {
 	inherited::OnStateSwitch(S, oldState);
 	if (S != oldState)
+	{
 		coop::on_actor_weapon_state(*this, S);
+		coop::on_npc_weapon_state(*this, S);
+	}
 	m_BriefInfo_CalcFrame = 0;
 
 	// NPC reload edges for Lua (npc_on_weapon_reload_start / _stop). Actor reloads already surface

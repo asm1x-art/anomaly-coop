@@ -198,6 +198,7 @@ void CGamePersistent::Disconnect()
 }
 
 #include "xr_level_controller.h"
+#include "coop/coop_save.h"
 
 void CGamePersistent::OnGameStart()
 {
@@ -924,12 +925,19 @@ float CGamePersistent::MtlTransparent(u32 mtl_idx)
 	return GMLib.GetMaterialByIdx((u16)mtl_idx)->fVisTransparencyFactor;
 }
 
+// co-op build: the game never pauses by itself (loaded in the background, the window losing focus); a shared
+// world pauses only when everyone in it agrees (coop_save.h), and a pause half-way through is worse alone too
+bool CGamePersistent::KeepsRunning()
+{
+	return true;
+}
+
 static BOOL bRestorePause = FALSE;
 static BOOL bEntryFlag = TRUE;
 
 void CGamePersistent::OnAppActivate()
 {
-	bool bIsMP = (g_pGameLevel && Level().game && GameID() != eGameIDSingle);
+	bool bIsMP = (g_pGameLevel && Level().game && GameID() != eGameIDSingle) || KeepsRunning();
 	bIsMP &= !Device.Paused();
 
 	if (!bIsMP)
@@ -948,7 +956,8 @@ void CGamePersistent::OnAppDeactivate()
 {
 	if (!bEntryFlag) return;
 
-	bool bIsMP = (g_pGameLevel && Level().game && GameID() != eGameIDSingle);
+	// co-op build: as in multiplayer, the world goes on without our window
+	bool bIsMP = (g_pGameLevel && Level().game && GameID() != eGameIDSingle) || KeepsRunning();
 
 	bRestorePause = FALSE;
 

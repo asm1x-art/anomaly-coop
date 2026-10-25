@@ -3,6 +3,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "coop/coop_npc.h"
 #include "ai_debug.h"
 #include "CustomMonster.h"
 #include "ai_space.h"
@@ -357,7 +358,7 @@ void CCustomMonster::shedule_Update(u32 DT)
 	m_dwCurrentTime = Device.dwTimeGlobal;
 
 	VERIFY(_valid(Position()));
-	if (Remote())
+	if (Remote() || coop::is_npc_puppet(this)) // a co-op puppet: another game thinks for it
 	{
 	}
 	else
@@ -533,7 +534,11 @@ void CCustomMonster::UpdateCL()
 				animation_movement()->DBG_verify_position_not_chaged();
 #endif
 
-		if (Local() && g_Alive())
+		if (coop::drive_npc_puppet(this, NET_Last.p_pos, NET_Last.o_model, NET_Last.o_torso))
+		{
+			// moved and animated by the co-op authority's stream
+		}
+		else if (Local() && g_Alive())
 		{
 #pragma todo("Dima to All : this is FAKE, network is not supported here!")
 
@@ -1090,6 +1095,17 @@ void CCustomMonster::on_enemy_change(const CEntityAlive* enemy)
 CVisualMemoryManager* CCustomMonster::visual_memory() const
 {
 	return (&memory().visual());
+}
+
+BOOL CCustomMonster::AlwaysTheCrow()
+{
+	// co-op: every frame near another player, as near our camera (coop::distance_to_others)
+	return coop::distance_to_others(this) < CROW_RADIUS2;
+}
+
+float CCustomMonster::shedule_Scale()
+{
+	return _min(inherited::shedule_Scale(), coop::distance_to_others(this) / 200.f); // as CObject's
 }
 
 void CCustomMonster::save(NET_Packet& packet)

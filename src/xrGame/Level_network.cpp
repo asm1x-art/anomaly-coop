@@ -21,6 +21,7 @@
 #include "../xrNetServer/NET_AuthCheck.h"
 
 #include "../xrphysics/physicscommon.h"
+#include "coop/coop_save.h"
 extern ENGINE_API bool g_dedicated_server;
 
 const int max_objects_size = 2 * 1024;
@@ -121,6 +122,7 @@ extern CUISequencer* g_tutorial2;
 void CLevel::net_Stop()
 {
 	Msg("- Disconnect");
+	coop::on_leaving_level(); // the level still runs: the master saves the world on its way out
 
 	if (CurrentGameUI())
 	{

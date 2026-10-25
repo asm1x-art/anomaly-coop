@@ -44,7 +44,7 @@
   label.check small { display: block; color: var(--muted); font-size: 12px; }
   label.field { display: flex; flex-direction: column; gap: 4px; }
   label.field span { color: var(--muted); font-size: 13px; }
-  select {
+  select, input[type=number] {
     background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
     padding: 7px 8px; font: inherit;
   }
@@ -64,6 +64,12 @@
   .savebar.show { display: block; }
   .savebar div { max-width: 760px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
   #msg { color: var(--muted); font-size: 13px; min-height: 1em; }
+  ul.saves { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow-y: auto; }
+  ul.saves li { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+  ul.saves li:first-child { border-top: 0; }
+  ul.saves .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  ul.saves .when { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  ul.saves button { padding: 4px 10px; font-size: 13px; }
   #msg.error { color: var(--danger); }
   #msg.ok { color: var(--ok); }
 </style>
@@ -81,8 +87,16 @@
       <div class="stat"><b id="count">0</b><span>онлайн</span></div>
     </div>
     <ul class="players" id="players"></ul>
+    <p class="note" id="paused" style="display:none"></p>
     <button class="danger" id="reset">Сбросить мир</button>
     <p class="note" id="reset-note" style="margin:10px 0 0">Удаляет мир, персонажей и выданные id. Только когда никого нет онлайн.</p>
+  </section>
+
+  <section>
+    <h2>Сохранения мира</h2>
+    <p class="note">Все сохранения подряд, новые сверху. «Откатить» возвращает мир и персонажей к сохранению без голосования: игроки в игре загрузят его заново.</p>
+    <ul class="saves" id="saves"></ul>
+    <p class="note" id="saves-note" style="margin:10px 0 0"></p>
   </section>
 
   <section>
@@ -109,6 +123,13 @@
   </section>
 
   <section>
+    <h2>Правила кооператива</h2>
+    <p class="note">Действуют сразу, на идущий мир тоже.</p>
+    <div class="row" id="rule-numbers"></div>
+    <div class="grid" id="rule-checks" style="margin-top:14px"></div>
+  </section>
+
+  <section>
     <h2>Фракции</h2>
     <p class="note">Из каких фракций игроки могут создать персонажа. Хотя бы одна.</p>
     <div class="grid" id="factions"></div>
@@ -130,6 +151,21 @@
     ['campfire', 'Сохранение у костра', 'Сохраняться можно только у костра'],
     ['conditions', 'Изношенные предметы', 'Найденные вещи в плохом состоянии'],
     ['opened_routes', 'Открытые маршруты', 'Все переходы между локациями открыты'],
+  ];
+  const RULE_NUMBERS = [
+    ['max_players', 'Игроков на сервере', 'больше сервер не пустит', 1, 32],
+    ['group_max', 'Игроков в группе', 'вместе с лидером', 2, 8],
+    ['faction_penalty', 'Штраф отношений', 'за атаку невраждебного отряда', 0, 2000],
+    ['witness_radius', 'Радиус свидетелей, м', 'отряды фракции рядом вступаются, как лагерь; 0 — только лагерь', 0, 500],
+    ['downed_time', 'Время «лёжа», с', '0 — сразу откат', 0, 600],
+    ['revive_time', 'Подъём, с', 'сколько держать F', 1, 60],
+    ['revive_health', 'Здоровье после подъёма, %', '', 1, 100],
+    ['rank_loss', 'Потеря ранга при откате, %', '', 0, 100],
+    ['travel_enemy_radius', 'Враги рядом, м', 'нет быстрого перемещения; 0 — не проверять', 0, 500],
+  ];
+  const RULE_CHECKS = [
+    ['fast_travel', 'Быстрое перемещение', 'Только в места, где игрок уже был'],
+    ['travel_overloaded', 'Перемещение с перегрузом', 'Можно перемещаться, когда тяжело'],
   ];
   const FACTION_NAMES = {
     stalker: 'Одиночки', dolg: 'Долг', freedom: 'Свобода', csky: 'Чистое Небо', ecolog: 'Учёные',
@@ -192,11 +228,64 @@
       }
       const level = document.createElement('span');
       level.className = 'level';
-      level.textContent = p.level ?? 'в меню';
+      level.textContent = (p.level ?? 'в меню') + (p.ping == null ? '' : ` · ${p.ping} мс`);
       li.append(name, level);
       list.append(li);
     }
     $('reset').disabled = state.online.length > 0;
+    $('paused').style.display = state.paused ? '' : 'none';
+    $('paused').replaceChildren(`Мир на паузе (попросил ${state.paused ?? ''}). `);
+    if (state.paused) {
+      const button = document.createElement('button');
+      button.className = 'primary';
+      button.textContent = 'Снять паузу';
+      button.addEventListener('click', async () => renderStatus(await api('POST', '/api/resume')));
+      $('paused').append(button);
+    }
+    renderSaves(state.saves ?? []);
+  }
+
+  const REASONS = {
+    auto: () => 'Автосохранение', quick: (s) => `Быстрое сохранение · ${s.who}`, named: (s) => `«${s.name}» · ${s.who}`,
+    join: (s) => `Вход: ${s.who}`, leave: (s) => `Выход: ${s.who}`, exit: (s) => `Выход мастера: ${s.who}`,
+    new: () => 'Новый мир', level: (s) => `Переход: ${s.who}`, rollback: (s) => `Откат к №${s.from}${s.name ? ` «${s.name}»` : ''}`,
+  };
+  function renderSaves(saves) {
+    const list = $('saves');
+    list.replaceChildren();
+    if (!saves.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Сохранений нет';
+      list.append(li);
+    }
+    saves.forEach((s, i) => {
+      const li = document.createElement('li');
+      const what = document.createElement('span');
+      what.className = 'what';
+      what.textContent = `№${s.revision} · ${(REASONS[s.reason] ?? (() => s.reason))(s)}`;
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = new Date(s.time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      li.append(what, when);
+      if (i > 0) { // the first is the world now
+        const button = document.createElement('button');
+        button.className = 'danger';
+        button.textContent = 'Откатить';
+        button.addEventListener('click', () => rollbackTo(s));
+        li.append(button);
+      }
+      list.append(li);
+    });
+  }
+  async function rollbackTo(save) {
+    if (!confirm(`Вернуть мир и персонажей к сохранению №${save.revision}? Игроки в игре загрузят его заново.`)) return;
+    try {
+      renderStatus(await api('POST', '/api/rollback', { revision: save.revision }));
+      $('saves-note').textContent = `Мир возвращён к №${save.revision}.`;
+    } catch (e) {
+      $('saves-note').textContent = 'Не получилось: ' + e.message;
+    }
   }
 
   function renderSettings(state) {
@@ -205,6 +294,9 @@
     for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) $(key).value = String(w[key]);
     $('ironman').checked = w.ironman;
     syncIronman();
+    const r = state.settings.rules;
+    for (const [key] of RULE_NUMBERS) $('r_' + key).value = String(r[key]);
+    for (const [key] of RULE_CHECKS) $('r_' + key).checked = r[key];
     for (const f of state.factions) $('f_' + f).checked = state.settings.factions.includes(f);
     dirty = false;
     $('savebar').classList.remove('show');
@@ -216,7 +308,10 @@
     for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) world[key] = Number($(key).value);
     world.ironman = $('ironman').checked;
     const factions = [...document.querySelectorAll('#factions input:checked')].map((i) => i.id.slice(2));
-    return { world, factions };
+    const rules = {};
+    for (const [key] of RULE_NUMBERS) rules[key] = Math.round(Number($('r_' + key).value));
+    for (const [key] of RULE_CHECKS) rules[key] = $('r_' + key).checked;
+    return { world, factions, rules };
   }
 
   async function api(method, path, body) {
@@ -247,6 +342,17 @@
   }
 
   for (const [key, title, hint] of WORLD_CHECKS) $('world-checks').append(check(key, title, hint));
+  for (const [key, title, hint] of RULE_CHECKS) $('rule-checks').append(check('r_' + key, title, hint));
+  for (const [key, title, hint, min, max] of RULE_NUMBERS) {
+    const label = document.createElement('label');
+    label.className = 'field';
+    label.innerHTML = `<span></span><input type="number" id="r_${key}" min="${min}" max="${max}" step="1">`;
+    label.querySelector('span').textContent = hint ? `${title} (${hint})` : title;
+    $('rule-numbers').append(label);
+  }
+  document.addEventListener('input', (e) => {
+    if (e.target.closest('section') && e.target.type === 'number') markDirty();
+  });
   document.addEventListener('change', (e) => {
     if (e.target.closest('section')) {
       syncIronman();

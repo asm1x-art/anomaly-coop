@@ -1,0 +1,29 @@
+-- Co-op: the server's rules (coop-server/src/settings.js) as the admin page sets them; they apply at once.
+
+local text, rules = nil, {}
+
+local function all()
+	local now = coop and coop.settings() or ""
+	if now ~= text then
+		text, rules = now, {}
+		for line in string.gmatch(now, "[^\n]+") do
+			local key, value = string.match(line, "^([%w_]+)=(.*)$")
+			if key then
+				rules[key] = value
+			end
+		end
+	end
+	return rules
+end
+
+function number(key, default)
+	return tonumber(all()[key]) or default
+end
+
+function flag(key, default)
+	local value = all()[key]
+	if value == nil then
+		return default
+	end
+	return value ~= "0"
+end

@@ -124,6 +124,13 @@ public:
 	IC Fmatrix const& current_spine_rotation() const;
 	IC Fmatrix const& current_shoulder_rotation() const;
 	IC Fmatrix const& current_head_rotation() const;
+	// co-op: how another game's NPC aims, on its puppet here (its own update is off)
+	void coop_set_rotations(Fmatrix const& spine, Fmatrix const& shoulder, Fmatrix const& head)
+	{
+		m_current.m_spine.m_rotation = spine;
+		m_current.m_shoulder.m_rotation = shoulder;
+		m_current.m_head.m_rotation = head;
+	}
 
 public:
 	IC void bone_aiming();

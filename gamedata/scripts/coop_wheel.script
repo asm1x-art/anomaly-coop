@@ -1,0 +1,127 @@
+-- Co-op: F on another player (on their stand-in, src/xrGame/coop/coop_combat.h) opens this wheel, as F on
+-- a companion opens the companions' one: trade, the group, passing notes and routes. On a player lying
+-- wounded F helps them up instead (coop_death.script).
+
+local GUI = nil
+local opened_at = 0
+
+-- the wheel's actions: hint text and what it does with the player (peer id, name)
+local ACTIONS = {
+	trade = {
+		hint = function() return "st_coop_wheel_trade" end,
+		run = function(id, name) coop_trade.offer(id, name) end,
+	},
+	group = {
+		hint = function(id, name)
+			if not coop_group.has(name) then
+				return "st_coop_wheel_invite"
+			end
+			return coop_group.is_leader() and "st_coop_wheel_kick" or "st_coop_wheel_leave"
+		end,
+		run = function(id, name)
+			if not coop_group.has(name) then
+				coop.group_invite(id, false) -- face to face: a yes/no box
+				actor_menu.set_msg(1, string.format(game.translate_string("st_coop_group_invited"), name), 4)
+			elseif coop_group.is_leader() then
+				coop.group_kick(name)
+			else
+				coop.group_leave()
+			end
+		end,
+	},
+	notes = {
+		hint = function() return "st_coop_wheel_notes" end,
+		run = function(id, name) coop_share.notes(name) end,
+	},
+	routes = {
+		hint = function() return "st_coop_wheel_routes" end,
+		run = function(id, name) coop_share.routes(name) end,
+	},
+}
+
+class "UICoopWheel" (CUIScriptWnd)
+
+function UICoopWheel:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_wheel.xml")
+	self.dialog = xml:InitStatic("wheel", self)
+	xml:InitStatic("wheel:background", self.dialog)
+	self.buttons = {}
+	local pictures = { trade = "trade", group = "movement", notes = "loot", routes = "distance" }
+	for action in pairs(ACTIONS) do
+		local picture = xml:InitStatic("wheel:box_" .. action, self.dialog)
+		picture:InitTexture("ui_companion_" .. pictures[action])
+		picture:SetStretchTexture(true)
+		self.buttons[action] = xml:Init3tButton("wheel:btn_" .. action, self.dialog)
+		self:Register(self.buttons[action], "btn_" .. action)
+		self:AddCallback("btn_" .. action, ui_events.BUTTON_CLICKED, function() self:Do(action) end, self)
+	end
+	self.hint = xml:InitTextWnd("wheel:hint", self.dialog)
+	local info = xml:InitStatic("info", self)
+	xml:InitStatic("info:background", info)
+	self.name = xml:InitTextWnd("info:name", info)
+end
+
+function UICoopWheel:__finalize()
+end
+
+function UICoopWheel:Reset(id, name)
+	self.id, self.player = id, name
+	self.name:SetText(name)
+end
+
+function UICoopWheel:Update()
+	CUIScriptWnd.Update(self)
+	for action, button in pairs(self.buttons) do
+		if button:IsCursorOverWindow() then
+			self.hint:SetText(game.translate_string(ACTIONS[action].hint(self.id, self.player)))
+			return
+		end
+	end
+	self.hint:SetText("")
+end
+
+function UICoopWheel:Do(action)
+	self:HideDialog()
+	ACTIONS[action].run(self.id, self.player)
+end
+
+function UICoopWheel:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_RELEASED then
+		local bind = dik_to_bind(dik)
+		if time_global() > opened_at + 100 and (bind == key_bindings.kQUIT or bind == key_bindings.kUSE) then
+			self:HideDialog()
+		end
+	end
+	return res
+end
+
+function open(id, name)
+	if not GUI then
+		GUI = UICoopWheel()
+	end
+	if GUI:IsShown() then
+		return
+	end
+	hide_hud_inventory()
+	GUI:Reset(id, name)
+	GUI:ShowDialog(true)
+	opened_at = time_global()
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	_G.coop_on_use_player = function(id, name)
+		if coop_death.help(id, name) then
+			return -- lying wounded: F helps them up
+		end
+		open(id, name)
+	end
+	RegisterScriptCallback("actor_on_net_destroy", function() GUI = nil end)
+end

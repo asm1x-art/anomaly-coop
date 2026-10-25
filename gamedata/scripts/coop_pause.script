@@ -1,0 +1,46 @@
+-- Co-op: the world's pause (src/xrGame/coop/coop_save.cpp). A game in the shared world never pauses on its
+-- own; the Pause key asks everyone in the world, and once all agree every game pauses, or goes on, together.
+-- The others are asked on the screen, not in a box: the mouse doesn't move on a paused level. Pause says yes
+-- (the engine answers), no answer in 30 s is no.
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+local function say(text, seconds)
+	if db.actor then
+		actor_menu.set_msg(1, text, seconds or 6)
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	_G.coop_on_pause_vote = function(proposer_id, proposer, pause)
+		if not db.actor then
+			return -- in the menu: no say
+		end
+		if proposer_id == coop.my_id() then
+			return say(tr("st_coop_pause_waiting"))
+		end
+		local key = dik_to_keyname(bind_to_dik(key_bindings.kPAUSE)) or "Pause"
+		say(tr(pause and "st_coop_pause_ask" or "st_coop_resume_ask", proposer, key), 30)
+	end
+
+	_G.coop_on_pause_agreed = function()
+		say(tr("st_coop_pause_waiting"))
+	end
+
+	-- result: 0 accepted (told by coop_on_paused), 1 declined, 2 timeout, 3 cancelled, 4 another vote is on
+	_G.coop_on_pause_result = function(result, who, pause)
+		if result ~= 0 then
+			say(tr("st_coop_pause_" .. result, who))
+		end
+	end
+
+	_G.coop_on_paused = function(paused, who)
+		say(paused and tr("st_coop_paused", who) or tr("st_coop_goes_on"))
+	end
+end

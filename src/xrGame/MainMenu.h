@@ -131,6 +131,7 @@ protected:
 	bool ReloadUI();
 public:
 	u32 m_deactivated_frame;
+	bool m_coop_running = false; // opened over a co-op world, which doesn't pause for it
 	bool m_activatedScreenRatio;
 	virtual void DestroyInternal(bool bForce);
 	CMainMenu();

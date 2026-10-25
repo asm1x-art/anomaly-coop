@@ -1,0 +1,59 @@
+-- Co-op: frames per second in the top right corner of the screen, while playing, and the ping to the
+-- co-op server while connected.
+-- Switched on the Co-op options page (modxml_coop_options.script, coop/general/fps).
+
+local HUD = nil
+
+class "UICoopFps" (CUIScriptWnd)
+
+function UICoopFps:__init() super()
+	self.text = CUITextWnd()
+	self.text:SetAutoDelete(true)
+	self.text:SetWndRect(Frect():set(1024 - 200, 4, 1024 - 8, 22)) -- the HUD's 1024x768
+	self.text:SetFont(GetFontLetterica16Russian())
+	self.text:SetTextAlignment(CGameFont.alRight)
+	self.text:SetTextColor(GetARGB(255, 200, 255, 200))
+	self:AttachChild(self.text)
+	self.frame = device().frame
+	self.since = time_global()
+end
+
+function UICoopFps:Update()
+	CUIScriptWnd.Update(self)
+	local now = time_global()
+	if now - self.since < 500 then
+		return
+	end
+	local frames = device().frame - self.frame
+	local text = string.format("%d FPS", math.floor(frames * 1000 / (now - self.since) + 0.5))
+	if coop.connected() then
+		text = string.format("%s   %d мс", text, coop.ping())
+	end
+	self.text:SetText(text)
+	self.frame = device().frame
+	self.since = now
+end
+
+local function show(on)
+	if on and not HUD then
+		HUD = UICoopFps()
+		get_hud():AddDialogToRender(HUD)
+	elseif not on and HUD then
+		get_hud():RemoveDialogToRender(HUD)
+		HUD = nil
+	end
+end
+
+function refresh()
+	if db.actor then
+		show(ui_options.get("coop/general/fps") ~= false)
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	RegisterScriptCallback("actor_on_first_update", refresh)
+	RegisterScriptCallback("actor_on_net_destroy", function() show(false) end)
+end

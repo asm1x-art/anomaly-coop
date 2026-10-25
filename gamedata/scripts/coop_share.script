@@ -1,0 +1,107 @@
+-- Co-op: knowledge passed to another player from the wheel (coop_wheel.script): notes, journals and craft
+-- recipes read (the PDA's encyclopedia), routes between levels opened (txr_routes). Copied: the giver
+-- keeps them. Sent to everyone with the receiver's name; only they take it.
+
+local PER_EVENT = 40 -- names per event: a NET_Packet holds 16 KB
+
+local function fmt(id, ...)
+	return string.format(game.translate_string(id), ...)
+end
+
+local function news(text)
+	db.actor:give_game_news(game.translate_string("st_coop_group"), text, "ui_iconsTotal_grouping", 0, 8000)
+end
+
+-- ui_pda_encyclopedia_tab keeps them in a local table: reached through one of its functions
+local function unlocked_notes()
+	local f = ui_pda_encyclopedia_tab.is_unlocked_note
+	for i = 1, 32 do
+		local name, value = debug.getupvalue(f, i)
+		if not name then
+			break
+		end
+		if name == "unlocked_notes" then
+			return value
+		end
+	end
+	return {}
+end
+
+local function known_routes()
+	local known = {}
+	local maps = txr_routes.maps
+	for i = 1, #maps do
+		for j = i + 1, #maps do
+			local route = txr_routes.get_route(maps[i], maps[j])
+			if route then
+				for _, id in ipairs(route) do
+					if mlr_utils.load_var("routes_" .. id) then
+						known[#known + 1] = maps[i] .. ":" .. maps[j]
+						break
+					end
+				end
+			end
+		end
+	end
+	return known
+end
+
+-- what = "notes" or "routes"; the list goes in parts, the last one says how many there were
+local function give(what, to, list)
+	for first = 1, math.max(#list, 1), PER_EVENT do
+		local part = {}
+		for i = first, math.min(first + PER_EVENT - 1, #list) do
+			part[#part + 1] = list[i]
+		end
+		local last = first + PER_EVENT > #list
+		coop_sync.send_event("share", what, to, last and #list or 0, table.concat(part, ","))
+	end
+	news(fmt(what == "notes" and "st_coop_notes_given" or "st_coop_routes_given", #list, to))
+end
+
+function notes(to)
+	local list = {}
+	for section in pairs(unlocked_notes()) do
+		list[#list + 1] = section
+	end
+	give("notes", to, list)
+end
+
+function routes(to)
+	give("routes", to, known_routes())
+end
+
+local learned = { notes = 0, routes = 0 } -- new ones so far from the parts of one gift
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	coop_sync.on_event("share", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		local what, to, total, list = f[1], f[2], tonumber(f[3]) or 0, f[4] or ""
+		if to ~= coop.my_name() or not db.actor then
+			return
+		end
+		for name in string.gmatch(list, "[^,]+") do
+			if what == "notes" then
+				if ui_pda_encyclopedia_tab.unlock_note(name) then
+					learned.notes = learned.notes + 1
+				end
+			elseif what == "routes" then
+				local a, b = string.match(name, "^(.+):(.+)$")
+				local before = #known_routes()
+				if a then
+					txr_routes.open_route(a, b, true)
+				end
+				if #known_routes() > before then
+					learned.routes = learned.routes + 1
+				end
+			end
+		end
+		if total > 0 or list == "" then -- the last part
+			news(fmt(what == "notes" and "st_coop_notes_got" or "st_coop_routes_got", sender, learned[what], total))
+			learned[what] = 0
+		end
+	end)
+end

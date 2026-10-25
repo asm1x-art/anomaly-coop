@@ -70,6 +70,7 @@ public:
 
 	virtual void OnAppActivate();
 	virtual void OnAppDeactivate();
+	virtual bool KeepsRunning();
 
 	virtual void OnAppStart();
 	virtual void OnAppEnd();

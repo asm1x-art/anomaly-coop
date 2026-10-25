@@ -69,6 +69,9 @@ public:
 	virtual void ActivateExplosionBox(const Fvector& size, Fvector& in_out_pos);
 	void SetExplosionSize(const Fvector& new_size);
 	virtual bool Useful() const;
+	// co-op: another game's explosion of this very object, as a blank here (effects and the same
+	// fragments, no hits, no blast); false when it is exploding already
+	bool coop_blank_explode(const Fvector& pos, const Fvector& dir, s32 seed);
 protected:
 	bool IsSoundPlaying() { return !!m_layered_sounds.FindSoundItem("sndExplode", true)->playing(); }
 	bool IsExploded() { return !!m_explosion_flags.test(flExploded); }
@@ -84,6 +87,8 @@ private:
 	                            collide::rq_results& storage, CObject* blasted_obj);
 	void LightCreate();
 	void LightDestroy();
+	void ExplodeEffector(const Fvector& pos);
+	s32 m_coop_seed = 0; // co-op: a blank (another game's explosion here), its fragments' seed
 protected:
 	HUD_SOUND_COLLECTION_LAYERED m_layered_sounds;
 

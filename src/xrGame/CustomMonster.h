@@ -156,6 +156,8 @@ public:
 	};
 	virtual void shedule_Update(u32 DT);
 	virtual void UpdateCL();
+	virtual BOOL AlwaysTheCrow();
+	virtual float shedule_Scale();
 
 	// Network
 	virtual void net_Export(NET_Packet& P); // export to server

@@ -1,5 +1,6 @@
 #include "pch_script.h"
 #include "Actor_Flags.h"
+#include "coop/coop_combat.h"
 #include "hudmanager.h"
 #ifdef DEBUG
 
@@ -2012,7 +2013,8 @@ void CActor::shedule_Update(u32 DT)
 	collide::rq_result& RQ = HUD().GetRQ();
 
 
-	if (!input_external_handler_installed() && RQ.O && RQ.O->getVisible() && RQ.range < 2.0f)
+	// co-op: a player's stand-in is never drawn but looked at all the same (F interacts with the player)
+	if (!input_external_handler_installed() && RQ.O && (RQ.O->getVisible() || coop::is_proxy(RQ.O)) && RQ.range < 2.0f)
 	{
 		m_pObjectWeLookingAt = smart_cast<CGameObject*>(RQ.O);
 

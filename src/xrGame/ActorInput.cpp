@@ -37,6 +37,7 @@
 #include "holder_custom.h"
 #include "Weapon.h"
 #include "CustomOutfit.h"
+#include "coop/coop_combat.h"
 
 extern u32 hud_adj_mode;
 
@@ -593,6 +594,9 @@ void CActor::ActorUse()
 				return;
 			}
 		}
+
+		if (m_pPersonWeLookingAt && coop::use_player(m_pPersonWeLookingAt))
+			return;
 
 		if (m_pPersonWeLookingAt)
 		{

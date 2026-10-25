@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "coop/coop_combat.h"
+
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
@@ -49,6 +51,10 @@ ALife::ERelationType RELATION_REGISTRY::GetRelationType(T from, T to) const
 {
 	static int attitude_neutral = pSettings->r_s16(GAME_RELATIONS_SECT, "attitude_neutal_threshold");
 	static int attitude_friend = pSettings->r_s16(GAME_RELATIONS_SECT, "attitude_friend_threshold");
+
+	// co-op: a squad's grudge against a player makes them enemies both ways, on the HUD and the map too
+	if (coop::has_grudge_id(from->object_id(), to->object_id()) || coop::has_grudge_id(to->object_id(), from->object_id()))
+		return ALife::eRelationTypeEnemy;
 
 	CHARACTER_GOODWILL attitude = GetAttitude(from, to);
 

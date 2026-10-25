@@ -138,6 +138,8 @@ public:
 	virtual void OnAppEnd();
 	virtual void OnAppActivate();
 	virtual void OnAppDeactivate();
+	// the game goes on whatever the window does (co-op: the world is shared), so never pauses on its own
+	virtual bool KeepsRunning() { return false; }
 	virtual void _BCL OnFrame();
 	virtual void ImGui_OnRender(LPCSTR name) {};
 

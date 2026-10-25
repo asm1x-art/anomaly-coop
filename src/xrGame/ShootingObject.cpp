@@ -542,7 +542,7 @@ void CShootingObject::FireBullet(const Fvector& pos,
 		l_fHitPower = fvHitPower[egdMaster];
 	}
 
-	Level().BulletManager().AddBullet(pos,
+	m_iCurrentBulletSeed = Level().BulletManager().AddBullet(pos,
 	                                  dir,
 	                                  m_fStartBulletSpeed * cur_silencer_koef.bullet_speed,
 	                                  l_fHitPower * cur_silencer_koef.hit_power,

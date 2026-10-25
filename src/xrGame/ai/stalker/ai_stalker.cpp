@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "coop/coop_npc.h"
 #include "ai_stalker.h"
 #include "../ai_monsters_misc.h"
 #include "../../weapon.h"
@@ -1027,7 +1028,8 @@ void CAI_Stalker::UpdateCL()
 		START_PROFILE("stalker/client_update")
 			VERIFY2(PPhysicsShell()||getEnabled(), *cName());
 
-			if (g_Alive())
+			const bool coop_puppet = coop::is_npc_puppet(this); // its weapon and sight follow another game
+			if (g_Alive() && !coop_puppet)
 			{
 				if (g_mt_config.test(mtObjectHandler) && CObjectHandler::planner().initialized())
 				{
@@ -1085,7 +1087,8 @@ void CAI_Stalker::UpdateCL()
 					VERIFY(!m_pPhysicsShell);
 					try
 					{
-						sight().update();
+						if (!coop_puppet)
+							sight().update();
 					}
 					catch (...)
 					{
@@ -1199,7 +1202,7 @@ void CAI_Stalker::shedule_Update(u32 DT)
 				inherited::inherited::shedule_Update(DT);
 			STOP_PROFILE
 
-			if (Remote())
+			if (Remote() || coop::is_npc_puppet(this)) // a co-op puppet: another game thinks for it
 			{
 			}
 			else
@@ -1377,12 +1380,12 @@ void CAI_Stalker::net_Relcase(CObject* O)
 
 	sight().remove_links(O);
 	movement().remove_links(O);
+	m_pPhysics_support->in_NetRelcase(O); // the dead too: the ragdoll's hand may hold O
 
 	if (!g_Alive())
 		return;
 
 	agent_manager().remove_links(O);
-	m_pPhysics_support->in_NetRelcase(O);
 }
 
 CMovementManager* CAI_Stalker::create_movement_manager()
@@ -1560,7 +1563,7 @@ void CAI_Stalker::aim_target(Fvector& result, const CGameObject* object)
 BOOL CAI_Stalker::AlwaysTheCrow()
 {
 	VERIFY(character_physics_support ());
-	return (character_physics_support()->interactive_motion());
+	return (character_physics_support()->interactive_motion() || inherited::AlwaysTheCrow());
 }
 
 smart_cover::cover const* CAI_Stalker::get_current_smart_cover()

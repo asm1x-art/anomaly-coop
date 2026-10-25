@@ -1,5 +1,9 @@
 #include "pch_script.h"
 #include "coop/coop_puppet.h"
+#include "coop/coop_npc.h"
+#include "coop/coop_combat.h"
+#include "coop/coop_projectiles.h"
+#include "coop/coop_save.h"
 #include "xrEngine/FDemoRecord.h"
 #include "xrEngine/FDemoPlay.h"
 #include "xrEngine/Environment.h"
@@ -288,6 +292,10 @@ extern CAI_Space* g_ai_space;
 CLevel::~CLevel()
 {
 	coop::clear_puppets(); // drawn on this level only
+	coop::clear_npc_sync();
+	coop::clear_proxies();
+	coop::clear_projectiles();
+	coop::on_level_unloaded();
 	//crash_saving::save_impl = nullptr; // CLevel not available, disable crash save
 	xr_delete(g_player_hud);
 	delete_data(m_script_attachments);

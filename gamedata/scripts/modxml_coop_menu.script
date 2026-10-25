@@ -2,7 +2,8 @@
 -- The menu's New game button is the Co-op button, opening the profile screen (ui_coop_profiles.script),
 -- which connects and then opens the new game screen when a world or a character is to be made.
 -- On a server without a world New game creates it: the new game becomes the world once it runs
--- (src/xrGame/coop/coop_save.cpp). In a world we have no character in yet the screen opens by itself
+-- (src/xrGame/coop/coop_save.cpp); the screen claims that on the server, so while one player makes the
+-- world the others wait. In a world we have no character in yet the screen opens by itself
 -- and Start loads the world with the character at its start point instead of starting a new game; the
 -- faction, money and loadout are then applied by Anomaly's own new game code (ui_mm_faction_select
 -- on_game_load). Either way the server's world settings replace the screen's options, only the factions
@@ -60,7 +61,10 @@ local function refusal()
 		return "Сначала подключитесь к серверу: Настройки > Кооператив."
 	end
 	local status = coop.world_status()
-	if status == "exists" then
+	if status == "being_created" then
+		return string.format("Мир сейчас создаёт %s. Как только он будет готов, откроется создание персонажа.",
+			coop.world_creator())
+	elseif status == "exists" then
 		return "На сервере уже есть мир: он загружается сам после подключения."
 	elseif status ~= "none" and status ~= "no_character" then
 		return "Ждём ответа сервера, попробуйте через пару секунд."
@@ -179,6 +183,9 @@ function on_xml_read()
 			show_faction_ui(self)
 			adapt(self.new_game_dlg)
 			self.new_game_dlg.coop_join = coop.world_status() == "no_character"
+		if not self.new_game_dlg.coop_join then
+			coop.claim_world(true) -- another player may have asked first: Start is refused then
+		end
 			printf("[coop] new game screen: %s, factions: %s", self.new_game_dlg.coop_join and "joining the world"
 				or "creating the world", server_settings().factions or "?")
 		end
@@ -208,8 +215,11 @@ function on_xml_read()
 		if not self.coop then
 			return start_game(self)
 		end
-		if refusal() then
-			return self:OnQuit()
+		local why = refusal()
+		if why then
+			self:OnQuit()
+			self.owner:SetMsg(why, 6)
+			return
 		end
 		-- the hidden keys (Z, faction passwords) don't get past the server's list
 		local s = server_settings()
@@ -230,6 +240,15 @@ function on_xml_read()
 		end
 		start_game(self)
 		owner.StartGame = start_new_game
+	end
+
+	-- Back or Esc while making the world: another player may make it
+	local quit = new_game.OnQuit
+	new_game.OnQuit = function(self)
+		if self.coop and self.access and not self.coop_join and coop.connected() and coop.world_creator() == coop.my_name() then
+			coop.claim_world(false)
+		end
+		return quit(self)
 	end
 
 	local randomize = new_game.OnRandomize

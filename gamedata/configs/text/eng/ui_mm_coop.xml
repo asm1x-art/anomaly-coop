@@ -13,6 +13,12 @@
 	<string id="ui_mm_coop_general_autosave_interval_desc">
 		<text>How often the sim master saves the shared world to the server. 0 turns it off.</text>
 	</string>
+	<string id="ui_mm_coop_general_fps">
+		<text>FPS and ping</text>
+	</string>
+	<string id="ui_mm_coop_general_fps_desc">
+		<text>Frames per second and the ping to the server (ms) in the top right corner of the screen.</text>
+	</string>
 	<string id="ui_mm_coop_general_title_color">
 		<text>Other players on the map</text>
 	</string>
@@ -58,7 +64,379 @@
 	<string id="ui_mm_coop_status_failed">
 		<text>Could not connect. Check the address and that the server is running.</text>
 	</string>
+	<string id="ui_mm_coop_status_being_created">
+		<text>%s is creating the world now. Character creation opens as soon as it is ready...</text>
+	</string>
+	<string id="ui_mm_coop_status_refused_full">
+		<text>The server is full.</text>
+	</string>
+	<string id="ui_mm_coop_status_refused_version">
+		<text>The server runs another version: update the game or the server.</text>
+	</string>
 	<string id="ui_mm_coop_status_loading">
 		<text>Your character is in this world. Loading it...</text>
+	</string>
+	<string id="st_coop_group">
+		<text>Co-op</text>
+	</string>
+	<string id="st_coop_group_invite">
+		<text>%s invites you to their group. Join?</text>
+	</string>
+	<string id="st_coop_group_declined">
+		<text>%s turned the invite down.</text>
+	</string>
+	<string id="st_coop_group_full">
+		<text>The group is full.</text>
+	</string>
+	<string id="st_coop_group_already">
+		<text>%s is in your group already.</text>
+	</string>
+	<string id="st_coop_group_expired">
+		<text>The invite from %s is no longer valid.</text>
+	</string>
+	<string id="st_coop_group_you_in">
+		<text>You joined a group.</text>
+	</string>
+	<string id="st_coop_group_you_out">
+		<text>You are no longer in a group.</text>
+	</string>
+	<string id="st_coop_group_joined">
+		<text>%s joined the group.</text>
+	</string>
+	<string id="st_coop_group_left">
+		<text>%s left the group.</text>
+	</string>
+	<string id="st_coop_group_invited">
+		<text>Invite sent: %s</text>
+	</string>
+	<string id="st_coop_wheel_trade">
+		<text>Trade</text>
+	</string>
+	<string id="st_coop_wheel_invite">
+		<text>Invite to the group</text>
+	</string>
+	<string id="st_coop_wheel_kick">
+		<text>Put out of the group</text>
+	</string>
+	<string id="st_coop_wheel_leave">
+		<text>Leave the group</text>
+	</string>
+	<string id="st_coop_wheel_notes">
+		<text>Pass notes</text>
+	</string>
+	<string id="st_coop_wheel_routes">
+		<text>Pass routes</text>
+	</string>
+	<string id="st_coop_notes_given">
+		<text>Notes passed: %d (%s).</text>
+	</string>
+	<string id="st_coop_routes_given">
+		<text>Routes passed: %d (%s).</text>
+	</string>
+	<string id="st_coop_notes_got">
+		<text>%s passed you notes: %d new of %d.</text>
+	</string>
+	<string id="st_coop_routes_got">
+		<text>%s passed you routes: %d new of %d.</text>
+	</string>
+	<string id="st_coop_attacked">
+		<text>We are attacked by %s! We are at %s.</text>
+	</string>
+	<string id="st_coop_downed">
+		<text>You are badly wounded. Help may still come: %d:%02d. %s to give up.</text>
+	</string>
+	<string id="st_coop_being_helped">
+		<text>%s is helping you up...</text>
+	</string>
+	<string id="st_coop_helping">
+		<text>Helping up: %s</text>
+	</string>
+	<string id="st_coop_helped_up">
+		<text>You helped up: %s</text>
+	</string>
+	<string id="st_coop_got_up">
+		<text>%s helped you up.</text>
+	</string>
+	<string id="st_coop_rolled_back">
+		<text>You came to where the world was last saved. Rank lost: %d.</text>
+	</string>
+	<string id="st_coop_player_downed">
+		<text>%s is badly wounded! Help needed.</text>
+	</string>
+	<string id="st_coop_player_rolled_back">
+		<text>%s came to at the last save point.</text>
+	</string>
+	<string id="st_coop_travel_alone">
+		<text>Travel alone: %s</text>
+	</string>
+	<string id="st_coop_travel_group">
+		<text>Travel with the group: %s</text>
+	</string>
+	<string id="st_coop_travel_offer">
+		<text>%s asks the group to travel to %s. Go along?</text>
+	</string>
+	<string id="st_coop_travel_off">
+		<text>Fast travel is not available now.</text>
+	</string>
+	<string id="st_coop_travel_enemies">
+		<text>Enemies nearby: no fast travel.</text>
+	</string>
+	<string id="st_coop_trade_mine">
+		<text>My things</text>
+	</string>
+	<string id="st_coop_trade_offer">
+		<text>I give</text>
+	</string>
+	<string id="st_coop_trade_theirs">
+		<text>%s gives</text>
+	</string>
+	<string id="st_coop_trade_money">
+		<text>Money:</text>
+	</string>
+	<string id="st_coop_trade_their_money">
+		<text>and money: %d</text>
+	</string>
+	<string id="st_coop_trade_ready">
+		<text>Ready</text>
+	</string>
+	<string id="st_coop_trade_unready">
+		<text>Not ready</text>
+	</string>
+	<string id="st_coop_trade_cancel">
+		<text>Cancel</text>
+	</string>
+	<string id="st_coop_trade_with">
+		<text>Trade: %s</text>
+	</string>
+	<string id="st_coop_trade_going">
+		<text>Trading...</text>
+	</string>
+	<string id="st_coop_trade_waiting">
+		<text>Waiting for %s to be ready.</text>
+	</string>
+	<string id="st_coop_trade_they_ready">
+		<text>%s is ready. Check and press Ready.</text>
+	</string>
+	<string id="st_coop_trade_choose">
+		<text>Double click or drag a thing to put it into the trade or take it back. Orange cells: worn or on the belt.</text>
+	</string>
+	<string id="st_coop_trade_cancelled">
+		<text>The trade with %s is off.</text>
+	</string>
+	<string id="st_coop_trade_gone">
+		<text>%s is gone: the trade is off.</text>
+	</string>
+	<string id="st_coop_trade_done">
+		<text>The trade with %s is done.</text>
+	</string>
+	<string id="st_coop_trade_asked">
+		<text>Trade offered to %s</text>
+	</string>
+	<string id="st_coop_trade_offered">
+		<text>%s offers you a trade. Agree?</text>
+	</string>
+	<string id="st_coop_trade_declined">
+		<text>%s turned the trade down.</text>
+	</string>
+	<string id="st_coop_trade_got_money">
+		<text>%s gave you money: %d</text>
+	</string>
+	<string id="ui_mm_coop_saves">
+		<text>World saves</text>
+	</string>
+	<string id="ui_mm_coop_saves_name">
+		<text>Name:</text>
+	</string>
+	<string id="ui_mm_coop_saves_save">
+		<text>Save the world</text>
+	</string>
+	<string id="ui_mm_coop_saves_rollback">
+		<text>Go back to the selected one</text>
+	</string>
+	<string id="st_coop_saves_hint">
+		<text>Newest first. To save, type a name (or leave it empty) and press Save the world. To go back, pick a save: everyone in the game has to agree.</text>
+	</string>
+	<string id="st_coop_saves_loading">
+		<text>Loading the list of saves...</text>
+	</string>
+	<string id="st_coop_saves_saving">
+		<text>The master is saving the world...</text>
+	</string>
+	<string id="st_coop_saves_pick">
+		<text>Pick a save in the list.</text>
+	</string>
+	<string id="st_coop_saves_latest">
+		<text>That is the world as it is now: pick an older save.</text>
+	</string>
+	<string id="st_coop_saves_voting">
+		<text>Waiting for the other players to answer (30 seconds at most)...</text>
+	</string>
+	<string id="st_coop_save_auto">
+		<text>Autosave</text>
+	</string>
+	<string id="st_coop_save_quick">
+		<text>Quick save</text>
+	</string>
+	<string id="st_coop_save_named">
+		<text>"%s"</text>
+	</string>
+	<string id="st_coop_save_join">
+		<text>Joined: %s</text>
+	</string>
+	<string id="st_coop_save_leave">
+		<text>Left: %s</text>
+	</string>
+	<string id="st_coop_save_exit">
+		<text>Master left: %s</text>
+	</string>
+	<string id="st_coop_save_new">
+		<text>New world</text>
+	</string>
+	<string id="st_coop_save_rollback">
+		<text>Back to #%s</text>
+	</string>
+	<string id="st_coop_ago_now">
+		<text>just now</text>
+	</string>
+	<string id="st_coop_ago_min">
+		<text>%s min ago</text>
+	</string>
+	<string id="st_coop_ago_hours">
+		<text>%s h ago</text>
+	</string>
+	<string id="st_coop_ago_days">
+		<text>%s days ago</text>
+	</string>
+	<string id="st_coop_rollback_ask">
+		<text>%s asks to take the world back to save #%s: %s (%s). Everyone in the game loads it again. Agree?</text>
+	</string>
+	<string id="st_coop_rollback_0">
+		<text>The world goes back to the save: everyone loads it again.</text>
+	</string>
+	<string id="st_coop_rollback_1">
+		<text>Not going back: %s said no.</text>
+	</string>
+	<string id="st_coop_rollback_2">
+		<text>Not going back: %s didn't answer.</text>
+	</string>
+	<string id="st_coop_rollback_3">
+		<text>Not going back: %s left the game.</text>
+	</string>
+	<string id="st_coop_rollback_4">
+		<text>A vote to go back is on already, %s started it.</text>
+	</string>
+	<string id="st_coop_pda_group">
+		<text>Group</text>
+	</string>
+	<string id="st_coop_pda_members">
+		<text>Group members</text>
+	</string>
+	<string id="st_coop_pda_players">
+		<text>Players in the world</text>
+	</string>
+	<string id="st_coop_pda_leave">
+		<text>Leave the group</text>
+	</string>
+	<string id="st_coop_pda_kick">
+		<text>Put out</text>
+	</string>
+	<string id="st_coop_pda_invite">
+		<text>Invite to the group</text>
+	</string>
+	<string id="st_coop_pda_send_money">
+		<text>Send</text>
+	</string>
+	<string id="st_coop_pda_offline">
+		<text>offline</text>
+	</string>
+	<string id="st_coop_pda_in_menu">
+		<text>in the menu</text>
+	</string>
+	<string id="st_coop_pda_meters">
+		<text>%s m</text>
+	</string>
+	<string id="st_coop_pda_downed">
+		<text>down, needs help</text>
+	</string>
+	<string id="st_coop_pda_you">
+		<text>you</text>
+	</string>
+	<string id="st_coop_pda_no_group">
+		<text>You are in no group: invite a player on the right.</text>
+	</string>
+	<string id="st_coop_pda_not_connected">
+		<text>Not connected to co-op.</text>
+	</string>
+	<string id="st_coop_pda_pick_member">
+		<text>Pick a group member on the left.</text>
+	</string>
+	<string id="st_coop_pda_pick_player">
+		<text>Pick a player on the right.</text>
+	</string>
+	<string id="st_coop_pda_kicked">
+		<text>%s is out of the group.</text>
+	</string>
+	<string id="st_coop_pda_money_away">
+		<text>%s is not in the world now: the money would not get there.</text>
+	</string>
+	<string id="st_coop_pda_money_amount">
+		<text>Type the amount.</text>
+	</string>
+	<string id="st_coop_pda_money_short">
+		<text>You don't have that much money.</text>
+	</string>
+	<string id="st_coop_pda_money_sent">
+		<text>You sent %s to %s.</text>
+	</string>
+	<string id="st_coop_pause_waiting">
+		<text>Waiting for the other players to answer...</text>
+	</string>
+	<string id="st_coop_pause_ask">
+		<text>%s asks to pause the world. Agree: %s; no: don't answer.</text>
+	</string>
+	<string id="st_coop_resume_ask">
+		<text>%s asks to let the world go on. Agree: %s; no: don't answer.</text>
+	</string>
+	<string id="st_coop_pause_1">
+		<text>Not done: %s said no.</text>
+	</string>
+	<string id="st_coop_pause_2">
+		<text>Not done: %s didn't answer.</text>
+	</string>
+	<string id="st_coop_pause_3">
+		<text>Not done: %s left the game.</text>
+	</string>
+	<string id="st_coop_pause_4">
+		<text>Another vote is on, %s started it.</text>
+	</string>
+	<string id="st_coop_paused">
+		<text>The world is paused (%s asked). To go on: the Pause key.</text>
+	</string>
+	<string id="st_coop_goes_on">
+		<text>The world goes on.</text>
+	</string>
+	<string id="st_coop_pda_invites">
+		<text>Group invites</text>
+	</string>
+	<string id="st_coop_pda_accept">
+		<text>Accept</text>
+	</string>
+	<string id="st_coop_pda_decline">
+		<text>Decline</text>
+	</string>
+	<string id="st_coop_pda_no_invites">
+		<text>No invites</text>
+	</string>
+	<string id="st_coop_pda_invite_from">
+		<text>From: %s</text>
+	</string>
+	<string id="st_coop_pda_pick_invite">
+		<text>Pick an invite.</text>
+	</string>
+	<string id="st_coop_group_invite_pda">
+		<text>%s invites you to their group: PDA, Group tab.</text>
+	</string>
+	<string id="st_coop_save_level">
+		<text>Level change: %s</text>
 	</string>
 </string_table>

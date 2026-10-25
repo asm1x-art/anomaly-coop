@@ -12,6 +12,7 @@
 
 #include "memory_manager.h"
 #include "enemy_manager.h"
+#include "coop/coop_net.h"
 
 struct SAttackGoodwillStorage
 {
@@ -195,7 +196,8 @@ void RELATION_REGISTRY::Action(CEntityAlive* from, CEntityAlive* to, ERelationAc
 					CGroupHierarchyHolder& group = Level()
 					                               .seniority_holder().team(stalker->g_Team()).squad(stalker->g_Squad())
 					                               .group(stalker->g_Group());
-					for (std::size_t i = 0; i < group.members().size(); i++)
+					// co-op: grudges instead, each player's own (coop_combat.h); here the actor is every player
+					for (std::size_t i = 0; i < group.members().size() && !coop::is_connected(); i++)
 					{
 						ChangeGoodwill(group.members()[i]->ID(), from->ID(), delta_goodwill);
 					}
@@ -203,7 +205,7 @@ void RELATION_REGISTRY::Action(CEntityAlive* from, CEntityAlive* to, ERelationAc
 					//*(CHARACTER_GOODWILL)( stalker->Sympathy() * (float)(delta_goodwill));
 					CHARACTER_GOODWILL community_goodwill = (CHARACTER_GOODWILL)(stalker->Sympathy() * (float)(st->
 						community_member_attack_goodwill));
-					if (community_goodwill)
+					if (community_goodwill && !coop::is_connected()) // co-op has its own, the same for all (coop_sync.script)
 					{
 						ChangeCommunityGoodwill(stalker->Community(), from->ID(), community_goodwill);
 					}
@@ -265,7 +267,8 @@ void RELATION_REGISTRY::Action(CEntityAlive* from, CEntityAlive* to, ERelationAc
 					CGroupHierarchyHolder& group = Level()
 					                               .seniority_holder().team(stalker->g_Team()).squad(stalker->g_Squad())
 					                               .group(stalker->g_Group());
-					for (std::size_t i = 0; i < group.members().size(); i++)
+					// co-op: grudges instead, each player's own (coop_combat.h); here the actor is every player
+					for (std::size_t i = 0; i < group.members().size() && !coop::is_connected(); i++)
 					{
 						if (stalker->ID() != group.members()[i]->ID())
 						{

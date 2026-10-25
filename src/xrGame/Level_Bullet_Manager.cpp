@@ -251,7 +251,7 @@ void CBulletManager::Clear()
 	m_Events.clear();
 }
 
-void CBulletManager::AddBullet(const Fvector& position,
+s32 CBulletManager::AddBullet(const Fvector& position,
                                const Fvector& direction,
                                float starting_speed,
                                float power,
@@ -265,7 +265,8 @@ void CBulletManager::AddBullet(const Fvector& position,
                                float const air_resistance_factor,
                                bool SendHit,
                                bool AimBullet,
-                               int iShotNum)
+                               int iShotNum,
+                               s32 seed)
 {
 #ifdef DEBUG
 	VERIFY(m_thread_id == GetCurrentThreadId());
@@ -280,6 +281,9 @@ void CBulletManager::AddBullet(const Fvector& position,
 	            e_hit_type, maximum_distance, cartridge, air_resistance_factor, SendHit, iShotNum);
 	//	bullet.frame_num			= Device.dwFrame;
 	bullet.flags.aim_bullet = AimBullet;
+	if (!seed)
+		seed = ((::Random.randI() << 15) | ::Random.randI()) + 1;
+	bullet.rng.seed(seed);
 
 	// demonized - bullet on init callback
 	::luabind::functor<void> funct;
@@ -311,6 +315,7 @@ void CBulletManager::AddBullet(const Fvector& position,
 		if (tmp_cl_game->get_reward_generator())
 			tmp_cl_game->get_reward_generator()->OnBullet_Fire(sender_id, sendersweapon_id, position, direction);
 	}
+	return seed;
 }
 
 void CBulletManager::UpdateWorkload()

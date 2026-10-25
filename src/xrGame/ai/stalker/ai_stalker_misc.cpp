@@ -31,6 +31,7 @@
 #include "../../agent_enemy_manager.h"
 #include "../../script_game_object.h"
 #include "../../ai_space.h"
+#include "../../coop/coop_combat.h"
 
 const u32 TOLLS_INTERVAL = 2000;
 const u32 GRENADE_INTERVAL = 0 * 1000;
@@ -93,6 +94,9 @@ bool CAI_Stalker::useful(const CEnemyManager* manager, const CEntityAlive* objec
 
 ALife::ERelationType CAI_Stalker::tfGetRelationType(const CEntityAlive* tpEntityAlive) const
 {
+	if (coop::has_grudge(this, tpEntityAlive))
+		return ALife::eRelationTypeEnemy; // co-op: a player its squad was shot by, in whichever game
+
 	const CInventoryOwner* pOtherIO = smart_cast<const CInventoryOwner*>(tpEntityAlive);
 
 	ALife::ERelationType relation = ALife::eRelationTypeDummy;

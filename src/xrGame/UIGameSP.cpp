@@ -22,6 +22,7 @@
 #include "ui/UIMessageBox.h"
 
 #include "Inventory.h"
+#include "coop/coop_save.h"
 
 
 CUIGameSP::CUIGameSP()
@@ -358,12 +359,14 @@ void CChangeLevelWnd::Show()
 
 
 	g_block_pause = true;
-	Device.Pause(TRUE, TRUE, TRUE, "CChangeLevelWnd_show");
+	if (!coop::keeps_running()) // co-op: the world doesn't wait for one player's choice
+		Device.Pause(TRUE, TRUE, TRUE, "CChangeLevelWnd_show");
 	bShowPauseString = FALSE;
 }
 
 void CChangeLevelWnd::Hide()
 {
 	g_block_pause = false;
-	Device.Pause(FALSE, TRUE, TRUE, "CChangeLevelWnd_hide");
+	if (!coop::keeps_running())
+		Device.Pause(FALSE, TRUE, TRUE, "CChangeLevelWnd_hide");
 }

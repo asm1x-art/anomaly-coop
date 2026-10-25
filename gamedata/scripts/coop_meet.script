@@ -1,0 +1,226 @@
+-- Co-op: NPCs meet every player on the level, not only this game's actor. Anomaly's meet (xr_meet.script)
+-- looks at db.actor alone: an NPC stops for the actor, turns to them, greets them and tells them to lower
+-- the gun. In the game that runs the level the other players are stand-ins (coop_proxy, coop_combat.h), so
+-- here the meet also looks at the nearest of them, by the vanilla default meet (xr_meet default_meet), and
+-- an NPC stands talking to a player who talks to it in their own game - there it is a puppet of this one,
+-- so it stops and turns there too. Our own actor comes first, as in single player.
+
+local WARY_CLOSE, CLOSE = 3, 2 -- m: close meet; wary of a player with a gun who isn't a friend yet
+local WARY_FAR, FAR = 5, 3     -- m: far meet
+local RESET = 30               -- m: farther than this, a player is greeted again next time
+
+local talks = {}  -- [npc id] = peer name: a player talking to that NPC (a puppet in their game)
+local met = {}    -- [npc id] = { [peer name] = true }: greeted
+
+local function coop_on()
+	return coop and coop.connected() and db.actor ~= nil
+end
+
+-- coop_debug 1: what the meet makes of the players, in the log
+local said = {} -- [what] = time_global() it was last said, so each says once in 2 s
+local function debug(what, fmt, ...)
+	if get_console():get_integer("coop_debug") ~= 1 then
+		return
+	end
+	local now = time_global()
+	if said[what] and now - said[what] < 2000 then
+		return
+	end
+	said[what] = now
+	printf("%s", "[coop meet] " .. string.format(fmt, ...)) -- printf itself knows %s alone
+end
+
+local function holds_weapon(section)
+	local class = section ~= "" and ini_sys:r_string_ex(section, "class")
+	return class and string.find(class, "^WP_") ~= nil or false
+end
+
+-- the other players on this level that NPCs see here: { name, obj (stand-in), weapon }
+local function players_here()
+	local list = {}
+	for _, p in ipairs(coop.peers()) do
+		local obj = p.level == level.name() and p.stand_in ~= 0 and not coop.downed(p.id) and level.object_by_id(p.stand_in)
+		if obj then
+			list[#list + 1] = { name = p.name, obj = obj, weapon = holds_weapon(p.item) }
+		end
+	end
+	return list
+end
+
+-- the player an NPC meets: the one talking to it, else the nearest it sees within the far meet
+local function target_of(npc, players)
+	local talker = talks[npc:id()]
+	local best, best_d = nil, WARY_FAR
+	for _, p in ipairs(players) do
+		if p.name == talker then
+			p.talking = true
+			return p
+		end
+		-- not npc:see(): NPCs don't see those of their own team (CCustomMonster::feel_vision_isRelevant), and a
+		-- stand-in is in its player's faction's team; within a few metres the distance alone will do
+		local d = npc:position():distance_to(p.obj:position())
+		if d <= best_d then
+			best, best_d = p, d
+		end
+	end
+	talks[npc:id()] = nil -- a talker gone from the level talks no more
+	return best
+end
+
+-- the vanilla default meet (xr_meet default_meet) for a player's stand-in; nil when there is none
+local function meet(manager, p)
+	local npc = manager.npc
+	if xr_wounded.is_wounded(npc) or not xr_conditions.is_squad_commander(db.actor, npc) then
+		debug(npc:id(), "%s: not for %s (wounded or not its squad's commander)", npc:name(), p.name)
+		return nil
+	end
+	local relation = npc:relation(p.obj)
+	if relation == game_object.enemy then
+		debug(npc:id(), "%s: not for %s (an enemy)", npc:name(), p.name)
+		return nil
+	end
+	-- A stand-in is an NPC of the player's faction, and NPCs of a faction are friends to each other; the
+	-- player to them is not (goodwill: loners are mostly neutral to a loner). So only an enemy counts here,
+	-- and a gun out makes it wary as it does with the actor.
+	local st = db.storage[npc:id()]
+	local wary = p.weapon and not (st and st.after_first_meet)
+	local d = npc:position():distance_to(p.obj:position())
+	local close = p.talking or d <= (wary and WARY_CLOSE or CLOSE)
+	if not (close or d <= (wary and WARY_FAR or FAR)) then
+		debug(npc:id(), "%s: %s too far (%.1f m, wary %s)", npc:name(), p.name, d, tostring(wary))
+		return nil
+	end
+	debug(npc:id(), "%s meets %s: %s, %.1f m, wary %s, talking %s (relation to the stand-in %s, to our actor %s)",
+		npc:name(), p.name, close and "close" or "far", d, tostring(wary), tostring(p.talking), relation,
+		npc:relation(db.actor))
+	local greeted = met[npc:id()]
+	if close and not greeted[p.name] and not p.talking and not state_mgr.is_npc_in_combat(npc) then
+		greeted[p.name] = true
+		xr_sound.set_sound_play(npc:id(), wary and "meet_stop" or "meet_hello")
+	end
+	manager.current_distance = close and "close" or "far"
+	if close then
+		-- with a gun out it stands wary, as for the actor; talking, it turns to them all the same
+		return { obj = p.obj, anim = (p.talking or not wary) and "talk_default" or nil }
+	end
+	return { obj = p.obj, anim = wary and "threat_na" or nil, snd = wary and "meet_hide_weapon" or "meet_wait" }
+end
+
+local function forget_far(npc, players)
+	local greeted = met[npc:id()]
+	local near = {}
+	for _, p in ipairs(players) do
+		near[p.name] = npc:position():distance_to(p.obj:position()) <= RESET
+	end
+	for name in pairs(greeted) do
+		if not near[name] then
+			greeted[name] = nil
+		end
+	end
+end
+
+local function wrap(tbl, name, wrapper)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [coop] xr_meet %s not found, not wrapped", name)
+		return
+	end
+	tbl[name] = function(...)
+		return wrapper(original, ...)
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Talking to a puppet: our NPC is another game's, which is told for as long as the talk goes on
+
+local talking_to = nil -- id of the NPC we used last, while it may become a talk
+local told = nil       -- id of the NPC the level's authority was told we talk to
+
+local function watch_talk()
+	local talking = db.actor:is_talking()
+	if told and not (talking and coop_on()) then
+		coop_sync.send_event("talk", told, 0)
+		debug("talk", "told the level's authority we stopped talking to %s", told)
+		told = nil
+	elseif not told and talking_to and talking then
+		told = talking_to
+		coop_sync.send_event("talk", told, 1)
+		debug("talk", "told the level's authority we talk to %s", told)
+	end
+	if not talking then
+		talking_to = nil
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	-- the vanilla meet works things out for our actor twice a second; the other players' meet goes with it
+	wrap(xr_meet.Cmeet_manager, "update", function(original, self)
+		local stimer = self.__stimer
+		original(self)
+		if self.__stimer == stimer then
+			return -- not this time
+		end
+		self.coop = nil
+		if not coop_on() then
+			return
+		end
+		local players = players_here()
+		met[self.npc:id()] = met[self.npc:id()] or {}
+		forget_far(self.npc, players)
+		if self.current_distance ~= nil and not talks[self.npc:id()] then
+			return -- our actor first
+		end
+		local p = target_of(self.npc, players)
+		if not p and #players > 0 then
+			debug(self.npc:id(), "%s: none of the %s player(s) within %s m", self.npc:name(), #players, WARY_FAR)
+		end
+		self.coop = p and meet(self, p)
+	end)
+
+	wrap(xr_meet.Cmeet_manager, "update_state", function(original, self)
+		local m = self.coop
+		if not (m and coop_on()) then
+			return original(self)
+		end
+		if m.anim then
+			state_mgr.set_state(self.npc, m.anim, nil, nil, { look_object = m.obj })
+		end
+		if m.snd then
+			xr_sound.set_sound_play(self.npc:id(), m.snd)
+		end
+	end)
+
+	RegisterScriptCallback("npc_on_use", function(npc, who)
+		if coop_on() and who and who:id() == AC_ID and not coop.is_authority(level.name()) then
+			talking_to = npc:id()
+			debug("use", "used %s (%s), a puppet here", npc:name(), npc:id())
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", function()
+		if coop_on() and coop.is_authority(level.name()) then
+			local list = {}
+			for _, p in ipairs(players_here()) do
+				list[#list + 1] = string.format("%s (stand-in %s%s)", p.name, p.obj:id(), p.weapon and ", gun out" or "")
+			end
+			debug("players", "players here: %s", #list > 0 and table.concat(list, ", ") or "none")
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", function()
+		if coop_on() or told then
+			watch_talk()
+		end
+	end)
+
+	coop_sync.on_event("talk", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		local npc_id = tonumber(f[1])
+		if npc_id then
+			talks[npc_id] = f[2] == "1" and sender or nil
+			debug("talk" .. npc_id, "%s %s %s", sender, f[2] == "1" and "talks to" or "stopped talking to", npc_id)
+		end
+	end)
+end

@@ -10,6 +10,7 @@
 #include "visual_memory_manager.h"
 #include "ai/stalker/ai_stalker.h"
 #include "memory_space_impl.h"
+#include "coop/coop_combat.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "ai_object_location.h"
 #include "level_graph.h"
@@ -322,7 +323,9 @@ float CVisualMemoryManager::object_luminocity(const CGameObject* game_object) co
 {
 	if (!smart_cast<CEntityAlive const*>(game_object)) //Alundaio
 		return (1.f);
-	float luminocity = const_cast<CGameObject*>(game_object)->ROS()->get_luminocity();
+	float luminocity;
+	if (!coop::stand_in_luminocity(game_object, luminocity)) // a stand-in isn't drawn: never lit
+		luminocity = const_cast<CGameObject*>(game_object)->ROS()->get_luminocity();
 	float power = log(luminocity > .001f ? luminocity : .001f) * current_state().m_luminocity_factor;
 	return (exp(power));
 }

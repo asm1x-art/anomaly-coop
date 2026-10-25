@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
-import { M, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ } from '../src/protocol.js';
+import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,12 +18,13 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [], settings: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
     if (type === M.WORLD_INFO) return client.worldInfo.push(msg.payload);
     if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
+    if (type === M.GROUPS) return client.groups.push(msg.payload);
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -80,13 +81,40 @@ test('frames split across chunks are reassembled', async () => {
   }
 });
 
-test('wrong protocol version is dropped', async () => {
+test('wrong protocol version is refused with the server version, then dropped', async () => {
   const server = await startServer(options());
   try {
     const c = await connect(server.address().port);
     const closed = new Promise((r) => c.socket.on('close', r));
     c.send(M.HELLO, hello('old', PROTOCOL_VERSION + 1));
+    const msg = await c.next();
+    assert.equal(msg.type, M.REFUSED);
+    assert.equal(msg.payload[0], REFUSED.VERSION);
+    assert.equal(msg.payload.readUInt16LE(1), PROTOCOL_VERSION);
     await closed;
+  } finally {
+    server.close();
+  }
+});
+
+test('a full server refuses the next player, saying how many it takes', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  fs.writeFileSync(path.join(dataDir, 'settings.json'), JSON.stringify({ rules: { max_players: 1 } }));
+  const server = await startServer(options(dataDir));
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    assert.equal((await a.next()).type, M.WELCOME);
+    const b = await connect(port);
+    const closed = new Promise((r) => b.socket.on('close', r));
+    b.send(M.HELLO, hello('друг'));
+    const msg = await b.next();
+    assert.equal(msg.type, M.REFUSED);
+    assert.equal(msg.payload[0], REFUSED.FULL);
+    assert.equal(msg.payload.readUInt16LE(1), 1);
+    await closed;
+    a.socket.destroy();
   } finally {
     server.close();
   }
@@ -325,7 +353,8 @@ test('script events reach others with the sender id', async () => {
 
 function worldInfo(payload) {
   const end = payload.indexOf(0, 1);
-  return { has: payload[0] === 1, owner: payload.toString('utf8', 1, end), revision: payload.readUInt32LE(end + 1) };
+  return { has: payload[0] === 1, owner: readStringZ(payload, 1), revision: payload.readUInt32LE(end + 1),
+    creator: readStringZ(payload, end + 5) };
 }
 
 function chunks(data, file) {
@@ -352,20 +381,20 @@ test('world: uploaded into an empty server, announced to all, downloaded in chun
     a.send(M.HELLO, hello('artem'));
     await a.next();
     await roundTrip(a);
-    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: false, owner: '', revision: 0 });
+    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: false, owner: '', revision: 0, creator: '' });
 
     const scop = Buffer.alloc(40000, 7);
     scop.write('scop', 0);
     const scoc = Buffer.from('lua state');
     await uploadWorld(a, [scop, scoc]);
     await roundTrip(a);
-    assert.deepEqual(worldInfo(a.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 1 });
+    assert.deepEqual(worldInfo(a.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 1, creator: '' });
 
     const b = await connect(port);
     b.send(M.HELLO, hello('друг'));
     await b.next();
     await roundTrip(b);
-    assert.deepEqual(worldInfo(b.worldInfo[0]), { has: true, owner: 'artem', revision: 1 });
+    assert.deepEqual(worldInfo(b.worldInfo[0]), { has: true, owner: 'artem', revision: 1, creator: '' });
 
     b.send(M.WORLD_REQUEST);
     const files = [Buffer.alloc(scop.length), Buffer.alloc(scoc.length)];
@@ -410,6 +439,50 @@ test('world: only the sim master replaces an existing world', async () => {
   }
 });
 
+test('world: on an empty server only the first claim may create it, free again when that player leaves', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    await b.next();
+
+    a.send(M.WORLD_CLAIM, Buffer.from([1]));
+    await roundTrip(a);
+    b.send(M.WORLD_CLAIM, Buffer.from([1]));
+    await roundTrip(b);
+    assert.equal(worldInfo(a.worldInfo.at(-1)).creator, 'artem');
+    assert.deepEqual(worldInfo(b.worldInfo.at(-1)), { has: false, owner: '', revision: 0, creator: 'artem' });
+
+    await uploadWorld(b, [Buffer.from('second'), Buffer.from('y')]);
+    await roundTrip(b);
+    assert.equal(worldInfo(b.worldInfo.at(-1)).has, false);
+
+    a.socket.destroy();
+    assert.equal((await b.next()).type, M.PEER_LEFT);
+    await roundTrip(b);
+    assert.equal(worldInfo(b.worldInfo.at(-1)).creator, '');
+
+    b.send(M.WORLD_CLAIM, Buffer.from([1]));
+    await roundTrip(b);
+    assert.equal(worldInfo(b.worldInfo.at(-1)).creator, 'друг');
+    b.send(M.WORLD_CLAIM, Buffer.from([0])); // backed out of the new game screen
+    await roundTrip(b);
+    assert.equal(worldInfo(b.worldInfo.at(-1)).creator, '');
+
+    b.send(M.WORLD_CLAIM, Buffer.from([1]));
+    await uploadWorld(b, [Buffer.from('second'), Buffer.from('y')]);
+    await roundTrip(b);
+    assert.deepEqual(worldInfo(b.worldInfo.at(-1)), { has: true, owner: 'друг', revision: 1, creator: '' });
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 test('characters, leases and the world survive a server restart', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
   let server = await startServer(options(dataDir));
@@ -439,7 +512,7 @@ test('characters, leases and the world survive a server restart', async () => {
     assert.equal(record.payload.toString(), 'my record');
     assert.equal((await a.next()).payload.readUInt16LE(0), 5); // the block is still ours
     await roundTrip(a);
-    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: true, owner: 'artem', revision: 1 });
+    assert.deepEqual(worldInfo(a.worldInfo[0]), { has: true, owner: 'artem', revision: 1, creator: '' });
     a.socket.destroy();
   } finally {
     server.close();
@@ -486,6 +559,259 @@ test('actor actions reach others with the sender id, not the sender', async () =
     assert.deepEqual(got.payload.subarray(4), shot);
     a.socket.destroy();
     b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('groups: invite, accept, leader kicks, leaving dissolves a group of two', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  const wait = () => new Promise((r) => setTimeout(r, 30));
+  const names = (payload) => {
+    const out = [];
+    let at = 1;
+    for (let g = 0; g < payload[0]; g++) {
+      const members = [];
+      for (let n = payload[at++]; n > 0; n--) {
+        const name = readStringZ(payload, at);
+        members.push(name);
+        at = payload.indexOf(0, at) + 1;
+      }
+      out.push(members);
+    }
+    return out;
+  };
+  const action = (kind, id) => {
+    const p = Buffer.alloc(5);
+    p[0] = kind;
+    p.writeUInt32LE(id, 1);
+    return p;
+  };
+  try {
+    const a = await connect(port);
+    const b = await connect(port);
+    const c = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    b.send(M.HELLO, hello('друг'));
+    c.send(M.HELLO, hello('third'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const idB = (await b.next()).payload.readUInt32LE(0);
+    const idC = (await c.next()).payload.readUInt32LE(0);
+    await wait();
+    assert.deepEqual(names(a.groups.at(-1)), []);
+
+    a.send(M.GROUP, action(GROUP.INVITE, idB));
+    const invite = await b.next();
+    assert.equal(invite.type, M.GROUP_INVITE);
+    assert.equal(invite.payload.readUInt32LE(0), idA);
+    assert.equal(readStringZ(invite.payload, 4), 'artem');
+    b.send(M.GROUP, action(GROUP.ACCEPT, idA));
+    await wait();
+    assert.deepEqual(names(c.groups.at(-1)), [['artem', 'друг']]);
+
+    // a member invites too; the leader stays
+    b.send(M.GROUP, action(GROUP.INVITE, idC));
+    assert.equal((await c.next()).type, M.GROUP_INVITE);
+    c.send(M.GROUP, action(GROUP.ACCEPT, idB));
+    await wait();
+    assert.deepEqual(names(a.groups.at(-1)), [['artem', 'друг', 'third']]);
+
+    // only the leader puts one out
+    b.send(M.GROUP, Buffer.concat([Buffer.from([GROUP.KICK]), encodeText('third'), Buffer.from([0])]));
+    a.send(M.GROUP, Buffer.concat([Buffer.from([GROUP.KICK]), encodeText('third'), Buffer.from([0])]));
+    await wait();
+    assert.deepEqual(names(a.groups.at(-1)), [['artem', 'друг']]);
+
+    // an invite not accepted in time, or never sent, joins nobody
+    c.send(M.GROUP, action(GROUP.ACCEPT, idA));
+    const note = await c.next();
+    assert.equal(note.type, M.GROUP_NOTE);
+    assert.equal(note.payload[0], GROUP_NOTE.EXPIRED);
+
+    b.send(M.GROUP, Buffer.from([GROUP.LEAVE]));
+    await wait();
+    assert.deepEqual(names(a.groups.at(-1)), []);
+    for (const x of [a, b, c]) x.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+// skips other messages until one of that type
+async function until(c, type) {
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === type) return msg;
+  }
+}
+
+function uploadMeta(files, base, name, reason, who) {
+  const head = Buffer.alloc(12);
+  head.writeUInt32LE(files[0].length, 0);
+  head.writeUInt32LE(files[1].length, 4);
+  head.writeUInt32LE(base, 8);
+  return Buffer.concat([head, ...[name, reason, who].map((s) => Buffer.concat([encodeText(s), Buffer.from([0])]))]);
+}
+
+async function uploadSave(c, files, base, name = '', reason = 'auto', who = '') {
+  c.send(M.WORLD_UPLOAD, uploadMeta(files, base, name, reason, who));
+  files.forEach((data, file) => chunks(data, file).forEach((ch) => c.send(M.WORLD_CHUNK, ch)));
+  c.send(M.WORLD_DONE);
+}
+
+function saveNow(msg) {
+  const [name, reason, who] = readStringsZ(msg.payload, 0, 3);
+  return { name, reason, who };
+}
+
+async function player(port, name) {
+  const c = await connect(port);
+  c.send(M.HELLO, hello(name));
+  assert.equal((await c.next()).type, M.WELCOME);
+  return c;
+}
+
+test('saves: the master is whoever is in the world; it saves for players coming in, leaving and asking', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const menu = await player(port, 'menu');       // lowest id, stays in the main menu
+    const master = await player(port, 'master');
+    await uploadSave(master, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'master');
+    await roundTrip(master);
+    master.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await roundTrip(master);
+    assert.equal(master.roles.at(-1), 2); // in the world: the master now, not the one in the menu
+
+    // a player coming in: the master saves first, then the newcomer gets that world
+    const joiner = await player(port, 'joiner');
+    joiner.send(M.WORLD_REQUEST);
+    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'join', who: 'joiner' });
+    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, '', 'join', 'joiner');
+    const done = await until(joiner, M.WORLD_DONE);
+    assert.equal(done.payload.readUInt32LE(done.payload.indexOf(0) + 1), 2);
+
+    // asked by name
+    menu.send(M.SAVE_REQUEST, Buffer.from('Перед Баром\0', 'latin1').length ? Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]) : null);
+    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: 'Перед Баром', reason: 'named', who: 'menu' });
+
+    // a player in the world leaving
+    joiner.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await roundTrip(joiner);
+    joiner.socket.destroy();
+    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'leave', who: 'joiner' });
+
+    menu.send(M.SAVES_REQUEST);
+    const saves = await until(menu, M.SAVES);
+    assert.equal(saves.payload.readUInt16LE(0), 2);
+    assert.equal(saves.payload.readUInt32LE(2), 2); // newest first
+    assert.deepEqual(readStringsZ(saves.payload, 10, 3), ['', 'join', 'joiner']);
+    menu.socket.destroy();
+    master.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('rollback: everyone must agree; then all reload, characters go back, old games may not upload', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0)); // b votes: in the world
+    a.send(M.CHARACTER, Buffer.from('at the start'));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    a.send(M.CHARACTER, Buffer.from('much later'));
+    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1);
+    await roundTrip(a);
+
+    // a no ends it
+    a.send(M.ROLLBACK_PROPOSE, u32le(1));
+    const ask = await until(b, M.ROLLBACK_VOTE);
+    assert.equal(ask.payload.readUInt32LE(0), 1); // proposer id
+    b.send(M.ROLLBACK_ANSWER, Buffer.from([0]));
+    const no = await until(a, M.ROLLBACK_RESULT);
+    assert.equal(no.payload[0], ROLLBACK.DECLINED);
+    assert.equal(readStringZ(no.payload, 1), 'друг');
+
+    // all yes: back to save 1 as save 3
+    a.send(M.ROLLBACK_PROPOSE, u32le(1));
+    await until(b, M.ROLLBACK_VOTE);
+    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
+    await until(b, M.WORLD_RELOAD);
+    const yes = await until(b, M.ROLLBACK_RESULT);
+    assert.equal(yes.payload[0], ROLLBACK.ACCEPTED);
+    assert.equal(yes.payload.readUInt32LE(yes.payload.indexOf(0, 1) + 1), 3);
+    await roundTrip(b);
+    assert.deepEqual(worldInfo(b.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 3, creator: '' });
+    await until(a, M.WORLD_RELOAD); // the one who asked reloads too
+    await until(a, M.ROLLBACK_RESULT);
+
+    // the master's game still runs revision 1's successor: its upload is turned down until it reloads
+    await uploadSave(a, [Buffer.from('stale'), Buffer.from('x')], 1);
+    await roundTrip(a);
+    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 3);
+    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3);
+    await roundTrip(a);
+    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 4);
+
+    // characters went back with the world
+    const c = await connect(port);
+    c.send(M.HELLO, hello('artem'));
+    await c.next();
+    assert.equal((await c.next()).payload.toString(), 'at the start');
+    a.socket.destroy();
+    b.socket.destroy();
+    c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function u32le(v) {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(v, 0);
+  return b;
+}
+
+test('pause: everyone in the world agrees to pause and to go on; alone, at once; newcomers learn it', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  const pausedOf = (msg) => ({ paused: msg.payload[0] === 1, by: readStringZ(msg.payload, 1) });
+  try {
+    const a = await player(port, 'artem');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await roundTrip(a);
+    a.send(M.PAUSE_PROPOSE, Buffer.from([1])); // alone in the world: no vote
+    assert.deepEqual(pausedOf(await until(a, M.PAUSED)), { paused: true, by: 'artem' });
+    a.send(M.PAUSE_PROPOSE, Buffer.from([0]));
+    assert.deepEqual(pausedOf(await until(a, M.PAUSED)), { paused: false, by: '' });
+
+    const b = await player(port, 'друг');
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    b.send(M.PING, Buffer.alloc(4));
+    await until(b, M.PONG); // b is in the world now: it has a say
+    a.send(M.PAUSE_PROPOSE, Buffer.from([1]));
+    const ask = await until(b, M.PAUSE_VOTE);
+    assert.equal(readStringZ(ask.payload, 4), 'artem');
+    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
+    assert.deepEqual(pausedOf(await until(b, M.PAUSED)), { paused: true, by: 'artem' });
+    assert.equal((await until(b, M.PAUSE_RESULT)).payload[0], ROLLBACK.ACCEPTED);
+
+    const c = await player(port, 'третий'); // comes in while paused
+    assert.deepEqual(pausedOf(await until(c, M.PAUSED)), { paused: true, by: 'artem' });
+
+    b.send(M.PAUSE_PROPOSE, Buffer.from([0]));
+    await until(a, M.PAUSE_VOTE);
+    a.send(M.ROLLBACK_ANSWER, Buffer.from([0])); // no
+    const no = await until(b, M.PAUSE_RESULT);
+    assert.equal(no.payload[0], ROLLBACK.DECLINED);
+    a.socket.destroy();
+    b.socket.destroy();
+    c.socket.destroy();
   } finally {
     server.close();
   }

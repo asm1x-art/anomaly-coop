@@ -1,0 +1,489 @@
+-- Co-op: trading between players, from the wheel (coop_wheel.script). Like a Steam trade: one asks, the
+-- other agrees, both see a window with what they carry, what they give and what the other gives,
+-- money included. Any change makes both unready; once both are ready the trade goes through: each game
+-- hands over its own player's things (coop.give_item) and money. Events go to everyone with the other
+-- player's name; only that player takes them.
+
+local session = nil -- the trade going on: see start()
+local asks = {}     -- invites still to answer: { id, name }
+local GUI = nil
+
+local function fmt(id, ...)
+	return string.format(game.translate_string(id), ...)
+end
+
+local function news(text)
+	db.actor:give_game_news(game.translate_string("st_coop_group"), text, "ui_iconsTotal_grouping", 0, 8000)
+end
+
+local function tell(action, to, ...)
+	coop_sync.send_event("trade", action, to, ...)
+end
+
+local function peer_of(name)
+	for _, p in ipairs(coop.peers()) do
+		if p.name == name then
+			return p
+		end
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- What can be traded: everything carried, worn and on the belt too (their cells are tinted, so nothing
+-- worn goes by accident), but no quest items
+
+local function equipped()
+	local ids = {}
+	for slot = 1, 13 do
+		local item = db.actor:item_in_slot(slot)
+		if item then
+			ids[item:id()] = true
+		end
+	end
+	return ids
+end
+
+-- the things, and which of them are worn or on the belt: { [id] = true }
+local function tradeable()
+	local list, worn = {}, {}
+	local slots = equipped()
+	db.actor:iterate_inventory(function(owner, item)
+		local sec = item:section()
+		if not (get_object_story_id(item:id()) or ini_sys:r_bool_ex(sec, "quest_item", false)) then
+			list[#list + 1] = item
+			if slots[item:id()] or db.actor:is_on_belt(item) then
+				worn[item:id()] = true
+			end
+		end
+	end, db.actor)
+	return list, worn
+end
+
+-- id:section:condition %:count:worn, read back by decode()
+local function encode(item, worn)
+	local count = IsAmmo(item) and item:ammo_get_count() or 0
+	return string.format("%d:%s:%d:%d:%d", item:id(), item:section(), math.floor(item:condition() * 100 + 0.5), count,
+		worn and 1 or 0)
+end
+
+local function decode(entry)
+	local id, sec, cond, count, worn = string.match(entry, "^(%d+):([^:]+):(%d+):(%d+):?(%d?)$")
+	return id and { id = tonumber(id), sec = sec, cond = tonumber(cond), count = tonumber(count), worn = worn == "1" }
+end
+
+local function signature(ids, money)
+	local sorted = {}
+	for id in pairs(ids) do
+		sorted[#sorted + 1] = id
+	end
+	table.sort(sorted)
+	return table.concat(sorted, ",") .. "/" .. money
+end
+
+----------------------------------------------------------------------------------------------------
+-- The window: three grids of item cells as in the inventory. Double click or drag a thing from mine to
+-- what I give and back; theirs are only shown (their things aren't in this game: their shadow keeps them)
+
+local WORN_COLOR = GetARGB(70, 255, 150, 40)
+
+class "UICoopTrade" (CUIScriptWnd)
+
+function UICoopTrade:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit() -- the cell containers take their places from it
+	local xml = self.xml
+	xml:ParseFile("ui_coop_trade.xml")
+	local form = xml:InitStatic("form", self)
+	self.caption = xml:InitTextWnd("form:caption", form)
+	self.CC = {}
+	for _, name in ipairs({ "mine", "offer", "theirs" }) do
+		self["cap_" .. name] = xml:InitTextWnd("form:cap_" .. name, form)
+		xml:InitFrame("form:frame_" .. name, form)
+		self.CC[name] = utils_ui.UICellContainer(name, self, nil, "form:cont_" .. name, form)
+	end
+	self.CC.theirs.showcase = true      -- by section: their things are not objects here
+	self.CC.theirs.disable_stack = true -- one cell each, with its own condition
+	self.CC.theirs.disable_drag = true
+	self.item_info = utils_ui.UIInfoItem(self, 1000)
+
+	xml:InitTextWnd("form:cap_money", form)
+	self.edit_money = xml:InitEditBox("form:edit_money", form)
+	self:Register(self.edit_money, "edit_money")
+	self.their_money = xml:InitTextWnd("form:their_money", form)
+	xml:InitTextWnd("form:hint", form)
+	self.status = xml:InitTextWnd("form:status", form)
+	self.btn_ready = xml:Init3tButton("form:btn_ready", form)
+	self:Register(self.btn_ready, "btn_ready")
+	self:Register(xml:Init3tButton("form:btn_cancel", form), "btn_cancel")
+
+	self:AddCallback("btn_ready", ui_events.BUTTON_CLICKED, self.OnReady, self)
+	self:AddCallback("btn_cancel", ui_events.BUTTON_CLICKED, self.OnCancel, self)
+	self:AddCallback("edit_money", ui_events.EDIT_TEXT_COMMIT, self.OnMoney, self)
+end
+
+function UICoopTrade:__finalize()
+end
+
+-- tint the cells of worn things (worn(ci, idx) says which), over the icon: hovering uses the cell's own highlight
+function UICoopTrade:MarkWorn(cc, worn)
+	for idx, ci in pairs(cc.cell) do
+		local on = ci:IsShown() and worn(ci, idx)
+		if on and not ci.coop_worn then
+			ci.coop_worn = self.xml:InitStatic("form:worn", ci.cell)
+			ci.coop_worn:SetTextureColor(WORN_COLOR)
+		end
+		if ci.coop_worn then
+			ci.coop_worn:Show(on and true or false)
+			if on then
+				ci.coop_worn:SetWndPos(vector2():set(0, 0))
+				ci.coop_worn:SetWndSize(vector2():set(ci.cell:GetWidth(), ci.cell:GetHeight()))
+			end
+		end
+	end
+end
+
+function UICoopTrade:Fill()
+	local s = session
+	self.caption:SetText(fmt("st_coop_trade_with", s.name))
+	self.cap_theirs:SetText(fmt("st_coop_trade_theirs", s.name))
+
+	local items, worn = tradeable()
+	local mine, offer = {}, {}
+	for _, item in ipairs(items) do
+		local list = s.mine[item:id()] and offer or mine
+		list[#list + 1] = item
+	end
+	for name, list in pairs({ mine = mine, offer = offer }) do
+		local cc = self.CC[name]
+		cc:Reinit(list)
+		self:MarkWorn(cc, function(ci, idx)
+			local obj = cc:GetObj(idx)
+			return obj and worn[obj:id()]
+		end)
+	end
+
+	local secs, info = {}, {}
+	for _, entry in ipairs(s.theirs) do
+		local e = decode(entry)
+		if e then
+			secs[#secs + 1] = e.sec
+			info[#secs] = e
+		end
+	end
+	self.CC.theirs:Reinit(secs, info)
+	for _, ci in pairs(self.CC.theirs.cell) do
+		local e = ci:IsShown() and ci.flags.info
+		if e then
+			ci:Add_CustomText(e.count > 0 and tostring(e.count) or (e.cond .. "%"))
+		end
+	end
+	self:MarkWorn(self.CC.theirs, function(ci) return ci.flags.info and ci.flags.info.worn end)
+
+	self.edit_money:SetText(tostring(s.money))
+	self.their_money:SetText(fmt("st_coop_trade_their_money", s.their_money))
+	self:Status()
+end
+
+function UICoopTrade:Status()
+	local s = session
+	local text = ""
+	if s.ready and s.their_ready then
+		text = game.translate_string("st_coop_trade_going")
+	elseif s.ready then
+		text = fmt("st_coop_trade_waiting", s.name)
+	elseif s.their_ready then
+		text = fmt("st_coop_trade_they_ready", s.name)
+	end
+	self.status:SetText(text)
+	self.btn_ready:TextControl():SetText(game.translate_string(s.ready and "st_coop_trade_unready" or "st_coop_trade_ready"))
+end
+
+-- a thing from mine to what I give, or back
+function UICoopTrade:Move(from, idx)
+	local obj = (from == "mine" or from == "offer") and self.CC[from]:GetObj(idx)
+	if obj then
+		session.mine[obj:id()] = from == "mine" or nil
+		changed()
+	end
+end
+
+function UICoopTrade:On_CC_Mouse1_DB(bag, idx)
+	self:Move(bag, idx)
+end
+
+function UICoopTrade:On_CC_DragDrop(bag, idx)
+	local to = bag == "mine" and "offer" or bag == "offer" and "mine"
+	if to and self.CC[to]:IsCursorOverWindow() then
+		self:Move(bag, idx)
+	end
+end
+
+function UICoopTrade:OnMoney()
+	local money = math.max(0, math.min(math.floor(tonumber(self.edit_money:GetText()) or 0), db.actor:money()))
+	if money ~= session.money then
+		session.money = money
+		changed()
+	else
+		self.edit_money:SetText(tostring(money))
+	end
+end
+
+function UICoopTrade:OnReady()
+	self:OnMoney()
+	set_ready(not session.ready)
+end
+
+function UICoopTrade:OnCancel()
+	tell("cancel", session.name)
+	finish("st_coop_trade_cancelled")
+end
+
+function UICoopTrade:Update()
+	CUIScriptWnd.Update(self)
+	if session and not peer_of(session.name) then
+		return finish("st_coop_trade_gone")
+	end
+	local found = false
+	for _, cc in pairs(self.CC) do
+		found = cc:Update(self.item_info) or found
+	end
+	if not found then
+		self.item_info:Update()
+	end
+end
+
+function UICoopTrade:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false then
+		for _, cc in pairs(self.CC) do
+			cc:OnKeyboard(dik, keyboard_action)
+		end
+		if keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik_to_bind(dik) == key_bindings.kQUIT then
+			self:OnCancel()
+		end
+	end
+	return res
+end
+
+----------------------------------------------------------------------------------------------------
+-- The trade
+
+local function send_offer()
+	local entries = {}
+	local items, worn = tradeable()
+	for _, item in ipairs(items) do
+		if session.mine[item:id()] then
+			entries[#entries + 1] = encode(item, worn[item:id()])
+		end
+	end
+	tell("offer", session.name, table.concat(entries, ";"), session.money)
+end
+
+-- our offer changed: nobody is ready any more
+function changed()
+	session.ready, session.their_ready = false, false
+	send_offer()
+	if GUI then
+		GUI:Fill()
+	end
+end
+
+local function sig_mine()
+	return signature(session.mine, session.money)
+end
+
+local function sig_theirs()
+	local ids = {}
+	for _, entry in ipairs(session.theirs) do
+		ids[tonumber(string.match(entry, "^(%d+):")) or entry] = true
+	end
+	return signature(ids, session.their_money)
+end
+
+function set_ready(ready)
+	session.ready = ready
+	tell("ready", session.name, ready and 1 or 0, sig_mine(), sig_theirs())
+	if GUI then
+		GUI:Status()
+	end
+	-- the one with the lower id asks for the trade to go through; the other hands over first
+	if session.ready and session.their_ready and coop.my_id() < session.id then
+		tell("commit", session.name, sig_mine(), sig_theirs())
+	end
+end
+
+-- everything we give is still ours to give
+local function can_hand_over()
+	if session.money > db.actor:money() then
+		return false
+	end
+	for id in pairs(session.mine) do
+		local item = level.object_by_id(id)
+		local parent = item and item:parent()
+		if not (parent and parent:id() == AC_ID) then
+			return false
+		end
+	end
+	return true
+end
+
+local function hand_over()
+	local given = 0
+	for id in pairs(session.mine) do
+		if coop.give_item(id, session.id) then
+			given = given + 1
+		end
+	end
+	if session.money > 0 then
+		db.actor:give_money(-session.money)
+		tell("money", session.name, session.money)
+	end
+	printf("[coop] traded with %s: %s things and %s money given", session.name, given, session.money)
+end
+
+function finish(text_id, ...)
+	if GUI then
+		GUI:HideDialog()
+		GUI = nil
+	end
+	if session and text_id then
+		news(fmt(text_id, session.name, ...))
+	end
+	session = nil
+end
+
+local function start(id, name)
+	session = { id = id, name = name, mine = {}, money = 0, theirs = {}, their_money = 0, ready = false, their_ready = false }
+	hide_hud_inventory()
+	GUI = UICoopTrade()
+	GUI:Fill()
+	GUI:ShowDialog(true)
+	send_offer()
+end
+
+-- money straight to another player, no trade (the PDA's Group tab): they get it as from a trade
+function send_money(name, amount)
+	if amount <= 0 or amount > db.actor:money() then
+		return false
+	end
+	db.actor:give_money(-amount)
+	tell("money", name, amount)
+	printf("[coop] %s money sent to %s", amount, name)
+	return true
+end
+
+function offer(id, name)
+	if session then
+		return
+	end
+	tell("ask", name)
+	actor_menu.set_msg(1, fmt("st_coop_trade_asked", name), 4)
+end
+
+local function on_trade(sender, payload)
+	local f = str_explode(payload, "\t")
+	local action, to = f[1], f[2]
+	if to ~= coop.my_name() or not db.actor then
+		return
+	end
+	local from = peer_of(sender)
+	if action == "ask" then
+		if session or not from then
+			return tell("answer", sender, 0)
+		end
+		table.insert(asks, { id = from.id, name = sender })
+		return
+	end
+	if action == "answer" then
+		if f[3] == "1" and from and not session then
+			start(from.id, sender)
+		elseif f[3] ~= "1" then
+			news(fmt("st_coop_trade_declined", sender))
+		end
+		return
+	end
+	if action == "money" then
+		local money = tonumber(f[3]) or 0
+		if money > 0 then
+			db.actor:give_money(money)
+			news(fmt("st_coop_trade_got_money", sender, money))
+		end
+		return
+	end
+	if not (session and session.name == sender) then
+		return
+	end
+	if action == "offer" then
+		session.theirs = {}
+		for entry in string.gmatch(f[3] or "", "[^;]+") do
+			session.theirs[#session.theirs + 1] = entry
+		end
+		session.their_money = tonumber(f[4]) or 0
+		session.ready, session.their_ready = false, false
+		if GUI then
+			GUI:Fill()
+		end
+	elseif action == "ready" then
+		-- ready for what we show each other right now, or not at all
+		session.their_ready = f[3] == "1" and f[4] == sig_theirs() and f[5] == sig_mine()
+		if GUI then
+			GUI:Status()
+		end
+		if session.ready and session.their_ready and coop.my_id() < session.id then
+			tell("commit", session.name, sig_mine(), sig_theirs())
+		end
+	elseif action == "commit" then
+		if session.ready and session.their_ready and f[3] == sig_theirs() and f[4] == sig_mine() and can_hand_over() then
+			hand_over()
+			tell("commit_ok", session.name)
+			finish("st_coop_trade_done")
+		else
+			tell("commit_fail", session.name)
+			session.ready, session.their_ready = false, false
+			if GUI then
+				GUI:Status()
+			end
+		end
+	elseif action == "commit_ok" then
+		if can_hand_over() then
+			hand_over()
+		end
+		finish("st_coop_trade_done")
+	elseif action == "commit_fail" then
+		session.ready, session.their_ready = false, false
+		if GUI then
+			GUI:Status()
+		end
+	elseif action == "cancel" then
+		finish("st_coop_trade_cancelled")
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	coop_sync.on_event("trade", on_trade)
+	RegisterScriptCallback("actor_on_update", function()
+		if #asks == 0 or session or not actor_menu.is_hud_free() then
+			return
+		end
+		local ask = table.remove(asks, 1)
+		ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, fmt("st_coop_trade_offered", ask.name),
+			function()
+				if session then
+					return tell("answer", ask.name, 0)
+				end
+				tell("answer", ask.name, 1)
+				start(ask.id, ask.name)
+			end,
+			function() tell("answer", ask.name, 0) end)
+	end)
+	RegisterScriptCallback("actor_on_net_destroy", function()
+		if session then
+			tell("cancel", session.name)
+		end
+		session, GUI = nil, nil
+	end)
+end

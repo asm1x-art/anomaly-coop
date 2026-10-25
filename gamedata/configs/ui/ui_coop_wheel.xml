@@ -1,0 +1,41 @@
+<w>
+	<!-- Co-op: what to do with another player (coop_wheel.script), laid out as the companions' wheel -->
+	<wheel x="292" y="164" width="440" height="420" stretch="1">
+		<background x="0" y="0" width="440" height="420" stretch="1">
+			<texture>ui_hud2_wheel_ammo</texture>
+		</background>
+
+		<box_trade x="225" y="288" width="100" height="100" stretch="1"/>
+		<btn_trade x="225" y="288" width="100" height="100" stretch="1">
+			<texture>ui_companion_trade_btn</texture>
+		</btn_trade>
+
+		<box_group x="107" y="46" width="100" height="100" stretch="1"/>
+		<btn_group x="107" y="46" width="100" height="100" stretch="1">
+			<texture>ui_companion_movement_btn</texture>
+		</btn_group>
+
+		<box_notes x="114" y="288" width="100" height="100" stretch="1"/>
+		<btn_notes x="114" y="288" width="100" height="100" stretch="1">
+			<texture>ui_companion_loot_btn</texture>
+		</btn_notes>
+
+		<box_routes x="233" y="46" width="100" height="100" stretch="1"/>
+		<btn_routes x="233" y="46" width="100" height="100" stretch="1">
+			<texture>ui_companion_distance_btn</texture>
+		</btn_routes>
+
+		<hint x="140" y="185" width="160" height="70" stretch="1">
+			<text complex_mode="1" r="200" g="200" b="200" align="c" vert_align="c" font="letterica18"/>
+		</hint>
+	</wheel>
+
+	<info x="341" y="589" width="341" height="60" stretch="1">
+		<background x="0" y="0" width="341" height="60" stretch="1">
+			<texture>ui_hud2_wheel_extent</texture>
+		</background>
+		<name x="20" y="14" width="300" height="33" stretch="1">
+			<text complex_mode="1" r="200" g="150" b="100" align="c" vert_align="c" font="letterica18"/>
+		</name>
+	</info>
+</w>

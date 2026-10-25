@@ -1,0 +1,234 @@
+-- Co-op fast travel (coop_rules: fast_travel, travel_overloaded, travel_enemy_radius), in place of
+-- Anomaly's (game_fast_travel.script, switched off while connected). Only to the faction's travel points
+-- the player has been to themselves: visits are each player's own, kept next to their profiles, since
+-- the world's statistics are the sim master's. Game time doesn't move on. From the PDA map: "travel
+-- alone", or in a group "travel with the group": the others are asked, as for a save; who says no stays.
+
+local FILE_PREFIX = "coop_visited_"
+local MARK = "fast_travel"
+local visited = {}   -- smart name -> true
+local points = {}    -- the faction's travel points: smart name -> true
+local loaded_for = nil
+
+local function fmt(id, ...)
+	return string.format(game.translate_string(id), ...)
+end
+
+local function visits_path()
+	local name = string.gsub(coop.my_name(), "[^%w_%-]", function(c) return string.format("%%%02X", string.byte(c)) end)
+	return getFS():update_path("$app_data_root$", FILE_PREFIX .. name .. ".txt")
+end
+
+local function load_visits()
+	visited = {}
+	local f = io.open(visits_path(), "r")
+	if f then
+		for line in f:lines() do
+			if line ~= "" then
+				visited[line] = true
+			end
+		end
+		f:close()
+	end
+	loaded_for = coop.my_name()
+end
+
+local function save_visit(name)
+	local f = io.open(visits_path(), "a")
+	if f then
+		f:write(name, "\n")
+		f:close()
+	end
+end
+
+local function on()
+	return coop.connected() and coop_rules.flag("fast_travel", true)
+end
+
+local function mark(id, smart_name)
+	if level.map_has_object_spot(id, MARK) == 0 then
+		level.map_add_object_spot(id, MARK, game.translate_string(smart_name))
+	end
+end
+
+local function refresh_marks()
+	local faction = character_community(db.actor):sub(7)
+	points = utils_data.collect_section(ini_file("plugins\\faction_quick_travel.ltx"), faction, true) or {}
+	local sim = alife()
+	for i = 1, 65534 do
+		local smart = sim:object(i)
+		if smart and smart:clsid() == clsid.smart_terrain and points[smart:name()] then
+			if level.map_has_object_spot(i, MARK) ~= 0 then
+				level.map_remove_object_spot(i, MARK)
+			end
+			if on() and visited[smart:name()] then
+				mark(i, smart:name())
+			end
+		end
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Going there
+
+-- belt and backpack add to what one carries (game_fast_travel.script)
+local function extra_weight()
+	local w = 0
+	db.actor:iterate_inventory(function(npc, itm)
+		if npc:is_on_belt(itm) then
+			w = w + (ini_sys:r_float_ex(itm:section(), "additional_inventory_weight") or 0) * itm:condition()
+		end
+	end, db.actor)
+	local backpack = db.actor:item_in_slot(13)
+	return w + (backpack and ini_sys:r_float_ex(backpack:section(), "additional_inventory_weight") or 0)
+end
+
+local function overloaded()
+	local suit = db.actor:item_in_slot(7)
+	return db.actor:get_total_weight() - db.actor:get_actor_max_walk_weight() -
+		(suit and suit:get_additional_max_weight() or 0) - extra_weight() > 0
+end
+
+local function enemies_near(radius)
+	local found = false
+	level.iterate_nearest(db.actor:position(), radius, function(obj)
+		if (IsStalker(obj) or IsMonster(obj)) and obj:alive() and obj:relation(db.actor) == game_object.enemy then
+			found = true
+			return true
+		end
+	end)
+	return found
+end
+
+-- why we can't go now, nil if we can
+local function refusal()
+	if not on() then
+		return game.translate_string("st_coop_travel_off")
+	end
+	if coop_death.is_downed() then
+		return game.translate_string("st_coop_travel_off")
+	end
+	if not coop_rules.flag("travel_overloaded", false) and overloaded() then
+		return game.translate_string("st_travel_overloaded")
+	end
+	local radius = coop_rules.number("travel_enemy_radius", 50)
+	if radius > 0 and enemies_near(radius) then
+		return game.translate_string("st_coop_travel_enemies")
+	end
+	if xr_conditions.surge_started() or psi_storm_manager.is_started() then
+		return game.translate_string("st_travel_event")
+	end
+end
+
+local function go(id)
+	local smart = alife_object(id)
+	if not smart then
+		return
+	end
+	local why = refusal()
+	if why then
+		hide_hud_pda()
+		actor_menu.set_msg(1, why, 4)
+		return
+	end
+	hide_hud_pda()
+	if smart.online then
+		db.actor:set_actor_position(smart.position)
+	else
+		ChangeLevel(smart.position, smart.m_level_vertex_id, smart.m_game_vertex_id, VEC_ZERO, true)
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The PDA map
+
+local function menu_items(id)
+	local smart = id > 0 and alife_object(id)
+	if not (smart and smart:clsid() == clsid.smart_terrain and points[smart:name()] and visited[smart:name()]) then
+		return
+	end
+	local place = game.translate_string(smart:name())
+	local items = { alone = fmt("st_coop_travel_alone", place) }
+	if coop_group.size() > 1 then
+		items.group = fmt("st_coop_travel_group", place)
+	end
+	return items, place
+end
+
+local pending = {} -- offers to travel along: { id, from, place }
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	-- Anomaly's own fast travel is off while connected: its points come from the world's statistics
+	local get = ui_options.get
+	ui_options.get = function(path, ...)
+		if path == "gameplay/fast_travel/state" and coop.connected() then
+			return 0
+		end
+		return get(path, ...)
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		if not coop.connected() then
+			return
+		end
+		if loaded_for ~= coop.my_name() then
+			load_visits()
+		end
+		refresh_marks()
+	end)
+	RegisterScriptCallback("actor_on_interaction", function(typ, obj, name)
+		if typ ~= "smarts" or not coop.connected() or not points[name] or visited[name] then
+			return
+		end
+		visited[name] = true
+		save_visit(name)
+		if on() then
+			mark(obj.id, name)
+			actor_menu.set_msg(1, game.translate_string(name) .. " " .. game.translate_string("st_fast_travel_discovered"), 4)
+		end
+	end)
+
+	RegisterScriptCallback("map_spot_menu_add_property", function(property_ui, id, level_name)
+		if not on() then
+			return
+		end
+		local items = menu_items(id)
+		if items then
+			property_ui:AddItem(items.alone)
+			if items.group then
+				property_ui:AddItem(items.group)
+			end
+		end
+	end)
+	RegisterScriptCallback("map_spot_menu_property_clicked", function(property_ui, id, level_name, prop)
+		local items, place = menu_items(id)
+		if not items then
+			return
+		end
+		if prop == items.group then
+			coop_sync.send_event("travel", id, place)
+			go(id)
+		elseif prop == items.alone then
+			go(id)
+		end
+	end)
+
+	coop_sync.on_event("travel", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		if db.actor and coop_group.has(sender) and coop_group.has(coop.my_name()) then
+			table.insert(pending, { id = tonumber(f[1]), from = sender, place = f[2] })
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", function()
+		if #pending == 0 or not actor_menu.is_hud_free() then
+			return
+		end
+		local offer = table.remove(pending, 1)
+		ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, fmt("st_coop_travel_offer", offer.from, offer.place),
+			function() go(offer.id) end)
+	end)
+end

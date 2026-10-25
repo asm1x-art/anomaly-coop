@@ -83,6 +83,8 @@ struct SBullet
 	float density;
 	Fvector begin_density;
 	LPCSTR section;
+	// ricochets and penetrations draw from it: the same seed flies the same way (co-op: in every game)
+	CRandom rng;
 	bool operator ==(u32 ID) { return ID == m_dwID; }
 public:
 	SBullet();
@@ -242,13 +244,14 @@ public:
 
 	void Load();
 	void Clear();
-	void AddBullet(const Fvector& position, const Fvector& direction, float starting_speed,
+	// returns the bullet's seed: a new one unless given
+	s32 AddBullet(const Fvector& position, const Fvector& direction, float starting_speed,
 	               float power, /*float power_critical,*/ float impulse,
 	               u16 sender_id, u16 sendersweapon_id,
 	               ALife::EHitType e_hit_type, float maximum_distance,
 	               const CCartridge& cartridge,
 	               float const air_resistance_factor,
-	               bool SendHit, bool AimBullet = false, int iShotNum = 0);
+	               bool SendHit, bool AimBullet = false, int iShotNum = 0, s32 seed = 0);
 
 	void CommitEvents(); // @ the start of frame
 	void CommitRenderSet(); // @ the end of frame

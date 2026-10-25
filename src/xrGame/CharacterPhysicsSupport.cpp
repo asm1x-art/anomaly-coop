@@ -38,6 +38,7 @@
 #include "stalker_movement_manager_smart_cover.h"
 
 #include "../build_config_defines.h"
+#include "coop/coop_npc.h"
 
 //const float default_hinge_friction = 5.f;//gray_wolf comment
 #ifdef DEBUG
@@ -550,6 +551,7 @@ void CCharacterPhysicsSupport::in_Hit(SHit& H, bool is_killing)
 		//&& Type() == etStalker
 	{
 		m_hit_animations.PlayHitMotion(H.direction(), H.bone_space_position(), H.bone(), m_EntityAlife);
+		coop::on_hit_motion(m_EntityAlife, H.direction(), H.bone_space_position(), H.bone());
 	}
 
 	if (!(m_pPhysicsShell && m_pPhysicsShell->isActive()))
@@ -1358,6 +1360,22 @@ void CCharacterPhysicsSupport::in_NetRelcase(CObject* O)
 
 	if (m_sv_hit.is_valide() && m_sv_hit.initiator() == O)
 		m_sv_hit = SHit();
+
+	if (m_active_item_obj && O == m_active_item_obj)
+	{
+		// the item in the ragdoll's hand is destroyed without falling out first (co-op: taken by a
+		// player in another game): its geoms go with it, RemoveActiveWeaponCollision needs its shell
+		for (CODEGeom* g : m_weapon_geoms)
+		{
+			m_weapon_attach_bone->remove_geom(g);
+			g->destroy();
+			xr_delete(g);
+		}
+		m_weapon_geoms.clear();
+		m_weapon_attach_bone = 0;
+		m_active_item_obj = 0;
+		bone_fix_clear();
+	}
 }
 
 void CCharacterPhysicsSupport::set_collision_hit_callback(ICollisionHitCallback* cc)

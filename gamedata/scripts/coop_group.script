@@ -1,0 +1,127 @@
+-- Co-op: groups of players, kept by the server (src/xrGame/coop/coop_net.h, coop-server/src/server.js).
+-- An invite face to face (the wheel) comes as a yes/no box once the HUD is free; one sent from the PDA waits
+-- in the PDA's Group tab to be answered there (ui_pda_coop_group.script). Who joined or left is told in the PDA.
+
+local pending = {} -- invites still to answer: { id, name }
+local from_pda = {} -- invites sent from the PDA, answered in it: { id, name }
+local last = {}    -- our group as last seen: name -> true
+
+local function news(text)
+	db.actor:give_game_news(game.translate_string("st_coop_group"), text, "ui_iconsTotal_grouping", 0, 8000)
+end
+
+local function fmt(id, ...)
+	return string.format(game.translate_string(id), ...)
+end
+
+function has(name)
+	for _, member in ipairs(coop.group()) do
+		if member == name then
+			return true
+		end
+	end
+	return false
+end
+
+-- the PDA's invites, without those whose sender left the game
+function pda_invites()
+	local online = {}
+	for _, p in ipairs(coop.peers()) do
+		online[p.id] = true
+	end
+	for i = #from_pda, 1, -1 do
+		if not online[from_pda[i].id] then
+			table.remove(from_pda, i)
+		end
+	end
+	return from_pda
+end
+
+function answer_pda(id, accept)
+	for i = #from_pda, 1, -1 do
+		if from_pda[i].id == id then
+			table.remove(from_pda, i)
+		end
+	end
+	coop.group_answer(id, accept)
+end
+
+function is_leader()
+	return coop.group()[1] == coop.my_name()
+end
+
+function size()
+	return #coop.group()
+end
+
+local function ask(invite)
+	ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, fmt("st_coop_group_invite", invite.name),
+		function() coop.group_answer(invite.id, true) end,
+		function() coop.group_answer(invite.id, false) end)
+end
+
+local NOTES = { [0] = "st_coop_group_declined", "st_coop_group_full", "st_coop_group_already", "st_coop_group_expired" }
+
+local function on_groups()
+	if not db.actor then
+		return
+	end
+	local me = coop.my_name()
+	local now = {}
+	for _, member in ipairs(coop.group()) do
+		now[member] = true
+	end
+	if now[me] ~= last[me] then
+		news(game.translate_string(now[me] and "st_coop_group_you_in" or "st_coop_group_you_out"))
+	elseif now[me] then
+		for member in pairs(now) do
+			if not last[member] then
+				news(fmt("st_coop_group_joined", member))
+			end
+		end
+		for member in pairs(last) do
+			if not now[member] then
+				news(fmt("st_coop_group_left", member))
+			end
+		end
+	end
+	last = now
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	_G.coop_on_group_invite = function(name, id, pda)
+		if not pda then
+			return table.insert(pending, { name = name, id = id })
+		end
+		for _, invite in ipairs(from_pda) do
+			if invite.id == id then
+				return -- asked again: one is enough
+			end
+		end
+		table.insert(from_pda, { name = name, id = id })
+		if db.actor then
+			news(fmt("st_coop_group_invite_pda", name))
+		end
+	end
+	_G.coop_on_group_note = function(note, name)
+		if db.actor and NOTES[note] then
+			news(fmt(NOTES[note], name))
+		end
+	end
+	_G.coop_on_groups = on_groups
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		last = {}
+		for _, member in ipairs(coop.group()) do
+			last[member] = true
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", function()
+		if #pending > 0 and actor_menu.is_hud_free() then
+			ask(table.remove(pending, 1))
+		end
+	end)
+end

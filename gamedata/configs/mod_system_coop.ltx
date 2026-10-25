@@ -1,3 +1,10 @@
 ; Co-op: hidden inventory holder standing in for another player ("shadow"),
 ; created by the engine, see src/xrGame/coop/coop_shadow.cpp. It never goes online.
 [coop_shadow_box]:inventory_box
+
+; Co-op: an invisible stalker standing in for another player on this level, so NPCs see, attack
+; and hit that player; what hits it goes to the player (src/xrGame/coop/coop_combat.cpp).
+; Spawned level-only, never in A-Life; no Anomaly logic (coop_proxy.script binds nothing).
+[coop_proxy]:sim_default_stalker_0
+script_binding = coop_proxy.bind
+species = actor ; mutants take it for the player it stands in for (stalkers judge by community)

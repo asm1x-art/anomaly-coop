@@ -6,6 +6,9 @@
 #include "coop_shadow.h"
 #include "coop_save.h"
 #include "coop_puppet.h"
+#include "coop_npc.h"
+#include "coop_combat.h"
+#include "coop_projectiles.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -48,6 +51,8 @@ namespace coop
 		bool welcomed() const { return m_welcomed; }
 		u32 id() const { return m_client_id; }
 		u32 master() const { return m_master_id; }
+		u32 rtt() const { return m_rtt; }
+		const xr_string& refusal() const { return m_refusal; }
 		const xr_string& name() const { return m_name; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
@@ -77,6 +82,7 @@ namespace coop
 		u16 m_port = 0;
 		xr_string m_name;
 		xr_string m_error;
+		xr_string m_refusal;
 
 		u32 m_client_id = 0;
 		u32 m_master_id = 0; // 0: not known yet, ids start at 1
@@ -87,9 +93,51 @@ namespace coop
 
 		peers_t m_peers;
 		xr_set<u32> m_left; // client ids are never reused
+
+	public:
+		xr_vector<xr_vector<xr_string>> m_groups; // as the server has them
 	};
 
 	static CClient g_client;
+
+	int debug_mode = 0;
+
+	// coop_debug: how many messages of each type went each way, told every DEBUG_TRAFFIC_MS
+	static const u32 DEBUG_TRAFFIC_MS = 5000;
+	static const u16 MAX_TYPES = 64;
+	static u32 g_sent[MAX_TYPES], g_received[MAX_TYPES];
+	static u32 g_last_traffic = 0;
+
+	static void count(u32* counts, u16 type)
+	{
+		if (debug_mode && type < MAX_TYPES)
+			++counts[type];
+	}
+
+	static void debug_traffic()
+	{
+		if (!debug_mode || Device.dwTimeContinual - g_last_traffic < DEBUG_TRAFFIC_MS)
+			return;
+		g_last_traffic = Device.dwTimeContinual;
+		xr_string sent, received;
+		for (u16 type = 0; type < MAX_TYPES; ++type)
+		{
+			string32 one;
+			if (g_sent[type])
+			{
+				xr_sprintf(one, " %u:%u", type, g_sent[type]);
+				sent += one;
+			}
+			if (g_received[type])
+			{
+				xr_sprintf(one, " %u:%u", type, g_received[type]);
+				received += one;
+			}
+			g_sent[type] = g_received[type] = 0;
+		}
+		Msg("[coop dbg] messages in %u s (type:count, coop_net.h): sent%s | received%s", DEBUG_TRAFFIC_MS / 1000,
+		    sent.empty() ? " none" : sent.c_str(), received.empty() ? " none" : received.c_str());
+	}
 
 	// another client's Lua state change: handed to _G.coop_on_event(name, sender_name, payload)
 	static void on_script_event(NET_Packet& P)
@@ -104,6 +152,15 @@ namespace coop
 			return;
 		auto peer = g_client.peers().find(sender);
 		handler(name.c_str(), peer != g_client.peers().end() ? peer->second.name.c_str() : "", payload.c_str());
+	}
+
+	// _G.<name>(args...) when Lua has it, in a level only
+	template <typename... Args>
+	static void call_lua(LPCSTR name, Args... args)
+	{
+		::luabind::functor<void> handler;
+		if (g_pGameLevel && ai().script_engine().functor(name, handler))
+			handler(args...);
 	}
 
 	// a peer showed up in the world (its first state) or left: _G.coop_on_peer(name, joined), in a level only
@@ -132,6 +189,7 @@ namespace coop
 		m_port = port;
 		m_name = name;
 		m_error.clear();
+		m_refusal.clear();
 		m_hello_sent = false;
 		m_welcomed = false;
 		m_client_id = 0;
@@ -140,6 +198,7 @@ namespace coop
 		m_inbox.clear();
 		m_peers.clear();
 		m_left.clear();
+		m_groups.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -172,12 +231,17 @@ namespace coop
 	void CClient::stop()
 	{
 		close();
+		FlushLog(); // the log is flushed from OnFrame, which ends here
 		Device.seqFrame.Remove(this);
 		m_state = eIdle;
 		m_welcomed = false;
 		m_peers.clear();
 		clear_map_markers();
 		clear_puppets();
+		clear_npc_sync();
+		clear_proxies();
+		clear_grudges();
+		clear_projectiles();
 		reset_id_blocks();
 		reset_world_sync();
 	}
@@ -275,6 +339,7 @@ namespace coop
 	{
 		if (m_state != eConnected)
 			return;
+		count(g_sent, *(const u16*)P.B.data);
 
 		xr_vector<u8> buf(sizeof(u32) + P.B.count);
 		*(u32*)buf.data() = P.B.count;
@@ -296,6 +361,7 @@ namespace coop
 	{
 		u16 type;
 		P.r_begin(type);
+		count(g_received, type);
 
 		switch (type)
 		{
@@ -307,6 +373,17 @@ namespace coop
 		case M_PONG:
 			m_rtt = Device.dwTimeContinual - P.r_u32();
 			break;
+		case M_REFUSED:
+		{
+			const u8 reason = P.r_u8();
+			const u16 value = P.r_u16();
+			m_refusal = reason == 0 ? "full" : "version";
+			if (reason == 0)
+				Msg("! [coop] the server is full: %u players at most", value);
+			else
+				Msg("! [coop] the server speaks protocol %u, this game %u", value, PROTOCOL_VERSION);
+			break;
+		}
 		case M_PEER_STATE:
 		{
 			u32 id = P.r_u32();
@@ -374,10 +451,76 @@ namespace coop
 		case M_SETTINGS:
 			on_settings(P);
 			break;
+		case M_SAVE_NOW:
+			on_save_now(P);
+			break;
+		case M_SAVES:
+			on_saves(P);
+			break;
+		case M_ROLLBACK_VOTE:
+			on_rollback_vote(P);
+			break;
+		case M_ROLLBACK_RESULT:
+			on_rollback_result(P);
+			break;
+		case M_WORLD_RELOAD:
+			on_world_reload();
+			break;
+		case M_PAUSE_VOTE:
+			on_pause_vote(P);
+			break;
+		case M_PAUSE_RESULT:
+			on_pause_result(P);
+			break;
+		case M_PAUSED:
+			on_paused(P);
+			break;
 		case M_ACTOR_ACTION:
 		{
 			const u32 sender = P.r_u32();
 			on_peer_action(sender, P);
+			break;
+		}
+		case M_NPC_STATES:
+		{
+			const u32 sender = P.r_u32();
+			on_npc_states(sender, P);
+			break;
+		}
+		case M_COOP_HIT:
+		{
+			const u32 sender = P.r_u32();
+			on_coop_hit(sender, P);
+			break;
+		}
+		case M_GROUPS:
+		{
+			m_groups.clear();
+			for (u8 count = P.r_u8(); count; --count)
+			{
+				xr_vector<xr_string>& group = m_groups.emplace_back();
+				for (u8 size = P.r_u8(); size; --size)
+					P.r_stringZ(group.emplace_back());
+			}
+			call_lua("_G.coop_on_groups");
+			break;
+		}
+		case M_GROUP_INVITE:
+		{
+			const u32 inviter = P.r_u32();
+			xr_string name;
+			P.r_stringZ(name);
+			const bool pda = P.r_elapsed() && P.r_u8() == 1;
+			Msg("[coop] '%s' invites us to a group%s", name.c_str(), pda ? " (from the PDA)" : "");
+			call_lua("_G.coop_on_group_invite", name.c_str(), inviter, pda);
+			break;
+		}
+		case M_GROUP_NOTE:
+		{
+			const u8 note = P.r_u8();
+			xr_string name;
+			P.r_stringZ(name);
+			call_lua("_G.coop_on_group_note", note, name.c_str());
 			break;
 		}
 		case M_PEER_LEFT:
@@ -479,7 +622,20 @@ namespace coop
 
 		if (m_state == eFailed)
 		{
+			// a server turning us away says why just before it closes: that is still unread here
+			{
+				std::lock_guard<std::mutex> lock(m_inbox_lock);
+				for (xr_vector<u8>& msg : m_inbox)
+					if (msg.size() >= sizeof(u16) && *(const u16*)msg.data() == M_REFUSED)
+					{
+						NET_Packet P;
+						P.construct(msg.data(), (u32)msg.size());
+						handle(P);
+					}
+				m_inbox.clear();
+			}
 			Msg("! [coop] disconnected: %s", m_error.c_str());
+			FlushLog(); // the log is flushed from OnFrame, which ends here
 			Device.seqFrame.Remove(this);
 			close();
 			m_state = eIdle;
@@ -487,6 +643,10 @@ namespace coop
 			m_peers.clear();
 			clear_map_markers();
 			clear_puppets();
+			clear_npc_sync();
+			clear_proxies();
+			clear_grudges();
+			clear_projectiles();
 			reset_id_blocks();
 			reset_world_sync();
 			return;
@@ -542,9 +702,15 @@ namespace coop
 		}
 		update_map_markers();
 		update_puppets();
+		update_npc_sync();
+		update_combat();
+		update_projectiles();
 		update_id_blocks();
 		update_shadows();
+		update_bodies();
+		update_releases();
 		update_world_sync();
+		debug_traffic();
 
 		if (!m_welcomed)
 			return;
@@ -556,6 +722,7 @@ namespace coop
 			NET_Packet P;
 			P.w_begin(M_PING);
 			P.w_u32(now);
+			P.w_u32(m_rtt);
 			send(P);
 		}
 		if (now - m_last_actor_state >= ACTOR_STATE_INTERVAL_MS)
@@ -594,6 +761,8 @@ namespace coop
 	}
 	void send(NET_Packet& P) { g_client.send(P); }
 	u32 my_id() { return g_client.id(); }
+	u32 ping_ms() { return g_client.rtt(); }
+	LPCSTR refusal() { return g_client.refusal().c_str(); }
 	const xr_string& my_name() { return g_client.name(); }
 
 	bool is_sim_master()
@@ -617,4 +786,42 @@ namespace coop
 		return owner == g_client.id();
 	}
 	const peers_t& peers() { return g_client.peers(); }
+
+	const xr_vector<xr_string>* group_of(const xr_string& name)
+	{
+		for (const auto& group : g_client.m_groups)
+			if (std::find(group.begin(), group.end(), name) != group.end())
+				return &group;
+		return nullptr;
+	}
+
+	static const xr_string* name_of(u32 id)
+	{
+		if (id == my_id())
+			return &my_name();
+		auto peer = peers().find(id);
+		return peer != peers().end() ? &peer->second.name : nullptr;
+	}
+
+	bool same_group(u32 a, u32 b)
+	{
+		const xr_string* name_a = name_of(a);
+		const xr_string* name_b = name_of(b);
+		const xr_vector<xr_string>* group = name_a && name_b ? group_of(*name_a) : nullptr;
+		return group && std::find(group->begin(), group->end(), *name_b) != group->end();
+	}
+
+	void group_request(EGroupAction action, u32 peer, LPCSTR name, bool pda)
+	{
+		NET_Packet P;
+		P.w_begin(M_GROUP);
+		P.w_u8(action);
+		if (action == eGroupKick)
+			P.w_stringZ(name);
+		else if (action != eGroupLeave)
+			P.w_u32(peer);
+		if (action == eGroupInvite)
+			P.w_u8(pda ? 1 : 0);
+		send(P);
+	}
 }

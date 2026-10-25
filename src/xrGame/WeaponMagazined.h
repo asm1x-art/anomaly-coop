@@ -55,6 +55,23 @@ protected:
 	virtual void on_b_hud_detach();
 
 	virtual void OnShot();
+
+public:
+	// co-op: a shot of this weapon in another game, its holder a puppet here: sound, flame, shell, light, no bullet
+	void coop_shot_fx()
+	{
+		UpdateFireDependencies();
+		OnShot();
+	}
+	// co-op: the sound of this weapon's state change in another game (reload, draw, holster)
+	void coop_state_sound(u32 state)
+	{
+		LPCSTR alias = state == eReload ? "sndReload" : state == eShowing ? "sndShow" : state == eHiding ? "sndHide" : nullptr;
+		if (alias && m_sounds.FindSoundItem(alias, false))
+			PlaySound(alias, get_LastFP());
+	}
+
+protected:
 	virtual void PlaySoundShot();
 
 	virtual void OnEmptyClick();

@@ -1,0 +1,278 @@
+-- Co-op: dying (coop_rules: downed_time, revive_time, revive_health, rank_loss). There is no death screen
+-- and no reloading the world in co-op. With another player on the level a deadly hit lays the player
+-- down: they can only look about, NPCs leave them be, and another player holding F on them for
+-- revive_time seconds helps them up. Nobody else on the level, the time up, or giving up (the jump key):
+-- back where the player was when the world was last saved, everything carried kept, some rank lost.
+
+local NEAR = 2.5          -- m: how close a helper stays
+local HUD = nil
+local downed_since = nil  -- time_global() we went down at
+local helper = nil        -- { name, since }: who helps us up
+local helping = nil       -- { id, name, since }: whom we help up
+local save_point = nil    -- { level, pos, lvid, gvid }: where we were when the world was last saved
+
+local function fmt(id, ...)
+	return string.format(game.translate_string(id), ...)
+end
+
+local function news(text)
+	db.actor:give_game_news(game.translate_string("st_coop_group"), text, "ui_iconsTotal_grouping", 0, 8000)
+end
+
+local function key_name(bind)
+	return dik_to_keyname(bind_to_dik(bind), true) or "?"
+end
+
+function is_downed()
+	return downed_since ~= nil
+end
+
+local function peer(id)
+	for _, p in ipairs(coop.peers()) do
+		if p.id == id then
+			return p
+		end
+	end
+end
+
+local function others_here()
+	for _, p in ipairs(coop.peers()) do
+		if p.level == level.name() and p.age < 5000 and not coop.downed(p.id) then
+			return true
+		end
+	end
+	return false
+end
+
+----------------------------------------------------------------------------------------------------
+-- HUD: the time left lying, or how far helping up has got
+
+class "UICoopDowned" (CUIScriptWnd)
+
+function UICoopDowned:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_death.xml")
+	self.dialog = xml:InitStatic("downed", self)
+	self.text = xml:InitTextWnd("downed:label", self.dialog)
+	xml:InitStatic("downed:back", self.dialog)
+	self.progress = xml:InitProgressBar("downed:progress", self.dialog)
+	self.progress:Show(true)
+end
+
+function UICoopDowned:Set(text, progress)
+	self.text:SetText(text)
+	self.progress:SetProgressPos(math.min(1, math.max(0, progress or 0)))
+end
+
+local function hud(on)
+	if on and not HUD then
+		HUD = UICoopDowned()
+		get_hud():AddDialogToRender(HUD)
+	elseif not on and HUD then
+		get_hud():RemoveDialogToRender(HUD)
+		HUD = nil
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Down, up, back to the save point
+
+function mark_save_point()
+	if db.actor then
+		save_point = { level = level.name(), pos = db.actor:position(), lvid = db.actor:level_vertex_id(),
+		               gvid = db.actor:game_vertex_id() }
+	end
+end
+
+local function stand(health)
+	downed_since, helper = nil, nil
+	coop.set_downed(false)
+	if not helping then
+		hud(false)
+	end
+	db.actor:set_health_ex(health)
+	db.actor.bleeding = 1
+	db.actor:restore_weapon()
+	printf("[coop] up with " .. math.floor(db.actor.health * 100 + 0.5) .. "% health") -- printf knows %s alone
+end
+
+local function go_down()
+	downed_since, helper = time_global(), nil
+	coop.set_downed(true)
+	db.actor:set_health_ex(0.05)
+	db.actor.bleeding = 1
+	db.actor:hide_weapon()
+	hud(true)
+	coop.fell()
+	coop_sync.send_event("downed", coop.my_name())
+	printf("[coop] down, waiting for help")
+end
+
+local function rollback()
+	coop.fell()
+	stand(1)
+	db.actor.power = 1
+	db.actor.radiation = 0
+	db.actor.psy_health = 1
+	local rank = db.actor:character_rank()
+	local lost = math.floor(rank * coop_rules.number("rank_loss", 10) / 100)
+	if lost > 0 then
+		db.actor:set_character_rank(rank - lost)
+	end
+	news(fmt("st_coop_rolled_back", lost))
+	coop_sync.send_event("rolled_back", coop.my_name())
+	printf("[coop] back to the save point, %s rank lost", lost)
+	if not save_point then
+		return
+	end
+	if save_point.level == level.name() then
+		db.actor:set_actor_position(save_point.pos)
+	else
+		ChangeLevel(save_point.pos, save_point.lvid, save_point.gvid, VEC_ZERO, false)
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Helping one up: hold F on them (coop_wheel.script sends F on a player here first)
+
+local function stop_helping(cancelled)
+	if helping and cancelled then
+		coop_sync.send_event("revive", "cancel", helping.name)
+	end
+	helping = nil
+	if not is_downed() then
+		hud(false)
+	end
+end
+
+function help(id, name)
+	if not coop.downed(id) then
+		return false
+	end
+	if not (helping or is_downed()) then
+		helping = { id = id, name = name, since = time_global() }
+		coop_sync.send_event("revive", "start", name)
+		hud(true)
+	end
+	return true
+end
+
+local function revive_ms()
+	return coop_rules.number("revive_time", 5) * 1000
+end
+
+local function update()
+	local now = time_global()
+	if is_downed() then
+		if db.actor.health < 0.05 then
+			db.actor:set_health_ex(0.05)
+		end
+		local left = coop_rules.number("downed_time", 90) * 1000 - (now - downed_since)
+		if left <= 0 or not coop.connected() then
+			return rollback()
+		end
+		if helper then
+			HUD:Set(fmt("st_coop_being_helped", helper.name), (now - helper.since) / revive_ms())
+		else
+			local seconds = math.ceil(left / 1000)
+			HUD:Set(fmt("st_coop_downed", math.floor(seconds / 60), seconds % 60, key_name(key_bindings.kJUMP)), 0)
+		end
+	elseif helping then
+		local p = peer(helping.id)
+		if not (p and coop.downed(helping.id) and p.level == level.name() and p.position:distance_to(db.actor:position()) < NEAR) then
+			return stop_helping(true)
+		end
+		local progress = (now - helping.since) / revive_ms()
+		if progress >= 1 then
+			coop_sync.send_event("revive", "done", helping.name)
+			news(fmt("st_coop_helped_up", helping.name))
+			return stop_helping(false)
+		end
+		HUD:Set(fmt("st_coop_helping", helping.name), progress)
+	end
+end
+
+-- lying: only looking about, the menu and the console; the jump key gives up
+local ALLOWED = {}
+
+local function on_key(dik, bind, dis, flags)
+	if not is_downed() then
+		return
+	end
+	if bind == key_bindings.kJUMP then
+		rollback()
+	elseif not ALLOWED[bind] then
+		flags.ret_value = false
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	ALLOWED = { [key_bindings.kQUIT] = true, [key_bindings.kCONSOLE] = true, [key_bindings.kSCREENSHOT] = true }
+
+	RegisterScriptCallback("actor_on_before_death", function(who_id, flags)
+		if not coop.connected() then
+			return
+		end
+		flags.ret_value = false -- never the death screen in co-op
+		if is_downed() then
+			db.actor:set_health_ex(0.05)
+		elseif coop_rules.number("downed_time", 90) > 0 and others_here() then
+			go_down()
+		else
+			rollback()
+		end
+	end)
+	RegisterScriptCallback("actor_on_before_hit", function(shit, bone_id, flags)
+		if is_downed() then
+			flags.ret_value = false -- left be while lying
+		end
+	end)
+	RegisterScriptCallback("on_before_key_press", on_key)
+	RegisterScriptCallback("on_before_key_hold", on_key)
+	RegisterScriptCallback("on_key_release", function(dik)
+		if helping and dik_to_bind(dik) == key_bindings.kUSE then
+			stop_helping(true)
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+	RegisterScriptCallback("actor_on_first_update", function()
+		if not save_point then
+			mark_save_point()
+		end
+	end)
+	RegisterScriptCallback("actor_on_net_destroy", function() hud(false) end)
+	RegisterScriptCallback("save_state", function()
+		if coop.connected() and coop.is_sim_master() then
+			mark_save_point()
+		end
+	end)
+
+	coop_sync.on_event("revive", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		if f[2] ~= coop.my_name() or not is_downed() then
+			return
+		end
+		if f[1] == "start" then
+			helper = { name = sender, since = time_global() }
+		elseif f[1] == "cancel" then
+			helper = nil
+		elseif f[1] == "done" then
+			stand(coop_rules.number("revive_health", 25) / 100)
+			news(fmt("st_coop_got_up", sender))
+		end
+	end)
+	coop_sync.on_event("downed", function(sender)
+		if db.actor then
+			news(fmt("st_coop_player_downed", sender))
+		end
+	end)
+	coop_sync.on_event("rolled_back", function(sender)
+		if db.actor then
+			news(fmt("st_coop_player_rolled_back", sender))
+		end
+	end)
+end

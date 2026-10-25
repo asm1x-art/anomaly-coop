@@ -50,6 +50,9 @@ local handlers = {}
 
 _G.coop_on_event = function(name, sender, payload)
 	local handler = handlers[name]
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] event %s from %s: %s", name, sender, payload)
+	end
 	if handler then
 		handler(sender, payload)
 	else
@@ -59,12 +62,25 @@ end
 
 local function send(name, ...)
 	if coop_on() then
-		coop.send_event(name, table.concat({ ... }, "\t"))
+		local payload = table.concat({ ... }, "\t")
+		if get_console():get_integer("coop_debug") == 1 then
+			printf("[coop dbg] event %s sent: %s", name, payload)
+		end
+		coop.send_event(name, payload)
 	end
 end
 
 local function fields(payload)
 	return str_explode(payload, "\t")
+end
+
+-- for the other co-op scripts: handler(sender, payload) for an event; send an event of tab-joined fields
+function on_event(name, handler)
+	handlers[name] = handler
+end
+
+function send_event(name, ...)
+	send(name, ...)
 end
 
 ------------------------------------------------------------------------------------------------
@@ -84,12 +100,23 @@ local function wrap_world_logic()
 		return original(self)
 	end)
 
-	-- offline combat: the sim master's battles reach the others as deaths and releases
-	wrap(sim_offline_combat, "validate_enemy", "sim_offline_combat", function(original, ...)
-		if coop_on() and not coop.is_sim_master() then
+	-- offline combat: a level's battles are its authority's (the sim master's while nobody is there) and
+	-- reach the others as deaths and releases. Not the sim master's on a player's level: there those squads
+	-- are online, in front of the player, and would drop dead and vanish
+	wrap(sim_offline_combat, "validate_enemy", "sim_offline_combat", function(original, sim, lid, ...)
+		if coop_on() and not coop.is_authority(alife():level_name(lid)) then
 			return false
 		end
-		return original(...)
+		return original(sim, lid, ...)
+	end)
+
+	-- a death another game sent, of a creature offline here: its squad would release the body (remove_npc
+	-- releases a dead member that is offline), and the release reach the game where it lies online
+	wrap(safe_release_manager, "release", "safe_release_manager", function(original, se_obj)
+		if coop_on() and se_obj and coop.remote_death(se_obj.id) then
+			return
+		end
+		return original(se_obj)
 	end)
 
 	-- trader restock. update() also sets the trade conditions up, so it must run everywhere: off the
@@ -177,6 +204,101 @@ local function wrap_corpse_loot()
 		local se_obj = id and alife_object(id)
 		if se_obj and se_obj:name() == name then
 			se_save_var(id, name, "death_dropped", true)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Mutant loot (ui_mutant_loot.script): the parts a body gives are rolled the first time someone opens it
+-- and kept on the body (save_var "loot"). Everyone gets that roll, and what is left after each take; also
+-- as se var "coop_loot", which an offline body or a world loaded again keeps.
+
+local function encode_loot(loot)
+	local parts = {}
+	for sec, t in pairs(loot or {}) do
+		if (t.count or 0) > 0 then
+			parts[#parts + 1] = sec .. "=" .. t.count
+		end
+	end
+	table.sort(parts)
+	return table.concat(parts, ",")
+end
+
+local function decode_loot(text)
+	local loot = {}
+	for _, part in ipairs(str_explode(text or "", ",")) do
+		local sec, count = part:match("^(.-)=(%d+)$")
+		if sec and sec ~= "" then
+			loot[sec] = { count = tonumber(count) }
+		end
+	end
+	return loot
+end
+
+-- the body's loot as it is now, to the others when it changed
+local function share_loot(obj, before)
+	local loot = load_var(obj, "loot", nil)
+	if not loot then
+		return
+	end
+	local text = encode_loot(loot)
+	if text ~= before then
+		se_save_var(obj:id(), obj:name(), "coop_loot", text)
+		send("mutant_loot", obj:id(), obj:name(), text)
+	end
+end
+
+local function wrap_mutant_loot()
+	local ui = ui_mutant_loot.UIMutantLoot
+	wrap(ui, "FillList", "ui_mutant_loot.UIMutantLoot", function(original, self)
+		if not (coop_on() and self.obj) then
+			return original(self)
+		end
+		local text = se_load_var(self.id, self.obj:name(), "coop_loot")
+		if text then
+			save_var(self.obj, "loot", decode_loot(text)) -- rolled by someone, maybe taken from
+		end
+		local rolled = load_var(self.obj, "loot", nil) ~= nil
+		local res = original(self)
+		if not rolled then
+			share_loot(self.obj, nil)
+		end
+		return res
+	end)
+	wrap(ui, "Loot", "ui_mutant_loot.UIMutantLoot", function(original, self, loot_all)
+		local before = coop_on() and self.obj and encode_loot(self.loot)
+		local res = original(self, loot_all)
+		if before then
+			share_loot(self.obj, before)
+		end
+		return res
+	end)
+
+	handlers.mutant_loot = function(sender, payload)
+		local f = fields(payload)
+		local id, name, text = tonumber(f[1]), f[2], f[3] or ""
+		local se_obj = id and alife_object(id)
+		if not (se_obj and se_obj:name() == name) then
+			return
+		end
+		local loot = decode_loot(text)
+		se_save_var(id, name, "coop_loot", text)
+		if is_empty(loot) then
+			se_save_var(id, name, "looted", true)
+			xr_corpse_detection.set_valuable_loot(id, false)
+		end
+		local obj = db.storage[id] and level.object_by_id(id)
+		if obj then
+			save_var(obj, "loot", loot)
+		end
+		local gui = ui_mutant_loot.GUI -- open on the same body here: what it shows goes too
+		if gui and gui:IsShown() and gui.id == id then
+			gui.loot = loot
+			if is_empty(loot) then
+				gui:Close()
+			else
+				gui:FillList()
+			end
 		end
 	end
 end
@@ -305,11 +427,14 @@ end
 
 ------------------------------------------------------------------------------------------------
 -- Saving. The world on the server is the sim master's save: it goes up whenever the master saves
--- (src/xrGame/coop/coop_save.cpp), by hand or every coop_autosave_interval minutes from here.
--- Another player's save stays on their disk, so the master is asked to save the world.
+-- (src/xrGame/coop/coop_save.cpp), every coop_autosave_interval minutes from here, and whenever the
+-- server asks: a player comes in, leaves or asks for a save (ui_coop_saves.script, the quick save key).
 
 local AUTOSAVE = "coop_autosave"
 local last_save -- time_global() of the master's last save, nil: not counting yet
+local asked = {} -- { name, reason, who }...: saves the server asked for, made one by one as soon as they can be
+local saving = nil -- the one being made, told to the others once it is (world_saved)
+local SAVES_APART_MS = 3000 -- a save goes up after the next frames: the next one waits, or it takes its name
 
 local function news(text)
 	db.actor:give_game_news("Кооператив", text, "ui_iconsTotal_grouping", 0, 8000)
@@ -323,14 +448,20 @@ local function autosave()
 	local now = time_global()
 	last_save = last_save or now
 	local minutes = get_console():get_integer("coop_autosave_interval")
-	if minutes <= 0 or now - last_save < minutes * 60000 then
+	if #asked == 0 and (minutes <= 0 or now - last_save < minutes * 60000) then
+		return
+	end
+	if #asked > 0 and now - last_save < SAVES_APART_MS then
 		return
 	end
 	-- as a quicksave: not dead, not in a menu, trade or dialog
 	if not (db.actor:alive() and actor_menu.is_hud_free()) then
 		return
 	end
-	actor_menu.set_msg(1, "Автосохранение мира", 3)
+	local meta = table.remove(asked, 1) or { name = "", reason = "auto", who = "" }
+	saving = meta
+	coop.set_save_meta(meta.name, meta.reason, meta.who)
+	actor_menu.set_msg(1, meta.reason == "auto" and "Автосохранение мира" or "Сохранение мира", 3)
 	local force_pause = not device():is_paused()
 	if force_pause then
 		device():pause(true)
@@ -350,23 +481,31 @@ local function wrap_saves()
 		end
 		if coop.is_sim_master() then
 			last_save = time_global()
-			send("world_saved")
-		else
-			send("save_request")
-			actor_menu.set_msg(1, "Мастер получил просьбу сохранить мир", 4)
+			local meta = saving or { name = "", reason = "quick", who = "" }
+			saving = nil
+			send("world_saved", meta.reason, meta.name, meta.who)
 		end
 	end)
 
-	handlers.save_request = function(sender)
-		if not coop.is_sim_master() then
-			return
-		end
-		local key = dik_to_keyname(bind_to_dik(key_bindings.kQUICK_SAVE), true) or "?"
-		news(string.format("%s просит сохранить мир. Нажми %s, чтобы сохранить.", sender, key))
+	_G.coop_on_save_now = function(name, reason, who)
+		table.insert(asked, { name = name, reason = reason, who = who })
 	end
 
-	handlers.world_saved = function(sender)
-		news(string.format("%s сохранил мир.", sender))
+	handlers.world_saved = function(sender, payload)
+		coop_death.mark_save_point() -- where we go back to after a death
+		local f = fields(payload)
+		local reason, name, who = f[1], f[2] or "", f[3] ~= "" and f[3] or sender
+		if reason == "auto" then
+			news("Автосохранение мира.")
+		elseif reason == "named" then
+			news(string.format("Мир сохранён: «%s» (%s).", name, who))
+		elseif reason == "join" then
+			news(string.format("Мир сохранён: входит %s.", who))
+		elseif reason == "leave" then
+			news(string.format("Мир сохранён: вышел %s.", who))
+		else
+			news(string.format("Мир сохранён (%s).", who))
+		end
 	end
 end
 
@@ -404,15 +543,205 @@ local function keep_faction()
 	end)
 end
 
+------------------------------------------------------------------------------------------------
+-- Players' stand-ins (section coop_proxy, src/xrGame/coop/coop_combat.cpp): an NPC judges one as it
+-- would the player himself. An enemy by relation (faction), unless the NPC leaves players alone right
+-- now (bases, combat_ignore logic): else it shoots an invisible, unkillable stand-in for ever and hits
+-- everyone around it.
+-- Grudges (coop.grudge): a squad shot by a player, in this game or in the one that ran the level then,
+-- answers him even there, as one shot by the actor does (xr_combat_ignore's hit_callback).
+
+local answered = {} -- NPC id: its grudge against our actor taken in, once, as the hit itself would be
+
+-- A non-hostile squad attacked by a player (the engine tells the level's authority, coop_combat.cpp):
+-- one of it who is still alive gets on the radio a little later and names the attacker, and the
+-- attacker's standing with that faction drops (coop_rules faction_penalty). A squad wiped out before
+-- that tells nobody.
+local REPORT_DELAY = 4 -- s
+
+local function faction_penalty(community)
+	local amount = coop_rules.number("faction_penalty", 100)
+	if amount > 0 and db.actor and community and community ~= "" then
+		relation_registry.change_community_goodwill(community, AC_ID, -amount)
+		printf("[coop] %s like us %s less", community, amount)
+	end
+end
+
+local function report_attack(npc_id, attacker)
+	local se = alife_object(npc_id)
+	local squad = se and se.group_id and se.group_id ~= 65535 and alife_object(se.group_id)
+	local reporter
+	if squad then
+		for member in squad:squad_members() do
+			local m = alife_object(member.id)
+			if m and m:alive() then
+				reporter = m
+				break
+			end
+		end
+	elseif se and se:alive() then
+		reporter = se
+	end
+	if not reporter then
+		return -- nobody of it lives to tell
+	end
+	local community = reporter:community()
+	local header = reporter.character_name and reporter:character_name() or ""
+	local msg = string.format(game.translate_string("st_coop_attacked"), attacker, game.translate_string(level.name()))
+	dynamic_news_helper.send_tip(msg, header, nil, 10, community, "danger", "gr")
+	send("news", msg, header, "", "10", community, "danger", "gr")
+	if attacker == coop.my_name() then
+		faction_penalty(community)
+	else
+		send("penalty", attacker, community)
+	end
+end
+
+local function judge_stand_ins()
+	_G.coop_on_squad_attacked = function(npc_id, peer, attacker)
+		CreateTimeEvent("coop_report_attack", npc_id .. ":" .. attacker, REPORT_DELAY, function()
+			report_attack(npc_id, attacker)
+			return true
+		end)
+	end
+	handlers.penalty = function(sender, payload)
+		local f = fields(payload)
+		if f[1] == coop.my_name() then
+			faction_penalty(f[2])
+		end
+	end
+	-- our grudge forgiven (we left that level): what our hit set on the squad goes too
+	_G.coop_on_calm = function(key)
+		local se = alife_object(key)
+		local ids = {}
+		if se and se.squad_members then
+			for member in se:squad_members() do
+				ids[#ids + 1] = member.id
+			end
+		else
+			ids[1] = key
+		end
+		for _, id in ipairs(ids) do
+			answered[id] = nil
+			local npc = level.object_by_id(id)
+			if npc then
+				save_var(npc, "xr_combat_ignore_enabled", nil)
+			end
+		end
+	end
+
+	RegisterScriptCallback("on_enemy_eval", function(obj, enemy, flags)
+		-- a player lying wounded is left be (coop_death.script)
+		local peer = enemy:id() == AC_ID and coop.my_id() or coop.stand_in_peer(enemy:id())
+		if peer ~= 0 and coop.downed(peer) then
+			flags.override = true
+			flags.result = false
+			return
+		end
+		local grudge = coop.grudge(obj:id(), enemy:id())
+		if enemy:id() == AC_ID then
+			if grudge and not answered[obj:id()] then
+				answered[obj:id()] = true
+				local st = db.storage[obj:id()]
+				if not (st and st.overrides and st.overrides.combat_ignore_keep_when_attacked) then
+					save_var(obj, "xr_combat_ignore_enabled", false)
+				end
+			end
+			return -- the rest of is_enemy as usual
+		end
+		if enemy:section() ~= "coop_proxy" then
+			return
+		end
+		flags.override = true
+		flags.result = grudge or (db.actor ~= nil and obj:relation(enemy) >= game_object.enemy
+			and not xr_combat_ignore.ignore_enemy_by_overrides(obj, db.actor))
+	end)
+end
+
+------------------------------------------------------------------------------------------------
+-- The stalker network: world news (chatter, deaths, finds, their reactions) come from the sim master's
+-- game and are shown in every game, the others' own world news generators keep quiet. Personal ones
+-- (tasks, companions, the network going down in an emission or underground) stay each player's own.
+
+local function share_world_news()
+	local DNM = dynamic_news_manager and dynamic_news_manager.DynamicNewsManager
+	if not (DNM and dynamic_news_helper) then
+		printf("! [coop] dynamic news not found, not shared")
+		return
+	end
+	local world = 0 -- > 0 while a world news generator runs
+
+	local function writes_news()
+		return not coop_on() or coop.is_sim_master()
+	end
+
+	local function generating(original, ...)
+		world = world + 1
+		local res = { pcall(original, ...) }
+		world = world - 1
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end
+
+	-- the instance is made a while after the level loads: from the class patched by then
+	for _, name in ipairs({ "TickNews", "TickQuick", "TickSpecial", "TickRandom" }) do
+		wrap(DNM, name, "DynamicNewsManager", function(original, self, ...)
+			if not writes_news() then
+				ResetTimeEvent("DynamicNewsManager", name, 10) -- a quiet tick re-arms itself too
+				return false
+			end
+			return generating(original, self, ...)
+		end)
+	end
+	for _, name in ipairs({ "npc_on_death_callback", "monster_on_death_callback", "npc_on_get_all_from_corpse" }) do
+		wrap(DNM, name, "DynamicNewsManager", function(original, self, ...)
+			if writes_news() then
+				return generating(original, self, ...)
+			end
+		end)
+	end
+	wrap(DNM, "NewsToggle", "DynamicNewsManager", function(original, self, ...)
+		local outer = world
+		world = 0
+		local res = { pcall(original, self, ...) }
+		world = outer
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end)
+
+	wrap(dynamic_news_helper, "send_tip", "dynamic_news_helper", function(original, msg, header, timeout, showtime, sender, sound, icon_by)
+		local shown = original(msg, header, timeout, showtime, sender, sound, icon_by)
+		if shown and world > 0 then
+			send("news", msg or "", header or "", timeout or "", showtime or "", sender or "", sound or "", icon_by or "")
+		end
+		return shown
+	end)
+
+	local function opt(s)
+		return s ~= "" and s or nil
+	end
+	handlers.news = function(sender, payload)
+		local f = fields(payload)
+		dynamic_news_helper.send_tip(opt(f[1]), opt(f[2]), tonumber(f[3]), tonumber(f[4]), opt(f[5]), opt(f[6]), opt(f[7]))
+	end
+end
+
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
 	end
 	wrap_world_logic()
 	wrap_corpse_loot()
+	wrap_mutant_loot()
 	wrap_stashes()
 	wrap_saves()
 	watch_peers()
 	keep_faction()
+	judge_stand_ins()
+	share_world_news()
 	printf("[coop] world logic wrapped")
 end

@@ -1,0 +1,205 @@
+-- Co-op: the world's saves, kept by the server (coop-server/src/storage.js). While this game runs the
+-- shared world the pause menu's Save, Load and Last save open this window (modxml_coop_saves.script).
+-- Saving asks the sim master's game to save the world; going back to a save asks everyone in the world,
+-- and only when all agree do all games load it again (coop_save.cpp).
+
+local REFRESH_MS = 3000
+local wnd = nil     -- the window, made on first use
+local saves = {}    -- { revision, time, name, reason, who, from }, newest first, as the server last sent them
+
+local function trim(s)
+	return string.match(s or "", "^%s*(.-)%s*$")
+end
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+-- what a save was: its name or why it was made, and whose it was
+local function label(s)
+	local text = tr("st_coop_save_" .. s.reason, s.reason == "named" and s.name or s.reason == "rollback" and s.from or s.who)
+	if s.reason == "rollback" and s.name ~= "" then
+		text = text .. " " .. tr("st_coop_save_named", s.name)
+	end
+	if (s.reason == "named" or s.reason == "quick") and s.who ~= "" then
+		text = text .. " - " .. s.who
+	end
+	return text
+end
+
+local function ago(time)
+	local minutes = math.floor((os.time() - time) / 60)
+	if minutes < 1 then
+		return tr("st_coop_ago_now")
+	elseif minutes < 60 then
+		return tr("st_coop_ago_min", minutes)
+	elseif minutes < 60 * 24 then
+		return tr("st_coop_ago_hours", math.floor(minutes / 60))
+	end
+	return tr("st_coop_ago_days", math.floor(minutes / 60 / 24))
+end
+
+local function line(s)
+	return string.format("#%d   %s (%s)   %s", s.revision, os.date("%d.%m %H:%M", s.time), ago(s.time), label(s))
+end
+
+class "UICoopSaves" (CUIScriptWnd)
+
+function UICoopSaves:__init(owner) super()
+	self.owner = owner
+	self:InitControls()
+	self:InitCallBacks()
+end
+
+function UICoopSaves:__finalize()
+end
+
+function UICoopSaves:InitControls()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_saves.xml")
+
+	xml:InitStatic("background", self)
+	local form = xml:InitStatic("form", self)
+	xml:InitTextWnd("form:caption", form)
+	xml:InitFrame("form:list_frame", form)
+	self.list = xml:InitListBox("form:list", form)
+	self.list:ShowSelectedItem(true)
+	self:Register(self.list, "list")
+	xml:InitTextWnd("form:cap_name", form)
+	self.edit_name = xml:InitEditBox("form:edit_name", form)
+	self:Register(self.edit_name, "edit_name")
+	self.status = xml:InitTextWnd("form:status", form)
+	for _, name in ipairs({ "btn_save", "btn_rollback", "btn_close" }) do
+		self:Register(xml:Init3tButton("form:" .. name, form), name)
+	end
+end
+
+function UICoopSaves:InitCallBacks()
+	self:AddCallback("btn_save", ui_events.BUTTON_CLICKED, self.OnSave, self)
+	self:AddCallback("btn_rollback", ui_events.BUTTON_CLICKED, self.OnRollback, self)
+	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
+end
+
+function UICoopSaves:SetStatus(key, ...)
+	self.status:SetText(tr(key, ...))
+end
+
+function UICoopSaves:Fill()
+	local selected = self.list:GetSelectedIndex()
+	self.list:RemoveAll()
+	for _, s in ipairs(saves) do
+		self.list:AddTextItem(line(s))
+	end
+	if selected >= 0 and selected < #saves then
+		self.list:SetSelectedIndex(selected)
+	end
+end
+
+function UICoopSaves:Open()
+	self.asked = nil
+	self:Fill()
+	self:SetStatus(#saves > 0 and "st_coop_saves_hint" or "st_coop_saves_loading")
+	self:ShowDialog(true)
+	self.owner:HideDialog()
+	self.owner:Show(false)
+end
+
+function UICoopSaves:Close()
+	self.owner:ShowDialog(true)
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	self.owner:Show(true)
+end
+
+function UICoopSaves:Update()
+	CUIScriptWnd.Update(self)
+	local now = device():time_continual()
+	if not self.asked or now - self.asked > REFRESH_MS then
+		self.asked = now
+		coop.request_saves()
+	end
+end
+
+function UICoopSaves:OnSave()
+	coop.request_save(trim(self.edit_name:GetText()))
+	self.edit_name:SetText("")
+	self:SetStatus("st_coop_saves_saving")
+	self.asked = device():time_continual() - REFRESH_MS + 1500 -- the new one shows up soon
+end
+
+function UICoopSaves:OnRollback()
+	local i = self.list:GetSelectedIndex()
+	local s = saves[i + 1]
+	if not s then
+		return self:SetStatus("st_coop_saves_pick")
+	elseif i == 0 then
+		return self:SetStatus("st_coop_saves_latest")
+	end
+	coop.propose_rollback(s.revision)
+	self:SetStatus("st_coop_saves_voting")
+end
+
+function UICoopSaves:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik == DIK_keys.DIK_ESCAPE then
+		self:Close()
+	end
+	return res
+end
+
+function is_shown()
+	return wnd ~= nil and wnd:IsShown()
+end
+
+-- the pause menu (owner) opens it
+function open(owner)
+	if not (wnd and rawequal(wnd.owner, owner)) then -- engine objects have no == of their own
+		wnd = UICoopSaves(owner)
+	end
+	wnd:Open()
+end
+
+local function show_result(text)
+	if is_shown() then
+		wnd.status:SetText(text)
+	end
+	if db.actor then
+		actor_menu.set_msg(1, text, 6)
+	end
+end
+
+-- from the engine (coop_save.cpp): "revision\ttime\tname\treason\twho\tfrom" lines, newest first
+function on_saves(text)
+	saves = {}
+	for revision, time, name, reason, who, from in string.gmatch(text, "(%d+)\t(%d+)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t(%d+)\n") do
+		saves[#saves + 1] = { revision = tonumber(revision), time = tonumber(time), name = name, reason = reason,
+			who = who, from = tonumber(from) }
+	end
+	if is_shown() then
+		wnd:Fill()
+	end
+end
+
+function on_rollback_vote(proposer_id, proposer, revision, time, name, reason)
+	if proposer_id == coop.my_id() then
+		if is_shown() then
+			wnd:SetStatus("st_coop_saves_voting")
+		end
+		return
+	end
+	if not db.actor then
+		return -- in the menu: no say, the world isn't running here
+	end
+	local s = { revision = revision, time = time, name = name, reason = reason, who = "", from = 0 }
+	ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true,
+		tr("st_coop_rollback_ask", proposer, revision, label(s), ago(time)),
+		function() coop.answer_rollback(true) end,
+		function() coop.answer_rollback(false) end)
+end
+
+-- result: 0 accepted, 1 declined, 2 timeout, 3 cancelled (the one who asked left), 4 another vote is on
+function on_rollback_result(result, who, revision)
+	show_result(tr("st_coop_rollback_" .. result, who, revision))
+end

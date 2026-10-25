@@ -1,8 +1,9 @@
 -- Co-op: the profile screen, opened by the main menu's Co-op button (modxml_coop_menu.script).
 -- A profile is a player name and a server, kept per player in <profile folder>\coop_profiles.txt (appdata\,
 -- appdata2\ for the second test instance), the last used first. Enter connects with it and follows the
--- server: no world there -> the new game screen creates it; a world without our character -> the new game
--- screen makes one; our character is there -> the world loads by itself (src/xrGame/coop/coop_save.cpp).
+-- server: no world there -> the new game screen creates it, or we wait while another player does; a world
+-- without our character -> the new game screen makes one; our character is there -> the world loads by
+-- itself (src/xrGame/coop/coop_save.cpp).
 
 local FILE = "coop_profiles.txt"
 local DEFAULT_SERVER = "localhost:7777"
@@ -212,7 +213,8 @@ function UICoopProfiles:Update()
 		if not coop.link_up() or device():time_continual() - self.connect_started > CONNECT_TIMEOUT_MS then
 			self.connect_started = nil
 			coop.disconnect()
-			self:SetStatus("ui_mm_coop_status_failed")
+			local refused = coop.refused() -- "full", "version" or ""
+			self:SetStatus(refused ~= "" and "ui_mm_coop_status_refused_" .. refused or "ui_mm_coop_status_failed")
 		end
 		return
 	end
@@ -222,6 +224,8 @@ function UICoopProfiles:Update()
 		-- the new game screen creates the world or makes our character (modxml_coop_menu.script)
 		self:Close()
 		self.owner:ShowFactionUI()
+	elseif status == "being_created" then
+		self:SetStatus("ui_mm_coop_status_being_created", coop.world_creator())
 	elseif status == "exists" then
 		self.connect_started = nil
 		self:SetStatus("ui_mm_coop_status_loading")

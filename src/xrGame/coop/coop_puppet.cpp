@@ -2,6 +2,9 @@
 #include "coop_puppet.h"
 #include "coop_net.h"
 #include "coop_world.h"
+#include "coop_npc.h"
+#include "coop_combat.h"
+#include "coop_projectiles.h"
 #include "Level.h"
 #include "Actor.h"
 #include "Inventory.h"
@@ -22,11 +25,6 @@ namespace coop
 	static const float SNAP_DISTANCE = 5.f; // farther than this from where it should be: jump there
 	static const float FOLLOW_RATE = 12.f;  // states come 10 times a second; a puppet closes the gap this fast
 
-	enum EActorAction : u8
-	{
-		eShot,        // u8 EShotFlags
-		eWeaponState, // u8 the weapon's new state (CWeapon/CHUDState), for its sounds
-	};
 	enum EShotFlags : u8
 	{
 		eShotLauncher = 1 << 0,
@@ -118,6 +116,29 @@ namespace coop
 	static shared_str g_indexed_visual;          // the actor model g_motion_index was made for
 	static xr_map<u32, u16> g_motion_index;      // MotionID::val -> index in puppet_motion_names()
 
+	static bool g_downed = false;
+
+	void set_downed(bool downed)
+	{
+		g_downed = downed;
+	}
+
+	bool is_downed(u32 peer)
+	{
+		if (peer == my_id())
+			return g_downed;
+		auto it = peers().find(peer);
+		return it != peers().end() && it->second.has_look && (it->second.look.flags & SLook::eDowned);
+	}
+
+	// a lying player's puppet and stand-in play the actor's fall to the ground, and stay down
+	static u16 downed_motion()
+	{
+		const xr_vector<shared_str>& names = puppet_motion_names();
+		static const u16 index = u16(std::find(names.begin(), names.end(), shared_str("norm_death_0")) - names.begin());
+		return index;
+	}
+
 	static u16 motion_index(MotionID motion)
 	{
 		auto it = motion.valid() ? g_motion_index.find(motion.val) : g_motion_index.end();
@@ -150,9 +171,9 @@ namespace coop
 		P.w_float(torso.pitch);
 		P.w_float(torso.roll);
 
-		P.w_u16(motion_index(actor->m_current_legs));
-		P.w_u16(motion_index(actor->m_current_torso));
-		P.w_u16(motion_index(actor->m_current_head));
+		P.w_u16(g_downed ? downed_motion() : motion_index(actor->m_current_legs));
+		P.w_u16(g_downed ? downed_motion() : motion_index(actor->m_current_torso));
+		P.w_u16(g_downed ? downed_motion() : motion_index(actor->m_current_head));
 		static CBlend* torso_blend = nullptr;
 		static u8 torso_seq = 0;
 		if (actor->m_current_torso_blend != torso_blend)
@@ -174,7 +195,13 @@ namespace coop
 		CTorch* torch = smart_cast<CTorch*>(actor->inventory().ItemFromSlot(TORCH_SLOT));
 		if (torch && torch->torch_active())
 			flags |= SLook::eTorch;
+		if (!actor->g_Alive())
+			flags |= SLook::eDead;
+		if (g_downed)
+			flags |= SLook::eDowned;
 		P.w_u8(flags);
+		P.w_stringZ(actor->CharacterInfo().Community().id());
+		P.w_u8(u8(iFloor(actor->ROS()->get_luminocity() * 255.f + .5f))); // 0..1 (CROS_impl)
 	}
 
 	void read_look(NET_Packet& P, SLook& look)
@@ -192,6 +219,8 @@ namespace coop
 		P.r_stringZ(look.item);
 		look.item_addons = P.r_u8();
 		look.flags = P.r_u8();
+		P.r_stringZ(look.community);
+		look.luminocity = P.r_u8();
 	}
 
 	void on_actor_shot(const CWeapon& weapon, bool launcher)
@@ -653,7 +682,8 @@ namespace coop
 		for (auto it = g_puppets.begin(); it != g_puppets.end();)
 		{
 			auto peer = list.find(it->first);
-			if (peer == list.end() || peer->second.level != level || !peer->second.has_look)
+			if (peer == list.end() || peer->second.level != level || !peer->second.has_look ||
+			    (peer->second.look.flags & SLook::eDead))
 			{
 				xr_delete(it->second);
 				it = g_puppets.erase(it);
@@ -664,7 +694,7 @@ namespace coop
 
 		for (const auto& [id, peer] : list)
 		{
-			if (peer.level != level || !peer.has_look)
+			if (peer.level != level || !peer.has_look || (peer.look.flags & SLook::eDead))
 				continue;
 			CPuppet*& puppet = g_puppets[id];
 			if (!puppet)
@@ -678,10 +708,27 @@ namespace coop
 
 	void on_peer_action(u32 sender, NET_Packet& P)
 	{
+		const u8 action = P.r_u8();
+		if (action == eNpcShot)
+			return play_npc_shot(P.r_u16());
+		if (action == eNpcHit)
+			return play_npc_hit(P);
+		if (action == eNpcSound)
+			return play_npc_sound(P);
+		if (action == eNpcWeaponState)
+			return play_npc_weapon_state(P);
+		if (action == eProjectile)
+			return play_projectile(sender, P);
+		if (action == eExplosion)
+			return play_explosion(sender, P);
+		if (action == eBullets)
+			return play_bullets(sender, P);
+		if (action == eBodyRest)
+			return apply_body_rest(P);
 		auto it = g_puppets.find(sender);
 		if (it == g_puppets.end())
 			return; // not on our level: nothing to see or hear
-		switch (P.r_u8())
+		switch (action)
 		{
 		case eShot: it->second->shot(P.r_u8()); break;
 		case eWeaponState: it->second->weapon_state(P.r_u8()); break;

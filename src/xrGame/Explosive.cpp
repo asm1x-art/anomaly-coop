@@ -37,6 +37,7 @@
 #include "profiler.h"
 
 #include "../Include/xrRender/Kinematics.h"
+#include "coop/coop_projectiles.h"
 #define EFFECTOR_RADIUS 30.f
 const u16 TEST_RAYS_PER_OBJECT = 5;
 const u16 BLASTED_OBJ_PROCESSED_PER_FRAME = 3;
@@ -410,10 +411,17 @@ void CExplosive::Explode()
 	if (OnServer()) SendHits = true;
 	else SendHits = false;
 
+	// co-op: the fragments come from a seed sent with the explosion, so the other games throw the same
+	// ones; a blank (another game's explosion here) sends no hits and has no blast
+	const bool blank = m_coop_seed != 0;
+	const s32 seed = blank ? m_coop_seed : ((::Random.randI() << 15) | ::Random.randI()) + 1;
+	if (!blank)
+		coop::on_explode(*cast_game_object(), pos, dir, seed);
+	CRandom frag_rng(seed);
 
 	for (int i = 0; i < m_iFragsNum; ++i)
 	{
-		frag_dir.random_dir();
+		frag_dir.random_dir(frag_rng);
 		frag_dir.normalize();
 
 		CCartridge cartridge;
@@ -434,10 +442,15 @@ void CExplosive::Explode()
 		Level().BulletManager().AddBullet(pos, frag_dir, m_fFragmentSpeed,
 		                                  m_fFragHit, m_fFragHitImpulse, Initiator(),
 		                                  cast_game_object()->ID(), m_eHitTypeFrag, m_fFragsRadius,
-		                                  cartridge, m_fFragAirRes, SendHits, false, i + 1);
+		                                  cartridge, m_fFragAirRes, SendHits && !blank, false, i + 1, seed + i + 1);
 	}
 
 	if (cast_game_object()->Remote()) return;
+	if (blank)
+	{
+		ExplodeEffector(pos);
+		return;
+	}
 
 	/////////////////////////////////
 	//взрывная волна
@@ -469,6 +482,11 @@ void CExplosive::Explode()
 		
 	}
 #endif
+	ExplodeEffector(pos);
+}
+
+void CExplosive::ExplodeEffector(const Fvector& pos)
+{
 	//////////////////////////////////////////////////////////////////////////
 	// Explode Effector	//////////////
 	CGameObject* GO = smart_cast<CGameObject*>(Level().CurrentEntity());
@@ -482,6 +500,21 @@ void CExplosive::Explode()
 				AddEffector(pActor, effExplodeHit, effector.effect_sect_name, (max_dist - dist_to_actor) / max_dist);
 			}
 	}
+}
+
+bool CExplosive::coop_blank_explode(const Fvector& pos, const Fvector& dir, s32 seed)
+{
+	if (m_explosion_flags.test(flExploding) || m_explosion_flags.test(flExploded))
+		return false;
+	m_coop_seed = seed;
+	if (Initiator() == u16(-1))
+		SetInitiator(cast_game_object()->ID());
+	m_explosion_flags.set(flReadyToExplode | flExplodEventSent, TRUE); // its own fuse won't go off now
+	m_vExplodePos = pos;
+	m_vExplodeDir = dir;
+	Explode();
+	m_fExplodeDuration = m_fExplodeDurationMax;
+	return true;
 }
 
 void CExplosive::PositionUpdate()

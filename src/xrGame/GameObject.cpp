@@ -1,4 +1,6 @@
 #include "pch_script.h"
+#include "coop/coop_combat.h"
+#include "coop/coop_net.h"
 #include "GameObject.h"
 //#include "../Include/xrRender/RenderVisual.h"
 #include "../Include/xrRender/RenderVisual.h"
@@ -211,6 +213,8 @@ void CGameObject::OnEvent(NET_Packet& P, u16 type)
 			{
 				Msg("! ERROR: hitter object [%d] is NULL on client.", HDS.whoID);
 			}
+			if (coop::intercept_hit(this, HDS))
+				break; // another co-op game takes it
 			//-------------------------------------------------------
 			switch (HDS.PACKET_TYPE)
 			{
@@ -402,6 +406,9 @@ BOOL CGameObject::net_Spawn(CSE_Abstract* DC)
 	{
 		//		Msg				("client data is present for object [%d][%s], load is processed",ID(),*cName());
 		IReader ireader = IReader(&*E->client_data.begin(), E->client_data.size());
+		if (coop::debug_mode) // a save that doesn't load: the last of these names the object
+			Msg("[coop dbg] loading the client data of %s (%s, id=%u), %u bytes", *cName(), *cNameSect(), ID(),
+			    u32(E->client_data.size()));
 		net_Load(ireader);
 	}
 	else

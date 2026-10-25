@@ -33,6 +33,7 @@ protected:
 
 	Fvector m_vCurrentShootDir;
 	Fvector m_vCurrentShootPos;
+	s32 m_iCurrentBulletSeed = 0; // CBulletManager::AddBullet's, of the last bullet fired
 
 private:
 	float m_air_resistance_factor;

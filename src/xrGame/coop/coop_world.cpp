@@ -10,6 +10,12 @@
 #include "alife_object_registry.h"
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
+#include "coop_puppet.h"
+#include "PhysicsShellHolder.h"
+#include "../xrPhysics/PhysicsShell.h"
+#include "level_graph.h"
+#include "game_level_cross_table.h"
+#include "ai_object_location.h"
 
 namespace coop
 {
@@ -18,6 +24,7 @@ namespace coop
 		ePlaceGround,      // vec3 position, u16 game vertex, u32 level vertex
 		ePlaceObject,      // u16 parent id, stringZ parent section
 		ePlaceSenderActor, // the sending player's actor, which is its shadow on the receiving side
+		ePlacePlayer,      // u32 peer id: that player's actor, our own one or the player's shadow (trading)
 	};
 
 	static const u16 NO_ID = u16(-1);
@@ -26,8 +33,16 @@ namespace coop
 	// Deaths we applied on behalf of another client. Their on_death must not be sent back:
 	// online kills reach on_death later, through GE_DIE, so a plain "applying" flag won't do.
 	static xr_set<u16> g_remote_deaths;
+	static u16 g_dying_remotely = u16(-1);
+	// bodies of our deaths still falling here: when they lie still, the others put theirs there too
+	static xr_map<u16, u32> g_falling; // id -> Device.dwTimeContinual of the death
+	static const u32 BODY_CHECK_MS = 500;
+	static const u32 BODY_FALL_MIN_MS = 2000;  // the ragdoll is made a frame or two after the death
+	static const u32 BODY_FALL_MAX_MS = 15000; // a body sliding down a slope is told where it is by then
 	// same for online objects we asked to be destroyed
 	static xr_set<u16> g_remote_releases;
+	// and for items we asked to be dropped out of an online holder
+	static xr_set<u16> g_remote_drops;
 	// set while we change A-Life on behalf of another client, so hooks don't echo it back
 	static bool g_applying = false;
 	static xr_map<xr_string, u32> g_skip_logs; // reason -> times logged
@@ -112,6 +127,59 @@ namespace coop
 		return object && object->s_name == section ? object : nullptr;
 	}
 
+	struct SBodyPlace
+	{
+		Fvector position;
+		u16 game_vertex;
+		u32 level_vertex;
+	};
+
+	// where a body lies in our game: its object while it is online here, else its A-Life place
+	static SBodyPlace body_place(CSE_ALifeDynamicObject* body)
+	{
+		SBodyPlace place{body->o_Position, body->m_tGraphID, body->m_tNodeID};
+		CGameObject* object = body->m_bOnline && g_pGameLevel ?
+			smart_cast<CGameObject*>(Level().Objects.net_Find(body->ID)) : nullptr;
+		if (!object || !ai().get_level_graph())
+			return place;
+		place.position = object->Position();
+		u32 vertex = ai().level_graph().vertex_id(place.position);
+		if (!ai().level_graph().valid_vertex_id(vertex)) // off the AI grid: the nearest, from where it stood
+			vertex = ai().level_graph().vertex(object->ai_location().level_vertex_id(), place.position);
+		place.level_vertex = vertex;
+		place.game_vertex = ai().cross_table().vertex(vertex).game_vertex_id();
+		return place;
+	}
+
+	static void write_body_place(NET_Packet& P, const SBodyPlace& place)
+	{
+		P.w_vec3(place.position);
+		P.w_u16(place.game_vertex);
+		P.w_u32(place.level_vertex);
+	}
+
+	static SBodyPlace read_body_place(NET_Packet& P)
+	{
+		SBodyPlace place;
+		P.r_vec3(place.position);
+		place.game_vertex = P.r_u16();
+		place.level_vertex = P.r_u32();
+		return place;
+	}
+
+	// A body offline here goes where the game that had it online shows it: offline, squads wander apart
+	// in each game, and it would lie wherever ours had got to. Online here, it fell here.
+	static void place_body(CSE_ALifeDynamicObject* body, const SBodyPlace& place)
+	{
+		if (body->m_bOnline || !ai().game_graph().valid_vertex_id(place.game_vertex))
+			return;
+		const float distance = body->o_Position.distance_to(place.position);
+		alife_rw().teleport_object(body->ID, place.game_vertex, place.level_vertex, place.position);
+		if (debug_mode)
+			Msg("[coop dbg] body of %s (id=%u) moved %.0f m, to where it lies for the others", body->name_replace(),
+			    body->ID, distance);
+	}
+
 	void on_creature_death(CSE_ALifeCreatureAbstract* victim, CSE_Abstract* killer)
 	{
 		if (g_remote_deaths.erase(victim->ID))
@@ -129,9 +197,56 @@ namespace coop
 		P.w_u16(victim->ID);
 		P.w_stringZ(victim->s_name);
 		P.w_u16(killer ? killer->ID : u16(-1));
+		write_body_place(P, body_place(victim));
 		send(P);
+		if (victim->m_bOnline)
+			g_falling[victim->ID] = Device.dwTimeContinual;
 
 		Msg("[coop] death of %s (id=%u) sent", victim->name_replace(), victim->ID);
+	}
+
+	void update_bodies()
+	{
+		static u32 last = 0;
+		if (g_falling.empty() || Device.dwTimeContinual - last < BODY_CHECK_MS)
+			return;
+		last = Device.dwTimeContinual;
+		if (!world_ready() || !is_connected())
+			return g_falling.clear();
+		for (auto it = g_falling.begin(); it != g_falling.end();)
+		{
+			const u32 age = Device.dwTimeContinual - it->second;
+			CPhysicsShellHolder* object = smart_cast<CPhysicsShellHolder*>(Level().Objects.net_Find(it->first));
+			CSE_ALifeDynamicObject* body = ai().alife().objects().object(it->first, true);
+			if (!object || !body || object->getDestroy())
+			{
+				it = g_falling.erase(it);
+				continue;
+			}
+			const bool still = !object->PPhysicsShell() || !object->PPhysicsShell()->isEnabled();
+			if (age < BODY_FALL_MIN_MS || (!still && age < BODY_FALL_MAX_MS))
+			{
+				++it;
+				continue;
+			}
+			NET_Packet P;
+			P.w_begin(M_ACTOR_ACTION);
+			P.w_u8(eBodyRest);
+			P.w_u16(it->first);
+			write_body_place(P, body_place(body));
+			send(P);
+			it = g_falling.erase(it);
+		}
+	}
+
+	void apply_body_rest(NET_Packet& P)
+	{
+		const u16 id = P.r_u16();
+		const SBodyPlace place = read_body_place(P);
+		CSE_ALifeCreatureAbstract* body = level_running() ?
+			smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true)) : nullptr;
+		if (body && !body->g_Alive())
+			place_body(body, place);
 	}
 
 	void apply_entity_death(NET_Packet& P)
@@ -140,6 +255,8 @@ namespace coop
 		shared_str section;
 		P.r_stringZ(section);
 		P.r_u16(); // killer: not credited locally, rewards stay with whoever made the kill
+		const bool placed = P.r_elapsed() > 0;
+		const SBodyPlace place = placed ? read_body_place(P) : SBodyPlace{};
 
 		if (!level_running())
 			return;
@@ -165,9 +282,20 @@ namespace coop
 		}
 		else
 		{
-			// offline: what sim_offline_combat does; scripts then drop it from its squad
+			// offline: what sim_offline_combat does; scripts then drop it from its squad. A squad releases
+			// a member that died offline, and the release would reach the game the body lies in: it stays,
+			// as after an online death
+			g_dying_remotely = id;
 			creature->on_death(creature);
+			g_dying_remotely = u16(-1);
+			if (placed)
+				place_body(creature, place);
 		}
+	}
+
+	bool is_dying_remotely(u16 id)
+	{
+		return id == g_dying_remotely;
 	}
 
 	static void send_spawn(CSE_ALifeDynamicObject* object)
@@ -225,6 +353,8 @@ namespace coop
 
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id)
 	{
+		if (g_remote_drops.erase(item->base()->ID))
+			return;
 		if (!should_send() || is_shadow(&parent) || local_objects().count(item->base()->ID))
 			return;
 
@@ -263,6 +393,8 @@ namespace coop
 		CSE_Abstract* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
 		if (is_actor(holder) || g_left_actor.erase(object->ID))
 			Msg("[coop] used up %s (id=%u), sent", object->name_replace(), object->ID);
+		else if (debug_mode)
+			Msg("[coop dbg] release of %s (id=%u) sent", object->name_replace(), object->ID);
 	}
 
 	static void spawn_online(NET_Packet& spawn_packet)
@@ -337,6 +469,23 @@ namespace coop
 				return skip("move", id, "sender has no shadow");
 			break;
 		}
+		case ePlacePlayer:
+		{
+			const u32 receiver = P.r_u32();
+			if (receiver == my_id())
+			{
+				target = ai().alife().graph().actor();
+				Msg("[coop] '%s' gave us %s (id=%u)", peer_name(sender), object->name_replace(), id);
+				break;
+			}
+			auto peer = peers().find(receiver);
+			if (peer == peers().end())
+				return skip("move", id, "unknown receiver");
+			target = ai().alife().objects().object(shadow_of(peer->second.name), true);
+			if (!target)
+				return skip("move", id, "receiver has no shadow");
+			break;
+		}
 		default:
 			return skip("move", id, "bad place");
 		}
@@ -362,9 +511,23 @@ namespace coop
 			return;
 		}
 
+		CSE_ALifeDynamicObject* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
+		if (!target && object->m_bOnline && holder)
+		{
+			// Dropped out of an inventory that is online here (a dead NPC's weapon falling from its
+			// hands): it falls here too, as a dropped item. Taken out on the server side it would be
+			// marked as about to be destroyed, and a dead NPC's weapon is part of its ragdoll until
+			// it really falls.
+			g_remote_drops.insert(id);
+			NET_Packet E;
+			CGameObject::u_EventGen(E, GE_OWNERSHIP_REJECT, holder->ID);
+			E.w_u16(id);
+			CGameObject::u_EventSend(E);
+			return;
+		}
+
 		// Everything below is done offline. An online item on the ground can be taken offline,
 		// but moving items between online inventories needs client-side transfers: not yet.
-		CSE_ALifeDynamicObject* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
 		if (target && target->m_bOnline)
 		{
 			// An offline item going into an online inventory here (a trader's restock spawns items on
@@ -399,6 +562,43 @@ namespace coop
 		else
 			alife_rw().teleport_object(id, game_vertex, level_vertex, position);
 		g_applying = false;
+	}
+
+	bool give_item(u16 id, u32 peer)
+	{
+		auto receiver = peers().find(peer);
+		CSE_ALifeDynamicObject* object = level_running() ? ai().alife().objects().object(id, true) : nullptr;
+		CSE_ALifeInventoryItem* item = smart_cast<CSE_ALifeInventoryItem*>(object);
+		CSE_ALifeDynamicObject* actor = level_running() ? ai().alife().graph().actor() : nullptr;
+		if (receiver == peers().end() || !item || !actor || object->ID_Parent != actor->ID || !is_connected())
+			return false;
+		CSE_ALifeDynamicObject* shadow = ai().alife().objects().object(shadow_of(receiver->second.name), true);
+		if (!shadow)
+			return false;
+
+		// into the receiver's shadow here, as apply_item_parent moves things
+		g_applying = true;
+		CSE_ALifeDynamicObject* holder = actor;
+		if (object->m_bOnline)
+		{
+			alife_rw().server().Perform_reject(object, holder, 0);
+			holder = nullptr;
+			alife_rw().switch_offline(object);
+		}
+		if (holder)
+			alife_rw().graph().detach(*holder, item, holder->m_tGraphID, true);
+		alife_rw().graph().attach(*shadow, item, shadow->m_tGraphID, true);
+		g_applying = false;
+
+		NET_Packet P;
+		P.w_begin(M_ITEM_PARENT);
+		P.w_u16(id);
+		P.w_stringZ(object->s_name);
+		P.w_u8(ePlacePlayer);
+		P.w_u32(peer);
+		send(P);
+		Msg("[coop] gave %s (id=%u) to '%s'", object->name_replace(), id, receiver->second.name.c_str());
+		return true;
 	}
 
 	void on_object_registered(CSE_ALifeDynamicObject* object)
@@ -497,6 +697,52 @@ namespace coop
 				mark_remote_release(c);
 	}
 
+	// online objects go through GE_DESTROY, like the Lua alife():release() does; the server destroys the
+	// contents first, one by one, so none of it must be sent back either
+	static void release_online(CSE_ALifeDynamicObject* object)
+	{
+		mark_remote_release(object);
+		NET_Packet E;
+		E.w_begin(M_EVENT);
+		E.w_u32(Level().timeServer());
+		E.w_u16(GE_DESTROY);
+		E.w_u16(object->ID);
+		Level().Send(E, net_flags(TRUE, TRUE));
+	}
+
+	// Online here, but not made on our side yet: a spawn and its release came one right after the other (a
+	// player drops a bandage and uses it). Destroyed before it exists, it is made after all and stays, with
+	// no server entity, till the level is destroyed - where the engine stops on it. The release waits.
+	static xr_map<u16, u32> g_unborn_releases; // id -> Device.dwTimeContinual asked
+	static const u32 UNBORN_WAIT_MS = 5000;
+
+	void update_releases()
+	{
+		if (g_unborn_releases.empty())
+			return;
+		if (!level_running())
+			return g_unborn_releases.clear();
+		for (auto it = g_unborn_releases.begin(); it != g_unborn_releases.end();)
+		{
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(it->first, true);
+			if (object && object->m_bOnline && !Level().Objects.net_Find(it->first) &&
+			    Device.dwTimeContinual - it->second < UNBORN_WAIT_MS)
+			{
+				++it;
+				continue;
+			}
+			if (object && object->m_bOnline)
+				release_online(object);
+			else if (object) // gone offline meanwhile
+			{
+				g_applying = true;
+				alife_rw().release(object, true);
+				g_applying = false;
+			}
+			it = g_unborn_releases.erase(it);
+		}
+	}
+
 	void apply_object_release(NET_Packet& P)
 	{
 		const u32 sender = P.r_u32();
@@ -519,15 +765,10 @@ namespace coop
 
 		if (object->m_bOnline)
 		{
-			// online objects go through GE_DESTROY, like the Lua alife():release() does; the server
-			// destroys the contents first, one by one, so none of it must be sent back either
-			mark_remote_release(object);
-			NET_Packet E;
-			E.w_begin(M_EVENT);
-			E.w_u32(Level().timeServer());
-			E.w_u16(GE_DESTROY);
-			E.w_u16(id);
-			Level().Send(E, net_flags(TRUE, TRUE));
+			if (Level().Objects.net_Find(id))
+				release_online(object);
+			else
+				g_unborn_releases.emplace(id, Device.dwTimeContinual);
 			return;
 		}
 

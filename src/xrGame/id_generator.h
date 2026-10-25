@@ -119,12 +119,20 @@ public:
 		return (std::find(b.m_tpIDs, b.m_tpIDs + b.m_tCount, value) != b.m_tpIDs + b.m_tCount);
 	}
 
+	// The id free the longest, not the last freed (tfGetFromBlock pops that one): the client may still be
+	// destroying its object. tfGetID gets the same delay by taking the block freed into longest ago.
 	IC VALUE_ID tfGetIDFromBlock(u32 block)
 	{
 		R_ASSERT2(block < m_tBlockCount, "Requesting block is invalid!");
-		if (!m_tppBlocks[block].m_tCount)
+		SID_Block& b = m_tppBlocks[block];
+		if (!b.m_tCount)
 			return (tInvalidValueID);
-		return (tfGetFromBlock(m_tppBlocks[block], tInvalidValueID));
+		if (b.m_tCount == 1)
+			--m_available_count;
+		const TYPE_ID value = b.m_tpIDs[0];
+		std::copy(b.m_tpIDs + 1, b.m_tpIDs + b.m_tCount, b.m_tpIDs);
+		--b.m_tCount;
+		return (VALUE_ID(value) + VALUE_ID(block) * tBlockSize + tMinValue);
 	}
 
 	IC void vfFreeID(VALUE_ID tValueID, TIME_ID tTimeID)

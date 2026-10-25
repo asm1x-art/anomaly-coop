@@ -23,6 +23,7 @@
 #include "actor.h"
 #include "ai/monsters/basemonster/base_monster.h"
 #include "script_game_object.h"
+#include "coop/coop_combat.h"
 
 //константы ShootFactor, определяющие 
 //поведение пули при столкновении с объектом
@@ -57,6 +58,8 @@ BOOL CBulletManager::test_callback(const collide::ray_defs& rd, CObject* object,
 		{
 			CActor* actor = smart_cast<CActor*>(entity);
 			CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(entity);
+			// a co-op player's stand-in is missed as often as the player himself would be
+			CActor* player = actor ? actor : (coop::is_proxy(entity) ? g_actor : NULL);
 			// в кого попали?
 			if (actor && IsGameTypeSingle()/**/ || stalker/**/)
 			{
@@ -70,11 +73,11 @@ BOOL CBulletManager::test_callback(const collide::ray_defs& rd, CObject* object,
 					// да попали, найдем кто стрелял
 					bool play_whine = true;
 					CObject* initiator = Level().Objects.net_Find(bullet->parent_id);
-					if (actor)
+					if (player)
 					{
 						// попали в актера
 						float hpf = 1.f;
-						float ahp = actor->HitProbability();
+						float ahp = player->HitProbability();
 #if 1
 #	if 0
 						CObject					*weapon_object = Level().Objects.net_Find	(bullet->weapon_id);
@@ -87,7 +90,7 @@ BOOL CBulletManager::test_callback(const collide::ray_defs& rd, CObject* object,
 							}
 						}
 #	else
-						float game_difficulty_hit_probability = actor->HitProbability();
+						float game_difficulty_hit_probability = player->HitProbability();
 						CAI_Stalker* stalker = smart_cast<CAI_Stalker*>(initiator);
 						if (stalker)
 							hpf = stalker->SpecificCharacter().hit_probability_factor();
@@ -370,6 +373,7 @@ FvectorVec g_hit[3];
 #endif
 
 extern void random_dir(Fvector& tgt_dir, const Fvector& src_dir, float dispersion);
+extern void random_dir(Fvector& tgt_dir, const Fvector& src_dir, float dispersion, CRandom& rng);
 
 bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvector& end_point,
                                collide::rq_result& R, u16 target_material, Fvector& hit_normal)
@@ -480,10 +484,10 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 	Fvector new_dir;
 	new_dir.reflect(bullet->dir, hit_normal);
 	Fvector tgt_dir;
-	random_dir(tgt_dir, new_dir, deg2rad(10.0f));
+	random_dir(tgt_dir, new_dir, deg2rad(10.0f), bullet->rng);
 	float ricoshet_factor = bullet->dir.dotproduct(tgt_dir);
 
-	float f = Random.randF(0.2f, 0.6f);
+	float f = bullet->rng.randF(0.2f, 0.6f);
 	if ((f < ricoshet_factor) && !mtl->Flags.test(SGameMtl::flNoRicoshet) && bullet->flags.allow_ricochet)
 	{
 		// уменьшение скорости полета в зависимости от угла падения пули (чем прямее угол, тем больше потеря)
@@ -518,7 +522,7 @@ bool CBulletManager::ObjectHit(SBullet_Hit* hit_res, SBullet* bullet, const Fvec
 		bullet->bullet_pos.mad(bullet->bullet_pos, bullet->dir, EPS); //fake
 		//ввести коэффициент случайности при простреливании
 		Fvector rand_normal;
-		rand_normal.random_dir(bullet->dir, deg2rad(2.0f), Random);
+		rand_normal.random_dir(bullet->dir, deg2rad(2.0f), bullet->rng);
 		bullet->dir.set(rand_normal);
 #ifdef DEBUG
 		bullet_state = 2;

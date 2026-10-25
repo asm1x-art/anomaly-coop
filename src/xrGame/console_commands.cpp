@@ -41,6 +41,7 @@
 #include "coop/coop_net.h"
 #include "coop/coop_save.h"
 #include "coop/coop_map.h"
+#include "coop/coop_npc.h"
 #include "GameTask.h"
 #include "MainMenu.h"
 #include "saved_game_wrapper.h"
@@ -415,11 +416,18 @@ class CCC_CoopConnect : public IConsole_Command
 public:
 	CCC_CoopConnect(LPCSTR N) : IConsole_Command(N) {}
 
-	// coop_connect <host>[:port] [name] [save to start the world from, if the server has none]
+	// coop_connect <host>[:port] [name] [save to start the world from, if the server has none];
+	// a name with spaces goes in double quotes
 	virtual void Execute(LPCSTR args)
 	{
 		string256 address = "", name = "", seed = "";
-		sscanf(args, "%255s %255s %255s", address, name, seed);
+		int read = 0;
+		sscanf(args, "%255s %n", address, &read);
+		LPCSTR rest = args + read;
+		if (*rest == '"')
+			sscanf(rest, "\"%255[^\"]\" %255s", name, seed);
+		else
+			sscanf(rest, "%255s %255s", name, seed);
 		if (!xr_strlen(address))
 		{
 			Msg("! usage: coop_connect <host>[:port] [name] [seed save]");
@@ -445,6 +453,13 @@ class CCC_CoopDisconnect : public IConsole_Command
 public:
 	CCC_CoopDisconnect(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
 	virtual void Execute(LPCSTR args) { coop::disconnect(); }
+};
+
+class CCC_CoopGroupLeave : public IConsole_Command
+{
+public:
+	CCC_CoopGroupLeave(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { coop::group_request(coop::eGroupLeave, 0); }
 };
 
 class CCC_CoopStatus : public IConsole_Command
@@ -3373,7 +3388,9 @@ void CCC_RegisterCommands()
 
 	CMD1(CCC_CoopConnect, "coop_connect");
 	CMD1(CCC_CoopDisconnect, "coop_disconnect");
+	CMD1(CCC_CoopGroupLeave, "coop_group_leave");
 	CMD1(CCC_CoopStatus, "coop_status");
 	CMD4(CCC_Integer, "coop_autosave_interval", &coop::autosave_interval, 0, 120);
+	CMD4(CCC_Integer, "coop_debug", &coop::debug_mode, 0, 1);
 	CMD2(CCC_Color, "coop_peer_color", &coop::peer_color);
 }

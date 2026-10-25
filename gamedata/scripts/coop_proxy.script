@@ -1,0 +1,4 @@
+-- Co-op: the binder of a player's stand-in (section coop_proxy, src/xrGame/coop/coop_combat.cpp).
+-- It gets no logic, jobs or squad: the engine moves it where its player is.
+function bind(obj)
+end

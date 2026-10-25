@@ -16,6 +16,7 @@
 #include "game_cl_mp.h"
 #include "reward_event_generator.h"
 #include "../Layers/xrRender/xrRender_console.h"
+#include "coop/coop_combat.h"
 
 #define FLAME_TIME 0.05f
 
@@ -34,6 +35,35 @@ float _nrand(float sigma)
 	while (Random.randF() > expf(-_sqr(y - 1.0f) * 0.5f));
 	if (rand() & 0x1) return y * sigma * ONE_OVER_SIGMA_EXP;
 	else return -y * sigma * ONE_OVER_SIGMA_EXP;
+}
+
+// the same from a given generator: a bullet's ricochets (CBulletManager::ObjectHit)
+static float _nrand(float sigma, CRandom& rng)
+{
+	if (sigma == 0) return 0;
+
+	float y;
+	do
+	{
+		y = -logf(rng.randF());
+	}
+	while (rng.randF() > expf(-_sqr(y - 1.0f) * 0.5f));
+	if (rng.randI() & 0x1) return y * sigma * ONE_OVER_SIGMA_EXP;
+	else return -y * sigma * ONE_OVER_SIGMA_EXP;
+}
+
+void random_dir(Fvector& tgt_dir, const Fvector& src_dir, float dispersion, CRandom& rng)
+{
+	float sigma = dispersion / 3.f;
+	float alpha = clampr(_nrand(sigma, rng), -dispersion, dispersion);
+	float theta = rng.randF(0, PI);
+	float r = tan(alpha);
+	Fvector U, V, T;
+	Fvector::generate_orthonormal_basis(src_dir, U, V);
+	U.mul(r * _sin(theta));
+	V.mul(r * _cos(theta));
+	T.add(U, V);
+	tgt_dir.add(src_dir, T).normalize();
 }
 
 void random_dir(Fvector& tgt_dir, const Fvector& src_dir, float dispersion)
@@ -121,10 +151,13 @@ void CWeapon::FireTrace(const Fvector& P, const Fvector& D)
 
 	bool SendHit = SendHitAllowed(H_Parent());
 	//выстерлить пулю (с учетом возможной стрельбы дробью)
+	xr_vector<coop::SBlank> blanks; // co-op: these bullets as they flew, for the other games
 	for (int i = 0; i < l_cartridge.param_s.buckShot; ++i)
 	{
 		FireBullet(P, D, fire_disp, l_cartridge, H_Parent()->ID(), ID(), SendHit, iAmmoElapsed);
+		blanks.push_back({m_vCurrentShootDir, m_iCurrentBulletSeed});
 	}
+	coop::on_fire_trace(*this, P, m_fStartBulletSpeed * cur_silencer_koef.bullet_speed, l_cartridge, blanks);
 
 	StartShotParticles();
 

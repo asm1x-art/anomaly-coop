@@ -1,0 +1,65 @@
+<w>
+	<!-- Co-op: trading between players (coop_trade.script): what I have, what I give, what they give, as the
+	     inventory's item cells (utils_ui.UICellContainer: cont_* only place them) -->
+	<form x="62" y="84" width="900" height="600" stretch="1">
+		<texture>ui_inGame2_opt_main_window</texture>
+		<caption x="16" y="6" width="600" height="24" stretch="1">
+			<text r="170" g="170" b="170" font="graffiti22" align="l" vert_align="c"/>
+		</caption>
+
+		<cap_mine x="20" y="38" width="328" height="22" stretch="1">
+			<text r="170" g="170" b="170" font="letterica18" align="l" vert_align="c">st_coop_trade_mine</text>
+		</cap_mine>
+		<frame_mine x="16" y="60" width="338" height="461" stretch="1">
+			<texture>ui_inGame2_servers_list_frame</texture>
+		</frame_mine>
+		<cont_mine x="20" y="64" width="328" height="451" stretch="1"/>
+
+		<cap_offer x="372" y="38" width="246" height="22" stretch="1">
+			<text r="170" g="170" b="170" font="letterica18" align="l" vert_align="c">st_coop_trade_offer</text>
+		</cap_offer>
+		<frame_offer x="368" y="60" width="256" height="379" stretch="1">
+			<texture>ui_inGame2_servers_list_frame</texture>
+		</frame_offer>
+		<cont_offer x="372" y="64" width="246" height="369" stretch="1"/>
+
+		<cap_theirs x="638" y="38" width="246" height="22" stretch="1">
+			<text r="170" g="170" b="170" font="letterica18" align="l" vert_align="c"/>
+		</cap_theirs>
+		<frame_theirs x="634" y="60" width="256" height="379" stretch="1">
+			<texture>ui_inGame2_servers_list_frame</texture>
+		</frame_theirs>
+		<cont_theirs x="638" y="64" width="246" height="369" stretch="1"/>
+
+		<cap_money x="372" y="448" width="70" height="24" stretch="1">
+			<text r="170" g="170" b="170" font="letterica18" align="l" vert_align="c">st_coop_trade_money</text>
+		</cap_money>
+		<edit_money x="442" y="448" width="176" height="24" stretch="1" numonly="1">
+			<texture>ui_inGame2_edit_box_1</texture>
+			<text x="3" font="letterica18" vert_align="c"/>
+		</edit_money>
+		<their_money x="638" y="448" width="246" height="24" stretch="1">
+			<text r="200" g="200" b="200" font="letterica18" align="l" vert_align="c"/>
+		</their_money>
+		<hint x="372" y="480" width="512" height="40" stretch="1">
+			<text r="150" g="150" b="150" font="letterica16" align="l" vert_align="t" complex_mode="1">st_coop_trade_choose</text>
+		</hint>
+
+		<status x="20" y="530" width="860" height="24" stretch="1">
+			<text r="200" g="200" b="120" font="letterica18" align="c" vert_align="c" complex_mode="1"/>
+		</status>
+		<btn_ready x="290" y="562" width="150" height="24" stretch="1">
+			<texture>ui_button_ordinary</texture>
+			<text font="letterica18">st_coop_trade_ready</text>
+		</btn_ready>
+		<btn_cancel x="460" y="562" width="150" height="24" stretch="1">
+			<texture>ui_button_ordinary</texture>
+			<text font="letterica18">st_coop_trade_cancel</text>
+		</btn_cancel>
+
+		<!-- over the cell of a thing worn or on the belt -->
+		<worn stretch="1">
+			<texture>ui_inGame2_white_rect</texture>
+		</worn>
+	</form>
+</w>

@@ -1,0 +1,68 @@
+-- Co-op: while this game runs the shared world, a save or a load of its own would be a world nobody else
+-- has. So the pause menu's Save, Load and Last save open the world's saves (ui_coop_saves.script), and the
+-- quick save key asks the sim master's game to save the world (coop_save.cpp). The engine's callbacks for
+-- the saves and the vote go to ui_coop_saves.
+
+local function in_world()
+	return coop.connected() and coop.world_status() == "exists" and level.present() and db.actor ~= nil
+end
+
+local menu = nil -- the main menu, the window's owner
+
+function on_xml_read()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	_G.coop_on_saves = function(text) ui_coop_saves.on_saves(text) end
+	_G.coop_on_rollback_vote = function(...) ui_coop_saves.on_rollback_vote(...) end
+	_G.coop_on_rollback_result = function(...) ui_coop_saves.on_rollback_result(...) end
+
+	-- typ 1: the menu's Save button, 2: the quick save key (level_input.script)
+	RegisterScriptCallback("on_before_save_input", function(flags, typ, text)
+		if flags.ret or not in_world() then
+			return
+		end
+		flags.ret = true
+		if typ == 2 then
+			coop.request_save("")
+			actor_menu.set_msg(1, game.translate_string("st_coop_saves_saving"), 3)
+		elseif menu then
+			ui_coop_saves.open(menu)
+		end
+	end)
+
+	RegisterScriptCallback("main_menu_on_init", function(m)
+		menu = m
+		-- Load: the menu makes its load dialog on first use and keeps it in load_dlg, so one is there already
+		-- that picks the world's saves or the real dialog each time (main_menu:OnButton_load_clicked)
+		local real = nil
+		m.load_dlg = {
+			FillList = function(dlg)
+				dlg.coop = in_world()
+				if not dlg.coop then
+					if not real then
+						real = ui_load_dialog.UILoadDialog()
+						real.owner = m
+					end
+					real:FillList()
+				end
+			end,
+			ShowDialog = function(dlg, show)
+				if dlg.coop then
+					ui_coop_saves.open(m)
+				else
+					real:ShowDialog(show)
+				end
+			end,
+		}
+		-- Last save, after its "are you sure" box
+		local load_last = m.LoadLastSave
+		m.LoadLastSave = function(self, ...)
+			if in_world() then
+				return ui_coop_saves.open(self)
+			end
+			return load_last(self, ...)
+		end
+	end)
+end

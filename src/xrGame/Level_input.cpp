@@ -154,6 +154,7 @@ extern bool g_block_all_except_movement;
 #include "script_engine.h"
 #include "ai_space.h"
 #include "ui\UIActorMenu.h"
+#include "coop/coop_save.h"
 
 extern string_path g_last_saved_game;
 
@@ -205,6 +206,11 @@ void CLevel::IR_OnKeyboardPress(int key)
 
 	if (_curr == kPAUSE)
 	{
+		if (coop::keeps_running())
+		{
+			coop::pause_key(); // the world's pause: everyone in it votes
+			return;
+		}
 #ifdef INGAME_EDITOR
         if (Device.editor())	return;
 #endif // INGAME_EDITOR

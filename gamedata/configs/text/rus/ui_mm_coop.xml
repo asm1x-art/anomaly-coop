@@ -13,6 +13,12 @@
 	<string id="ui_mm_coop_general_autosave_interval_desc">
 		<text>Как часто сим-мастер сохраняет общий мир на сервер. 0 - выключено.</text>
 	</string>
+	<string id="ui_mm_coop_general_fps">
+		<text>FPS и пинг</text>
+	</string>
+	<string id="ui_mm_coop_general_fps_desc">
+		<text>Кадры в секунду и пинг до сервера (мс) в правом верхнем углу экрана.</text>
+	</string>
 	<string id="ui_mm_coop_general_title_color">
 		<text>Напарники на карте</text>
 	</string>
@@ -58,7 +64,379 @@
 	<string id="ui_mm_coop_status_failed">
 		<text>Не удалось подключиться. Проверьте адрес и что сервер запущен.</text>
 	</string>
+	<string id="ui_mm_coop_status_being_created">
+		<text>Мир сейчас создаёт %s. Как только он будет готов, откроется создание персонажа...</text>
+	</string>
+	<string id="ui_mm_coop_status_refused_full">
+		<text>На сервере нет свободных мест.</text>
+	</string>
+	<string id="ui_mm_coop_status_refused_version">
+		<text>Версия сервера не совпадает с вашей игрой: обновите игру или сервер.</text>
+	</string>
 	<string id="ui_mm_coop_status_loading">
 		<text>Ваш персонаж уже есть в этом мире. Загрузка мира...</text>
+	</string>
+	<string id="st_coop_group">
+		<text>Кооператив</text>
+	</string>
+	<string id="st_coop_group_invite">
+		<text>%s приглашает вас в группу. Вступить?</text>
+	</string>
+	<string id="st_coop_group_declined">
+		<text>%s не стал вступать в группу.</text>
+	</string>
+	<string id="st_coop_group_full">
+		<text>Группа уже полная.</text>
+	</string>
+	<string id="st_coop_group_already">
+		<text>%s уже в вашей группе.</text>
+	</string>
+	<string id="st_coop_group_expired">
+		<text>Приглашение от %s больше не действует.</text>
+	</string>
+	<string id="st_coop_group_you_in">
+		<text>Вы вступили в группу.</text>
+	</string>
+	<string id="st_coop_group_you_out">
+		<text>Вы больше не в группе.</text>
+	</string>
+	<string id="st_coop_group_joined">
+		<text>%s вступил в группу.</text>
+	</string>
+	<string id="st_coop_group_left">
+		<text>%s вышел из группы.</text>
+	</string>
+	<string id="st_coop_group_invited">
+		<text>Приглашение отправлено: %s</text>
+	</string>
+	<string id="st_coop_wheel_trade">
+		<text>Обмен</text>
+	</string>
+	<string id="st_coop_wheel_invite">
+		<text>Пригласить в группу</text>
+	</string>
+	<string id="st_coop_wheel_kick">
+		<text>Исключить из группы</text>
+	</string>
+	<string id="st_coop_wheel_leave">
+		<text>Выйти из группы</text>
+	</string>
+	<string id="st_coop_wheel_notes">
+		<text>Передать заметки</text>
+	</string>
+	<string id="st_coop_wheel_routes">
+		<text>Передать переходы</text>
+	</string>
+	<string id="st_coop_notes_given">
+		<text>Передано заметок: %d (%s).</text>
+	</string>
+	<string id="st_coop_routes_given">
+		<text>Передано переходов: %d (%s).</text>
+	</string>
+	<string id="st_coop_notes_got">
+		<text>%s передал вам заметки: новых %d из %d.</text>
+	</string>
+	<string id="st_coop_routes_got">
+		<text>%s передал вам переходы: новых %d из %d.</text>
+	</string>
+	<string id="st_coop_attacked">
+		<text>На нас напал %s! Мы на локации %s.</text>
+	</string>
+	<string id="st_coop_downed">
+		<text>Вы тяжело ранены. Помощь ещё может успеть: %d:%02d. %s - сдаться.</text>
+	</string>
+	<string id="st_coop_being_helped">
+		<text>%s поднимает вас...</text>
+	</string>
+	<string id="st_coop_helping">
+		<text>Поднимаете: %s</text>
+	</string>
+	<string id="st_coop_helped_up">
+		<text>Вы подняли: %s</text>
+	</string>
+	<string id="st_coop_got_up">
+		<text>%s поднял вас.</text>
+	</string>
+	<string id="st_coop_rolled_back">
+		<text>Вы очнулись там, где был сохранён мир. Потеряно ранга: %d.</text>
+	</string>
+	<string id="st_coop_player_downed">
+		<text>%s тяжело ранен! Нужна помощь.</text>
+	</string>
+	<string id="st_coop_player_rolled_back">
+		<text>%s очнулся на месте последнего сохранения.</text>
+	</string>
+	<string id="st_coop_travel_alone">
+		<text>Перейти самому: %s</text>
+	</string>
+	<string id="st_coop_travel_group">
+		<text>Перейти с группой: %s</text>
+	</string>
+	<string id="st_coop_travel_offer">
+		<text>%s предлагает группе переместиться: %s. Переместиться?</text>
+	</string>
+	<string id="st_coop_travel_off">
+		<text>Быстрое перемещение сейчас недоступно.</text>
+	</string>
+	<string id="st_coop_travel_enemies">
+		<text>Рядом враги: быстрое перемещение невозможно.</text>
+	</string>
+	<string id="st_coop_trade_mine">
+		<text>Мои вещи</text>
+	</string>
+	<string id="st_coop_trade_offer">
+		<text>Я отдаю</text>
+	</string>
+	<string id="st_coop_trade_theirs">
+		<text>%s отдаёт</text>
+	</string>
+	<string id="st_coop_trade_money">
+		<text>Деньги:</text>
+	</string>
+	<string id="st_coop_trade_their_money">
+		<text>и денег: %d</text>
+	</string>
+	<string id="st_coop_trade_ready">
+		<text>Готов</text>
+	</string>
+	<string id="st_coop_trade_unready">
+		<text>Не готов</text>
+	</string>
+	<string id="st_coop_trade_cancel">
+		<text>Отмена</text>
+	</string>
+	<string id="st_coop_trade_with">
+		<text>Обмен: %s</text>
+	</string>
+	<string id="st_coop_trade_going">
+		<text>Обмен проходит...</text>
+	</string>
+	<string id="st_coop_trade_waiting">
+		<text>Ждём, когда %s будет готов.</text>
+	</string>
+	<string id="st_coop_trade_they_ready">
+		<text>%s готов. Проверьте и нажмите «Готов».</text>
+	</string>
+	<string id="st_coop_trade_choose">
+		<text>Двойной щелчок или перетаскивание переносит вещь в обмен и обратно. Оранжевые клетки — надетое и на поясе.</text>
+	</string>
+	<string id="st_coop_trade_cancelled">
+		<text>Обмен с %s отменён.</text>
+	</string>
+	<string id="st_coop_trade_gone">
+		<text>%s ушёл: обмен отменён.</text>
+	</string>
+	<string id="st_coop_trade_done">
+		<text>Обмен с %s завершён.</text>
+	</string>
+	<string id="st_coop_trade_asked">
+		<text>Предложение обмена отправлено: %s</text>
+	</string>
+	<string id="st_coop_trade_offered">
+		<text>%s предлагает обмен. Согласиться?</text>
+	</string>
+	<string id="st_coop_trade_declined">
+		<text>%s отказался от обмена.</text>
+	</string>
+	<string id="st_coop_trade_got_money">
+		<text>%s передал вам деньги: %d</text>
+	</string>
+	<string id="ui_mm_coop_saves">
+		<text>Сохранения мира</text>
+	</string>
+	<string id="ui_mm_coop_saves_name">
+		<text>Название:</text>
+	</string>
+	<string id="ui_mm_coop_saves_save">
+		<text>Сохранить мир</text>
+	</string>
+	<string id="ui_mm_coop_saves_rollback">
+		<text>Откатить мир к выбранному</text>
+	</string>
+	<string id="st_coop_saves_hint">
+		<text>Новые сверху. Сохранить: введите название (можно оставить пустым) и нажмите «Сохранить мир». Откатить: выберите сохранение — согласиться должны все, кто в игре.</text>
+	</string>
+	<string id="st_coop_saves_loading">
+		<text>Список сохранений загружается...</text>
+	</string>
+	<string id="st_coop_saves_saving">
+		<text>Мастер сохраняет мир...</text>
+	</string>
+	<string id="st_coop_saves_pick">
+		<text>Выберите сохранение в списке.</text>
+	</string>
+	<string id="st_coop_saves_latest">
+		<text>Это и есть мир сейчас: выберите сохранение постарше.</text>
+	</string>
+	<string id="st_coop_saves_voting">
+		<text>Ждём ответа остальных игроков (до 30 секунд)...</text>
+	</string>
+	<string id="st_coop_save_auto">
+		<text>Автосохранение</text>
+	</string>
+	<string id="st_coop_save_quick">
+		<text>Быстрое сохранение</text>
+	</string>
+	<string id="st_coop_save_named">
+		<text>«%s»</text>
+	</string>
+	<string id="st_coop_save_join">
+		<text>Вход: %s</text>
+	</string>
+	<string id="st_coop_save_leave">
+		<text>Выход: %s</text>
+	</string>
+	<string id="st_coop_save_exit">
+		<text>Выход мастера: %s</text>
+	</string>
+	<string id="st_coop_save_new">
+		<text>Новый мир</text>
+	</string>
+	<string id="st_coop_save_rollback">
+		<text>Откат к №%s</text>
+	</string>
+	<string id="st_coop_ago_now">
+		<text>только что</text>
+	</string>
+	<string id="st_coop_ago_min">
+		<text>%s мин назад</text>
+	</string>
+	<string id="st_coop_ago_hours">
+		<text>%s ч назад</text>
+	</string>
+	<string id="st_coop_ago_days">
+		<text>%s дн. назад</text>
+	</string>
+	<string id="st_coop_rollback_ask">
+		<text>%s предлагает откатить мир к сохранению №%s: %s (%s). Все, кто в игре, загрузят его заново. Согласны?</text>
+	</string>
+	<string id="st_coop_rollback_0">
+		<text>Мир откатывается к сохранению: все загрузят его заново.</text>
+	</string>
+	<string id="st_coop_rollback_1">
+		<text>Откат отменён: %s против.</text>
+	</string>
+	<string id="st_coop_rollback_2">
+		<text>Откат отменён: не ответил %s.</text>
+	</string>
+	<string id="st_coop_rollback_3">
+		<text>Откат отменён: %s вышел из игры.</text>
+	</string>
+	<string id="st_coop_rollback_4">
+		<text>Уже идёт голосование за откат, его начал %s.</text>
+	</string>
+	<string id="st_coop_pda_group">
+		<text>Группа</text>
+	</string>
+	<string id="st_coop_pda_members">
+		<text>Состав группы</text>
+	</string>
+	<string id="st_coop_pda_players">
+		<text>Игроки в мире</text>
+	</string>
+	<string id="st_coop_pda_leave">
+		<text>Выйти из группы</text>
+	</string>
+	<string id="st_coop_pda_kick">
+		<text>Исключить</text>
+	</string>
+	<string id="st_coop_pda_invite">
+		<text>Пригласить в группу</text>
+	</string>
+	<string id="st_coop_pda_send_money">
+		<text>Перевести</text>
+	</string>
+	<string id="st_coop_pda_offline">
+		<text>не в сети</text>
+	</string>
+	<string id="st_coop_pda_in_menu">
+		<text>в меню</text>
+	</string>
+	<string id="st_coop_pda_meters">
+		<text>%s м</text>
+	</string>
+	<string id="st_coop_pda_downed">
+		<text>лежит, нужна помощь</text>
+	</string>
+	<string id="st_coop_pda_you">
+		<text>это вы</text>
+	</string>
+	<string id="st_coop_pda_no_group">
+		<text>Вы не в группе: пригласите игрока справа.</text>
+	</string>
+	<string id="st_coop_pda_not_connected">
+		<text>Нет подключения к кооперативу.</text>
+	</string>
+	<string id="st_coop_pda_pick_member">
+		<text>Выберите участника группы слева.</text>
+	</string>
+	<string id="st_coop_pda_pick_player">
+		<text>Выберите игрока справа.</text>
+	</string>
+	<string id="st_coop_pda_kicked">
+		<text>%s исключён из группы.</text>
+	</string>
+	<string id="st_coop_pda_money_away">
+		<text>%s сейчас не в мире: деньги не дойдут.</text>
+	</string>
+	<string id="st_coop_pda_money_amount">
+		<text>Введите сумму.</text>
+	</string>
+	<string id="st_coop_pda_money_short">
+		<text>У вас нет столько денег.</text>
+	</string>
+	<string id="st_coop_pda_money_sent">
+		<text>Вы перевели %s игроку %s.</text>
+	</string>
+	<string id="st_coop_pause_waiting">
+		<text>Ждём ответа остальных игроков...</text>
+	</string>
+	<string id="st_coop_pause_ask">
+		<text>%s предлагает поставить мир на паузу. Согласны: %s, нет — не отвечайте.</text>
+	</string>
+	<string id="st_coop_resume_ask">
+		<text>%s предлагает снять паузу. Согласны: %s, нет — не отвечайте.</text>
+	</string>
+	<string id="st_coop_pause_1">
+		<text>Не вышло: %s против.</text>
+	</string>
+	<string id="st_coop_pause_2">
+		<text>Не вышло: не ответил %s.</text>
+	</string>
+	<string id="st_coop_pause_3">
+		<text>Не вышло: %s вышел из игры.</text>
+	</string>
+	<string id="st_coop_pause_4">
+		<text>Сейчас идёт другое голосование, его начал %s.</text>
+	</string>
+	<string id="st_coop_paused">
+		<text>Мир на паузе (попросил %s). Снять: клавиша Pause.</text>
+	</string>
+	<string id="st_coop_goes_on">
+		<text>Пауза снята.</text>
+	</string>
+	<string id="st_coop_pda_invites">
+		<text>Приглашения в группу</text>
+	</string>
+	<string id="st_coop_pda_accept">
+		<text>Принять</text>
+	</string>
+	<string id="st_coop_pda_decline">
+		<text>Отклонить</text>
+	</string>
+	<string id="st_coop_pda_no_invites">
+		<text>Приглашений нет</text>
+	</string>
+	<string id="st_coop_pda_invite_from">
+		<text>От: %s</text>
+	</string>
+	<string id="st_coop_pda_pick_invite">
+		<text>Выберите приглашение.</text>
+	</string>
+	<string id="st_coop_group_invite_pda">
+		<text>%s приглашает вас в группу: ПДА, вкладка «Группа».</text>
+	</string>
+	<string id="st_coop_save_level">
+		<text>Переход: %s</text>
 	</string>
 </string_table>

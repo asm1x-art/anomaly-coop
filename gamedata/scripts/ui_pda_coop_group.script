@@ -1,0 +1,250 @@
+-- Co-op: the PDA's Group tab (pda_dynamic_tabs.script): who is in our group and where, the players in the
+-- world to invite, leaving the group or putting one out of it (the leader), invites sent to us from a PDA
+-- (answered here, no box: coop_group.script), and sending money to a player.
+-- The group itself is the server's (coop_group.script); money goes as in a trade (coop_trade.send_money).
+
+local REFRESH_MS = 1000
+local IN_WORLD_MS = 3000 -- a player whose state is older than this is in the menu or loading
+local SINGLETON = nil
+
+function get_ui()
+	SINGLETON = SINGLETON or pda_coop_group_tab()
+	SINGLETON:Reset()
+	return SINGLETON
+end
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+local function peer_named(name)
+	for _, p in ipairs(coop.peers()) do
+		if p.name == name then
+			return p
+		end
+	end
+end
+
+-- where a player is, as a line: level, distance, lying wounded or away in the menu
+local function whereabouts(p)
+	if not p then
+		return tr("st_coop_pda_offline")
+	elseif p.age > IN_WORLD_MS then
+		return tr("st_coop_pda_in_menu")
+	end
+	local text = game.translate_string(p.level)
+	if p.level == level.name() and db.actor then
+		text = text .. ", " .. tr("st_coop_pda_meters", math.floor(p.position:distance_to(db.actor:position()) + 0.5))
+	end
+	if coop.downed(p.id) then
+		text = text .. ", " .. tr("st_coop_pda_downed")
+	end
+	return text
+end
+
+class "pda_coop_group_tab" (CUIScriptWnd)
+
+function pda_coop_group_tab:__init() super()
+	self.member_names = {}
+	self.player_names = {}
+	self.invite_ids = {}
+	self:InitControls()
+end
+
+function pda_coop_group_tab:__finalize()
+end
+
+function pda_coop_group_tab:InitControls()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("pda_coop_group.xml")
+	xml:InitFrame("frame", self)
+	xml:InitTextWnd("caption", self)
+	for _, name in ipairs({ "members", "players", "invites" }) do
+		xml:InitTextWnd("cap_" .. name, self)
+		xml:InitFrame("frame_" .. name, self)
+		self[name] = xml:InitListBox(name, self)
+		self[name]:ShowSelectedItem(true)
+	end
+	xml:InitTextWnd("cap_money", self)
+	self.edit_money = xml:InitEditBox("edit_money", self)
+	self.status = xml:InitTextWnd("status", self)
+	for _, name in ipairs({ "btn_leave", "btn_kick", "btn_invite", "btn_money", "btn_accept", "btn_decline" }) do
+		self[name] = xml:Init3tButton(name, self)
+		self:Register(self[name], name)
+	end
+	self:AddCallback("btn_leave", ui_events.BUTTON_CLICKED, self.OnLeave, self)
+	self:AddCallback("btn_kick", ui_events.BUTTON_CLICKED, self.OnKick, self)
+	self:AddCallback("btn_invite", ui_events.BUTTON_CLICKED, self.OnInvite, self)
+	self:AddCallback("btn_money", ui_events.BUTTON_CLICKED, self.OnMoney, self)
+	self:AddCallback("btn_accept", ui_events.BUTTON_CLICKED, self.OnAccept, self)
+	self:AddCallback("btn_decline", ui_events.BUTTON_CLICKED, self.OnDecline, self)
+end
+
+function pda_coop_group_tab:Reset()
+	self.refreshed = nil
+	self.status:SetText("")
+	self:Refresh()
+end
+
+-- lists filled again, the selection kept by name
+local function fill(list, names, lines)
+	local selected = names[list:GetSelectedIndex() + 1]
+	list:RemoveAll()
+	for i, line in ipairs(lines) do
+		list:AddTextItem(line)
+	end
+	return selected
+end
+
+function pda_coop_group_tab:Refresh()
+	self.refreshed = time_global()
+	if not (coop and coop.connected()) then
+		self.members:RemoveAll()
+		self.players:RemoveAll()
+		self.invites:RemoveAll()
+		self.status:SetText(tr("st_coop_pda_not_connected"))
+		return
+	end
+	local group = coop.group()
+	local in_group = {}
+	local member_names, member_lines = {}, {}
+	for i, name in ipairs(group) do
+		in_group[name] = true
+		member_names[i] = name
+		local mark = i == 1 and "* " or "  "
+		local where = name == coop.my_name() and tr("st_coop_pda_you") or whereabouts(peer_named(name))
+		member_lines[i] = mark .. name .. " - " .. where
+	end
+	if #group == 0 then
+		member_lines[1] = tr("st_coop_pda_no_group")
+		member_names[1] = nil
+	end
+	local player_names, player_lines = {}, {}
+	for _, p in ipairs(coop.peers()) do
+		player_names[#player_names + 1] = p.name
+		player_lines[#player_lines + 1] = (in_group[p.name] and "* " or "  ") .. p.name .. " - " .. whereabouts(p)
+	end
+
+	local member = fill(self.members, self.member_names, member_lines)
+	local player = fill(self.players, self.player_names, player_lines)
+	self.member_names, self.player_names = member_names, player_names
+	for i, name in ipairs(member_names) do
+		if name == member then
+			self.members:SetSelectedIndex(i - 1)
+		end
+	end
+	for i, name in ipairs(player_names) do
+		if name == player then
+			self.players:SetSelectedIndex(i - 1)
+		end
+	end
+	local invite_ids, invite_lines = {}, {}
+	for i, invite in ipairs(coop_group.pda_invites()) do
+		invite_ids[i] = invite.id
+		invite_lines[i] = tr("st_coop_pda_invite_from", invite.name)
+	end
+	if #invite_lines == 0 then
+		invite_lines[1] = tr("st_coop_pda_no_invites")
+	end
+	local invite = fill(self.invites, self.invite_ids, invite_lines)
+	self.invite_ids = invite_ids
+	for i, id in ipairs(invite_ids) do
+		if id == invite then
+			self.invites:SetSelectedIndex(i - 1)
+		end
+	end
+	self.btn_accept:Enable(#invite_ids > 0)
+	self.btn_decline:Enable(#invite_ids > 0)
+
+	local leader = group[1] == coop.my_name()
+	self.btn_leave:Enable(#group > 0)
+	self.btn_kick:Enable(leader and #group > 1)
+end
+
+function pda_coop_group_tab:Update()
+	CUIScriptWnd.Update(self)
+	if not self.refreshed or time_global() - self.refreshed > REFRESH_MS then
+		self:Refresh()
+	end
+end
+
+function pda_coop_group_tab:Selected(list, names)
+	return names[list:GetSelectedIndex() + 1]
+end
+
+function pda_coop_group_tab:OnLeave()
+	coop.group_leave()
+	self.status:SetText(tr("st_coop_group_you_out"))
+end
+
+function pda_coop_group_tab:OnKick()
+	local name = self:Selected(self.members, self.member_names)
+	if not name or name == coop.my_name() then
+		return self.status:SetText(tr("st_coop_pda_pick_member"))
+	end
+	coop.group_kick(name)
+	self.status:SetText(tr("st_coop_pda_kicked", name))
+end
+
+function pda_coop_group_tab:OnInvite()
+	local p = peer_named(self:Selected(self.players, self.player_names) or "")
+	if not p then
+		return self.status:SetText(tr("st_coop_pda_pick_player"))
+	end
+	coop.group_invite(p.id, true) -- they answer it in their PDA, no box in their way
+	self.status:SetText(tr("st_coop_group_invited", p.name))
+end
+
+-- the selected invite, or the only one
+function pda_coop_group_tab:SelectedInvite()
+	return self.invite_ids[self.invites:GetSelectedIndex() + 1] or (#self.invite_ids == 1 and self.invite_ids[1])
+end
+
+function pda_coop_group_tab:OnAccept()
+	local id = self:SelectedInvite()
+	if not id then
+		return self.status:SetText(tr("st_coop_pda_pick_invite"))
+	end
+	coop_group.answer_pda(id, true)
+	self:Refresh()
+end
+
+function pda_coop_group_tab:OnDecline()
+	local id = self:SelectedInvite()
+	if not id then
+		return self.status:SetText(tr("st_coop_pda_pick_invite"))
+	end
+	coop_group.answer_pda(id, false)
+	self:Refresh()
+end
+
+function pda_coop_group_tab:OnMoney()
+	local p = peer_named(self:Selected(self.players, self.player_names) or "")
+	if not p then
+		return self.status:SetText(tr("st_coop_pda_pick_player"))
+	elseif p.age > IN_WORLD_MS then
+		return self.status:SetText(tr("st_coop_pda_money_away", p.name)) -- the money would go nowhere
+	end
+	local amount = math.floor(tonumber(self.edit_money:GetText()) or 0)
+	if amount <= 0 then
+		return self.status:SetText(tr("st_coop_pda_money_amount"))
+	elseif amount > db.actor:money() then
+		return self.status:SetText(tr("st_coop_pda_money_short"))
+	end
+	coop_trade.send_money(p.name, amount)
+	self.edit_money:SetText("")
+	self.status:SetText(tr("st_coop_pda_money_sent", amount, p.name))
+end
+
+local tab = nil -- our tab's id, once registered
+
+function on_game_start()
+	if not (coop and pda_dynamic_tabs and CUITabControl and CUITabControl.AddTab) then
+		return -- not the co-op engine, or no PDA tabs of mods
+	end
+	-- not while the level is still being made: registering rebuilds the PDA, which isn't there yet
+	RegisterScriptCallback("actor_on_first_update", function()
+		tab = tab or pda_dynamic_tabs.register("st_coop_pda_group", get_ui)
+	end)
+end

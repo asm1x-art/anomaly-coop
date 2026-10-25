@@ -27,6 +27,7 @@
 #include "ui/UIProgressShape.h"
 #include "ui/UIXmlInit.h"
 #include "physicsshellholder.h"
+#include "coop/coop_projectiles.h"
 
 CUIProgressShape* g_MissileForceShape = NULL;
 
@@ -611,6 +612,8 @@ void CMissile::OnEvent(NET_Packet& P, u16 type)
 			missile->H_SetParent(0, !P.r_eof() && P.r_u8());
 			if (IsFakeMissile && OnClient())
 				missile->set_destroy_time(m_dwDestroyTimeMax);
+			if (IsFakeMissile)
+				coop::on_projectile_launched(*missile, H_Parent()); // thrown: it flies in the other games too
 			break;
 		}
 	}

@@ -1,0 +1,74 @@
+<w>
+	<!-- Co-op: the PDA's Group tab (ui_pda_coop_group.script), in the content area the other PDA tabs use -->
+	<frame x="28" y="41" width="764" height="490" stretch="1">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame>
+	<caption x="28" y="56" width="764" height="27" stretch="1">
+		<text font="letterica18" align="c" r="170" g="170" b="170">st_coop_pda_group</text>
+	</caption>
+
+	<cap_members x="52" y="96" width="330" height="22" stretch="1">
+		<text font="letterica18" align="l" vert_align="c" r="170" g="170" b="170">st_coop_pda_members</text>
+	</cap_members>
+	<frame_members x="48" y="120" width="338" height="186" stretch="1">
+		<texture>ui_inGame2_servers_list_frame</texture>
+	</frame_members>
+	<members x="52" y="122" width="330" height="182" item_height="22" can_select="1" stretch="1">
+		<font font="letterica16"/>
+	</members>
+	<btn_leave x="52" y="312" width="160" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_leave</text>
+	</btn_leave>
+	<btn_kick x="222" y="312" width="160" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_kick</text>
+	</btn_kick>
+
+	<cap_invites x="52" y="344" width="330" height="22" stretch="1">
+		<text font="letterica18" align="l" vert_align="c" r="170" g="170" b="170">st_coop_pda_invites</text>
+	</cap_invites>
+	<frame_invites x="48" y="368" width="338" height="58" stretch="1">
+		<texture>ui_inGame2_servers_list_frame</texture>
+	</frame_invites>
+	<invites x="52" y="370" width="330" height="54" item_height="22" can_select="1" stretch="1">
+		<font font="letterica16"/>
+	</invites>
+	<btn_accept x="52" y="432" width="160" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_accept</text>
+	</btn_accept>
+	<btn_decline x="222" y="432" width="160" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_decline</text>
+	</btn_decline>
+
+	<cap_players x="438" y="96" width="330" height="22" stretch="1">
+		<text font="letterica18" align="l" vert_align="c" r="170" g="170" b="170">st_coop_pda_players</text>
+	</cap_players>
+	<frame_players x="434" y="120" width="338" height="216" stretch="1">
+		<texture>ui_inGame2_servers_list_frame</texture>
+	</frame_players>
+	<players x="438" y="122" width="330" height="212" item_height="22" can_select="1" stretch="1">
+		<font font="letterica16"/>
+	</players>
+	<btn_invite x="438" y="346" width="330" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_invite</text>
+	</btn_invite>
+	<cap_money x="438" y="384" width="70" height="24" stretch="1">
+		<text font="letterica16" align="l" vert_align="c" r="170" g="170" b="170">st_coop_trade_money</text>
+	</cap_money>
+	<edit_money x="508" y="384" width="110" height="24" stretch="1" numonly="1">
+		<texture>ui_inGame2_edit_box_1</texture>
+		<text x="3" font="letterica16" vert_align="c"/>
+	</edit_money>
+	<btn_money x="628" y="384" width="140" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_send_money</text>
+	</btn_money>
+
+	<status x="52" y="466" width="716" height="56" stretch="1">
+		<text font="letterica16" align="l" vert_align="t" r="200" g="200" b="120" complex_mode="1"/>
+	</status>
+</w>

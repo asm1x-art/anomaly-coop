@@ -172,6 +172,7 @@ extern ENGINE_API BOOL bShowPauseString;
 extern bool IsGameTypeSingle();
 
 #include "..\..\xrEngine\x_ray.h"
+#include "coop/coop_save.h"
 
 void CMainMenu::Activate(bool bActivate)
 {
@@ -182,7 +183,11 @@ void CMainMenu::Activate(bool bActivate)
 		(m_screenshotFrame == Device.dwFrame + 1))
 		return;
 
-	bool b_is_single = IsGameTypeSingle();
+	// co-op: the shared world goes on behind the menu, as in multiplayer (the choice made on opening holds
+	// for closing)
+	if (bActivate)
+		m_coop_running = coop::keeps_running();
+	bool b_is_single = IsGameTypeSingle() && !m_coop_running;
 
 	if (g_dedicated_server && bActivate) return;
 

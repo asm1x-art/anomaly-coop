@@ -20,6 +20,7 @@
 #include "profiler.h"
 #include "sound_collection_storage.h"
 #include "object_broker.h"
+#include "coop/coop_npc.h"
 
 
 CSoundPlayer::CSoundPlayer(CObject* object)
@@ -173,6 +174,8 @@ bool CSoundPlayer::need_bone_data() const
 void CSoundPlayer::play(u32 internal_type, u32 max_start_time, u32 min_start_time, u32 max_stop_time, u32 min_stop_time,
                         u32 id)
 {
+	if (coop::mute_npc_sound(m_object))
+		return; // co-op: a puppet here, its voice comes from the game running it
 	if (!check_sound_legacy(internal_type))
 		return;
 
@@ -209,6 +212,8 @@ void CSoundPlayer::play(u32 internal_type, u32 max_start_time, u32 min_start_tim
 		sg_SourceType
 	);
 	/**/
+	if (id != u32(-1) && id >= (*I).second.second->m_sounds.size())
+		id = u32(-1); // another game's choice (co-op) from a collection that differs here
 	u32 random_id = (*I).second.second->random_num(id);
 	sound_single.m_sound->clone(
 		(*I).second.second->random(random_id),
@@ -240,6 +245,7 @@ void CSoundPlayer::play(u32 internal_type, u32 max_start_time, u32 min_start_tim
 	sound_single.m_stop_time = sound_single.m_start_time + iFloor(sound_single.m_sound->get_length_sec() * 1000.0f) +
 		random_time;
 	m_playing_sounds.push_back(sound_single);
+	coop::on_npc_sound(m_object, internal_type, random_id, sound_single.m_start_time - Device.dwTimeGlobal);
 	string256 name;
 	xr_sprintf(name, "%s%s%i", *sound.m_sound_player_prefix, *sound.m_sound_prefix, (random_id + 1));
 	//Msg("Sound name \"%s\"", name);

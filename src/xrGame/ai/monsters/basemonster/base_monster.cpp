@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "coop/coop_npc.h"
 #include "base_monster.h"
 #include "../../../../xrphysics/PhysicsShell.h"
 #include "../../../hit.h"
@@ -347,7 +348,9 @@ void CBaseMonster::UpdateCL()
 
 	inherited::UpdateCL();
 
-	if (g_Alive())
+	// a co-op puppet: moved and animated by the level authority's stream (CCustomMonster::UpdateCL)
+	const bool coop_puppet = coop::is_npc_puppet(this);
+	if (g_Alive() && !coop_puppet)
 	{
 		update_enemy_accessible_and_at_home_info();
 		CStepManager::update(false);
@@ -355,7 +358,8 @@ void CBaseMonster::UpdateCL()
 		update_pos_by_grouping_behaviour();
 	}
 
-	control().update_frame();
+	if (!coop_puppet)
+		control().update_frame();
 
 	m_pPhysics_support->in_UpdateCL();
 }
@@ -384,7 +388,8 @@ void CBaseMonster::shedule_Update(u32 dt)
 	m_base_aura.update_schedule();
 	m_radiation_aura.update_schedule();
 
-	control().update_schedule();
+	if (!coop::is_npc_puppet(this))
+		control().update_schedule();
 
 	Morale.update_schedule(dt);
 

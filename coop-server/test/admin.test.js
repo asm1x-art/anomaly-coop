@@ -6,11 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { startServer } from '../src/server.js';
 import { startAdmin } from '../src/admin.js';
-import { M, PROTOCOL_VERSION, encode, encodeText } from '../src/protocol.js';
+import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
 import { normalizeSettings, DEFAULT_SETTINGS } from '../src/settings.js';
 
-async function start() {
+// seed(dataDir): files the server finds when it starts
+async function start(seed = () => {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-admin-'));
+  seed(dataDir);
   const game = await startServer({ port: 0, host: '127.0.0.1', dataDir, log: () => {} });
   const admin = await startAdmin({ port: 0, host: '127.0.0.1', password: 'secret', coop: game.coop, log: () => {} });
   const base = `http://127.0.0.1:${admin.address().port}`;
@@ -64,17 +66,28 @@ test('admin: password required, settings saved and kept, players listed', async 
     assert.equal(online.length, 1);
     assert.equal(online[0].name, 'Друг');
     assert.equal(online[0].master, true);
+    assert.equal(online[0].ping, null);
+
+    const ping = Buffer.alloc(8);
+    ping.writeUInt32LE(42, 4); // the client's last round trip
+    socket.write(encode(M.PING, ping));
+    await new Promise((r) => socket.on('data', createDecoder((type) => type === M.PONG && r())));
+    assert.equal((await (await s.call('GET', '/api/state')).json()).online[0].ping, 42);
     socket.destroy();
   } finally {
     s.close();
   }
 });
 
-test('admin: world reset only with nobody online, and it clears world, characters and leases', async () => {
-  const s = await start();
+test('admin: world reset only with nobody online, and it clears saves, characters and leases', async () => {
+  // a world kept the old way: it becomes save 3
+  const s = await start((dataDir) => {
+    for (const f of ['world.scop', 'world.scoc', 'characters.json', 'leases.json']) fs.writeFileSync(path.join(dataDir, f), '{}');
+    fs.writeFileSync(path.join(dataDir, 'world.json'), JSON.stringify({ owner: 'artem', revision: 3 }));
+  });
   try {
-    for (const f of ['world.scop', 'world.scoc', 'characters.json', 'leases.json']) fs.writeFileSync(path.join(s.dataDir, f), '{}');
-    fs.writeFileSync(path.join(s.dataDir, 'world.json'), JSON.stringify({ owner: 'artem', revision: 3 }));
+    assert.deepEqual((await (await s.call('GET', '/api/state')).json()).world, { owner: 'artem', revision: 3 });
+    assert.equal(fs.existsSync(path.join(s.dataDir, 'saves', '3', 'world.scop')), true);
 
     const socket = await join(s.game.address().port, 'artem');
     assert.equal((await s.call('POST', '/api/reset-world')).status, 409);
@@ -84,8 +97,25 @@ test('admin: world reset only with nobody online, and it clears world, character
     const res = await s.call('POST', '/api/reset-world');
     assert.equal(res.status, 200);
     assert.equal((await res.json()).world, null);
-    for (const f of ['world.scop', 'world.scoc', 'world.json', 'characters.json', 'leases.json'])
+    for (const f of ['saves', 'world.scop', 'world.json', 'characters.json', 'leases.json'])
       assert.equal(fs.existsSync(path.join(s.dataDir, f)), false, f);
+  } finally {
+    s.close();
+  }
+});
+
+test('admin: saves listed newest first; rollback makes the old save the world again', async () => {
+  const s = await start((dataDir) => {
+    for (const f of ['world.scop', 'world.scoc']) fs.writeFileSync(path.join(dataDir, f), 'old');
+    fs.writeFileSync(path.join(dataDir, 'world.json'), JSON.stringify({ owner: 'artem', revision: 3 }));
+  });
+  try {
+    let state = await (await s.call('GET', '/api/state')).json();
+    assert.deepEqual(state.saves.map((m) => m.revision), [3]);
+    assert.equal((await s.call('POST', '/api/rollback', { revision: 9 })).status, 404);
+    state = await (await s.call('POST', '/api/rollback', { revision: 3 })).json();
+    assert.deepEqual(state.world, { owner: 'artem', revision: 4 });
+    assert.deepEqual(state.saves.map((m) => [m.revision, m.reason, m.from]), [[4, 'rollback', 3], [3, 'auto', undefined]]);
   } finally {
     s.close();
   }
