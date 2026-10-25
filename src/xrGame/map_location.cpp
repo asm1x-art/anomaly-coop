@@ -350,7 +350,18 @@ void CMapLocation::CalcLevelName()
 
 bool CMapLocation::Update() //returns actual
 {
-	R_ASSERT(m_cached.m_updatedFrame!=Device.dwFrame);
+	// co-op: a second update in one frame (seen once on the parallel thread) keeps the first one's result
+	// instead of ending the game
+	if (m_cached.m_updatedFrame == Device.dwFrame)
+	{
+		static bool told = false;
+		if (!told)
+		{
+			told = true;
+			Msg("! [coop] map spot %s updated twice in a frame", spot_type ? spot_type : "?");
+		}
+		return m_cached.m_Actuality;
+	}
 
 	if (m_flags.test(eTTL))
 	{

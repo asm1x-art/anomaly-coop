@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 15;
+export const PROTOCOL_VERSION = 16;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -62,6 +62,11 @@ export const M = {
   PAUSE_VOTE: 43,     // s->c, to all: u32 proposer id, stringZ proposer name, u8 1 pause, 0 go on
   PAUSE_RESULT: 44,   // s->c, to all: u8 ROLLBACK result, stringZ the player it came to, u8 1 pause, 0 go on
   PAUSED: 45,         // s->c: u8 paused, stringZ who asked for it; to all on every change, and after WELCOME
+  // a player's own progress (tasks, story, rank...: src/xrGame/coop/coop_progress.cpp), opaque here, kept per
+  // character with every save (storage.js)
+  PROGRESS_REQUEST: 46, // s->c, to all in the world when it is to be saved: send your progress
+  PROGRESS: 47,       // both: u32 total size, u32 offset, data (chunks of at most CHUNK_SIZE, offset 0 first); c->s
+                      // the player's progress, s->c theirs right before WORLD_DONE (total 0: none kept)
   REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version; then it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up

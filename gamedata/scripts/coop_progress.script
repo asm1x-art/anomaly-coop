@@ -1,0 +1,183 @@
+-- Co-op: a player's own progress, the Lua part (the engine part and how it travels: src/xrGame/coop/coop_progress.cpp).
+-- The world's save is the sim master's game, so its Lua state (alife_storage_manager's m_data) carries the
+-- master's tasks, statistics, needs and the actor's variables. A game loading someone else's save puts its
+-- own in their place before the modules read it; a new character gets none of the save's.
+-- What is personal: docs/coop/progress/lua-state.md (ËÈ×ÍÎÅ) and docs/coop/progress/actor-vars.md.
+
+-- top-level m_data keys about one player
+local PERSONAL = {
+	"actor_contacts", "azazel_death", "bolt_first", "bolt_slot", "bolts", "bounties_by_id", "bribe",
+	"companion_states", "default_faction", "detector_was_active", "disguise_highest_suspicion",
+	"disguise_npcs_memory", "disguise_state", "drink", "game_statistics", "jobs_guide",
+	"lttz_hb_last_stash_time", "lttz_hb_next_stash_time", "mlr", "multifetch_data", "psy_table", "PsyAntenna",
+	"recover_mutant_data_mdata", "RF_freq", "RF_targets", "sleep", "start_wpn_ammo", "stealth_kills",
+	"task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
+}
+
+-- the actor's variables (save_var(db.actor, ...)) that are facts about the world: the save's stay
+local WORLD_VARS = {
+	"^drx_df_",      -- faction to faction relations (game_relations)
+	"^next_clean$",  -- the day of the next NPC inventory clean-up (release_npc_inventory)
+}
+
+-- what is worn and where: in someone else's save our things come out of our shadow into the backpack
+local SLOTS = 13
+local pending_equipment = nil -- taken with our progress, put on once the actor is there
+
+local function equipment()
+	local slots, belt = {}, {}
+	for slot = 1, SLOTS do
+		local item = db.actor:item_in_slot(slot)
+		if item then
+			slots[slot] = item:id()
+		end
+	end
+	db.actor:iterate_belt(function(owner, item)
+		belt[#belt + 1] = item:id()
+	end, db.actor)
+	return { slots = slots, belt = belt }
+end
+
+local function our_item(id)
+	local item = id and level.object_by_id(id)
+	local parent = item and item:parent()
+	return parent and parent:id() == AC_ID and item
+end
+
+local function put_on(eq)
+	local count = 0
+	for slot, id in pairs(eq.slots or {}) do
+		local item = our_item(id)
+		local worn = db.actor:item_in_slot(slot)
+		if item and not (worn and worn:id() == id) then -- game objects have no ==: by id
+			db.actor:move_to_slot(item, slot)
+			count = count + 1
+		end
+	end
+	for _, id in ipairs(eq.belt or {}) do
+		local item = our_item(id)
+		if item and not db.actor:is_on_belt(item) then
+			db.actor:move_to_belt(item)
+			count = count + 1
+		end
+	end
+	printf("[coop] %s of our things put back where we wore them", count)
+end
+
+local function is_world_var(name)
+	for _, pattern in ipairs(WORLD_VARS) do
+		if string.find(name, pattern) then
+			return true
+		end
+	end
+	return false
+end
+
+-- called by the engine: ours, as a save would keep it, into the file at path
+function export(path)
+	local m_data = alife_storage_manager.get_state()
+	if not m_data then
+		return false
+	end
+	SendScriptCallback("save_state", m_data) -- every module writes its part, as in a save
+	local out = { keys = {}, actor = {} }
+	for _, key in ipairs(PERSONAL) do
+		out.keys[key] = m_data[key]
+	end
+	local st = db.storage[AC_ID]
+	if st then
+		local vars = {}
+		for name, value in pairs(st.pstor or {}) do
+			if not is_world_var(name) then
+				vars[name] = value
+			end
+		end
+		out.actor.pstor_all = vars
+		out.actor.pstor_ctime = st.pstor_ctime
+	end
+	out.equipment = equipment()
+	local data = marshal.encode(out)
+	local f = data and io.open(path, "wb")
+	if not f then
+		return false
+	end
+	f:write(data)
+	f:close()
+	return true
+end
+
+local function read_ours()
+	local path = coop.progress_lua()
+	if path == "" then
+		return nil
+	end
+	local f = io.open(path, "rb")
+	local data = f and f:read("*all")
+	if f then
+		f:close()
+	end
+	local ok, t = pcall(marshal.decode, data or "")
+	if not (ok and type(t) == "table") then
+		printf("! [coop] our Lua progress can't be read: the save's stays")
+		return nil
+	end
+	return t
+end
+
+-- in the load, right after the save's Lua state is read and before the modules get it
+local function take_ours()
+	if not (coop and coop.connected()) then
+		return
+	end
+	local fresh = coop.progress_fresh()
+	local ours = read_ours()
+	if not (ours or fresh) then
+		return
+	end
+	ours = ours or { keys = {}, actor = {} }
+	local m_data = alife_storage_manager.get_state()
+	for _, key in ipairs(PERSONAL) do
+		m_data[key] = ours.keys and ours.keys[key]
+	end
+	m_data.game_object = m_data.game_object or {}
+	local entry = m_data.game_object[AC_ID] or { name = "actor" }
+	local vars = {}
+	for name, value in pairs(entry.pstor_all or {}) do
+		if is_world_var(name) then
+			vars[name] = value
+		end
+	end
+	for name, value in pairs(ours.actor and ours.actor.pstor_all or {}) do
+		vars[name] = value
+	end
+	entry.pstor_all = vars
+	entry.pstor_ctime = ours.actor and ours.actor.pstor_ctime
+	m_data.game_object[AC_ID] = entry
+	pending_equipment = ours.equipment
+	printf("[coop] our own Lua progress in place of the save's (%s)", fresh and "new character" or "ours")
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local original = alife_storage_manager.on_before_load_state
+	alife_storage_manager.on_before_load_state = function(...)
+		take_ours()
+		return original(...)
+	end
+	RegisterScriptCallback("actor_on_first_update", function()
+		local eq = pending_equipment
+		pending_equipment = nil
+		if eq then
+			-- a moment later: the inventory is still being filled on the first update
+			CreateTimeEvent("coop_progress", "put_on", 0.5, function()
+				local ok, err = pcall(put_on, eq) -- not worth ending the game over
+				if not ok then
+					printf("! [coop] our things couldn't be put back on: %s", tostring(err))
+				end
+				return true
+			end)
+		end
+	end)
+end

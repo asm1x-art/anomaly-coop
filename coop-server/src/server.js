@@ -116,19 +116,28 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     const info = worldInfo();
     for (const c of clients.values()) c.send(M.WORLD_INFO, info);
   };
-  const sendWorld = (send) => {
+  // the player's own progress goes with it, before WORLD_DONE: the game puts it on its actor while loading
+  const sendWorld = (send, name) => {
     const info = storage.worldInfo();
     storage.readWorld().forEach((data, file) => {
       for (let offset = 0; offset < data.length; offset += CHUNK_SIZE)
         send(M.WORLD_CHUNK, Buffer.concat([Buffer.from([file]), u32(offset), data.subarray(offset, offset + CHUNK_SIZE)]));
     });
+    const progress = storage.progress(name) ?? Buffer.alloc(0);
+    let offset = 0;
+    do {
+      send(M.PROGRESS, Buffer.concat([u32(progress.length), u32(offset), progress.subarray(offset, offset + CHUNK_SIZE)]));
+      offset += CHUNK_SIZE;
+    } while (offset < progress.length);
     send(M.WORLD_DONE, Buffer.concat([stringZ(info.owner), u32(info.revision)]));
   };
 
   // Saves (storage.js): the master's game saves the world when asked and uploads it with the reason
+  // Everyone in the world sends their own progress with it, kept with the save (storage.writeWorld).
   const requestSave = (reason, who, name = '') => {
     const master = clients.get(masterId());
     if (!master?.inWorld) return false;
+    for (const c of clients.values()) if (c.inWorld) c.send(M.PROGRESS_REQUEST);
     master.send(M.SAVE_NOW, Buffer.concat([stringZ(name), stringZ(reason), stringZ(who)]));
     return true;
   };
@@ -139,7 +148,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     clearTimeout(awaiting.get(cid));
     awaiting.delete(cid);
     const c = clients.get(cid);
-    if (c && storage.worldInfo()) sendWorld(c.send);
+    if (c && storage.worldInfo()) sendWorld(c.send, c.name);
   };
   const savesPayload = () => {
     const list = storage.saves().reverse().slice(0, MAX_SAVES_LISTED);
@@ -281,12 +290,26 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.CHARACTER:
           storage.saveCharacter(client.name, Buffer.from(payload));
           break;
+        case M.PROGRESS: {
+          const total = payload.readUInt32LE(0);
+          const offset = payload.readUInt32LE(4);
+          if (!total) break; // nothing to keep: what we have stays
+          if (offset === 0) client.progress = { data: Buffer.alloc(total), got: 0 };
+          if (!client.progress || client.progress.data.length !== total) break; // a piece of an upload we didn't see begin
+          client.progress.got += payload.copy(client.progress.data, offset, 8);
+          if (client.progress.got >= total) {
+            storage.saveProgress(client.name, client.progress.data);
+            log(`[${id}] '${client.name}' sent their progress (${total} bytes)`);
+            client.progress = null;
+          }
+          break;
+        }
         case M.WORLD_REQUEST:
           if (!storage.worldInfo()) send(M.WORLD_INFO, worldInfo());
           // a player coming in gets the world as it is now: the master saves it first
           else if (!awaiting.has(id) && requestSave('join', client.name))
             awaiting.set(id, setTimeout(() => giveWorld(id), JOIN_WAIT_MS).unref());
-          else if (!awaiting.has(id)) sendWorld(send);
+          else if (!awaiting.has(id)) sendWorld(send, client.name);
           break;
         case M.SAVE_REQUEST: {
           const name = readStringZ(payload, 0);

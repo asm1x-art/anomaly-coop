@@ -170,6 +170,9 @@ CMapLocation* CMapManager::AddRelationLocation(CInventoryOwner* pInvOwner)
 
 void CMapManager::Destroy(CMapLocation* ml)
 {
+	// co-op: a spot listed twice would be deleted twice
+	if (std::find(m_deffered_destroy_queue.begin(), m_deffered_destroy_queue.end(), ml) != m_deffered_destroy_queue.end())
+		return;
 	m_deffered_destroy_queue.push_back(ml);
 }
 

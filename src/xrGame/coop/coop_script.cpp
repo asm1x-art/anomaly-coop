@@ -4,6 +4,7 @@
 #include "coop_save.h"
 #include "coop_combat.h"
 #include "coop_puppet.h"
+#include "coop_progress.h"
 #include "ai_space.h"
 #include "script_engine.h"
 
@@ -106,6 +107,8 @@ namespace coop
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
+			def("progress_lua", &progress_lua_file),   // our progress's Lua part to take while loading, "" none
+			def("progress_fresh", &progress_fresh),    // a new character: the save's personal Lua state goes
 			def("remote_death", &is_dying_remotely), // (id) another game's death of it is being applied here
 			def("grudge", &has_grudge_id),          // (npc id, id of our actor or a stand-in): its squad was shot by that player
 			def("begin_shared", &begin_shared_spawns),

@@ -60,6 +60,9 @@ namespace coop
 		M_PAUSE_VOTE = 43,      // s->c: u32 proposer id, stringZ proposer, u8 1 pause, 0 go on
 		M_PAUSE_RESULT = 44,    // s->c: u8 result (as M_ROLLBACK_RESULT), stringZ who, u8 1 pause, 0 go on
 		M_PAUSED = 45,          // s->c: u8 paused, stringZ the one who asked; to all on every change, after WELCOME
+		M_PROGRESS_REQUEST = 46, // s->c, to all in the world when it is to be saved: send our progress (coop_progress.h)
+		M_PROGRESS = 47,        // both: u32 total size, u32 offset, data; c->s our progress, s->c ours with the world,
+		                        // before M_WORLD_DONE (total 0: none kept)
 		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
 		M_WORLD_CLAIM = 30,     // c->s: u8 1: we start the world on an empty server, the first to ask gets it (M_WORLD_INFO
 		                        // says who); 0: we gave it up
@@ -74,7 +77,7 @@ namespace coop
 		eGroupKick,
 	};
 
-	const u16 PROTOCOL_VERSION = 15;
+	const u16 PROTOCOL_VERSION = 16;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook

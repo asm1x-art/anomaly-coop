@@ -1,4 +1,5 @@
 #include "pch_script.h"
+#include "coop/coop_save.h"
 #include "gamepersistent.h"
 #include "../xrEngine/fmesh.h"
 #include "../xrEngine/xr_ioconsole.h"
@@ -167,6 +168,7 @@ void CGamePersistent::OnAppStart()
 
 void CGamePersistent::OnAppEnd()
 {
+	coop::on_app_end();
 	if (m_pMainMenu->IsActive())
 		m_pMainMenu->Activate(false);
 

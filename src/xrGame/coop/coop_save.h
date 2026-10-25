@@ -57,9 +57,11 @@ namespace coop
 	// false: we won't after all
 	void claim_world(bool claim);
 	void on_level_unloaded();
-	// CLevel::net_Stop: leaving the world to the menu or the desktop (not a level change or a reload): the
-	// master saves it and waits until the server has it; the server learns we are out of the world
+	// CLevel::net_Stop: leaving the world to the menu or the desktop (not a level change or a reload): our
+	// progress goes, the master saves the world and waits until the server has it, the server learns we are
+	// out of it; then we are off the server
 	void on_leaving_level();
+	void on_app_end(); // the game closes: off the server (CGamePersistent::OnAppEnd)
 	// our new character is made (Lua) and starts there: load the world; with the "no_character" status only
 	void join_world(u16 game_vertex, u32 level_vertex, const Fvector& position);
 	LPCSTR character_community(); // "actor_<faction>" of our character as the server keeps it, "" if none

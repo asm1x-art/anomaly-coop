@@ -97,8 +97,9 @@ function UICoopProfiles:InitControls()
 
 	self.status = xml:InitTextWnd("form:status", form)
 
-	for _, name in ipairs({ "btn_save", "btn_delete", "btn_enter", "btn_back" }) do
-		self:Register(xml:Init3tButton("form:" .. name, form), name)
+	for _, name in ipairs({ "btn_save", "btn_delete", "btn_enter", "btn_disconnect", "btn_back" }) do
+		self[name] = xml:Init3tButton("form:" .. name, form)
+		self:Register(self[name], name)
 	end
 end
 
@@ -106,6 +107,7 @@ function UICoopProfiles:InitCallBacks()
 	self:AddCallback("btn_save", ui_events.BUTTON_CLICKED, self.OnSave, self)
 	self:AddCallback("btn_delete", ui_events.BUTTON_CLICKED, self.OnDelete, self)
 	self:AddCallback("btn_enter", ui_events.BUTTON_CLICKED, self.OnEnter, self)
+	self:AddCallback("btn_disconnect", ui_events.BUTTON_CLICKED, self.OnDisconnect, self)
 	self:AddCallback("btn_back", ui_events.BUTTON_CLICKED, self.OnBack, self)
 	self:AddCallback("list", ui_events.LIST_ITEM_CLICKED, self.OnSelect, self)
 end
@@ -131,6 +133,7 @@ end
 function UICoopProfiles:Open()
 	self:Fill()
 	self.connect_started = nil
+	self.loading = nil
 	self:SetStatus(coop.connected() and "ui_mm_coop_status_connected" or "ui_mm_coop_status_idle", coop.my_name())
 	shown = true
 	self:ShowDialog(true)
@@ -199,12 +202,27 @@ function UICoopProfiles:OnEnter()
 	self:SetStatus("ui_mm_coop_status_connecting", server)
 end
 
+-- off the server, staying in the menu (leaving the game does it by itself: coop_save.cpp on_leaving_level)
+function UICoopProfiles:OnDisconnect()
+	if not coop.link_up() then
+		return
+	end
+	printf("[coop] profile screen: disconnecting")
+	self.connect_started = nil
+	self.loading = nil
+	coop.disconnect()
+	self:SetStatus("ui_mm_coop_status_disconnected")
+end
+
 function UICoopProfiles:OnBack()
 	self:Close()
 end
 
 function UICoopProfiles:Update()
 	CUIScriptWnd.Update(self)
+	self.btn_disconnect:Enable(coop.link_up())
+	-- the world is on its way: entering again would start it all over (disconnect first to change profile)
+	self.btn_enter:Enable(not (self.loading and coop.link_up()))
 	if not self.connect_started then
 		return
 	end
@@ -228,6 +246,7 @@ function UICoopProfiles:Update()
 		self:SetStatus("ui_mm_coop_status_being_created", coop.world_creator())
 	elseif status == "exists" then
 		self.connect_started = nil
+		self.loading = true
 		self:SetStatus("ui_mm_coop_status_loading")
 	end
 end

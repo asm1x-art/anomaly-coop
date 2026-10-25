@@ -5,6 +5,7 @@
 #include "coop_ids.h"
 #include "coop_shadow.h"
 #include "coop_save.h"
+#include "coop_progress.h"
 #include "coop_puppet.h"
 #include "coop_npc.h"
 #include "coop_combat.h"
@@ -474,6 +475,12 @@ namespace coop
 			break;
 		case M_PAUSED:
 			on_paused(P);
+			break;
+		case M_PROGRESS_REQUEST:
+			send_progress();
+			break;
+		case M_PROGRESS:
+			on_progress_chunk(P);
 			break;
 		case M_ACTOR_ACTION:
 		{

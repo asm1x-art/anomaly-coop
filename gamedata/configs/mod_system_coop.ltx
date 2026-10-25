@@ -8,3 +8,17 @@
 [coop_proxy]:sim_default_stalker_0
 script_binding = coop_proxy.bind
 species = actor ; mutants take it for the player it stands in for (stalkers judge by community)
+
+; Co-op: facts about the world Anomaly keeps as the actor's info portions, the same for every player and
+; never part of a player's own progress (src/xrGame/coop/coop_progress.cpp; docs/coop/progress.md).
+; Masks: * any characters, ? one.
+[coop_world_infos]
+*_squad_dead            ; a squad's on_death (squad_descr*.ltx)
+*_dead                  ; an NPC's [death] on_info
+*_death
+*_upgrade_tier_?        ; a mechanic has the tools for that tier
+*_drugkit_done          ; a medic has his kit
+*_tech_instrument_?_brought ; the Zaton and Jupiter mechanics' tools
+*_dead_spawned          ; a task's body is in the world already
+*_item_spawned
+*_first_spawn

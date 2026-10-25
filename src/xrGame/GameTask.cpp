@@ -106,6 +106,8 @@ void CGameTask::CreateMapLocation(bool on_load)
 	}
 
 	VERIFY(m_linked_map_location);
+	if (!m_linked_map_location)
+		return; // co-op: a task whose spot isn't on the map loads without one, as the game would end otherwise
 
 	if (m_linked_map_location->complex_spot())
 	{

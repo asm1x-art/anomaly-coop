@@ -40,6 +40,12 @@
 	<string id="ui_mm_coop_profile_save">
 		<text>Save profile</text>
 	</string>
+	<string id="ui_mm_coop_profile_disconnect">
+		<text>Disconnect</text>
+	</string>
+	<string id="ui_mm_coop_status_disconnected">
+		<text>Disconnected from the server.</text>
+	</string>
 	<string id="ui_mm_coop_profile_enter">
 		<text>Enter</text>
 	</string>
@@ -74,7 +80,7 @@
 		<text>The server runs another version: update the game or the server.</text>
 	</string>
 	<string id="ui_mm_coop_status_loading">
-		<text>Your character is in this world. Loading it...</text>
+		<text>Your character is in this world. The master saves it for you, then it loads by itself (up to 30 s). Don't press Enter again.</text>
 	</string>
 	<string id="st_coop_group">
 		<text>Co-op</text>

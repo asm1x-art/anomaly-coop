@@ -40,11 +40,15 @@
 		<status x="24" y="344" width="419" height="76">
 			<text r="200" g="200" b="200" font="letterica18" align="l" vert_align="t" complex_mode="1"/>
 		</status>
-		<btn_enter x="100" y="430" width="120" height="24" stretch="1">
+		<btn_enter x="34" y="430" width="120" height="24" stretch="1">
 			<texture>ui_button_ordinary</texture>
 			<text font="letterica18">ui_mm_coop_profile_enter</text>
 		</btn_enter>
-		<btn_back x="240" y="430" width="120" height="24" stretch="1">
+		<btn_disconnect x="170" y="430" width="120" height="24" stretch="1">
+			<texture>ui_button_ordinary</texture>
+			<text font="letterica18">ui_mm_coop_profile_disconnect</text>
+		</btn_disconnect>
+		<btn_back x="306" y="430" width="120" height="24" stretch="1">
 			<texture>ui_button_ordinary</texture>
 			<text font="letterica18">ui_mm_back</text>
 		</btn_back>

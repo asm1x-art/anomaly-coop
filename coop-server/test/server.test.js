@@ -404,6 +404,10 @@ test('world: uploaded into an empty server, announced to all, downloaded in chun
         assert.equal(msg.payload.toString('utf8', 0, msg.payload.indexOf(0)), 'artem');
         break;
       }
+      if (msg.type === M.PROGRESS) {
+        assert.equal(msg.payload.readUInt32LE(0), 0); // none kept for this player
+        continue;
+      }
       assert.equal(msg.type, M.WORLD_CHUNK);
       msg.payload.copy(files[msg.payload[0]], msg.payload.readUInt32LE(1), 5);
     }
@@ -765,6 +769,85 @@ test('rollback: everyone must agree; then all reload, characters go back, old ga
     assert.equal((await c.next()).payload.toString(), 'at the start');
     a.socket.destroy();
     b.socket.destroy();
+    c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function sendProgress(c, data) {
+  for (let offset = 0; offset === 0 || offset < data.length; offset += 15000)
+    c.send(M.PROGRESS, Buffer.concat([u32le(data.length), u32le(offset), data.subarray(offset, offset + 15000)]));
+}
+
+// the progress that comes with a world download, null when the server keeps none
+async function downloadProgress(c) {
+  let progress = null;
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.WORLD_DONE) return progress;
+    if (msg.type !== M.PROGRESS) continue;
+    const total = msg.payload.readUInt32LE(0);
+    if (!total) continue;
+    progress ??= Buffer.alloc(total);
+    msg.payload.copy(progress, msg.payload.readUInt32LE(4), 8);
+  }
+}
+
+test('progress: asked of everyone in the world with each save, given back with the world, rolled back with it', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    // a save: everyone in the world is asked for their progress
+    b.send(M.SAVE_REQUEST, Buffer.from([0]));
+    await until(a, M.PROGRESS_REQUEST); // the master too
+    await until(a, M.SAVE_NOW);
+    await until(b, M.PROGRESS_REQUEST);
+    const early = Buffer.alloc(40000, 1); // three chunks
+    early.write('early', 0);
+    sendProgress(b, early);
+    await roundTrip(b);
+    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1);
+    await roundTrip(a);
+    const late = Buffer.from('late');
+    sendProgress(b, late);
+    sendProgress(b, Buffer.alloc(0)); // nothing to keep: no change
+    await roundTrip(b);
+
+    // b comes back: its latest progress comes with the world, before WORLD_DONE
+    b.socket.destroy();
+    await until(a, M.SAVE_NOW); // b's leave save
+    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'leave', 'друг');
+    await roundTrip(a);
+    const b2 = await player(port, 'друг');
+    b2.send(M.WORLD_REQUEST);
+    await until(a, M.SAVE_NOW); // join save
+    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3, '', 'join', 'друг');
+    assert.deepEqual(await downloadProgress(b2), late);
+
+    // a player without progress gets none
+    const c = await player(port, 'третий');
+    c.send(M.WORLD_REQUEST);
+    await until(a, M.SAVE_NOW);
+    await uploadSave(a, [Buffer.from('w5'), Buffer.from('l5')], 4, '', 'join', 'третий');
+    assert.equal(await downloadProgress(c), null);
+
+    // back to revision 2: the progress kept with it
+    assert.ok(server.coop.rollback(2));
+    await until(b2, M.WORLD_RELOAD);
+    b2.send(M.WORLD_REQUEST);
+    await until(a, M.SAVE_NOW);
+    await uploadSave(a, [Buffer.from('w7'), Buffer.from('l7')], 6, '', 'join', 'друг');
+    assert.deepEqual(await downloadProgress(b2), early);
+    a.socket.destroy();
+    b2.socket.destroy();
     c.socket.destroy();
   } finally {
     server.close();

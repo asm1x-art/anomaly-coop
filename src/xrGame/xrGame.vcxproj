@@ -2008,6 +2008,7 @@
     <ClInclude Include="coop\coop_ids.h" />
     <ClInclude Include="coop\coop_puppet.h" />
     <ClInclude Include="coop\coop_npc.h" />
+    <ClInclude Include="coop\coop_progress.h" />
     <ClInclude Include="coop\coop_combat.h" />
     <ClInclude Include="coop\coop_projectiles.h" />
     <ClInclude Include="coop\coop_map.h" />
@@ -3115,6 +3116,7 @@
     <ClCompile Include="coop\coop_ids.cpp" />
     <ClCompile Include="coop\coop_puppet.cpp" />
     <ClCompile Include="coop\coop_npc.cpp" />
+    <ClCompile Include="coop\coop_progress.cpp" />
     <ClCompile Include="coop\coop_combat.cpp" />
     <ClCompile Include="coop\coop_projectiles.cpp" />
     <ClCompile Include="coop\coop_map.cpp" />

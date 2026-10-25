@@ -12,6 +12,8 @@ import { normalizeSettings } from './settings.js';
 //                             rollback (from: the save it went back to); who: the player it was for
 //   leases.json             { block: player }: id blocks, they must outlive restarts like the world does
 //   characters.json         { player: base64 record }: position, money... as the client sent it
+//   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
+//                            copy of the folder (saves/<revision>/progress/), a rollback brings it back
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
 //   groups.json             [[leader, member...]]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
@@ -37,6 +39,11 @@ export function openStorage(dir) {
   let characters = readJson('characters.json', {});
 
   const saveFile = (revision, name) => path.join('saves', String(revision), name);
+  const progressFile = (name) => path.join('progress', Buffer.from(name, 'utf8').toString('hex') + '.bin');
+  const copyProgress = (from, to) => {
+    fs.rmSync(file(to), { recursive: true, force: true });
+    if (fs.existsSync(file(from))) fs.cpSync(file(from), file(to), { recursive: true });
+  };
   // a world kept the old way, in the directory itself, becomes the first save
   const old = readJson('world.json', null);
   if (old && WORLD_FILES.every((f) => fs.existsSync(file(f)))) {
@@ -69,6 +76,18 @@ export function openStorage(dir) {
       writeAtomic('characters.json', JSON.stringify(characters, null, 1));
     },
 
+    progress(name) {
+      try {
+        return fs.readFileSync(file(progressFile(name)));
+      } catch {
+        return null;
+      }
+    },
+    saveProgress(name, data) {
+      fs.mkdirSync(file('progress'), { recursive: true });
+      writeAtomic(progressFile(name), data);
+    },
+
     worldInfo() {
       const last = saves.at(-1);
       return last ? { owner: last.owner, revision: last.revision } : null;
@@ -84,6 +103,7 @@ export function openStorage(dir) {
       fs.rmSync(file('saves'), { recursive: true, force: true });
       for (const f of ['leases.json', 'characters.json', 'groups.json'])
         fs.rmSync(file(f), { force: true });
+      fs.rmSync(file('progress'), { recursive: true, force: true });
       saves.length = 0;
       characters = {};
     },
@@ -118,6 +138,7 @@ export function openStorage(dir) {
       fs.mkdirSync(file(saveFile(revision, '')), { recursive: true });
       WORLD_FILES.forEach((f, i) => writeAtomic(saveFile(revision, f), files[i]));
       writeAtomic(saveFile(revision, 'characters.json'), JSON.stringify(characters, null, 1));
+      copyProgress('progress', saveFile(revision, 'progress'));
       const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}) };
       writeAtomic(saveFile(revision, 'meta.json'), JSON.stringify(meta));
       saves.push(meta);
@@ -129,6 +150,7 @@ export function openStorage(dir) {
       if (!from) return 0;
       characters = readJson(saveFile(revision, 'characters.json'), {});
       writeAtomic('characters.json', JSON.stringify(characters, null, 1));
+      copyProgress(saveFile(revision, 'progress'), 'progress');
       return this.writeWorld(from.owner, this.readWorld(revision), { name: from.name, reason: 'rollback', from: revision });
     },
   };

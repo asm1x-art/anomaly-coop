@@ -3,6 +3,7 @@
 #include "coop_net.h"
 #include "coop_shadow.h"
 #include "coop_world.h"
+#include "coop_progress.h"
 #include "Level.h"
 #include "Actor.h"
 #include "ai_object_location.h"
@@ -149,6 +150,7 @@ namespace coop
 	}
 
 	static bool is_mine(const xr_string& owner);
+	static void leave_world();
 	static void request_world();
 
 	// _G.<name>(args...) when Lua has it
@@ -231,6 +233,7 @@ namespace coop
 		Msg("[coop] downloading the world (revision %u, by '%s')", g_server_revision, g_server_owner.c_str());
 		for (auto& file : g_download)
 			file.clear();
+		forget_progress();
 		g_downloading = true;
 		NET_Packet R;
 		R.w_begin(M_WORLD_REQUEST);
@@ -523,11 +526,30 @@ namespace coop
 		g_in_world = 0;
 	}
 
+	// Out of the game: to the main menu ("End game"), to the desktop (Quit, Alt+F4, the window's close
+	// button, the quit command) - every one of them stops the level first. The world gets what it needs of us,
+	// then we are off the server; the profile screen connects again.
 	void on_leaving_level()
 	{
 		// a level change or a load of the world comes back to it at once: KERNEL:start is waiting
-		if (!is_connected() || g_loading || Engine.Event.Peek("KERNEL:start"))
+		if (!is_link_up() || Engine.Event.Peek("KERNEL:start"))
 			return;
+		if (is_connected() && !g_loading)
+			leave_world();
+		Msg("[coop] out of the game: off the co-op server");
+		disconnect();
+	}
+
+	void on_app_end()
+	{
+		if (is_link_up())
+			disconnect(); // from the main menu: nothing of ours is in the world any more
+	}
+
+	static void leave_world()
+	{
+		if (g_in_world)
+			send_progress(); // kept with the save the server asks for now (leave) or with ours (exit)
 		if (g_in_world && is_sim_master() && g_actor && ai().get_alife())
 		{
 			const u32 before = g_server_revision;
@@ -656,6 +678,8 @@ namespace coop
 			// Engine.Event defers the actual start, so this is safe from a frame callback
 			g_load_pending = false;
 			g_loading = true;
+			// someone else's actor in the save: ours goes on it (its Lua part is taken first thing in the load)
+			begin_progress_load(!is_mine(g_loading_owner), g_join_requested);
 			string256 command;
 			if (g_pGameLevel) // a game running the world before it went back to a save
 				xr_sprintf(command, "load %s", WORLD_SAVE);
@@ -837,6 +861,7 @@ namespace coop
 		g_loading = false;
 		g_in_world = g_loading_revision;
 
+		apply_progress();
 		name_actor();
 
 		if (is_mine(g_loading_owner))
