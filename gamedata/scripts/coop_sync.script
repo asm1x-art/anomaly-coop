@@ -268,7 +268,8 @@ end
 
 local ITEM_TABLES = { "item_remaining_uses", "item_condition", "device_condition" }
 
-local function serialize(v)
+-- a value as Lua text (numbers, strings, booleans, tables of them), for the other co-op scripts too
+function serialize(v)
 	local t = type(v)
 	if t == "number" then
 		return string.format("%.17g", v)
@@ -301,14 +302,20 @@ function item_lua(id)
 	return ok and text or ""
 end
 
-function take_item_lua(id, text)
-	local f = loadstring("return " .. text)
+-- serialize's text back, nil for anything else
+function deserialize(text)
+	local f = text and loadstring("return " .. text)
 	if not f then
 		return
 	end
 	setfenv(f, {})
-	local ok, data = pcall(f)
-	if not (ok and type(data) == "table") then
+	local ok, value = pcall(f)
+	return ok and value or nil
+end
+
+function take_item_lua(id, text)
+	local data = deserialize(text)
+	if type(data) ~= "table" then
 		return
 	end
 	local m_data = alife_storage_manager.get_state()

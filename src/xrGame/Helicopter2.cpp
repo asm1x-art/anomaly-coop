@@ -8,6 +8,7 @@
 //#include "../xrphysics/PhysicsShell.h"
 #include "script_callback_ex.h"
 #include "ai/stalker/ai_stalker.h"
+#include "coop/coop_world.h"
 #include "CustomZone.h"
 #include "../xrphysics/MathUtils.h"
 
@@ -288,6 +289,7 @@ void CHelicopter::DieHelicopter()
 	if (state() == CHelicopter::eDead)
 		return;
 	CEntity::Die(NULL);
+	coop::on_vehicle_death(this);
 
 	m_engineSound.stop();
 

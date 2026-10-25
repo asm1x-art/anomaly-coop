@@ -8,6 +8,7 @@ class CSE_ALifeCreatureAbstract;
 class CSE_ALifeInventoryItem;
 class CSE_ALifeDynamicObject;
 class CSE_Abstract;
+class CEntity;
 class NET_Packet;
 
 namespace coop
@@ -20,6 +21,10 @@ namespace coop
 	void update_bodies();
 	void update_releases(); // per frame: releases waiting for their object to be made on our side
 	void apply_body_rest(NET_Packet& P); // M_ACTOR_ACTION eBodyRest
+	// A vehicle destroyed in our game (CCar::Die, CHelicopter::DieHelicopter): the others' copy goes too. Not
+	// a creature, so it goes as an M_ENTITY_DEATH without a body place; is_dying_remotely is true for it
+	// until its death here.
+	void on_vehicle_death(CEntity* vehicle);
 	// Our things as they are now (condition, upgrades, ammo, addons, uses left): moves carry only where an item went,
 	// so the others' copies (our shadow in their worlds, the master's save) kept the state it was shared with.
 	void send_inventory_states(); // all we carry: with our progress, at every save and on the way out

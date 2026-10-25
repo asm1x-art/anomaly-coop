@@ -11,6 +11,8 @@
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "coop_puppet.h"
+#include "coop_combat.h"
+#include "Helicopter.h"
 #include "PhysicsShellHolder.h"
 #include "../xrPhysics/PhysicsShell.h"
 #include "level_graph.h"
@@ -37,6 +39,7 @@ namespace coop
 	// online kills reach on_death later, through GE_DIE, so a plain "applying" flag won't do.
 	static xr_set<u16> g_remote_deaths;
 	static u16 g_dying_remotely = u16(-1);
+	static xr_set<u16> g_remote_vehicles; // their destruction another game sent, being applied here
 	// bodies of our deaths still falling here: when they lie still, the others put theirs there too
 	static xr_map<u16, u32> g_falling; // id -> Device.dwTimeContinual of the death
 	static const u32 BODY_CHECK_MS = 500;
@@ -183,6 +186,18 @@ namespace coop
 			    body->ID, distance);
 	}
 
+	// the player who killed, for the tasks: "" for anyone else (an NPC, a mutant, an anomaly, offline combat).
+	// A stand-in's kill is the kill of the player it stands for (coop_combat.h).
+	static LPCSTR killer_name(CSE_Abstract* killer)
+	{
+		if (!killer)
+			return "";
+		if (smart_cast<CSE_ALifeCreatureActor*>(killer))
+			return my_name().c_str();
+		const u32 peer = peer_of_stand_in(killer->ID);
+		return peer ? peer_name(peer) : "";
+	}
+
 	void on_creature_death(CSE_ALifeCreatureAbstract* victim, CSE_Abstract* killer)
 	{
 		if (g_remote_deaths.erase(victim->ID))
@@ -192,20 +207,28 @@ namespace coop
 		if (smart_cast<CSE_ALifeCreatureActor*>(victim))
 			return;
 
-		if (!is_connected() || !level_running() || local_objects().count(victim->ID))
+		if (!is_connected() || !level_running())
 			return;
 
-		NET_Packet P;
-		P.w_begin(M_ENTITY_DEATH);
-		P.w_u16(victim->ID);
-		P.w_stringZ(victim->s_name);
-		P.w_u16(killer ? killer->ID : u16(-1));
-		write_body_place(P, body_place(victim));
-		send(P);
-		if (victim->m_bOnline)
-			g_falling[victim->ID] = Device.dwTimeContinual;
+		if (!local_objects().count(victim->ID)) // not the others' yet: nothing to tell them
+		{
+			NET_Packet P;
+			P.w_begin(M_ENTITY_DEATH);
+			P.w_u16(victim->ID);
+			P.w_stringZ(victim->s_name);
+			P.w_u16(killer ? killer->ID : u16(-1));
+			write_body_place(P, body_place(victim));
+			send(P);
+			if (victim->m_bOnline)
+				g_falling[victim->ID] = Device.dwTimeContinual;
 
-		Msg("[coop] death of %s (id=%u) sent", victim->name_replace(), victim->ID);
+			Msg("[coop] death of %s (id=%u) sent", victim->name_replace(), victim->ID);
+		}
+
+		// only the game it died in knows the killer: the tasks pass it on to the others (coop_tasks.script)
+		::luabind::functor<void> on_kill;
+		if (ai().script_engine().functor("_G.coop_on_kill", on_kill))
+			on_kill(victim->ID, killer_name(killer), killer ? killer->ID : u16(-1)); // the id: a companion's (Lua)
 	}
 
 	void update_bodies()
@@ -252,6 +275,8 @@ namespace coop
 			place_body(body, place);
 	}
 
+	static void apply_vehicle_death(CSE_ALifeDynamicObject* object);
+
 	void apply_entity_death(NET_Packet& P)
 	{
 		const u16 id = P.r_u16();
@@ -264,8 +289,14 @@ namespace coop
 		if (!level_running())
 			return;
 
-		CSE_ALifeCreatureAbstract* creature =
-			smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true));
+		CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
+		if (object && object->s_name == section &&
+		    (smart_cast<CSE_ALifeCar*>(object) || smart_cast<CSE_ALifeHelicopter*>(object)))
+		{
+			apply_vehicle_death(object);
+			return;
+		}
+		CSE_ALifeCreatureAbstract* creature = smart_cast<CSE_ALifeCreatureAbstract*>(object);
 		if (!creature || creature->s_name != section)
 		{
 			Msg("! [coop] remote death of %s (id=%u) ignored: no such creature here, worlds differ?", section.c_str(), id);
@@ -298,7 +329,41 @@ namespace coop
 
 	bool is_dying_remotely(u16 id)
 	{
-		return id == g_dying_remotely;
+		return id == g_dying_remotely || g_remote_vehicles.count(id);
+	}
+
+	void on_vehicle_death(CEntity* vehicle)
+	{
+		if (g_remote_vehicles.erase(vehicle->ID()) || !is_connected() || !level_running() ||
+		    local_objects().count(vehicle->ID()))
+			return;
+		NET_Packet P;
+		P.w_begin(M_ENTITY_DEATH);
+		P.w_u16(vehicle->ID());
+		P.w_stringZ(vehicle->cNameSect());
+		P.w_u16(u16(-1));
+		send(P);
+		Msg("[coop] destruction of %s (id=%u) sent", vehicle->cName().c_str(), vehicle->ID());
+	}
+
+	// another game's vehicle destroyed: online here, it goes as there (a car is killed, a helicopter's script
+	// brings it down at no health); offline, a car comes online wrecked
+	static void apply_vehicle_death(CSE_ALifeDynamicObject* object)
+	{
+		Msg("[coop] remote destruction of %s (id=%u)", object->name_replace(), object->ID);
+		CEntity* vehicle = smart_cast<CEntity*>(Level().Objects.net_Find(object->ID));
+		if (vehicle)
+		{
+			if (vehicle->getDestroy() || !vehicle->g_Alive())
+				return;
+			g_remote_vehicles.insert(object->ID);
+			if (CHelicopter* heli = smart_cast<CHelicopter*>(vehicle))
+				heli->SetfHealth(0.f);
+			else
+				vehicle->KillEntity(object->ID);
+		}
+		else if (CSE_ALifeCar* car = smart_cast<CSE_ALifeCar*>(object))
+			car->health = 0.f;
 	}
 
 	static void send_spawn(CSE_ALifeDynamicObject* object)

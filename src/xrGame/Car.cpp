@@ -39,6 +39,7 @@ BONE_P_MAP CCar::bone_map = BONE_P_MAP();
 #ifdef CAR_NEW
 #include "script_game_object.h"
 #include "script_hit.h"
+#include "coop/coop_world.h"
 #endif
 
 CCar::CCar()
@@ -2340,6 +2341,7 @@ void CCar::Die(CObject* who)
 {
 	inherited::Die(who);
 	CarExplode();
+	coop::on_vehicle_death(this);
 }
 
 Fvector CCar::ExitVelocity()

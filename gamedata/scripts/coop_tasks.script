@@ -1,8 +1,82 @@
 -- Co-op: tasks several players may hold (docs/coop/plan.md, "Личный прогресс"). When the job is done by another
 -- player, the others holding it lose it softly: no goodwill penalty, no "task failed" news, a word from the giver.
+-- Whom a task counts for depends on its kind (docs/coop/progress/tasks.md, 2.1), facts of the world on the server:
+-- * elimination (bounty): the one who killed the target, at the kill; killed by no player, it is off for everyone.
+--   The target is the world's for a giver and task, the second to hear of the job gets the same one:
+--   "target:<giver id>:<task id>" = target id; "killed:<target id>" = the player, "-" for no player, from the game
+--   it died in (the engine tells it the killer: _G.coop_on_kill, src/xrGame/coop/coop_world.cpp).
+-- * clearing a point (assault): the one who killed the last enemy there, when the point is clear; cleared with no
+--   kill by a player shortly before (they died otherwise or left), it is off. The point is the world's for a giver and
+--   task, as above ("target:..." = "<smart id>|<squad id>|<is_enemy>|<scripted>"); "lastkill:<smart id>" =
+--   "<player or ->|<game seconds>" for the last of a squad staying there killed, "cleared:<smart id>" =
+--   "<player>|<game seconds>" from the one it counted for, those who took it before then lose it.
+-- * a special squad (task_status_functor.special_steps_for_lostzone_tasks: done when the world's flag of its death is
+--   there): the one who killed its last member; "squadkill:<squad section>" = "<player or ->|<game seconds>" for each
+--   member killed, the last stays. Such a squad is everyone's and spawned once for the world: a second holder's task
+--   finds it there.
+-- * clearing a level of mutants (CLEAR_MAP): as a point, for the last mutant killed there: "maplastkill:<level>",
+--   "mapclear:<level>".
+-- * bring something and hand it in (fetch and the like): the first to hand it in;
+--   "done:<giver id>:<task id>" = "<player>|<game seconds>", those who took it before then lose it. What such a task
+--   spawns for the job is there once for the world, the second holder gets the same: the body and item of a
+--   recover-item-on-corpse task, the stash of a quest item, the dead squad of a fate task, the mutant and device of
+--   a mutant data task, the vehicles to destroy ("spawned:<giver id>:<task id>", dropped when it is handed in).
+-- What the logic of a task spawns (its status functor, its on_init) is everyone's: a task's spawns are only its
+-- holder's otherwise.
+-- * shooting a helicopter down (HELI_TASKS, completed by bind_heli.heli_die): the one who downed it, as an
+--   elimination: "killed:<helicopter id>" from the game it was downed in (a destroyed vehicle reaches the others
+--   too: src/xrGame/coop/coop_world.cpp on_vehicle_death).
+-- Story tasks stay as in a game of one: story is personal, cancelling one would stop the player's chain.
 
 local QUIET_MS = 5000 -- the fail news of a task taken off this way are dropped for so long
 local quiet = {}      -- task id -> time_global() it was taken off
+
+-- the kinds of tasks (status_functor in task_manager.ltx, tm_*.ltx) that count for the first to hand them in
+local FIRST_TO_HAND_IN = {
+	actor_has_fetch_item = true,
+	actor_has_fetch_weapon_warfare = true,
+	multifetch_status_functor = true,
+	drx_sl_quest_item_task_status = true,
+	drx_sl_retrieve_item_task_status = true,
+	recover_item_on_corpse_status_functor = true,
+	recover_mutant_data_status = true,
+	fate_task = true,
+	veh_destroy_sf = true,
+}
+
+local LAST_KILL_SECONDS = 600 -- a point cleared counts for the last kill on it this long before (game seconds)
+
+-- special squad tasks -> the squad whose death completes them (task_status_functor.special_steps_for_lostzone_tasks)
+local SQUAD_OF = {
+	mar_smart_terrain_base_stalker_leader_marsh_task_2 = "special_chimera_task_squad",
+	cit_killers_merc_barman_mlr_task_4 = "special_chimera_task2_squad",
+	mil_smart_terrain_7_10_freedom_trader_stalker_task_3 = "special_bloodsucker_task_squad",
+	bar_dolg_leader_task_2 = "special_bloodsucker_task2_squad",
+	zat_b7_bandit_boss_sultan_task_5 = "boss_sultan_task_5_stalkers",
+	zat_b7_bandit_boss_sultan_task_6 = "special_bloodsucker_task3_squad",
+	bar_dolg_leader_task_3 = "zat_greh_resurgent_squad",
+	cit_killers_merc_trader_stalker_task_4 = "zat_greh_resurgent_squad",
+	esc_m_trader_task_4 = "zat_greh_resurgent_squad",
+	mar_smart_terrain_base_stalker_leader_marsh_task_3 = "zat_greh_resurgent_squad",
+	mil_smart_terrain_7_7_freedom_leader_stalker_task_7 = "zat_greh_resurgent_squad",
+}
+
+-- clearing a level of mutants: task -> level (its target)
+local CLEAR_MAP = {
+	cit_killers_merc_barman_mlr_task_5 = "l09_deadcity",
+}
+
+-- tasks heli_die completes (bind_heli)
+local HELI_TASKS = {
+	mar_base_owl_stalker_trader_task_2 = true,
+}
+
+local targets = {} -- id -> true: the target of someone's elimination task
+local points = {}  -- smart id -> true: the point of someone's clearing task
+local map_levels = {} -- level -> true: CLEAR_MAP's
+for _, name in pairs(CLEAR_MAP) do
+	map_levels[name] = true
+end
 
 local function giver_of(rtask)
 	local giver = rtask.task_giver_id and alife_object(rtask.task_giver_id)
@@ -12,17 +86,77 @@ local function giver_of(rtask)
 	return giver and giver.character_name and giver
 end
 
+local function shared_call(f, ...)
+	coop.begin_shared()
+	local res = { pcall(f, ...) }
+	coop.end_shared()
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+local function level_of(se_obj)
+	return alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+end
+
+-- a task's data its module keeps in itself: the module's save_state puts the table in m_data (the same table)
+local function module_data(module, key)
+	local m_data = alife_storage_manager.get_state()
+	module.save_state(m_data)
+	return m_data[key]
+end
+
+local function game_seconds(time)
+	return math.floor((time or game.get_game_time()):diffSec(level.get_start_time()))
+end
+
+local function kind_of(task_id)
+	local ini = task_manager.task_ini
+	return not ini:r_bool_ex(task_id, "storyline", false) and ini:r_string_ex(task_id, "status_functor") or nil
+end
+
+-- "<player>|<game seconds>"
+local function who_when(value)
+	local who, when = string.match(value or "", "^(.*)|(%d+)$")
+	return who, tonumber(when)
+end
+
+-- our tasks of a kind, not done, taken before when (any time: when nil), for which filter(task_id) is true
+local function our_tasks(kind, when, filter)
+	local out = {}
+	for task_id, rtask in pairs(task_manager.get_task_manager().task_info) do
+		if rtask.stage ~= 255 and kind_of(task_id) == kind and rtask.inited_time
+			and (not when or game_seconds(rtask.inited_time) <= when) and filter(task_id, rtask) then
+			out[#out + 1] = task_id
+		end
+	end
+	return out
+end
+
 -- Takes a task of ours off as cancelled (on_cancel, not on_fail: no penalty) with message from its giver.
+-- None of its on_cancel either: penalties and clean-ups of the world are the one's it counts for.
 -- false when we don't hold it.
 function cancel(task_id, message)
 	local tm = task_manager.get_task_manager()
 	local rtask = tm and tm.task_info[task_id]
-	if not rtask then
+	if not rtask or rtask.stage == 255 or rtask.forced_status == "fail" then -- 255: done, waiting to be offered again
 		return false
 	end
 	local giver = giver_of(rtask)
-	-- what a fail would have tidied up of ours: the giver's count of open tasks
+	-- what a fail would have tidied up of ours: the giver's count of open tasks, the task's data
 	pcall(xr_effects.drx_sl_unregister_task_giver, db.actor, nil, { task_id })
+	save_var(db.actor, task_id, nil)
+	rtask.on_cancel = nil
+	-- what its module keeps of the world's things (the body, the mutant, the vehicles): the others' now
+	local kind = kind_of(task_id)
+	if kind == "recover_item_on_corpse_status_functor" then
+		module_data(tasks_recover_item_on_corpse, "tasks_rioc")[task_id] = nil
+	elseif kind == "recover_mutant_data_status" then
+		module_data(tasks_recover_mutant_data, "recover_mutant_data_mdata")[task_id] = nil
+	elseif kind == "veh_destroy_sf" then
+		module_data(tasks_veh_destroy, "tasks_veh_destroy")[task_id] = nil
+	end
 	quiet[task_id] = time_global()
 	tm:set_task_cancelled(task_id)
 	if message and giver then
@@ -33,8 +167,686 @@ function cancel(task_id, message)
 	return true
 end
 
+------------------------------------------------------------------------------------------------
+-- Elimination
+
+local function alive_stalker(id)
+	local se_obj = id and alife_object(id)
+	return se_obj and IsStalker(nil, se_obj:clsid()) and se_obj:alive() and se_obj
+end
+
+-- what tasks_bounty's setup_bounty_task does once it has picked the target
+local function take_bounty_target(task_id, se_target)
+	local target_id = se_target.id
+	axr_task_manager.bounties_by_id[task_id] = target_id
+	local squad = se_target.group_id and se_target.group_id ~= 65535 and alife_object(se_target.group_id)
+	if squad then
+		sim_offline_combat.task_squads[squad.id] = true
+	end
+	local level_target = alife():level_name(game_graph():vertex(se_target.m_game_vertex_id):level_id())
+	save_var(db.actor, task_id, {
+		lvl_task = level.name(),
+		lvl_target = level_target,
+		target_id = target_id,
+		target_comm = alife_character_community(se_target),
+	})
+	CreateTimeEvent(0, "setup_bounty_task", 0, function()
+		local caption = game.translate_string(task_manager.task_ini:r_string_ex(task_id, "title")) or "error"
+		local text = game.translate_string("st_mm_new_game_name") .. " " .. se_target:character_name() .. "\\n "
+			.. game.translate_string("st_mm_new_game_faction_2") .. " " .. game.translate_string(se_target:community())
+			.. "\\n " .. game.translate_string("st_location") .. " " .. game.translate_string(level_target)
+		db.actor:give_talk_message2(caption, text, se_target:character_icon(), "iconed_answer_item")
+		return true
+	end)
+end
+
+-- the target of an elimination task of ours died: killer is the player, "-" for no player
+local function on_killed(target_id, killer)
+	if killer == coop.my_name() then
+		return -- ours, as in a game of one
+	end
+	local held = our_tasks("bounty_task", nil, function(task_id)
+		return axr_task_manager.bounties_by_id[task_id] == target_id
+	end)
+	for _, task_id in ipairs(held) do
+		cancel(task_id, killer == "-" and game.translate_string("st_coop_task_target_died")
+			or strformat(game.translate_string("st_coop_task_target_killed"), killer))
+	end
+end
+
+local function share_bounty_targets()
+	local setup = xr_effects.setup_bounty_task
+	xr_effects.setup_bounty_task = function(actor, npc, p)
+		local giver = coop.connected() and p and p[1] and kind_of(p[1]) and get_speaker(true)
+		if not giver then
+			return setup(actor, npc, p)
+		end
+		local key = "target:" .. giver:id() .. ":" .. p[1]
+		local se_target = alive_stalker(tonumber(coop.fact(key)))
+		if se_target then
+			return take_bounty_target(p[1], se_target) -- someone heard of this job first
+		end
+		setup(actor, npc, p)
+		local id = axr_task_manager.bounties_by_id[p[1]]
+		if id then
+			targets[id] = true
+			coop.report_fact("killed:" .. id, "") -- from someone it had the id before
+			coop.report_fact(key, tostring(id))
+		end
+	end
+
+	coop_facts.on_fact("target:", function(fact, value)
+		local id = tonumber(value)
+		local smart = tonumber(string.match(value, "^(%d+)|"))
+		if id then
+			targets[id] = true
+		elseif smart then
+			points[smart] = true
+		end
+	end)
+	coop_facts.on_fact("killed:", function(fact, value)
+		local id = tonumber(string.match(fact, "^killed:(%d+)$"))
+		if id and value ~= "" then
+			on_killed(id, value)
+		end
+	end)
+	_G.coop_on_kill = function(victim_id, killer, killer_id)
+		-- a kill by one of our companions (axr_companions) is ours, as in a game of one; others' companions are only
+		-- NPCs here
+		local se_killer = killer == "" and killer_id and alife_object(killer_id)
+		if se_killer and se_killer.group_id and axr_companions.companion_squads[se_killer.group_id] then
+			killer = coop.my_name()
+		end
+		local value = killer ~= "" and killer or "-"
+		-- one of a squad staying on someone's point
+		local se_victim = alife_object(victim_id)
+		local squad = se_victim and se_victim.group_id ~= 65535 and alife_object(se_victim.group_id)
+		local smart = squad and squad.current_target_id
+		if smart and points[smart] then
+			coop.report_fact("lastkill:" .. smart, value .. "|" .. game_seconds())
+		end
+		-- a mutant on a level someone may have to clear
+		if squad and is_squad_monster[squad.player_id] and map_levels[level_of(se_victim)] then
+			coop.report_fact("maplastkill:" .. level_of(se_victim), value .. "|" .. game_seconds())
+		end
+		-- one of a squad whose death is a fact of the world (its on_death): the last one killed stays
+		if squad and squad.death_condlist then
+			coop.report_fact("squadkill:" .. squad:section_name(), value .. "|" .. game_seconds())
+		end
+		if not targets[victim_id] then
+			return
+		end
+		coop.report_fact("killed:" .. victim_id, value)
+		local ok, err = pcall(on_killed, victim_id, value)
+		if not ok then
+			printf("! [coop] elimination tasks on a kill: %s", err)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Clearing a point
+
+-- the point (and squad) of "target:..." while it holds: the squad still going for it, as validate_assault_task checks
+local function shared_point(key)
+	local smart, squad, is_enemy, scripted = string.match(coop.fact(key), "^(%d+)|(%d+)|(%a+)|(%a+)$")
+	smart, squad = tonumber(smart), tonumber(squad)
+	local se_squad = squad and alife_object(squad)
+	if se_squad and smart and alife_object(smart) and se_squad.current_target_id == smart then
+		return { smart_id = smart, squad_id = squad, is_enemy = is_enemy == "true", scripted = scripted == "true" }
+	end
+end
+
+local function point_key(task_id)
+	local giver = coop.connected() and task_id and kind_of(task_id) and get_speaker(true)
+	return giver and "target:" .. giver:id() .. ":" .. task_id
+end
+
+-- our point got clear (the task's stage went 1): ours if we made the last kill there just before, else off
+local function judge_point(tsk, task_id)
+	local var = load_var(db.actor, task_id)
+	local smart = var and var.smart_id
+	if not smart then
+		return
+	end
+	local who, when = who_when(coop.fact("lastkill:" .. smart))
+	local now = game_seconds()
+	local recent = when and now - when <= LAST_KILL_SECONDS
+	if recent and who == coop.my_name() then
+		coop.report_fact("cleared:" .. smart, who .. "|" .. now)
+		return
+	end
+	tsk.stage = 0
+	cancel(task_id, (recent and who ~= "-") and strformat(game.translate_string("st_coop_task_point_cleared"), who)
+		or game.translate_string("st_coop_task_point_left"))
+end
+
+local function share_points()
+	local validate = xr_conditions.validate_assault_task
+	xr_conditions.validate_assault_task = function(actor, npc, p)
+		local key = point_key(p and p[1])
+		if key and shared_point(key) then
+			return true -- someone heard of this job first: the same point
+		end
+		return validate(actor, npc, p)
+	end
+
+	local setup = xr_effects.setup_assault_task
+	xr_effects.setup_assault_task = function(actor, npc, p)
+		local task_id = p and p[1]
+		local key = point_key(task_id)
+		if not key then
+			return setup(actor, npc, p)
+		end
+		local point = shared_point(key)
+		if point then -- what setup_assault_task does with its pick
+			alife_object(point.squad_id).stay_time = game.get_game_time()
+			sim_offline_combat.task_squads[point.squad_id] = true
+			save_var(db.actor, task_id, point)
+			CreateTimeEvent(0, "setup_assault_task", 0, tasks_assault.postpone_for_next_frame, task_id, point.squad_id)
+			return
+		end
+		setup(actor, npc, p)
+		local var = load_var(db.actor, task_id)
+		if var and var.smart_id and var.squad_id then
+			points[var.smart_id] = true
+			coop.report_fact(key, strformat("%s|%s|%s|%s", var.smart_id, var.squad_id, tostring(var.is_enemy == true),
+				tostring(var.scripted == true)))
+		end
+	end
+
+	local status = task_status_functor.assault_task_status_functor
+	task_status_functor.assault_task_status_functor = function(tsk, task_id)
+		local before = tsk and tsk.stage
+		local res = status(tsk, task_id)
+		if before == 0 and tsk.stage == 1 and coop.connected() and kind_of(task_id) then
+			judge_point(tsk, task_id)
+		end
+		return res
+	end
+
+	coop_facts.on_fact("cleared:", function(fact, value)
+		local smart = tonumber(string.match(fact, "^cleared:(%d+)$"))
+		local who, when = who_when(value)
+		if not (smart and who) or who == coop.my_name() then
+			return
+		end
+		local held = our_tasks("assault_task_status_functor", when, function(task_id)
+			local var = load_var(db.actor, task_id)
+			return var and var.smart_id == smart
+		end)
+		for _, task_id in ipairs(held) do
+			cancel(task_id, strformat(game.translate_string("st_coop_task_point_cleared"), who))
+		end
+	end)
+end
+
+-- a level of ours got clear of mutants (set_task_stage to 1 by its condlist): as a point
+local function share_map_clearing()
+	local set_stage = xr_effects.set_task_stage
+	xr_effects.set_task_stage = function(actor, npc, p)
+		local task_id = p and p[1]
+		local map = task_id and CLEAR_MAP[task_id]
+		if not (map and coop.connected() and tonumber(p[2]) == 1) then
+			return set_stage(actor, npc, p)
+		end
+		local who, when = who_when(coop.fact("maplastkill:" .. map))
+		local now = game_seconds()
+		local recent = when and now - when <= LAST_KILL_SECONDS
+		if recent and who == coop.my_name() then
+			set_stage(actor, npc, p)
+			coop.report_fact("mapclear:" .. map, who .. "|" .. now)
+			return
+		end
+		cancel(task_id, (recent and who ~= "-") and strformat(game.translate_string("st_coop_task_done_by"), who)
+			or game.translate_string("st_coop_task_point_left"))
+	end
+
+	coop_facts.on_fact("mapclear:", function(fact, value)
+		local map = string.match(fact, "^mapclear:(.+)$")
+		local who, when = who_when(value)
+		if not (map and who) or who == coop.my_name() then
+			return
+		end
+		local tm = task_manager.get_task_manager()
+		for task_id, level_name in pairs(CLEAR_MAP) do
+			local rtask = tm.task_info[task_id]
+			if level_name == map and rtask and rtask.inited_time and game_seconds(rtask.inited_time) <= when then
+				cancel(task_id, strformat(game.translate_string("st_coop_task_done_by"), who))
+			end
+		end
+	end)
+end
+
+-- a helicopter down: its tasks are ours if we downed it, otherwise off
+local function share_helicopters()
+	local last_hitter = {} -- helicopter id -> id of what hit it last here
+	RegisterScriptCallback("heli_on_hit_callback", function(heli, power, impulse, enemy)
+		if heli and enemy then
+			last_hitter[heli:id()] = enemy:id()
+		end
+	end)
+
+	local heli_die = bind_heli.heli_die
+	bind_heli.heli_die = function(obj)
+		if not coop.connected() then
+			return heli_die(obj)
+		end
+		local id = obj:id()
+		local killer
+		if coop.remote_death(id) then -- downed in another game: it told who did
+			killer = coop.fact("killed:" .. id)
+		else
+			killer = last_hitter[id] == AC_ID and coop.my_name() or "-"
+			coop.report_fact("killed:" .. id, killer)
+		end
+		if killer == coop.my_name() then
+			return heli_die(obj)
+		end
+		local complete = xr_effects.set_task_completed
+		xr_effects.set_task_completed = function(a, b, p)
+			if not (p and HELI_TASKS[p[1]]) then
+				return complete(a, b, p)
+			end
+		end
+		local ok, err = pcall(heli_die, obj)
+		xr_effects.set_task_completed = complete
+		for task_id in pairs(HELI_TASKS) do
+			cancel(task_id, (killer == "" or killer == "-") and game.translate_string("st_coop_task_target_died")
+				or strformat(game.translate_string("st_coop_task_target_killed"), killer))
+		end
+		if not ok then
+			error(err, 0)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- What a task spawns for the job, once for the world
+
+local function share_job_spawns()
+	-- recover an item on a body: the body, the item and the mutants about (spawned by its status functor)
+	local rioc = task_status_functor.recover_item_on_corpse_status_functor
+	task_status_functor.recover_item_on_corpse_status_functor = function(tsk, task_id)
+		if not (coop.connected() and tsk and tsk.task_giver_id and kind_of(task_id)) then
+			return rioc(tsk, task_id)
+		end
+		local M = module_data(tasks_recover_item_on_corpse, "tasks_rioc")
+		local key = "spawned:" .. tsk.task_giver_id .. ":" .. task_id
+		local corpse, item, critters = string.match(coop.fact(key), "^(%d+)|(%d+)|(.*)$")
+		corpse, item = tonumber(corpse), tonumber(item)
+		local mine = M[task_id]
+		if item and not (mine and mine.corpse_id) then
+			local settings = tasks_recover_item_on_corpse.parse_settings(task_id)
+			local se_item = alife_object(item)
+			if se_item and string.find(settings.item_section or "", se_item:section_name(), 1, true) then
+				mine = { settings = settings, corpse_id = corpse, item_id = item } -- someone's: the same ones
+				M[task_id] = mine
+			end
+		end
+		if mine and mine.corpse_id == corpse and not mine.critter and critters and critters ~= "-" then
+			mine.critter = {}
+			for id in string.gmatch(critters, "%d+") do
+				mine.critter[#mine.critter + 1] = tonumber(id)
+			end
+		end
+		local res = rioc(tsk, task_id)
+		mine = M[task_id]
+		if mine and mine.corpse_id and mine.item_id then
+			coop.report_fact(key, mine.corpse_id .. "|" .. mine.item_id .. "|"
+				.. (mine.critter and table.concat(mine.critter, ",") or "-"))
+		end
+		return res
+	end
+
+	-- a quest item in a stash: the stash picked when the job is told, the item put in by the status functor
+	local create_stash = xr_effects.drx_sl_create_quest_stash
+	xr_effects.drx_sl_create_quest_stash = function(actor, npc, p)
+		local giver = coop.connected() and p and p[1] and kind_of(p[1]) and get_speaker(true)
+		if not giver then
+			return create_stash(actor, npc, p)
+		end
+		local stash, typ = string.match(coop.fact("spawned:" .. giver:id() .. ":" .. p[1]), "^(%d+)|(%d+)$")
+		local se_stash = tonumber(stash) and alife_object(tonumber(stash))
+		if se_stash and get_story_se_item("drx_sl_quest_item_" .. typ) then -- someone's: the same stash and item
+			save_var(db.actor, p[1], { lvl_task = level.name(), lvl_target = level_of(se_stash), target_id = se_stash.id,
+				stash_type = tonumber(typ), stash_created = true, coop_giver = giver:id() })
+			db.actor:give_info_portion("drx_sl_quest_item_task_" .. typ .. "_started")
+			return
+		end
+		create_stash(actor, npc, p)
+		local var = load_var(db.actor, p[1])
+		if var then
+			var.coop_giver = giver:id()
+			save_var(db.actor, p[1], var)
+		end
+	end
+	local stash_status = task_status_functor.drx_sl_quest_item_task_status
+	task_status_functor.drx_sl_quest_item_task_status = function(tsk, task_id)
+		local res = stash_status(tsk, task_id)
+		local var = coop.connected() and kind_of(task_id) and load_var(db.actor, task_id)
+		if var and var.stash_created and var.target_id and var.coop_giver then
+			coop.report_fact("spawned:" .. var.coop_giver .. ":" .. task_id, var.target_id .. "|" .. var.stash_type)
+		end
+		return res
+	end
+end
+
+-- "a|b|c" -> { "a", "b", "c" }, empty ones kept
+local function fields_of(value)
+	local out, from = {}, 1
+	while true do
+		local at = string.find(value, "|", from, true)
+		out[#out + 1] = string.sub(value, from, at and at - 1 or nil)
+		if not at then
+			return out
+		end
+		from = at + 1
+	end
+end
+
+local function ids_of(text)
+	local out = {}
+	for id in string.gmatch(text or "", "%d+") do
+		out[#out + 1] = tonumber(id)
+	end
+	return out
+end
+
+-- the fate of a squad: where it was lost and on what frequency, the dead squad and the PDA, as the first holder's
+local function take_fate(var, f)
+	local changed = false
+	if (f[3] or "") ~= "" and not var.smart_name then
+		var.smart_name, changed = f[3], true
+	end
+	if tonumber(f[4]) and not var.target_id then
+		var.target_id, changed = tonumber(f[4]), true
+	end
+	if tonumber(f[5]) and not var.item_2_id then
+		var.item_2_id, changed = tonumber(f[5]), true
+		item_radio.add_target(var.item_2_id, var.freq, 200) -- its search distance (tasks_fate)
+	end
+	if (f[6] or "") ~= "" and not var.dead_npcs then
+		var.dead_npcs, changed = ids_of(f[6]), true
+	end
+	return changed
+end
+
+local function share_fates()
+	local on_init = xr_effects.on_init_fate_task
+	xr_effects.on_init_fate_task = function(actor, npc, p)
+		on_init(actor, npc, p)
+		local giver = coop.connected() and p and p[1] and kind_of(p[1]) and get_speaker(true)
+		local var = giver and load_var(db.actor, p[1])
+		if not var then
+			return
+		end
+		var.coop_giver = giver:id()
+		local value = coop.fact("spawned:" .. giver:id() .. ":" .. p[1])
+		if value ~= "" then -- someone's: the same place, frequency and squad
+			local f = fields_of(value)
+			var.map = f[1] ~= "" and f[1] or var.map
+			var.freq = tonumber(f[2]) or var.freq
+			take_fate(var, f)
+		end
+		save_var(db.actor, p[1], var)
+	end
+
+	local status = task_status_functor.fate_task
+	task_status_functor.fate_task = function(tsk, task_id)
+		local var = coop.connected() and kind_of(task_id) and load_var(db.actor, task_id)
+		if not (var and var.coop_giver) then
+			return status(tsk, task_id)
+		end
+		local key = "spawned:" .. var.coop_giver .. ":" .. task_id
+		local value = coop.fact(key)
+		if value ~= "" and take_fate(var, fields_of(value)) then
+			save_var(db.actor, task_id, var)
+		end
+		local res = status(tsk, task_id)
+		var = load_var(db.actor, task_id)
+		if var then
+			coop.report_fact(key, table.concat({ var.map or "", var.freq or "", var.smart_name or "", var.target_id or "",
+				var.item_2_id or "", var.dead_npcs and table.concat(var.dead_npcs, ",") or "" }, "|"))
+		end
+		return res
+	end
+end
+
+-- data of a mutant: the mutant picked when the job is offered, the device spawned on its body
+local function share_mutant_data()
+	local function data()
+		return module_data(tasks_recover_mutant_data, "recover_mutant_data_mdata")
+	end
+	local function report(key, d)
+		coop.report_fact(key, d.mutant_id .. "|" .. (d.target_level or "") .. "|" .. (d.item_id or "-"))
+	end
+
+	local precondition = xr_conditions.recover_mutant_data_precondition
+	xr_conditions.recover_mutant_data_precondition = function(a, b, c)
+		local task_id = c and c[1]
+		local giver = coop.connected() and task_id and kind_of(task_id) and get_speaker(true)
+		if not giver then
+			return precondition(a, b, c)
+		end
+		local key = "spawned:" .. giver:id() .. ":" .. task_id
+		local f = fields_of(coop.fact(key))
+		local mutant, item = tonumber(f[1]), tonumber(f[3])
+		local se_mutant = mutant and alife_object(mutant)
+		local M = data()
+		if se_mutant and (se_mutant:alive() or (item and alife_object(item))) then -- someone's: the same mutant
+			M[task_id] = { mutant_id = mutant, target_level = f[2], item_id = item, coop_giver = giver:id() }
+			return M[task_id]
+		end
+		local res = precondition(a, b, c)
+		local d = M[task_id]
+		if d then
+			d.coop_giver = giver:id()
+			report(key, d)
+		end
+		return res
+	end
+
+	-- the device on the body: spawned once, everyone's
+	local on_death = tasks_recover_mutant_data.on_death
+	local function coop_on_death(victim)
+		if not coop.connected() then
+			return on_death(victim)
+		end
+		for task_id, d in pairs(data()) do
+			if type(d) == "table" and d.mutant_id == victim:id() and not d.item_id then
+				local key = d.coop_giver and "spawned:" .. d.coop_giver .. ":" .. task_id
+				local item = key and tonumber(fields_of(coop.fact(key))[3])
+				if item and alife_object(item) then
+					d.item_id = item
+				else
+					local se_item = shared_call(alife_create, "recover_mutant_data_device", victim:position(),
+						victim:level_vertex_id(), victim:game_vertex_id())
+					d.item_id = se_item and se_item.id
+					if key and d.item_id then
+						report(key, d)
+					end
+				end
+			end
+		end
+	end
+	tasks_recover_mutant_data.on_death = coop_on_death -- the one its on_game_start registers, before or after ours
+	UnregisterScriptCallback("monster_on_death_callback", on_death)
+	RegisterScriptCallback("monster_on_death_callback", coop_on_death)
+
+	local status = task_status_functor.recover_mutant_data_status
+	task_status_functor.recover_mutant_data_status = function(tsk, task_id)
+		local d = coop.connected() and data()[task_id]
+		if d and not d.item_id and d.coop_giver then -- spawned in another holder's game
+			local item = tonumber(fields_of(coop.fact("spawned:" .. d.coop_giver .. ":" .. task_id))[3])
+			if item and alife_object(item) then
+				d.item_id = item
+			end
+		end
+		return status(tsk, task_id)
+	end
+end
+
+-- vehicles to destroy: spawned by the status functor's first stage
+local function share_vehicles()
+	local function data()
+		return module_data(tasks_veh_destroy, "tasks_veh_destroy")
+	end
+	local status = task_status_functor.veh_destroy_sf
+	task_status_functor.veh_destroy_sf = function(tsk, task_id)
+		if not (coop.connected() and tsk and tsk.task_giver_id and kind_of(task_id)) then
+			return status(tsk, task_id)
+		end
+		local DATA = data()
+		local key = "spawned:" .. tsk.task_giver_id .. ":" .. task_id
+		if tsk.stage == 0 and not DATA[task_id] then
+			local ids = ids_of(coop.fact(key))
+			if ids[1] and alife_object(ids[1]) then -- someone's: the same vehicles, as tasks_veh_destroy lists them
+				local settings = utils_data.parse_ini_section_to_array(task_manager.task_ini, task_id)
+				local vehicles = {}
+				local i = 1
+				while settings["veh_" .. i] do
+					local v = str_explode(settings["veh_" .. i], ",")
+					vehicles[i] = { veh_sec = v[7], must_kill = v[8] == "true", id = ids[i] }
+					i = i + 1
+				end
+				DATA[task_id] = { vehicles = vehicles, settings = settings }
+				tsk.stage = 1
+				return
+			end
+		end
+		local res = status(tsk, task_id)
+		local d = DATA[task_id]
+		if d and d.vehicles then
+			local ids = {}
+			for i, v in ipairs(d.vehicles) do
+				ids[i] = v.id or 0
+			end
+			coop.report_fact(key, table.concat(ids, ","))
+		end
+		return res
+	end
+end
+
+-- everything a task's logic spawns: everyone's
+local function share_task_spawns()
+	for name, f in pairs(task_status_functor) do
+		if type(f) == "function" then
+			task_status_functor[name] = function(tsk, task_id, ...)
+				if type(task_id) == "string" and coop.connected() and kind_of(task_id) then
+					return shared_call(f, tsk, task_id, ...)
+				end
+				return f(tsk, task_id, ...)
+			end
+		end
+	end
+	local general = task_objects.CGeneralTask
+	local give_task = general and general.give_task
+	if type(give_task) == "function" then -- its on_init
+		general.give_task = function(self, ...)
+			if coop.connected() and not self.storyline then
+				return shared_call(give_task, self, ...)
+			end
+			return give_task(self, ...)
+		end
+	else
+		printf("! [coop] task_objects.CGeneralTask.give_task not found: a task's on_init spawns stay its holder's")
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Special squads
+
+local function share_squads()
+	local status = task_status_functor.special_steps_for_lostzone_tasks
+	task_status_functor.special_steps_for_lostzone_tasks = function(tsk, task_id)
+		local before = tsk and tsk.stage
+		local res = status(tsk, task_id)
+		local squad = SQUAD_OF[task_id]
+		if squad and before == 0 and tsk.stage == 1 and coop.connected() and kind_of(task_id) then
+			local who = who_when(coop.fact("squadkill:" .. squad))
+			if who and who ~= coop.my_name() then
+				tsk.stage = 0
+				cancel(task_id, who == "-" and game.translate_string("st_coop_task_target_died")
+					or strformat(game.translate_string("st_coop_task_target_killed"), who))
+			end
+		end
+		return res
+	end
+
+	-- the squad of such a task: everyone's (a task's spawns are only its holder's otherwise), one at a time in the
+	-- world (a second holder's task finds the first's)
+	local special = {}
+	for _, section in pairs(SQUAD_OF) do
+		special[section] = true
+	end
+	local create_squad = xr_effects.create_squad
+	xr_effects.create_squad = function(actor, obj, p)
+		local section = coop.connected() and p and p[1]
+		if section and special[section] then
+			for id in pairs(SIMBOARD.squads) do
+				local se_squad = alife_object(id)
+				if se_squad and se_squad:section_name() == section and se_squad:npc_count() > 0 then
+					printf("[coop] squad %s is in the world already: not spawned again", section)
+					return
+				end
+			end
+			coop.begin_shared()
+			local ok, err = pcall(create_squad, actor, obj, p)
+			coop.end_shared()
+			if not ok then
+				error(err, 0)
+			end
+			return
+		end
+		return create_squad(actor, obj, p)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- The first to hand it in
+
+local function first_to_hand_in(task_id)
+	return FIRST_TO_HAND_IN[kind_of(task_id) or ""]
+end
+
+local function share_hand_ins()
+	local task_callback = task_manager.task_callback
+	task_manager.task_callback = function(tsk, state)
+		local task_id = tsk and tsk:get_id()
+		local rtask = task_id and task_manager.get_task_manager().task_info[task_id]
+		local giver = rtask and rtask.task_giver_id
+		-- before its on_complete: it may release what the others' tasks look for, which would fail them
+		if state == task.completed and giver and coop.connected() and first_to_hand_in(task_id) then
+			coop.report_fact("done:" .. giver .. ":" .. task_id, coop.my_name() .. "|" .. game_seconds())
+			-- what was spawned for it goes: the next one to take it gets new
+			local var = load_var(db.actor, task_id)
+			local d = kind_of(task_id) == "recover_mutant_data_status"
+				and module_data(tasks_recover_mutant_data, "recover_mutant_data_mdata")[task_id]
+			local spawned_by = type(var) == "table" and var.coop_giver or d and d.coop_giver or giver
+			coop.report_fact("spawned:" .. spawned_by .. ":" .. task_id, "")
+		end
+		task_callback(tsk, state)
+	end
+
+	coop_facts.on_fact("done:", function(fact, value)
+		local giver, task_id = string.match(fact, "^done:(%d+):(.+)$")
+		local who, when = who_when(value)
+		if not (giver and who) or who == coop.my_name() then
+			return
+		end
+		local rtask = task_manager.get_task_manager().task_info[task_id]
+		if rtask and rtask.stage ~= 255 and rtask.task_giver_id == tonumber(giver) and rtask.inited_time
+			and game_seconds(rtask.inited_time) <= when and first_to_hand_in(task_id) then
+			cancel(task_id, strformat(game.translate_string("st_coop_task_done_by"), who))
+		end
+	end)
+end
+
 function on_game_start()
-	if not coop then
+	if not (coop and coop_facts and tasks_bounty and tasks_assault and tasks_recover_item_on_corpse and tasks_stash
+		and tasks_fate and tasks_recover_mutant_data and tasks_veh_destroy and task_objects and bind_heli
+		and xr_effects.setup_bounty_task) then
 		return -- not the co-op engine
 	end
 	local send_task = news_manager.send_task
@@ -45,4 +857,15 @@ function on_game_start()
 		end
 		return send_task(actor, kind, tsk)
 	end
+	share_bounty_targets()
+	share_points()
+	share_squads()
+	share_map_clearing()
+	share_helicopters()
+	share_job_spawns()
+	share_fates()
+	share_mutant_data()
+	share_vehicles()
+	share_hand_ins()
+	share_task_spawns() -- last: around the wrappers above
 end

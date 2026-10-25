@@ -1,0 +1,507 @@
+-- Co-op: world events (docs/coop/plan.md, "Личный прогресс"): the defence of the barrier from the Monolith or from
+-- zombies (tasks_defense) and of the pump station (tasks_pump_station_defense). One at a time for the world: the game
+-- of the player who starts it is its host and runs it - what it spawns is everyone's (and the forced logic of its
+-- NPCs, wherever they are run); the others hear of it from the server's facts. Everyone who took part gets the full
+-- reward in his own game: he was in the event's zone while it ran and hurt or killed at least one of its attackers,
+-- holding the task or not. The host gets his as in a game of one, from the giver.
+-- Facts: "event:<name>" = "<host>|<run>|<state>" (run: game seconds it began; state announced, running, won, failed),
+-- "eventpart:<name>:<player>" = "<run>" from the game the hit was taken in.
+-- No surge or psi storm begins while one runs (each game has its own). Its host gone from the game, the player in
+-- its zone first in id order takes it over with the state the host keeps on the server ("eventdata:<name>"), and
+-- the old host's task, if he comes back, is taken off; nobody in the zone, it is lost.
+-- The base defence (faction_base_defense) isn't here: in Anomaly only Yantar's story starts it.
+
+local BARRIER = { "barrier_defense_monolith", "barrier_defense_zombie" }
+
+local function squad_section_in(sections)
+	return function(npc)
+		local squad = get_object_squad(npc)
+		return squad and sections[squad:section_name()] or false
+	end
+end
+
+local function smart_position(name)
+	local smart = SIMBOARD.smarts_by_names[name]
+	return smart and smart.position
+end
+
+local EVENTS = {
+	barrier_defense_monolith = {
+		smart = "mil_smart_terrain_3_8", radius = 90,
+		attacker = squad_section_in({ barrier_monolith_squad = true, barrier_monolith_squad_rpg = true }),
+		sender = { "mil_freedom_leader_name", "ui_inGame2_lukash" },
+	},
+	barrier_defense_zombie = {
+		smart = "mil_smart_terrain_3_8", radius = 90,
+		attacker = squad_section_in({ barrier_zombie_squad = true }),
+		sender = { "mil_freedom_leader_name", "ui_inGame2_lukash" },
+	},
+	pump_station = {
+		task = "mar_smart_terrain_base_stalker_leader_marsh_task_4",
+		smart = "mar_smart_terrain_5_8", radius = 55, -- tasks_pump_station_defense: 3000 squared
+		attacker = function(npc)
+			local center = smart_position("mar_smart_terrain_5_8")
+			return character_community(npc) == "bandit" and center and npc:position():distance_to(center) <= 55
+		end,
+		sender = { "mar_smart_terrain_base_stalker_leader_marsh_task_4_title", "ui_iconsTotal_defend_lager" },
+	},
+}
+
+local hosting = 0 -- > 0 while our game runs a part of an event as its host: spawns shared, forced logic sent
+local HOST_GONE_MS = 15000 -- out of the game so long, the host hands the event over
+local missing = {}         -- event -> time_global() its host was first missed
+
+-- a module's own table of its state: its save_state puts it in m_data (the same table)
+local function module_data(module, key)
+	local m_data = alife_storage_manager.get_state()
+	module.save_state(m_data)
+	return m_data[key]
+end
+
+local function game_seconds()
+	return math.floor(game.get_game_time():diffSec(level.get_start_time()))
+end
+
+-- host, run, state of an event's fact
+local function parse_state(value)
+	local host, run, state = string.match(value or "", "^(.*)|(%d+)|(%a+)$")
+	return host, tonumber(run), state
+end
+
+local function event_state(name)
+	return parse_state(coop.fact("event:" .. name))
+end
+
+local function set_state(name, host, run, state)
+	coop.report_fact("event:" .. name, host .. "|" .. run .. "|" .. state)
+	printf("[coop] event %s: %s (host '%s', run %s)", name, state, host, run)
+end
+
+local function in_world(player)
+	if player == coop.my_name() then
+		return true
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.name == player then
+			return true
+		end
+	end
+	return false
+end
+
+-- running with its host here: no other may begin (a host gone, the event is as good as over)
+local function busy(name)
+	local host, _, state = event_state(name)
+	return state == "running" and in_world(host)
+end
+
+local function as_host(f, ...)
+	hosting = hosting + 1
+	coop.begin_shared()
+	local res = { pcall(f, ...) }
+	coop.end_shared()
+	hosting = hosting - 1
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+local function hosts(name)
+	local host, _, state = event_state(name)
+	return state == "running" and host == coop.my_name()
+end
+
+local function tip(name, text)
+	local sender = EVENTS[name].sender
+	dynamic_news_helper.send_tip(game.translate_string(text), game.translate_string(sender[1]), nil, nil, sender[2], nil, "npc")
+end
+
+------------------------------------------------------------------------------------------------
+-- The host handing over
+
+-- what our game as the host keeps of an event, for another to take it over
+local function host_data(name)
+	local task_id = EVENTS[name].task
+	if task_id then -- the pump station: all in its module and its task's stage
+		local tsk = task_manager.get_task_manager().task_info[task_id]
+		return tsk and { stage = tsk.stage, giver = tsk.task_giver_id,
+			M = module_data(tasks_pump_station_defense, "pump_station_def_csky") }
+	end
+	return { mdata = module_data(tasks_defense, "defense_task_data")[name] }
+end
+
+-- the one to take an event over: the player in its zone first in id order (our name or a peer's), nil for none
+local function heir_of(event)
+	local smart = SIMBOARD.smarts_by_names[event.smart]
+	if not smart then
+		return
+	end
+	local level_name = alife():level_name(game_graph():vertex(smart.m_game_vertex_id):level_id())
+	local heir, heir_id
+	if level.name() == level_name and db.actor:position():distance_to(smart.position) <= event.radius then
+		heir, heir_id = coop.my_name(), coop.my_id()
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == level_name and p.position:distance_to(smart.position) <= event.radius
+			and (not heir_id or p.id < heir_id) then
+			heir, heir_id = p.name, p.id
+		end
+	end
+	return heir
+end
+
+local function take_over(name, run, data)
+	set_state(name, coop.my_name(), run, "running") -- first: our task's functor finds the event ours
+	local task_id = EVENTS[name].task
+	local tm = task_manager.get_task_manager()
+	if task_id then
+		local M = module_data(tasks_pump_station_defense, "pump_station_def_csky")
+		for k in pairs(M) do
+			M[k] = nil
+		end
+		for k, v in pairs(data.M or {}) do
+			M[k] = v
+		end
+		tm:give_task(task_id, data.giver)
+		if tm.task_info[task_id] then
+			tm.task_info[task_id].stage = data.stage
+		end
+	else
+		local MDATA = module_data(tasks_defense, "defense_task_data")
+		MDATA[name] = data.mdata
+		MDATA.allow_surge = false
+		tm:give_task(name)
+	end
+	tip(name, "st_coop_event_taken_over")
+end
+
+local next_check = 0
+local function watch_hosts()
+	if time_global() < next_check or not coop.connected() then
+		return
+	end
+	next_check = time_global() + 5000
+	local me = coop.my_name()
+	for name, event in pairs(EVENTS) do
+		local host, run, state = event_state(name)
+		if state ~= "running" or host == me or in_world(host) then
+			missing[name] = nil
+			if state == "running" and host == me then
+				local data = host_data(name)
+				if data then
+					coop.report_fact("eventdata:" .. name, coop_sync.serialize(data))
+				end
+			end
+		else
+			missing[name] = missing[name] or time_global()
+			if time_global() - missing[name] >= HOST_GONE_MS then
+				missing[name] = nil
+				local heir = heir_of(event)
+				local data = coop_sync.deserialize(coop.fact("eventdata:" .. name))
+				if heir == me and type(data) == "table" then
+					take_over(name, run, data)
+				elseif (not heir or type(data) ~= "table") and coop.is_sim_master() then
+					set_state(name, host, run, "failed") -- nobody there to hold it
+				end
+			end
+		end
+	end
+end
+
+-- no surge or psi storm while an event runs
+local function hold_back(flags)
+	if not coop.connected() then
+		return
+	end
+	for name in pairs(EVENTS) do
+		if busy(name) then
+			flags.allow = false
+			return
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Rewards of the ones who took part, as the host's task gives them
+
+local function give(section, count)
+	news_manager.relocate_item(db.actor, "in", section, count)
+	for i = 1, count do
+		alife_create_item(section, db.actor)
+	end
+end
+
+local function give_money(amount)
+	news_manager.relocate_money(db.actor, "in", amount)
+	db.actor:give_money(amount)
+end
+
+-- ammo for the weapons in the two main slots (tasks_defense)
+local function give_ammo(min, max)
+	for _, slot in ipairs({ 2, 3 }) do
+		local weapon = db.actor:item_in_slot(slot)
+		local classes = weapon and ini_sys:r_string_ex(weapon:section(), "ammo_class")
+		if classes then
+			give(str_explode(classes, ",")[1], math.random(min, max))
+		end
+	end
+end
+
+local REWARDS = {
+	barrier_defense_monolith = function()
+		give("joint", 1)
+		give_ammo(4, 6)
+		give_money(40000)
+	end,
+	barrier_defense_zombie = function()
+		give("vodka", 1)
+		give("drug_psy_blockade", 2)
+		give_ammo(2, 4)
+		give_money(25000)
+	end,
+	pump_station = function() -- tasks_pump_station_defense: a container more for every 20 days
+		local pool = { "af_dummy_battery_lead_box", "af_dummy_glassbeads_lead_box", "af_electra_moonlight_lead_box",
+			"af_night_star_lead_box", "af_soul_lead_box" }
+		local days = math.min(math.floor(game_seconds() / 86400), 60)
+		repeat
+			give(pool[math.random(#pool)], 1)
+			days = days - 20
+		until days <= 0
+		xr_effects.complete_task_inc_goodwill(db.actor, db.actor, { "100", "csky" })
+	end,
+}
+
+-- the event won: our share, if we took part and aren't its host
+local function reward(name, host, run)
+	local me = coop.my_name()
+	if host == me or tonumber(coop.fact("eventpart:" .. name .. ":" .. me)) ~= run
+		or load_var(db.actor, "coop_event_rewarded_" .. name) == run then
+		return
+	end
+	save_var(db.actor, "coop_event_rewarded_" .. name, run)
+	tip(name, "st_coop_event_reward")
+	REWARDS[name]()
+	printf("[coop] event %s (run %s): our share of the reward", name, run)
+end
+
+------------------------------------------------------------------------------------------------
+-- Who takes part: hurt or killed an attacker while in the zone. Seen in the game the hit is taken in.
+
+local function player_of(who)
+	if not who then
+		return
+	end
+	if who:id() == AC_ID then
+		return coop.my_name()
+	end
+	local peer = coop.stand_in_peer(who:id())
+	if peer ~= 0 then
+		for _, p in ipairs(coop.peers()) do
+			if p.id == peer then
+				return p.name
+			end
+		end
+	end
+end
+
+local function on_hit(npc, amount, direction, who)
+	if not (npc and who and coop.connected()) then
+		return
+	end
+	local player
+	for name, event in pairs(EVENTS) do
+		local host, run, state = event_state(name)
+		if state == "running" and event.attacker(npc) then
+			player = player or player_of(who)
+			local center = smart_position(event.smart)
+			if player and center and who:position():distance_to(center) <= event.radius then
+				coop.report_fact("eventpart:" .. name .. ":" .. player, tostring(run))
+			end
+		end
+	end
+end
+
+-- xr_effects[effect] runs as the host's alone: name_of(params) is its event
+local function wrap_host_effect(effect, name_of)
+	local original = xr_effects[effect]
+	xr_effects[effect] = function(a, b, p)
+		if not coop.connected() then
+			return original(a, b, p)
+		end
+		local name = name_of(p)
+		if name and hosts(name) then
+			return as_host(original, a, b, p)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- The barrier
+
+local function wrap_barrier()
+	-- its announcement: the sim master's game rolls it (and drops it a day later), the others hear of it
+	local first_update = tasks_defense.actor_on_first_update
+	local function on_first_update(...)
+		if not coop.connected() then
+			return first_update(...)
+		end
+		if coop.is_sim_master() and not (busy(BARRIER[1]) or busy(BARRIER[2])) then
+			first_update(...)
+			CreateTimeEvent("coop_events", "barrier_announced", 25, function() -- it gives the info 20 s later
+				for _, name in ipairs(BARRIER) do
+					local _, _, state = event_state(name)
+					if db.actor:has_info(name .. "_announced") and state ~= "announced" then
+						set_state(name, "", game_seconds(), "announced")
+					elseif not db.actor:has_info(name .. "_announced") and state == "announced" then
+						coop.report_fact("event:" .. name, "")
+					end
+				end
+				return true
+			end)
+		end
+	end
+	-- the one tasks_defense registers (in its on_game_start, before or after ours)
+	tasks_defense.actor_on_first_update = on_first_update
+	UnregisterScriptCallback("actor_on_first_update", first_update)
+	RegisterScriptCallback("actor_on_first_update", on_first_update)
+
+	-- started by talking to Lukash: we are its host
+	for _, name in ipairs(BARRIER) do
+		local start = name .. "_start"
+		local original = tasks_defense[start]
+		tasks_defense[start] = function(a, b)
+			if not coop.connected() then
+				return original(a, b)
+			end
+			as_host(original, a, b)
+			set_state(name, coop.my_name(), game_seconds(), "running")
+		end
+	end
+
+	-- the first wave (near the barrier, from the host's task) and the next ones (a wave's squad dead): the host's
+	wrap_host_effect("barrier_defense_first_spawn", function(p)
+		return p and p[1] and "barrier_defense_" .. p[1]
+	end)
+	wrap_host_effect("on_barrier_defense_squad_death", function(p)
+		local name = p and p[1]
+		return name == "barrier_defense_freedom" and (hosts(BARRIER[1]) and BARRIER[1] or BARRIER[2]) or name
+	end)
+end
+
+------------------------------------------------------------------------------------------------
+-- The pump station: the whole event runs in its task's status functor, in the holder's game
+
+local function wrap_pump()
+	local precondition = xr_conditions.pump_station_defense_task_precondition
+	xr_conditions.pump_station_defense_task_precondition = function(...)
+		if coop.connected() and busy("pump_station") then
+			return false
+		end
+		return precondition(...)
+	end
+
+	local status = task_status_functor.gd_task_status_functor
+	task_status_functor.gd_task_status_functor = function(tsk, task_id)
+		if not (coop.connected() and tsk) then
+			return status(tsk, task_id)
+		end
+		local res = as_host(status, tsk, task_id)
+		local me = coop.my_name()
+		local host, run, state = event_state("pump_station")
+		local ours = state == "running" and host == me
+		if res == "fail" then
+			if ours then
+				set_state("pump_station", me, run, "failed")
+			end
+		elseif tsk.stage == 6 then -- the attack beaten off
+			if ours then
+				set_state("pump_station", me, run, "won")
+			end
+		elseif not ours then -- the task is on
+			set_state("pump_station", me, game_seconds(), "running")
+		end
+		return res
+	end
+
+	-- its NPCs' forced logic: in every game, the one running the marsh drives them
+	local assign = logic_enforcer.assign
+	logic_enforcer.assign = function(id, ini_filename, logic_name, section_name, tags)
+		assign(id, ini_filename, logic_name, section_name, tags)
+		if hosting > 0 and coop.connected() then
+			coop_sync.send_event("logic_assign", id, ini_filename, logic_name, section_name)
+		end
+	end
+	coop_sync.on_event("logic_assign", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		local id = tonumber(f[1])
+		if id and f[4] then
+			assign(id, f[2], f[3], f[4])
+		end
+	end)
+end
+
+------------------------------------------------------------------------------------------------
+
+function on_game_start()
+	if not (coop and coop_facts and coop_sync and coop_tasks and tasks_defense and tasks_pump_station_defense
+		and logic_enforcer) then
+		return -- not the co-op engine
+	end
+	wrap_barrier()
+	wrap_pump()
+
+	-- the barrier won (all attackers dead: its finished info in the host's game) or lost (the host's task failed)
+	RegisterScriptCallback("actor_on_info_callback", function(npc, info)
+		for _, name in ipairs(BARRIER) do
+			if info == name .. "_finished" and coop.connected() then
+				local host, run = event_state(name)
+				if host == coop.my_name() then
+					set_state(name, host, run, "won")
+				end
+			end
+		end
+	end)
+	local task_callback = task_manager.task_callback
+	task_manager.task_callback = function(tsk, state)
+		local task_id = tsk and tsk:get_id()
+		task_callback(tsk, state)
+		if state == task.fail and EVENTS[task_id] and coop.connected() then
+			local host, run = event_state(task_id)
+			if host == coop.my_name() then
+				set_state(task_id, host, run, "failed")
+			end
+		end
+	end
+
+	RegisterScriptCallback("npc_on_hit_callback", on_hit)
+	RegisterScriptCallback("monster_on_hit_callback", on_hit)
+	RegisterScriptCallback("actor_on_update", watch_hosts)
+	RegisterScriptCallback("on_before_surge", hold_back)
+	RegisterScriptCallback("on_before_psi_storm", hold_back)
+
+	coop_facts.on_fact("event:", function(fact, value)
+		local name = string.match(fact, "^event:(.+)$")
+		if not (EVENTS[name] and db.actor) then
+			return
+		end
+		local host, run, state = parse_state(value)
+		local announced = name .. "_announced"
+		if name == "pump_station" then
+		elseif state == "announced" and not db.actor:has_info(announced) then
+			db.actor:give_info_portion(announced) -- Lukash has the job for us too
+			tip(name, name .. "_announce")
+		elseif state ~= "announced" and db.actor:has_info(announced) and host ~= coop.my_name() then
+			db.actor:disable_info_portion(announced) -- someone took it, or it's gone
+		end
+		-- ours once, taken over by another while we were away: our task goes (the rest is his now)
+		local task_id = EVENTS[name].task or name
+		if host and host ~= "" and host ~= coop.my_name() and state ~= "announced"
+			and task_manager.get_task_manager().task_info[task_id] then
+			coop_tasks.cancel(task_id, strformat(game.translate_string("st_coop_event_continued"), host))
+		end
+		if state == "won" then
+			reward(name, host, run)
+		end
+	end)
+end

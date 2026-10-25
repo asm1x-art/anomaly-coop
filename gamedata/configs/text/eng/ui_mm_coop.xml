@@ -43,6 +43,30 @@
 	<string id="st_coop_difficulty_server">
 		<text>In co-op the difficulty is the world's: the server sets it (admin page).</text>
 	</string>
+	<string id="st_coop_task_target_killed">
+		<text>%s already took the target out. The contract is off, there's nothing to pay you for.</text>
+	</string>
+	<string id="st_coop_task_target_died">
+		<text>The target is dead, but no stalker did it. The contract is off.</text>
+	</string>
+	<string id="st_coop_task_point_cleared">
+		<text>%s already cleared the place. The contract is off, thanks.</text>
+	</string>
+	<string id="st_coop_task_point_left">
+		<text>It's clear already, but not thanks to you. The contract is off.</text>
+	</string>
+	<string id="st_coop_event_taken_over">
+		<text>Whoever led the defence is gone. It is on you now, stalker, hold on!</text>
+	</string>
+	<string id="st_coop_event_continued">
+		<text>%s carried on the defence without you. The task is off.</text>
+	</string>
+	<string id="st_coop_event_reward">
+		<text>Thanks for helping hold them off, stalker. Here's your share.</text>
+	</string>
+	<string id="st_coop_task_done_by">
+		<text>Too late, stalker: %s already did it. No longer needed.</text>
+	</string>
 	<string id="st_coop_tools_brought">
 		<text>Too late, stalker: %s has brought me those tools already. Thanks, I don't need them.</text>
 	</string>

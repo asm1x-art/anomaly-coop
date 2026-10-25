@@ -46,6 +46,30 @@
 	<string id="st_coop_difficulty_server">
 		<text>Сложность в кооперативе одна на мир: её задаёт сервер (админка).</text>
 	</string>
+	<string id="st_coop_task_target_killed">
+		<text>Цель уже устранил %s. Заказ снят, платить тебе не за что.</text>
+	</string>
+	<string id="st_coop_task_target_died">
+		<text>Цель мертва, но не от руки сталкера. Заказ снят.</text>
+	</string>
+	<string id="st_coop_task_point_cleared">
+		<text>Точку уже зачистил %s. Заказ снят, спасибо.</text>
+	</string>
+	<string id="st_coop_task_point_left">
+		<text>Тут уже чисто, но не твоими стараниями. Заказ снят.</text>
+	</string>
+	<string id="st_coop_event_taken_over">
+		<text>Тот, кто вёл оборону, ушёл. Теперь на тебе, сталкер, — держитесь!</text>
+	</string>
+	<string id="st_coop_event_continued">
+		<text>Оборону без тебя продолжил %s. Задание снято.</text>
+	</string>
+	<string id="st_coop_event_reward">
+		<text>Спасибо за помощь в обороне, сталкер. Вот твоя доля.</text>
+	</string>
+	<string id="st_coop_task_done_by">
+		<text>Опоздал, сталкер: это уже сделал %s. Больше не нужно.</text>
+	</string>
 	<string id="st_coop_tools_brought">
 		<text>Опоздал, сталкер: инструменты мне уже принёс %s. Спасибо, больше не нужно.</text>
 	</string>
