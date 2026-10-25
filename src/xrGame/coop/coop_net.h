@@ -63,6 +63,11 @@ namespace coop
 		M_PROGRESS_REQUEST = 46, // s->c, to all in the world when it is to be saved: send our progress (coop_progress.h)
 		M_PROGRESS = 47,        // both: u32 total size, u32 offset, data; c->s our progress, s->c ours with the world,
 		                        // before M_WORLD_DONE (total 0: none kept)
+		M_OBJECT_STATE = 50,    // c->s: u16 size, the object's M_SPAWN packet (Spawn_Write), u16 size, its client data,
+		                        // stringZ its Lua data: an item of ours as it is now (condition, upgrades, ammo, uses...);
+		                        // relayed like the above
+		M_FACT = 49,            // both: stringZ key, stringZ value ("" gone): a fact about the world (coop_facts.h); s->c
+		                        // also each one the server keeps, before M_WORLD_DONE
 		M_LOG = 48,             // c->s: stringZ file name, u32 size, u32 packed size (zlib), u32 offset, data: a log
 		                        // or crash dump of ours, for the server's data/logs (coop_logs.h)
 		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
@@ -79,7 +84,7 @@ namespace coop
 		eGroupKick,
 	};
 
-	const u16 PROTOCOL_VERSION = 16;
+	const u16 PROTOCOL_VERSION = 18;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook

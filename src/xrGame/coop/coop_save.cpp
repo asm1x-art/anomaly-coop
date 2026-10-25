@@ -4,6 +4,7 @@
 #include "coop_shadow.h"
 #include "coop_world.h"
 #include "coop_progress.h"
+#include "coop_facts.h"
 #include "Level.h"
 #include "Actor.h"
 #include "ai_object_location.h"
@@ -234,6 +235,7 @@ namespace coop
 		for (auto& file : g_download)
 			file.clear();
 		forget_progress();
+		forget_facts();
 		g_downloading = true;
 		NET_Packet R;
 		R.w_begin(M_WORLD_REQUEST);
@@ -867,6 +869,7 @@ namespace coop
 		g_in_world = g_loading_revision;
 
 		apply_progress();
+		put_infos_on_load(); // after it: what the server knows of the world wins over both
 		name_actor();
 
 		if (is_mine(g_loading_owner))

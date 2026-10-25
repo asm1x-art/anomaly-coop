@@ -12,6 +12,8 @@ import { normalizeSettings } from './settings.js';
 //                             rollback (from: the save it went back to); who: the player it was for
 //   leases.json             { block: player }: id blocks, they must outlive restarts like the world does
 //   characters.json         { player: base64 record }: position, money... as the client sent it
+//   facts.json              { key: value }: facts about the world the games report (protocol.js FACT); saves keep
+//                            a copy, a rollback brings it back
 //   logs/<hex name>/<file>   the logs and crash dumps a player's game sent, the last MAX_LOGS (not the world's:
 //                            a reset keeps them)
 //   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
@@ -40,6 +42,7 @@ export function openStorage(dir) {
   };
 
   let characters = readJson('characters.json', {});
+  let facts = readJson('facts.json', {});
 
   const saveFile = (revision, name) => path.join('saves', String(revision), name);
   const playerDir = (name) => Buffer.from(name, 'utf8').toString('hex');
@@ -124,6 +127,16 @@ export function openStorage(dir) {
       }
     },
 
+    facts: () => ({ ...facts }),
+    // true when it changed
+    setFact(key, value) {
+      if ((facts[key] ?? '') === value) return false;
+      if (value) facts[key] = value;
+      else delete facts[key];
+      writeAtomic('facts.json', JSON.stringify(facts, null, 1));
+      return true;
+    },
+
     worldInfo() {
       const last = saves.at(-1);
       return last ? { owner: last.owner, revision: last.revision } : null;
@@ -137,8 +150,9 @@ export function openStorage(dir) {
     // the world and everything that only makes sense with it: saves, characters, id leases, groups
     resetWorld() {
       fs.rmSync(file('saves'), { recursive: true, force: true });
-      for (const f of ['leases.json', 'characters.json', 'groups.json'])
+      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json'])
         fs.rmSync(file(f), { force: true });
+      facts = {};
       fs.rmSync(file('progress'), { recursive: true, force: true });
       saves.length = 0;
       characters = {};
@@ -174,6 +188,7 @@ export function openStorage(dir) {
       fs.mkdirSync(file(saveFile(revision, '')), { recursive: true });
       WORLD_FILES.forEach((f, i) => writeAtomic(saveFile(revision, f), files[i]));
       writeAtomic(saveFile(revision, 'characters.json'), JSON.stringify(characters, null, 1));
+      writeAtomic(saveFile(revision, 'facts.json'), JSON.stringify(facts, null, 1));
       copyProgress('progress', saveFile(revision, 'progress'));
       const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}) };
       writeAtomic(saveFile(revision, 'meta.json'), JSON.stringify(meta));
@@ -186,6 +201,8 @@ export function openStorage(dir) {
       if (!from) return 0;
       characters = readJson(saveFile(revision, 'characters.json'), {});
       writeAtomic('characters.json', JSON.stringify(characters, null, 1));
+      facts = readJson(saveFile(revision, 'facts.json'), {});
+      writeAtomic('facts.json', JSON.stringify(facts, null, 1));
       copyProgress(saveFile(revision, 'progress'), 'progress');
       return this.writeWorld(from.owner, this.readWorld(revision), { name: from.name, reason: 'rollback', from: revision });
     },

@@ -50,6 +50,7 @@ namespace inventory
 
 			// precondition_functor
 			LPCSTR precondition_functor_str = pSettings->r_string(id(), "precondition_functor");
+			m_preconditions.name = precondition_functor_str;
 			m_preconditions.parameter = pSettings->r_string(id(), "precondition_parameter");
 			m_preconditions.parameter2 = m_section.c_str();
 			R_ASSERT2(
@@ -62,6 +63,7 @@ namespace inventory
 
 			// effect_functor
 			LPCSTR effect_functor_str = pSettings->r_string(id(), "effect_functor");
+			m_effects.name = effect_functor_str;
 			m_effects.parameter = pSettings->r_string(id(), "effect_parameter");
 			m_effects.parameter2 = m_section.c_str();
 			m_effects.parameter3 = 1;
@@ -75,6 +77,7 @@ namespace inventory
 
 			// prereq_functor (1,2) : m_prerequisites, m_tooltip
 			LPCSTR prereq_functor_str = pSettings->r_string(id(), "prereq_functor"); //prerequisites_functor
+			m_prerequisites.name = prereq_functor_str;
 			//	LPCSTR tooltip_functor_str	= pSettings->r_string( id(), "prereq_tooltip_functor" );
 			m_prerequisites.parameter = pSettings->r_string(id(), "prereq_params"); //prerequisites_params
 			m_prerequisites.parameter2 = m_section.c_str();

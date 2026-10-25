@@ -1,7 +1,10 @@
 // What the server decides for everyone. The world settings are the options of Anomaly's new game screen
 // (gamedata/scripts/ui_mm_faction_select.script) that belong to the world rather than to a character;
 // they take effect when a world is created. Factions limit what a player can pick for their character.
-// Azazel mode is left out: it swaps the actor for another NPC, which co-op can't follow.
+// Azazel mode is left out: it swaps the actor for another NPC, which co-op can't follow. Warfare and Ironman are off
+// in co-op for now (maybe their own modes later): kept here, always false, as the game reads the keys.
+// Difficulty and economy are the world's, the same for everyone: a game loading the world takes them from here
+// (coop_rules.script), so a change shows from the next load.
 // The rules are co-op's own (groups, fights, death, fast travel) and apply at once (coop_rules.script).
 
 export const FACTIONS = ['stalker', 'dolg', 'freedom', 'csky', 'ecolog', 'killer', 'army', 'bandit', 'monolith',
@@ -36,6 +39,11 @@ export const DEFAULT_SETTINGS = {
     fast_travel: true,
     travel_overloaded: false, // fast travel with too much to carry
     travel_enemy_radius: 50, // m: no fast travel with enemies this close; 0: no such check
+    // % off a mechanic's upgrades of a tier for the player who brought him the tools for it (coop_mechanics.script)
+    tool_discount_1: 20, // rough work
+    tool_discount_2: 25, // fine work
+    tool_discount_3: 30, // calibration
+    tool_group_share: 50, // % of that discount for the bringer's group
   },
 };
 
@@ -48,6 +56,10 @@ export const RULE_LIMITS = {
   downed_time: [0, 600],
   revive_time: [1, 60],
   revive_health: [1, 100],
+  tool_discount_1: [0, 90],
+  tool_discount_2: [0, 90],
+  tool_discount_3: [0, 90],
+  tool_group_share: [0, 100],
   rank_loss: [0, 100],
   travel_enemy_radius: [0, 500],
 };
@@ -80,14 +92,14 @@ export function normalizeSettings(input = {}) {
   return {
     world: {
       story: bool('story'),
-      warfare: bool('warfare'),
+      warfare: false,
       survival: bool('survival'),
       campfire: bool('campfire'),
       conditions: bool('conditions'),
       opened_routes: bool('opened_routes'),
       difficulty: clampInt(w.difficulty, 1, 3, def.difficulty),
       economy: clampInt(w.economy, 1, 3, def.economy),
-      ironman: bool('ironman'),
+      ironman: false,
       ironman_lives: clampInt(w.ironman_lives, 1, 5, def.ironman_lives),
       ironman_regen: IRONMAN_REGEN_HOURS.includes(w.ironman_regen) ? w.ironman_regen : def.ironman_regen,
     },

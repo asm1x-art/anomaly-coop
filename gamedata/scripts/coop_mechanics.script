@@ -1,0 +1,105 @@
+-- Co-op: mechanics' tools (docs/coop/plan.md, "Инструменты техников"). One set per tier per mechanic for the whole
+-- world: the tier infos (<mechanic>_upgrade_tier_N) are world facts, and the server remembers who brought each set
+-- ("tool:<mechanic>:<tier>" = player, src/xrGame/coop/coop_facts.cpp). The one who brought it gets that tier's
+-- upgrades at that mechanic cheaper, the group a share of it (coop_rules tool_discount_N, tool_group_share);
+-- anyone else holding the same toolkit task loses it softly, the giver saying who was first.
+
+local TIER_OF = { a = 1, b = 1, c = 2, d = 2, e = 3, f = 3 } -- an upgrade section's 14th letter (inventory_upgrades)
+local DEFAULT_DISCOUNT = { 20, 25, 30 }
+
+local function in_my_group(name)
+	for _, member in ipairs(coop.group()) do
+		if member == name then
+			return true
+		end
+	end
+	return false
+end
+
+-- % off this upgrade at the mechanic we talk to
+local function discount(section)
+	local mechanic = get_speaker()
+	if not (mechanic and section) then
+		return 0
+	end
+	local tier = TIER_OF[string.sub(section, 14, 14)] or 1
+	local who = coop.fact("tool:" .. mechanic:section() .. ":" .. tier)
+	if who == "" then
+		return 0
+	end
+	local off = coop_rules.number("tool_discount_" .. tier, DEFAULT_DISCOUNT[tier])
+	if who == coop.my_name() then
+		return off
+	elseif in_my_group(who) then
+		return off * coop_rules.number("tool_group_share", 50) / 100
+	end
+	return 0
+end
+
+-- f with the mechanic's price lowered by the discount for section (cur_price_percent, which every price uses)
+local function with_discount(section, f, ...)
+	local off = coop.connected() and discount(section) or 0
+	if off <= 0 then
+		return f(...)
+	end
+	local base = inventory_upgrades.get_price_percent()
+	local eco = game_difficulties.get_eco_factor("upgrade") or 1
+	inventory_upgrades.mech_discount(base * (1 - off / 100) / eco)
+	local res = { pcall(f, ...) }
+	inventory_upgrades.mech_discount(base / eco)
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+local function wrap_prices()
+	-- the price shown, the money check, the requirements text and the charge (the engine looks them up by name)
+	local cost = inventory_upgrades.get_upgrade_cost
+	inventory_upgrades.get_upgrade_cost = function(section)
+		return with_discount(section, cost, section)
+	end
+	for _, name in ipairs({ "precondition_functor_a", "prereq_functor_a", "effect_functor_a" }) do
+		local original = inventory_upgrades[name]
+		inventory_upgrades[name] = function(param, section, ...)
+			return with_discount(section, original, param, section, ...)
+		end
+	end
+end
+
+-- "Mechanized Warfare": a mechanic got all his tools - from us
+local function wrap_achievement()
+	local requirements = game_achievements.mechanized_warfare_requirements
+	game_achievements.mechanized_warfare_requirements = function()
+		if not coop.connected() then
+			return requirements()
+		end
+		local has = _G.has_alife_info
+		_G.has_alife_info = function(info)
+			local mechanic, tier = string.match(info, "^(.+)_upgrade_tier_(%d)$")
+			if mechanic then
+				return coop.fact("tool:" .. mechanic .. ":" .. tier) == coop.my_name()
+			end
+			return has(info)
+		end
+		local ok, res = pcall(requirements)
+		_G.has_alife_info = has
+		return ok and res
+	end
+end
+
+function on_game_start()
+	if not (coop and inventory_upgrades and coop_facts and coop_tasks) then
+		return -- not the co-op engine
+	end
+	wrap_prices()
+	wrap_achievement()
+
+	-- someone brought a set: our same toolkit task goes (its tier's task is <mechanic>_task_<tier>)
+	coop_facts.on_fact("tool:", function(fact, who)
+		local mechanic, tier = string.match(fact, "^tool:(.+):(%d)$")
+		if mechanic and who ~= "" and who ~= coop.my_name() then
+			coop_tasks.cancel(mechanic .. "_task_" .. tier, strformat(game.translate_string("st_coop_tools_brought"), who))
+		end
+	end)
+end

@@ -16,6 +16,9 @@
 #include "level_graph.h"
 #include "game_level_cross_table.h"
 #include "ai_object_location.h"
+#include "Inventory.h"
+#include "inventory_item.h"
+#include "script_engine.h"
 
 namespace coop
 {
@@ -351,12 +354,111 @@ namespace coop
 			Msg("[coop] took %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 	}
 
+	static void send_item_state(CSE_ALifeDynamicObject* object)
+	{
+		NET_Packet spawn;
+		object->Spawn_Write(spawn, FALSE);
+		NET_Packet client;
+		client.write_start();
+		if (CGameObject* game_object = smart_cast<CGameObject*>(Level().Objects.net_Find(object->ID)))
+			game_object->net_Save(client); // u16 size, then the data, as a save keeps it
+		const u32 client_size = client.B.count > sizeof(u16) ? client.B.count - sizeof(u16) : 0;
+		// what scripts keep by its id (coop_sync.script)
+		::luabind::functor<LPCSTR> item_lua;
+		LPCSTR lua = nullptr;
+		if (ai().script_engine().functor("coop_sync.item_lua", item_lua))
+			lua = item_lua(object->ID);
+
+		NET_Packet P;
+		P.w_begin(M_OBJECT_STATE);
+		P.w_u16(u16(spawn.B.count));
+		P.w(spawn.B.data, spawn.B.count);
+		P.w_u16(u16(client_size));
+		if (client_size)
+			P.w(client.B.data + sizeof(u16), client_size);
+		P.w_stringZ(lua ? lua : "");
+		send(P);
+	}
+
+	void send_inventory_states()
+	{
+		if (!should_send() || !g_actor)
+			return;
+		u32 sent = 0;
+		for (PIItem item : g_actor->inventory().m_all)
+		{
+			const u16 id = item->object().ID();
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
+			if (!object || local_objects().count(id))
+				continue; // not the others' yet: sent whole when it is
+			send_item_state(object);
+			++sent;
+		}
+		if (debug_mode)
+			Msg("[coop dbg] the state of our %u thing(s) sent", sent);
+	}
+
+	void apply_object_state(NET_Packet& P)
+	{
+		P.r_u32(); // sender
+		const u16 size = P.r_u16();
+		NET_Packet spawn;
+		spawn.construct(&P.B.data[P.r_tell()], size);
+		P.r_advance(size);
+		const u16 client_size = P.r_u16();
+		xr_vector<u8> client(client_size);
+		if (client_size)
+			P.r(client.data(), client_size);
+		xr_string lua;
+		P.r_stringZ(lua);
+
+		if (!level_running())
+			return;
+		u16 type;
+		string256 section;
+		spawn.r_begin(type);
+		spawn.r_stringZ(section);
+		if (!pSettings->section_exist(section))
+			return;
+		CSE_Abstract* state = F_entity_Create(section);
+		if (!state)
+			return;
+		state->Spawn_Read(spawn);
+		CSE_ALifeDynamicObject* object = local_object(state->ID, section);
+		// online here, its game object has the state; an offline copy (a shadow's) takes it
+		if (object && !object->m_bOnline)
+		{
+			const GameGraph::_GRAPH_ID game_vertex = object->m_tGraphID;
+			const u32 level_vertex = object->m_tNodeID;
+			const float distance = object->m_fDistance;
+			NET_Packet packet;
+			state->STATE_Write(packet);
+			packet.r_pos = 0;
+			object->STATE_Read(packet, u16(packet.B.count));
+			packet.write_start();
+			state->UPDATE_Write(packet);
+			packet.r_pos = 0;
+			object->UPDATE_Read(packet);
+			object->m_tGraphID = game_vertex; // where it is stays ours
+			object->m_tNodeID = level_vertex;
+			object->m_fDistance = distance;
+			if (!client.empty())
+				object->client_data = client;
+			::luabind::functor<void> take_lua;
+			if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
+				take_lua(object->ID, lua.c_str());
+		}
+		F_entity_Destroy(state);
+	}
+
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id)
 	{
 		if (g_remote_drops.erase(item->base()->ID))
 			return;
 		if (!should_send() || is_shadow(&parent) || local_objects().count(item->base()->ID))
 			return;
+		if (is_actor(&parent)) // the server entities are as the objects were last frame (CLevel::net_Update)
+			send_item_state(smart_cast<CSE_ALifeDynamicObject*>(item->base())); // as it leaves us, first
 
 		// the item is left where its holder stands
 		const CSE_ALifeDynamicObject* holder = smart_cast<CSE_ALifeDynamicObject*>(&parent);
@@ -575,6 +677,8 @@ namespace coop
 		CSE_ALifeDynamicObject* shadow = ai().alife().objects().object(shadow_of(receiver->second.name), true);
 		if (!shadow)
 			return false;
+
+		send_item_state(object); // as it leaves us, first
 
 		// into the receiver's shadow here, as apply_item_parent moves things
 		g_applying = true;

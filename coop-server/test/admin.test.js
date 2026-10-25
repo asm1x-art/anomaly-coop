@@ -56,7 +56,7 @@ test('admin: password required, settings saved and kept, players listed', async 
     let res = await s.call('PUT', '/api/settings', { world: { warfare: true, economy: 2 }, factions: ['monolith', 'dolg'] });
     assert.equal(res.status, 200);
     const state = await res.json();
-    assert.equal(state.settings.world.warfare, true);
+    assert.equal(state.settings.world.warfare, false); // off in co-op whatever is asked
     assert.equal(state.settings.world.economy, 2);
     assert.deepEqual(state.settings.factions, ['dolg', 'monolith']);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(s.dataDir, 'settings.json'), 'utf8')), state.settings);

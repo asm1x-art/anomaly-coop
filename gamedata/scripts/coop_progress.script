@@ -9,7 +9,7 @@ local PERSONAL = {
 	"actor_contacts", "azazel_death", "bolt_first", "bolt_slot", "bolts", "bounties_by_id", "bribe",
 	"companion_states", "default_faction", "detector_was_active", "disguise_highest_suspicion",
 	"disguise_npcs_memory", "disguise_state", "drink", "game_statistics", "jobs_guide",
-	"lttz_hb_last_stash_time", "lttz_hb_next_stash_time", "mlr", "multifetch_data", "psy_table", "PsyAntenna",
+	"lttz_hb_last_stash_time", "lttz_hb_next_stash_time", "mlr", "multifetch_data", "new_mines", "psy_table", "PsyAntenna",
 	"recover_mutant_data_mdata", "RF_freq", "RF_targets", "sleep", "start_wpn_ammo", "stealth_kills",
 	"task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
 }

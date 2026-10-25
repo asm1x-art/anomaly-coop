@@ -43,6 +43,12 @@
 	<string id="ui_mm_coop_profile_enter">
 		<text>Войти</text>
 	</string>
+	<string id="st_coop_difficulty_server">
+		<text>Сложность в кооперативе одна на мир: её задаёт сервер (админка).</text>
+	</string>
+	<string id="st_coop_tools_brought">
+		<text>Опоздал, сталкер: инструменты мне уже принёс %s. Спасибо, больше не нужно.</text>
+	</string>
 	<string id="ui_mm_coop_profile_disconnect">
 		<text>Отключиться</text>
 	</string>

@@ -534,9 +534,9 @@ test('settings: sent after welcome and to everyone when the admin changes them',
     assert.match(a.settings[0], /^story=1$/m);
     assert.match(a.settings[0], /^factions=stalker,dolg,/m);
 
-    server.coop.saveSettings({ world: { warfare: true }, factions: ['monolith'] });
+    server.coop.saveSettings({ world: { survival: true }, factions: ['monolith'] });
     await new Promise((r) => setTimeout(r, 20));
-    assert.match(a.settings[1], /^warfare=1$/m);
+    assert.match(a.settings[1], /^survival=1$/m);
     assert.match(a.settings[1], /^factions=monolith$/m);
     a.socket.destroy();
   } finally {
@@ -892,6 +892,74 @@ test('pause: everyone in the world agrees to pause and to go on; alone, at once;
     a.send(M.ROLLBACK_ANSWER, Buffer.from([0])); // no
     const no = await until(b, M.PAUSE_RESULT);
     assert.equal(no.payload[0], ROLLBACK.DECLINED);
+    a.socket.destroy();
+    b.socket.destroy();
+    c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function fact(key, value) {
+  return Buffer.concat([encodeText(key), Buffer.from([0]), encodeText(value), Buffer.from([0])]);
+}
+
+// the facts that come with a world download, as { key: value }
+async function downloadFacts(c) {
+  const facts = {};
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.WORLD_DONE) return facts;
+    if (msg.type === M.FACT) {
+      const [key, value] = readStringsZ(msg.payload, 0, 2);
+      facts[key] = value;
+    }
+  }
+}
+
+test('facts: kept by the server, passed on when they change, given with the world, rolled back with it', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    a.send(M.FACT, fact('info:esc_bandit_squad_dead', '1'));
+    let got = await until(b, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['info:esc_bandit_squad_dead', '1']);
+    a.send(M.FACT, fact('info:esc_bandit_squad_dead', '1')); // no change: not passed on
+    a.send(M.FACT, fact('rel:dolg:freedom', '-5000'));
+    got = await until(b, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['rel:dolg:freedom', '-5000']);
+    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1); // revision 2 keeps both
+    a.send(M.FACT, fact('tool:esc_mechanic:1', 'artem'));
+    await until(b, M.FACT);
+    b.send(M.FACT, fact('tool:esc_mechanic:1', 'друг')); // too late: the first one stays
+    b.send(M.PING, Buffer.alloc(4));
+    await until(b, M.PONG);
+    assert.equal(server.coop.facts()['tool:esc_mechanic:1'], 'artem');
+    a.send(M.FACT, fact('tool:esc_mechanic:1', '')); // cleared, as any fact can be
+    a.send(M.PING, Buffer.alloc(4));
+    await until(a, M.PONG);
+    await until(b, M.FACT); // b learns it is gone
+
+    b.send(M.FACT, fact('rel:dolg:freedom', '0'));
+    b.send(M.FACT, fact('info:esc_bandit_squad_dead', '')); // gone
+    await roundTrip(b);
+    assert.deepEqual(server.coop.facts(), { 'rel:dolg:freedom': '0' });
+
+    const c = await player(port, 'третий');
+    c.send(M.WORLD_REQUEST);
+    await until(a, M.SAVE_NOW);
+    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'join', 'третий');
+    assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0' });
+
+    assert.ok(server.coop.rollback(2));
+    assert.deepEqual(server.coop.facts(), { 'info:esc_bandit_squad_dead': '1', 'rel:dolg:freedom': '-5000' });
     a.socket.destroy();
     b.socket.destroy();
     c.socket.destroy();

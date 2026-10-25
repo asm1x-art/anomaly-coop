@@ -27,3 +27,34 @@ function flag(key, default)
 	end
 	return value ~= "0"
 end
+
+-- The world's difficulty (gameplay and economy) is the server's, the same for everyone: it is put on the save's
+-- Lua state as the world loads, before game_difficulties reads it (custom factors dropped), so a change on the admin
+-- page shows from the next load. The options' difficulty pages change nothing in co-op. Ironman is off in co-op:
+-- a world that had it loses it.
+function on_game_start()
+	if not (coop and game_difficulties and alife_storage_manager) then
+		return -- not the co-op engine
+	end
+	local before_load = alife_storage_manager.on_before_load_state
+	alife_storage_manager.on_before_load_state = function(...)
+		if coop.connected() then
+			local m_data = alife_storage_manager.get_state()
+			m_data.diff_game = { type = number("difficulty", 1) }
+			m_data.diff_eco = { type = number("economy", 1) }
+			m_data.ironman = nil
+			printf("[coop] the world's difficulty: gameplay %s, economy %s", m_data.diff_game.type, m_data.diff_eco.type)
+		end
+		return before_load(...)
+	end
+	for _, name in ipairs({ "set_game_factor", "set_eco_factor" }) do
+		local set = game_difficulties[name]
+		game_difficulties[name] = function(...)
+			if coop.connected() then
+				actor_menu.set_msg(1, game.translate_string("st_coop_difficulty_server"), 6)
+				return
+			end
+			return set(...)
+		end
+	end
+end

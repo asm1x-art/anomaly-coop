@@ -107,7 +107,7 @@
 
   <section>
     <h2>Настройки мира</h2>
-    <p class="note">Применяются при создании нового мира: на уже идущий мир не влияют.</p>
+    <p class="note">Применяются при создании нового мира. Сложность и экономика — одни на всех и меняются только здесь: у игроков со следующей загрузки мира. Война группировок и ограниченные жизни в кооперативе выключены.</p>
     <div class="grid" id="world-checks"></div>
     <div class="row">
       <label class="field"><span>Сложность игры</span>
@@ -115,15 +115,6 @@
       </label>
       <label class="field"><span>Экономика</span>
         <select id="economy"><option value="1">Лёгкая</option><option value="2">Средняя</option><option value="3">Тяжёлая</option></select>
-      </label>
-    </div>
-    <div class="row">
-      <label class="check"><input type="checkbox" id="ironman"><span>Ограниченные жизни<small>Хардкор: после последней смерти персонаж потерян</small></span></label>
-      <label class="field"><span>Жизней</span>
-        <select id="ironman_lives"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
-      </label>
-      <label class="field"><span>Жизнь восстанавливается</span>
-        <select id="ironman_regen"><option value="0">никогда</option><option value="24">раз в 1 день</option><option value="72">раз в 3 дня</option><option value="120">раз в 5 дней</option></select>
       </label>
     </div>
   </section>
@@ -152,7 +143,6 @@
 <script>
   const WORLD_CHECKS = [
     ['story', 'Сюжет', 'Сюжетные задания и закрытые до поры локации'],
-    ['warfare', 'Война группировок', 'Фракции захватывают территории'],
     ['survival', 'Выживание', 'Жёсткий режим выживания Anomaly'],
     ['campfire', 'Сохранение у костра', 'Сохраняться можно только у костра'],
     ['conditions', 'Изношенные предметы', 'Найденные вещи в плохом состоянии'],
@@ -168,6 +158,10 @@
     ['revive_health', 'Здоровье после подъёма, %', '', 1, 100],
     ['rank_loss', 'Потеря ранга при откате, %', '', 0, 100],
     ['travel_enemy_radius', 'Враги рядом, м', 'нет быстрого перемещения; 0 — не проверять', 0, 500],
+    ['tool_discount_1', 'Скидка за инструменты: грубая работа, %', 'тому, кто принёс технику набор этого уровня', 0, 90],
+    ['tool_discount_2', 'Скидка за инструменты: тонкая работа, %', '', 0, 90],
+    ['tool_discount_3', 'Скидка за инструменты: калибровка, %', '', 0, 90],
+    ['tool_group_share', 'Доля скидки для группы, %', 'от скидки принёсшего; 0 — только ему', 0, 100],
   ];
   const RULE_CHECKS = [
     ['fast_travel', 'Быстрое перемещение', 'Только в места, где игрок уже был'],
@@ -204,10 +198,6 @@
   function setMsg(text, kind = '') {
     $('msg').textContent = text;
     $('msg').className = kind;
-  }
-
-  function syncIronman() {
-    $('ironman_lives').disabled = $('ironman_regen').disabled = !$('ironman').checked;
   }
 
   function renderStatus(state) {
@@ -325,9 +315,7 @@
   function renderSettings(state) {
     const w = state.settings.world;
     for (const [key] of WORLD_CHECKS) $(key).checked = w[key];
-    for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) $(key).value = String(w[key]);
-    $('ironman').checked = w.ironman;
-    syncIronman();
+    for (const key of ['difficulty', 'economy']) $(key).value = String(w[key]);
     const r = state.settings.rules;
     for (const [key] of RULE_NUMBERS) $('r_' + key).value = String(r[key]);
     for (const [key] of RULE_CHECKS) $('r_' + key).checked = r[key];
@@ -339,8 +327,7 @@
   function collect() {
     const world = {};
     for (const [key] of WORLD_CHECKS) world[key] = $(key).checked;
-    for (const key of ['difficulty', 'economy', 'ironman_lives', 'ironman_regen']) world[key] = Number($(key).value);
-    world.ironman = $('ironman').checked;
+    for (const key of ['difficulty', 'economy']) world[key] = Number($(key).value);
     const factions = [...document.querySelectorAll('#factions input:checked')].map((i) => i.id.slice(2));
     const rules = {};
     for (const [key] of RULE_NUMBERS) rules[key] = Math.round(Number($('r_' + key).value));
@@ -388,10 +375,7 @@
     if (e.target.closest('section') && e.target.type === 'number') markDirty();
   });
   document.addEventListener('change', (e) => {
-    if (e.target.closest('section')) {
-      syncIronman();
-      markDirty();
-    }
+    if (e.target.closest('section')) markDirty();
   });
 
   $('save').addEventListener('click', async () => {

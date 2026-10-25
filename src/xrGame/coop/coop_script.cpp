@@ -5,6 +5,7 @@
 #include "coop_combat.h"
 #include "coop_puppet.h"
 #include "coop_progress.h"
+#include "coop_facts.h"
 #include "ai_space.h"
 #include "script_engine.h"
 
@@ -107,6 +108,9 @@ namespace coop
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
+			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
+			def("fact", &fact),                        // (key) as the server has it, "" none
+			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count
 			def("progress_lua", &progress_lua_file),   // our progress's Lua part to take while loading, "" none
 			def("progress_fresh", &progress_fresh),    // a new character: the save's personal Lua state goes
 			def("remote_death", &is_dying_remotely), // (id) another game's death of it is being applied here

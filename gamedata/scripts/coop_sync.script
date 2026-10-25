@@ -209,6 +209,120 @@ local function wrap_corpse_loot()
 end
 
 ------------------------------------------------------------------------------------------------
+-- Clean-ups of the world each game would run on its own (docs/coop/progress.md, old bugs): the sim master's alone,
+-- and never where a player is, whose NPCs are online in his game.
+
+local function player_on(level_name)
+	if not level_name then
+		return false
+	end
+	if level.name() == level_name then
+		return true
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == level_name then
+			return true
+		end
+	end
+	return false
+end
+
+local function wrap_cleanups()
+	-- the inventories of NPCs on other levels, every few days (release_npc_inventory)
+	wrap(release_npc_inventory, "clean_npc_inv", "release_npc_inventory", function(original, se_npc)
+		if coop_on() and (not coop.is_sim_master() or player_on(level_of(se_npc))) then
+			return
+		end
+		return original(se_npc)
+	end)
+	-- the trade goods spawned on NPCs, on a level change (death_manager): only of NPCs where no player is
+	wrap(death_manager, "clear_items_by_npc", "death_manager", function(original)
+		if not coop_on() then
+			return original()
+		end
+		if not coop.is_sim_master() then
+			return
+		end
+		local items = death_manager.items_by_npc
+		for npc_id, list in pairs(items) do
+			local se_npc = alife_object(npc_id)
+			if not (se_npc and player_on(level_of(se_npc))) then
+				if list then
+					for item_id in pairs(list) do
+						local se_item = alife_object(item_id)
+						if se_item and se_item.parent_id == npc_id then
+							alife_release_id(item_id)
+						end
+					end
+				end
+				items[npc_id] = nil
+			end
+		end
+	end)
+end
+
+------------------------------------------------------------------------------------------------
+-- An item's Lua data: what scripts keep by its id - uses left, condition and power as the binders last saw them
+-- (bind_item, item_device: the save's tables are theirs), its se vars (weapon parts...). The engine sends it with the
+-- item's state (coop_world.cpp send_item_state), so the item keeps it in the others' worlds.
+
+local ITEM_TABLES = { "item_remaining_uses", "item_condition", "device_condition" }
+
+local function serialize(v)
+	local t = type(v)
+	if t == "number" then
+		return string.format("%.17g", v)
+	elseif t == "string" then
+		return string.format("%q", v)
+	elseif t == "boolean" then
+		return tostring(v)
+	elseif t == "table" then
+		local out = {}
+		for k, value in pairs(v) do
+			local key = (type(k) == "number" or type(k) == "string") and serialize(k)
+			local text = key and serialize(value)
+			if text then
+				out[#out + 1] = "[" .. key .. "]=" .. text
+			end
+		end
+		return "{" .. table.concat(out, ",") .. "}"
+	end
+end
+
+function item_lua(id)
+	local ok, text = pcall(function()
+		local m_data = alife_storage_manager.get_state()
+		local data = { se = m_data.se_object and m_data.se_object[id] }
+		for _, key in ipairs(ITEM_TABLES) do
+			data[key] = m_data[key] and m_data[key][id]
+		end
+		return serialize(data)
+	end)
+	return ok and text or ""
+end
+
+function take_item_lua(id, text)
+	local f = loadstring("return " .. text)
+	if not f then
+		return
+	end
+	setfenv(f, {})
+	local ok, data = pcall(f)
+	if not (ok and type(data) == "table") then
+		return
+	end
+	local m_data = alife_storage_manager.get_state()
+	for _, key in ipairs(ITEM_TABLES) do
+		if m_data[key] then
+			m_data[key][id] = data[key] -- none there: the engine's state stands
+		end
+	end
+	if m_data.se_object then
+		m_data.se_object[id] = data.se
+	end
+end
+
+------------------------------------------------------------------------------------------------
 -- Mutant loot (ui_mutant_loot.script): the parts a body gives are rolled the first time someone opens it
 -- and kept on the body (save_var "loot"). Everyone gets that roll, and what is left after each take; also
 -- as se var "coop_loot", which an offline body or a world loaded again keeps.
@@ -737,6 +851,7 @@ function on_game_start()
 	wrap_world_logic()
 	wrap_corpse_loot()
 	wrap_mutant_loot()
+	wrap_cleanups()
 	wrap_stashes()
 	wrap_saves()
 	watch_peers()

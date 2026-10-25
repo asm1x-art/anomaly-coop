@@ -3,6 +3,7 @@
 #include "coop_net.h"
 #include "coop_save.h"
 #include "coop_world.h"
+#include "coop_facts.h"
 #include "Level.h"
 #include "Actor.h"
 #include "ai_space.h"
@@ -14,7 +15,6 @@
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "map_location.h"
 #include "map_manager.h"
-#include "../xrCore/LocatorAPI_defs.h"
 
 namespace coop
 {
@@ -26,7 +26,6 @@ namespace coop
 	static const u16 MAP_ID = 1;         // the map manager keeps all its spots under 1 (map_manager.cpp)
 	static LPCSTR LUA_OUT = "coop_progress_out.dat"; // in $game_saves$: Lua writes its part there, and reads ours
 	static LPCSTR LUA_IN = "coop_progress_in.dat";
-	static LPCSTR WORLD_INFOS = "coop_world_infos"; // gamedata/configs/mod_system_coop.ltx
 
 	static xr_vector<u8> g_received; // ours, as the server sent it with the world
 	static u32 g_received_got = 0;
@@ -43,25 +42,6 @@ namespace coop
 	static R& registry()
 	{
 		return ai().alife().registry((R*)nullptr);
-	}
-
-	// Facts about the world Anomaly keeps as the actor's info portions (a squad is dead, a mechanic has his
-	// tools): the same for every player, never part of the progress; the save's stay.
-	static bool is_world_info(const shared_str& info)
-	{
-		static xr_vector<shared_str> masks;
-		static bool read = false;
-		if (!read)
-		{
-			read = true;
-			if (pSettings->section_exist(WORLD_INFOS))
-				for (const auto& item : pSettings->r_section(WORLD_INFOS).Data)
-					masks.push_back(item.first);
-		}
-		for (const shared_str& mask : masks)
-			if (PatternMatch(info.c_str(), mask.c_str()))
-				return true;
-		return false;
 	}
 
 	static void path_in_saves(LPCSTR name, string_path& path)
@@ -226,6 +206,7 @@ namespace coop
 	{
 		if (!is_connected() || !runs_shared_world() || !world_ready())
 			return;
+		send_inventory_states(); // our things as they are, kept by the others' worlds and the save
 		CMemoryWriter out;
 		if (!write_progress(out))
 			return;

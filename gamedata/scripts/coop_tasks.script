@@ -1,0 +1,48 @@
+-- Co-op: tasks several players may hold (docs/coop/plan.md, "Личный прогресс"). When the job is done by another
+-- player, the others holding it lose it softly: no goodwill penalty, no "task failed" news, a word from the giver.
+
+local QUIET_MS = 5000 -- the fail news of a task taken off this way are dropped for so long
+local quiet = {}      -- task id -> time_global() it was taken off
+
+local function giver_of(rtask)
+	local giver = rtask.task_giver_id and alife_object(rtask.task_giver_id)
+	if giver and not giver.character_name and giver.commander_id then -- a squad: its commander speaks
+		giver = alife_object(giver:commander_id())
+	end
+	return giver and giver.character_name and giver
+end
+
+-- Takes a task of ours off as cancelled (on_cancel, not on_fail: no penalty) with message from its giver.
+-- false when we don't hold it.
+function cancel(task_id, message)
+	local tm = task_manager.get_task_manager()
+	local rtask = tm and tm.task_info[task_id]
+	if not rtask then
+		return false
+	end
+	local giver = giver_of(rtask)
+	-- what a fail would have tidied up of ours: the giver's count of open tasks
+	pcall(xr_effects.drx_sl_unregister_task_giver, db.actor, nil, { task_id })
+	quiet[task_id] = time_global()
+	tm:set_task_cancelled(task_id)
+	if message and giver then
+		local name, icon = game.translate_string(giver:character_name()), giver:character_icon()
+		dynamic_news_helper.send_tip(message, name, nil, nil, icon, nil, "npc")
+	end
+	printf("[coop] task %s taken off: %s", task_id, message or "")
+	return true
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local send_task = news_manager.send_task
+	news_manager.send_task = function(actor, kind, tsk)
+		local since = kind == "fail" and tsk and quiet[tsk:get_id()]
+		if since and time_global() - since < QUIET_MS then
+			return
+		end
+		return send_task(actor, kind, tsk)
+	end
+end

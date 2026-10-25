@@ -40,6 +40,12 @@
 	<string id="ui_mm_coop_profile_save">
 		<text>Save profile</text>
 	</string>
+	<string id="st_coop_difficulty_server">
+		<text>In co-op the difficulty is the world's: the server sets it (admin page).</text>
+	</string>
+	<string id="st_coop_tools_brought">
+		<text>Too late, stalker: %s has brought me those tools already. Thanks, I don't need them.</text>
+	</string>
 	<string id="ui_mm_coop_profile_disconnect">
 		<text>Disconnect</text>
 	</string>

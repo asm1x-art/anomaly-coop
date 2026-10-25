@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 16;
+export const PROTOCOL_VERSION = 18;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -22,6 +22,7 @@ export const M = {
   ITEM_PARENT: 11,    // c->s: u16 item, stringZ section, u8 place (PLACE), place data
   OBJECT_RELEASE: 12, // c->s: u16 object, stringZ section
   OBJECT_SPAWN: 13,   // c->s: u16 size, the engine's M_SPAWN packet for the new object
+  OBJECT_STATE: 50,   // c->s: u16 size, M_SPAWN packet, u16 size, client data, stringZ Lua data: an item of the player's as it is now
   SCRIPT_EVENT: 14,   // c->s: stringZ name, stringZ payload (Lua-level state sync), relayed like the above
   ROLES: 15,          // s->c: u32 sim master id (the longest-connected player), sent to all on every join/leave
   // The shared world is a save stored on the server (storage.js). Files go in chunks both ways.
@@ -69,6 +70,10 @@ export const M = {
                       // the player's progress, s->c theirs right before WORLD_DONE (total 0: none kept)
   LOG: 48,            // c->s: stringZ file name, u32 size, u32 packed size (zlib), u32 offset, data: a log or crash
                       // dump of the player's game (storage.js data/logs), offset 0 first
+  // Facts about the world the server keeps itself (storage.js facts.json): world infos, faction relations...
+  // A game reports a change, the server keeps it and passes it on; a game loading the world gets them all.
+  FACT: 49,           // both: stringZ key ("info:<name>", "rel:<faction>:<faction>"...), stringZ value ('' gone);
+                      // s->c also every one kept, right before WORLD_DONE
   REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version; then it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up

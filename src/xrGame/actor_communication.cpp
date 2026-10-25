@@ -1,4 +1,5 @@
 #include "pch_script.h"
+#include "coop/coop_facts.h"
 #include "actor.h"
 #include "UIGameSP.h"
 #include "PDA.h"
@@ -53,6 +54,7 @@ bool CActor::OnReceiveInfo(shared_str info_id) const
 	info_portion.Load(info_id);
 
 	callback(GameObject::eInventoryInfo)(lua_game_object(), *info_id);
+	coop::on_actor_info(info_id, true); // a fact about the world: the server keeps it for every game
 
 	if (!CurrentGameUI())
 		return false;
@@ -72,7 +74,10 @@ bool CActor::OnReceiveInfo(shared_str info_id) const
 
 void CActor::OnDisableInfo(shared_str info_id) const
 {
+	const bool had = !!HasInfo(info_id);
 	CInventoryOwner::OnDisableInfo(info_id);
+	if (had)
+		coop::on_actor_info(info_id, false);
 
 	if (!CurrentGameUI())
 		return;

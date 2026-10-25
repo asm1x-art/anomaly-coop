@@ -1,0 +1,56 @@
+-- Co-op: facts about the world kept by the server (src/xrGame/coop/coop_facts.h), the ones that live in Lua:
+-- faction relations. game_relations changes them in whatever game the deaths and events happen; every game needs
+-- one war between the factions. A change here goes to the server; one from another game, or kept by the server
+-- since the save, is put here (and into the actor's drx_df_* variable, where game_relations keeps it).
+
+local applying = false
+local set_num -- game_relations.set_factions_community_num as it was
+local handlers = {} -- other kinds of facts: prefix ("tool:"...) -> handler(fact, value)
+
+-- for the other co-op scripts: facts whose key starts so come to handler(fact, value), from another game or
+-- kept by the server since the save (after a load too: every one kept)
+function on_fact(prefix, handler)
+	handlers[prefix] = handler
+end
+
+local function key(faction, faction_to)
+	return "rel:" .. faction .. ":" .. faction_to
+end
+
+function on_game_start()
+	if not (coop and game_relations) then
+		return -- not the co-op engine
+	end
+	set_num = game_relations.set_factions_community_num
+	game_relations.set_factions_community_num = function(faction, faction_to, num)
+		set_num(faction, faction_to, num)
+		if not applying and coop.connected() and faction and faction_to and tonumber(num) then
+			coop.report_fact(key(faction, faction_to), tostring(math.floor(num)))
+		end
+	end
+
+	_G.coop_on_fact = function(fact, value)
+		for prefix, handler in pairs(handlers) do
+			if string.sub(fact, 1, #prefix) == prefix then
+				return handler(fact, value)
+			end
+		end
+		local faction, faction_to = string.match(fact, "^rel:([^:]+):(.+)$")
+		local num = tonumber(value)
+		if not (faction and num) then
+			return
+		end
+		applying = true
+		set_num(faction, faction_to, num)
+		if db.actor then
+			save_var(db.actor, "drx_df_" .. faction .. "_" .. faction_to .. "_relations", num)
+		end
+		applying = false
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		if coop.connected() then
+			coop.facts_ready() -- what the server knows of the world onto ours; our changes count from now
+		end
+	end)
+end

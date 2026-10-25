@@ -20,6 +20,10 @@ namespace coop
 	void update_bodies();
 	void update_releases(); // per frame: releases waiting for their object to be made on our side
 	void apply_body_rest(NET_Packet& P); // M_ACTOR_ACTION eBodyRest
+	// Our things as they are now (condition, upgrades, ammo, addons, uses left): moves carry only where an item went,
+	// so the others' copies (our shadow in their worlds, the master's save) kept the state it was shared with.
+	void send_inventory_states(); // all we carry: with our progress, at every save and on the way out
+	void apply_object_state(NET_Packet& P); // M_OBJECT_STATE
 	// called from CALifeGraphRegistry::attach / detach, which every A-Life parent change goes through
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item);
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id);

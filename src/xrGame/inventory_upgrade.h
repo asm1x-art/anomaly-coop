@@ -10,6 +10,8 @@
 #define INVENTORY_UPGRADE_H_INCLUDED
 
 #include "inventory_upgrade_base.h"
+#include "ai_space.h"
+#include "script_engine.h"
 
 namespace inventory
 {
@@ -24,6 +26,18 @@ namespace inventory
 
 				functor_type functr;
 				LPCSTR parameter;
+				// co-op: the script function is looked up by name on every call. The upgrades are made before the
+				// scripts start, so a script wrapping one later (coop_mechanics.script: tool discounts) was never
+				// called otherwise.
+				shared_str name;
+
+				functor_type get() const
+				{
+					functor_type f;
+					if (name.size() && ai().script_engine().functor(name.c_str(), f))
+						return f;
+					return functr;
+				}
 			};
 
 			template <typename return_type>
@@ -31,7 +45,7 @@ namespace inventory
 			{
 				IC return_type operator()() const
 				{
-					return functr(parameter);
+					return this->get()(this->parameter);
 				}
 			};
 
@@ -42,7 +56,7 @@ namespace inventory
 
 				IC return_type operator()() const
 				{
-					return functr(parameter, parameter2);
+					return this->get()(this->parameter, parameter2);
 				}
 			};
 
@@ -53,7 +67,7 @@ namespace inventory
 
 				IC return_type operator()() const
 				{
-					return functr(parameter, parameter2, parameter3);
+					return this->get()(this->parameter, this->parameter2, parameter3);
 				}
 			};
 
@@ -62,7 +76,7 @@ namespace inventory
 			{
 				IC void operator()() const
 				{
-					functr(parameter);
+					get()(parameter);
 				}
 			};
 
@@ -72,7 +86,7 @@ namespace inventory
 				LPCSTR parameter2;
 				IC void operator()() const
 				{
-					functr(parameter, parameter2);
+					get()(parameter, parameter2);
 				}
 			};
 
@@ -82,7 +96,7 @@ namespace inventory
 				int parameter3;
 				IC void operator()() const
 				{
-					functr(parameter, parameter2, parameter3);
+					get()(parameter, parameter2, parameter3);
 				}
 			};
 		} // namespace detail

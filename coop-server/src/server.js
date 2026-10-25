@@ -124,6 +124,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       for (let offset = 0; offset < data.length; offset += CHUNK_SIZE)
         send(M.WORLD_CHUNK, Buffer.concat([Buffer.from([file]), u32(offset), data.subarray(offset, offset + CHUNK_SIZE)]));
     });
+    for (const [key, value] of Object.entries(storage.facts())) send(M.FACT, Buffer.concat([stringZ(key), stringZ(value)]));
     const progress = storage.progress(name) ?? Buffer.alloc(0);
     let offset = 0;
     do {
@@ -291,6 +292,13 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.CHARACTER:
           storage.saveCharacter(client.name, Buffer.from(payload));
           break;
+        case M.FACT: {
+          const [key, value] = readStringsZ(payload, 0, 2);
+          // who brought a mechanic his tools: the first one stays (two finishing the task at once)
+          if (key.startsWith('tool:') && value && storage.facts()[key]) break;
+          if (key && storage.setFact(key, value)) broadcast(id, M.FACT, Buffer.from(payload));
+          break;
+        }
         case M.LOG: {
           const file = readStringZ(payload, 0);
           const at = payload.indexOf(0) + 1;
@@ -426,6 +434,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.ITEM_PARENT:
         case M.OBJECT_RELEASE:
         case M.OBJECT_SPAWN:
+        case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
         case M.ACTOR_ACTION:
         case M.NPC_STATES:
@@ -496,6 +505,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     },
     settings: () => storage.settings(),
     logs: () => storage.logs(),
+    facts: () => storage.facts(),
     logFile: (player, file) => storage.logFile(player, file),
     adminPassword: () => storage.adminPassword(),
     saveSettings(settings) {

@@ -7,6 +7,7 @@
 #include "coop_save.h"
 #include "coop_progress.h"
 #include "coop_logs.h"
+#include "coop_facts.h"
 #include "coop_puppet.h"
 #include "coop_npc.h"
 #include "coop_combat.h"
@@ -420,6 +421,9 @@ namespace coop
 		case M_OBJECT_SPAWN:
 			apply_object_spawn(P);
 			break;
+		case M_OBJECT_STATE:
+			apply_object_state(P);
+			break;
 		case M_ENTITY_DEATH:
 			apply_entity_death(P);
 			break;
@@ -482,6 +486,9 @@ namespace coop
 			break;
 		case M_PROGRESS:
 			on_progress_chunk(P);
+			break;
+		case M_FACT:
+			on_fact(P);
 			break;
 		case M_ACTOR_ACTION:
 		{
@@ -683,7 +690,7 @@ namespace coop
 		{
 			const u16 type = *(const u16*)msg.data();
 			const bool from_sender = type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
-				type == M_SCRIPT_EVENT;
+				type == M_SCRIPT_EVENT || type == M_OBJECT_STATE;
 			const bool world_change = from_sender || type == M_ENTITY_DEATH;
 			if (from_sender && msg.size() >= sizeof(u16) + sizeof(u32))
 			{
