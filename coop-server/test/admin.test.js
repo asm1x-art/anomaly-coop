@@ -4,6 +4,7 @@ import net from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { startServer } from '../src/server.js';
 import { startAdmin } from '../src/admin.js';
 import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
@@ -116,6 +117,41 @@ test('admin: saves listed newest first; rollback makes the old save the world ag
     state = await (await s.call('POST', '/api/rollback', { revision: 3 })).json();
     assert.deepEqual(state.world, { owner: 'artem', revision: 4 });
     assert.deepEqual(state.saves.map((m) => [m.revision, m.reason, m.from]), [[4, 'rollback', 3], [3, 'auto', undefined]]);
+  } finally {
+    s.close();
+  }
+});
+
+test('logs: a game sends them in packed chunks; listed newest first and downloadable; unreadable ones dropped', async () => {
+  const s = await start();
+  try {
+    const socket = await join(s.game.address().port, 'друг');
+    const send = (file, raw, packed) => {
+      for (let offset = 0; offset === 0 || offset < packed.length; offset += 14000) {
+        const head = Buffer.alloc(12);
+        head.writeUInt32LE(raw.length, 0);
+        head.writeUInt32LE(packed.length, 4);
+        head.writeUInt32LE(offset, 8);
+        socket.write(encode(M.LOG, Buffer.concat([Buffer.from(file + '\0'), head, packed.subarray(offset, offset + 14000)])));
+      }
+    };
+    const log = Buffer.from('FATAL ERROR\n'.repeat(20000)); // packs into several chunks? no: tiny packed; still offsets work
+    const big = Buffer.from(Array.from({ length: 60000 }, (_, i) => String.fromCharCode(32 + (i * 7919) % 90)).join(''));
+    send('xray_friend_2026-10-25_18-00-00.log', log, zlib.deflateSync(log));
+    send('xray_player_10-25-26_18-01-00.mdmp', big, zlib.deflateSync(big)); // several chunks
+    send('../../evil name.log', Buffer.from('x'), Buffer.from('not zlib'));
+    for (let i = 0; i < 50 && (await (await s.call('GET', '/api/logs')).json()).length < 2; i++)
+      await new Promise((r) => setTimeout(r, 20));
+    const logs = await (await s.call('GET', '/api/logs')).json();
+    assert.deepEqual(logs.map((l) => [l.player, l.file, l.size]).sort(), [
+      ['друг', 'xray_friend_2026-10-25_18-00-00.log', log.length],
+      ['друг', 'xray_player_10-25-26_18-01-00.mdmp', big.length],
+    ]);
+    const res = await s.call('GET', `/api/log?player=${encodeURIComponent('друг')}&file=xray_player_10-25-26_18-01-00.mdmp`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), big);
+    assert.equal((await s.call('GET', `/api/log?player=x&file=nope.log`)).status, 404);
+    socket.destroy();
   } finally {
     s.close();
   }

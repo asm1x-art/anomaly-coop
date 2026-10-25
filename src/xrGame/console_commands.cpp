@@ -39,6 +39,7 @@
 #include "ui/UIStatic.h"
 #include "zone_effector.h"
 #include "coop/coop_net.h"
+#include "coop/coop_logs.h"
 #include "coop/coop_save.h"
 #include "coop/coop_map.h"
 #include "coop/coop_npc.h"
@@ -460,6 +461,13 @@ class CCC_CoopGroupLeave : public IConsole_Command
 public:
 	CCC_CoopGroupLeave(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
 	virtual void Execute(LPCSTR args) { coop::group_request(coop::eGroupLeave, 0); }
+};
+
+class CCC_CoopSendLogs : public IConsole_Command
+{
+public:
+	CCC_CoopSendLogs(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { coop::send_logs_now(); }
 };
 
 class CCC_CoopStatus : public IConsole_Command
@@ -3390,6 +3398,7 @@ void CCC_RegisterCommands()
 	CMD1(CCC_CoopDisconnect, "coop_disconnect");
 	CMD1(CCC_CoopGroupLeave, "coop_group_leave");
 	CMD1(CCC_CoopStatus, "coop_status");
+	CMD1(CCC_CoopSendLogs, "coop_send_logs");
 	CMD4(CCC_Integer, "coop_autosave_interval", &coop::autosave_interval, 0, 120);
 	CMD4(CCC_Integer, "coop_debug", &coop::debug_mode, 0, 1);
 	CMD2(CCC_Color, "coop_peer_color", &coop::peer_color);

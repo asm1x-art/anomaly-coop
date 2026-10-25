@@ -63,6 +63,8 @@ namespace coop
 		M_PROGRESS_REQUEST = 46, // s->c, to all in the world when it is to be saved: send our progress (coop_progress.h)
 		M_PROGRESS = 47,        // both: u32 total size, u32 offset, data; c->s our progress, s->c ours with the world,
 		                        // before M_WORLD_DONE (total 0: none kept)
+		M_LOG = 48,             // c->s: stringZ file name, u32 size, u32 packed size (zlib), u32 offset, data: a log
+		                        // or crash dump of ours, for the server's data/logs (coop_logs.h)
 		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
 		M_WORLD_CLAIM = 30,     // c->s: u8 1: we start the world on an empty server, the first to ask gets it (M_WORLD_INFO
 		                        // says who); 0: we gave it up

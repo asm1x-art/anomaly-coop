@@ -589,6 +589,11 @@ namespace coop
 		return g_has_record ? g_record.community.c_str() : "";
 	}
 
+	bool world_busy()
+	{
+		return g_downloading || g_load_pending || g_loading || (g_pGameLevel && !world_ready());
+	}
+
 	bool runs_shared_world()
 	{
 		return g_in_world || g_loading;

@@ -1,4 +1,5 @@
 import net from 'node:net';
+import zlib from 'node:zlib';
 import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
@@ -290,6 +291,29 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.CHARACTER:
           storage.saveCharacter(client.name, Buffer.from(payload));
           break;
+        case M.LOG: {
+          const file = readStringZ(payload, 0);
+          const at = payload.indexOf(0) + 1;
+          const raw = payload.readUInt32LE(at);
+          const total = payload.readUInt32LE(at + 4);
+          const offset = payload.readUInt32LE(at + 8);
+          client.logs ??= new Map();
+          if (offset === 0) client.logs.set(file, { data: Buffer.alloc(total), got: 0 });
+          const upload = client.logs.get(file);
+          if (!upload || upload.data.length !== total) break; // a piece of an upload we didn't see begin
+          upload.got += payload.copy(upload.data, offset, at + 12);
+          if (upload.got < total) break;
+          client.logs.delete(file);
+          try {
+            const data = zlib.inflateSync(upload.data);
+            if (data.length !== raw) throw new Error(`${data.length} bytes, ${raw} expected`);
+            storage.saveLog(client.name, file, data);
+            log(`[${id}] '${client.name}' sent ${file} (${raw} bytes)`);
+          } catch (e) {
+            log(`[${id}] '${client.name}' sent ${file}, unreadable: ${e.message}`);
+          }
+          break;
+        }
         case M.PROGRESS: {
           const total = payload.readUInt32LE(0);
           const offset = payload.readUInt32LE(4);
@@ -471,6 +495,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       return rollback(revision, 'admin page');
     },
     settings: () => storage.settings(),
+    logs: () => storage.logs(),
+    logFile: (player, file) => storage.logFile(player, file),
     adminPassword: () => storage.adminPassword(),
     saveSettings(settings) {
       storage.saveSettings(settings);

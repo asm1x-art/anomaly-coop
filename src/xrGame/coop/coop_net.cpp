@@ -6,6 +6,7 @@
 #include "coop_shadow.h"
 #include "coop_save.h"
 #include "coop_progress.h"
+#include "coop_logs.h"
 #include "coop_puppet.h"
 #include "coop_npc.h"
 #include "coop_combat.h"
@@ -101,7 +102,7 @@ namespace coop
 
 	static CClient g_client;
 
-	int debug_mode = 0;
+	int debug_mode = 1; // on while we test: a friend's game logs everything without asking (coop_debug 0 to quiet it)
 
 	// coop_debug: how many messages of each type went each way, told every DEBUG_TRAFFIC_MS
 	static const u32 DEBUG_TRAFFIC_MS = 5000;
@@ -722,6 +723,7 @@ namespace coop
 		if (!m_welcomed)
 			return;
 
+		update_log_upload();
 		const u32 now = Device.dwTimeContinual;
 		if (now - m_last_ping >= PING_INTERVAL_MS)
 		{

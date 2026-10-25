@@ -6504,6 +6504,9 @@
     <ClInclude Include="coop\coop_progress.h">
       <Filter>coop</Filter>
     </ClInclude>
+    <ClInclude Include="coop\coop_logs.h">
+      <Filter>coop</Filter>
+    </ClInclude>
     <ClInclude Include="coop\coop_puppet.h">
       <Filter>coop</Filter>
     </ClInclude>
@@ -8982,6 +8985,9 @@
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_progress.cpp">
+      <Filter>coop</Filter>
+    </ClCompile>
+    <ClCompile Include="coop\coop_logs.cpp">
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_puppet.cpp">

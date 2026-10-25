@@ -51,7 +51,8 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
       res.end();
       return;
     }
-    const route = `${req.method} ${new URL(req.url, 'http://x').pathname}`;
+    const url = new URL(req.url, 'http://x');
+    const route = `${req.method} ${url.pathname}`;
     try {
       switch (route) {
         case 'GET /':
@@ -64,6 +65,16 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
         case 'POST /api/reset-world':
           if (!coop.resetWorld()) return reply(res, 409, { error: 'players are online' });
           return reply(res, 200, state());
+        case 'GET /api/logs':
+          return reply(res, 200, coop.logs());
+        case 'GET /api/log': {
+          const file = url.searchParams.get('file') ?? '';
+          const data = coop.logFile(url.searchParams.get('player') ?? '', file);
+          if (!data) return reply(res, 404, { error: 'no such log' });
+          res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store',
+            'Content-Disposition': `attachment; filename="${file.replace(/[^\w.-]/g, '_')}"` });
+          return res.end(data);
+        }
         case 'POST /api/resume':
           coop.resume();
           return reply(res, 200, state());

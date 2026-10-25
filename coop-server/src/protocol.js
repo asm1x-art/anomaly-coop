@@ -67,6 +67,8 @@ export const M = {
   PROGRESS_REQUEST: 46, // s->c, to all in the world when it is to be saved: send your progress
   PROGRESS: 47,       // both: u32 total size, u32 offset, data (chunks of at most CHUNK_SIZE, offset 0 first); c->s
                       // the player's progress, s->c theirs right before WORLD_DONE (total 0: none kept)
+  LOG: 48,            // c->s: stringZ file name, u32 size, u32 packed size (zlib), u32 offset, data: a log or crash
+                      // dump of the player's game (storage.js data/logs), offset 0 first
   REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version; then it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up

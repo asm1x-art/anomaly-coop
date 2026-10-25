@@ -278,6 +278,56 @@ void InitLog()
 	LogFile.reserve(10000);
 }
 
+// co-op: every session's log is kept, named by when it was last written (the last MAX_KEPT_LOGS of them),
+// so the log of a crash survives the next starts; the co-op client sends the ones not sent yet to the server
+// (src/xrGame/coop/coop_logs.cpp). It was a single .bkp.
+static const u32 MAX_KEPT_LOGS = 20;
+
+static void keep_previous_log()
+{
+	WIN32_FILE_ATTRIBUTE_DATA attr;
+	if (!GetFileAttributesExA(logFName, GetFileExInfoStandard, &attr))
+		return;
+	FILETIME local;
+	SYSTEMTIME t;
+	FileTimeToLocalFileTime(&attr.ftLastWriteTime, &local);
+	FileTimeToSystemTime(&local, &t);
+
+	string_path stem, kept;
+	xr_strcpy(stem, logFName);
+	if (char* ext = strrchr(stem, '.'))
+		*ext = 0;
+	xr_sprintf(kept, "%s_%04u-%02u-%02u_%02u-%02u-%02u.log", stem, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
+	           t.wSecond);
+	MoveFileExA(logFName, kept, MOVEFILE_REPLACE_EXISTING);
+
+	// the oldest go: names sort by time, sent ones (..._sent.log) included
+	string_path mask, dir;
+	xr_sprintf(mask, "%s_*.log", stem);
+	xr_strcpy(dir, logFName);
+	if (char* slash = strrchr(dir, '\\'))
+		slash[1] = 0;
+	else
+		dir[0] = 0;
+	xr_vector<xr_string> names;
+	WIN32_FIND_DATAA found;
+	HANDLE h = FindFirstFileA(mask, &found);
+	if (h != INVALID_HANDLE_VALUE)
+	{
+		do
+			names.push_back(found.cFileName);
+		while (FindNextFileA(h, &found));
+		FindClose(h);
+	}
+	std::sort(names.begin(), names.end());
+	for (u32 i = 0; i + MAX_KEPT_LOGS < names.size(); ++i)
+	{
+		string_path old_log;
+		xr_sprintf(old_log, "%s%s", dir, names[i].c_str());
+		DeleteFileA(old_log);
+	}
+}
+
 void CreateLog(BOOL nl)
 {
 	no_log = nl;
@@ -286,10 +336,7 @@ void CreateLog(BOOL nl)
 		FS.update_path(logFName, "$logs$", log_file_name);
 	if (!no_log)
 	{
-		//Alun: Backup existing log
-		xr_string backup_logFName = EFS.ChangeFileExt(logFName, ".bkp");
-		FS.file_rename(logFName, backup_logFName.c_str(), true);
-		//-Alun
+		keep_previous_log();
 		IWriter* f = FS.w_open(logFName);
 		if (f == NULL)
 		{

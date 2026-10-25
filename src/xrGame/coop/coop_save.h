@@ -67,6 +67,8 @@ namespace coop
 	LPCSTR character_community(); // "actor_<faction>" of our character as the server keeps it, "" if none
 	// this game runs the shared world or is loading it: only then do new objects take ids from leased blocks
 	bool runs_shared_world();
+	// the world is on its way: downloaded, waiting to load, or loading (nothing else should take frames then)
+	bool world_busy();
 
 	// per frame. A game played while connected to a server without a world becomes the world: after it
 	// has run a while it is saved and uploaded, and keeps running as the shared world.

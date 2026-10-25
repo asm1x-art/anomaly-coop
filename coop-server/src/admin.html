@@ -100,6 +100,12 @@
   </section>
 
   <section>
+    <h2>Логи игроков</h2>
+    <p class="note">Логи и дампы вылетов, которые игры прислали сами: при каждом подключении игра отправляет то, что ещё не отправляла (прошлые сессии). Текущую сессию — консольной командой <code>coop_send_logs</code>. Последние 50 у каждого игрока.</p>
+    <ul class="saves" id="logs"></ul>
+  </section>
+
+  <section>
     <h2>Настройки мира</h2>
     <p class="note">Применяются при создании нового мира: на уже идущий мир не влияют.</p>
     <div class="grid" id="world-checks"></div>
@@ -278,6 +284,34 @@
       list.append(li);
     });
   }
+  function size(bytes) {
+    return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} КБ` : `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
+  }
+  async function renderLogs() {
+    const logs = await api('GET', '/api/logs');
+    const list = $('logs');
+    list.replaceChildren();
+    if (!logs.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Логов нет';
+      list.append(li);
+    }
+    for (const l of logs) {
+      const li = document.createElement('li');
+      const what = document.createElement('span');
+      what.className = 'what';
+      const link = document.createElement('a');
+      link.href = `/api/log?player=${encodeURIComponent(l.player)}&file=${encodeURIComponent(l.file)}`;
+      link.textContent = l.file;
+      what.append(`${l.player} · `, link, ` · ${size(l.size)}${/\.mdmp$/.test(l.file) ? ' · дамп вылета' : ''}`);
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = new Date(l.time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      li.append(what, when);
+      list.append(li);
+    }
+  }
   async function rollbackTo(save) {
     if (!confirm(`Вернуть мир и персонажей к сохранению №${save.revision}? Игроки в игре загрузят его заново.`)) return;
     try {
@@ -388,6 +422,8 @@
 
   refresh(true);
   setInterval(refresh, 5000);
+  renderLogs().catch(() => {});
+  setInterval(() => renderLogs().catch(() => {}), 30000);
 </script>
 </body>
 </html>

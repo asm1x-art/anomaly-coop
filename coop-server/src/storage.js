@@ -12,12 +12,15 @@ import { normalizeSettings } from './settings.js';
 //                             rollback (from: the save it went back to); who: the player it was for
 //   leases.json             { block: player }: id blocks, they must outlive restarts like the world does
 //   characters.json         { player: base64 record }: position, money... as the client sent it
+//   logs/<hex name>/<file>   the logs and crash dumps a player's game sent, the last MAX_LOGS (not the world's:
+//                            a reset keeps them)
 //   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
 //                            copy of the folder (saves/<revision>/progress/), a rollback brings it back
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
 //   groups.json             [[leader, member...]]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
+export const MAX_LOGS = 50; // per player
 
 export function openStorage(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -39,6 +42,9 @@ export function openStorage(dir) {
   let characters = readJson('characters.json', {});
 
   const saveFile = (revision, name) => path.join('saves', String(revision), name);
+  const playerDir = (name) => Buffer.from(name, 'utf8').toString('hex');
+  // a file name from a client: no paths, nothing odd
+  const safeName = (file) => String(file).replace(/^.*[\\/]/, '').replace(/[^\w.-]/g, '_').slice(0, 120) || 'unnamed';
   const progressFile = (name) => path.join('progress', Buffer.from(name, 'utf8').toString('hex') + '.bin');
   const copyProgress = (from, to) => {
     fs.rmSync(file(to), { recursive: true, force: true });
@@ -86,6 +92,36 @@ export function openStorage(dir) {
     saveProgress(name, data) {
       fs.mkdirSync(file('progress'), { recursive: true });
       writeAtomic(progressFile(name), data);
+    },
+
+    saveLog(name, fileName, data) {
+      const dir = path.join('logs', playerDir(name));
+      fs.mkdirSync(file(dir), { recursive: true });
+      writeAtomic(path.join(dir, safeName(fileName)), data);
+      const kept = fs.readdirSync(file(dir))
+        .map((f) => ({ f, time: fs.statSync(file(path.join(dir, f))).mtimeMs }))
+        .sort((a, b) => b.time - a.time);
+      for (const { f } of kept.slice(MAX_LOGS)) fs.rmSync(file(path.join(dir, f)), { force: true });
+    },
+    // [{ player, file, size, time }], newest first
+    logs() {
+      if (!fs.existsSync(file('logs'))) return [];
+      const list = [];
+      for (const dir of fs.readdirSync(file('logs'))) {
+        const player = Buffer.from(dir, 'hex').toString('utf8');
+        for (const f of fs.readdirSync(file(path.join('logs', dir)))) {
+          const st = fs.statSync(file(path.join('logs', dir, f)));
+          list.push({ player, file: f, size: st.size, time: st.mtimeMs });
+        }
+      }
+      return list.sort((a, b) => b.time - a.time);
+    },
+    logFile(name, f) {
+      try {
+        return fs.readFileSync(file(path.join('logs', playerDir(name), safeName(f))));
+      } catch {
+        return null;
+      }
     },
 
     worldInfo() {
