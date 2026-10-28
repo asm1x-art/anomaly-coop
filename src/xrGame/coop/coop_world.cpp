@@ -497,6 +497,7 @@ namespace coop
 			const u32 level_vertex = object->m_tNodeID;
 			const float distance = object->m_fDistance;
 			NET_Packet packet;
+			packet.write_start(); // NET_Packet() leaves its size as the stack had it
 			state->STATE_Write(packet);
 			packet.r_pos = 0;
 			object->STATE_Read(packet, u16(packet.B.count));
