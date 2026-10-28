@@ -1,0 +1,822 @@
+-- Co-op: the story (docs/coop/plan.md, "—южет (этап 3)").
+-- The story is the tasks with storyline = true and the info portions of [coop_story_infos]
+-- (gamedata/configs/mod_system_coop.ltx). The Mysteries of the Zone and Lost to the Zone happen in one world: what
+-- a step of theirs does to the world (WORLD_EFFECTS: squads and items spawned, squads removed, camps cleared) - when
+-- a story task is given, checked or ends, in level logic that checks or gives a story info, in the LTTZ dialogs'
+-- actions - happens once for the world, in the first game to get there, and is everyone's. The server's
+-- "once:<effect>(<params>)" facts say whose it is: the first claim stays. A player who gets to such a step later
+-- finds the world as it is. DRX questlines are each player's own chain, their effects not limited.
+-- A player's story goes to another from the wheel (they say yes or no), or along a group whose leader made it share
+-- its story (coop.group_story): story infos, story tasks given, done and failed, at the others at once. Taken over
+-- so, nothing is given again and nothing spawned: tasks done are put in the PDA as done, tasks under way as they
+-- are, at their stage; no rewards. In a group the one whose game finishes a step first has done it; the others'
+-- copies close, with its reward only if the server says so (coop_rules story_rewards_all).
+
+local CHUNK = 12000    -- characters of a story per event: a NET_Packet holds 16 KB
+local CLAIM_MS = 10000 -- an effect waits so long for the server to say whose it is
+local HOLD_MS = 3000   -- a story task done right after a story info came from the group waits so long: the one
+                       -- the info came from may have done the step
+local DONE_MS = 30000  -- a member's word that they did a step holds so long
+local ONLINE_MS = 3000 -- a player not heard of for longer is in the menu or loading
+
+-- what changes the world (xr_effects): once for the world when a story step does it
+local WORLD_EFFECTS = {
+	"create_squad", "create_squad_member", "create_special_task_squad", "remove_squad", "remove_special_task_squad",
+	"kill_squad", "kill_npc", "remove_npc", "clear_smart_terrain", "flush_smart_terrain", "set_smart_faction",
+	"teleport_squad", "teleport_squad_lvid", "teleport_npc", "teleport_npc_pos", "teleport_npc_lvid",
+	"teleport_npc_by_story_id", "spawn_object", "spawn_object_in", "spawn_corpse", "spawn_npc_in_zone",
+	"spawn_npc_at_position", "spawn_item_at_pos", "spawn_item_to_npc", "destroy_object", "spawn_contact_lost_pda",
+	"spawn_jupiter_documents", "spawn_monolith_shard", "spawn_stitch_decoder", "spawn_strelok_notes",
+	"spawn_x8_documents", "spawn_wpn_gauss_quest",
+}
+
+-- a step's rewards (xr_effects): the group's others get them only if the server says so
+local REWARD_EFFECTS = {
+	reward_money = true, reward_random_money = true, reward_random_money_by_dist = true, reward_item = true,
+	reward_random_item = true, reward_stash = true, drx_sl_reward_random_rifle = true,
+	drx_sl_reward_random_artefact = true, complete_task_inc_goodwill = true, inc_goodwill_by_tasker_comm = true,
+	inc_goodwill_by_tasker_id = true, inc_faction_goodwill_to_actor = true,
+}
+
+-- a DRX chain (xr_effects.drx_sl_*): who the player goes to, which step, how many
+local DRX_VARS = {
+	"drx_sl_current_honcho", "drx_sl_current_task", "drx_sl_current_task_number", "drx_sl_total_task_number",
+	"drx_sl_start_task", "drx_sl_endgame_task",
+}
+
+local story = {}        -- info -> true: the world's story (no DRX)
+local prefixes = {}     -- story infos by prefix ("drx_sl_*" in the list)
+local story_tasks = nil -- ids of the story tasks, read once
+local lttz = nil        -- dialogs_lostzone's faction variants: faction -> { info = {...}, task = {...} }
+local scope = 0         -- > 0 while a story step of the world's runs: what it does to the world is once for it
+local claims = {}       -- once: key -> { since, run }: an effect waiting for the server to say whose it is
+local times = {}        -- effect -> how many times the story step running now has done it
+local applying = false  -- another player's story being put on ours: none of it is ours to pass on
+local quiet = 0         -- > 0: task news and titles held back (a story taken over in bulk)
+local heard_info = 0    -- time_global() a story info last came from the group
+local done_by = {}      -- task id -> { name, at }: a member did that step
+local pending_new = {}  -- story tasks given here, told to the group next update (their giver is set after)
+local incoming = {}     -- sender -> parts of a story coming in pieces
+local offers = {}       -- stories to say yes or no to, once the HUD is free
+local was_sharing = false
+local checks = setmetatable({}, { __mode = "k" }) -- condlist -> it checks or gives a world story info
+
+local function pack(...)
+	return { n = select("#", ...), ... }
+end
+
+local function tr(id, ...)
+	return strformat(game.translate_string(id), ...)
+end
+
+local function news(text)
+	if db.actor then
+		db.actor:give_game_news(game.translate_string("st_coop_group"), text, "ui_iconsTotal_grouping", 0, 8000)
+	end
+end
+
+local function is_story_info(info)
+	if story[info] then
+		return true
+	end
+	for _, prefix in ipairs(prefixes) do
+		if string.sub(info, 1, #prefix) == prefix then
+			return true
+		end
+	end
+	return false
+end
+
+local function is_drx(id)
+	return string.sub(id, 1, 7) == "drx_sl_"
+end
+
+local function storyline(task_id)
+	local ini = task_manager.task_ini
+	return type(task_id) == "string" and ini:section_exist(task_id) and ini:r_bool_ex(task_id, "storyline", false)
+end
+
+-- a step of the world's story (not DRX): once for the world
+local function worlds_step(task_id)
+	return storyline(task_id) and not is_drx(task_id)
+end
+
+local function count(t)
+	local n = 0
+	for _ in pairs(t) do
+		n = n + 1
+	end
+	return n
+end
+
+------------------------------------------------------------------------------------------------
+-- Once for the world
+
+local function in_story(f, ...)
+	if scope == 0 then
+		times = {}
+	end
+	scope = scope + 1
+	local res = pack(pcall(f, ...))
+	scope = scope - 1
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2, res.n)
+end
+
+-- run the effect if the world hasn't had it: the server says whose it is (CLAIM_MS); asked again meanwhile (logic
+-- doing it on every update), it is the same one
+local function claim(key, run)
+	if claims[key] then
+		return
+	end
+	local whose = coop.fact(key)
+	if whose ~= "" then
+		printf("[coop] %s: done in the world by %s, not again", key, whose)
+		return
+	end
+	claims[key] = { since = time_global(), run = run }
+	coop.report_fact(key, coop.my_name())
+end
+
+local function on_claim(key, whose)
+	local waiting = claims[key]
+	if not waiting then
+		return
+	end
+	claims[key] = nil
+	if whose ~= coop.my_name() then
+		printf("[coop] %s: %s's, not done here", key, whose)
+		return
+	end
+	printf("[coop] %s: ours, done", key)
+	local ok, err = pcall(waiting.run)
+	if not ok then
+		printf("! [coop] %s: %s", key, tostring(err))
+	end
+end
+
+local function object_of(obj)
+	local ok, id, name = pcall(function()
+		return obj:id(), obj:name()
+	end)
+	if ok then
+		return id, name
+	end
+end
+
+-- an effect of xr_effects, once for the world inside the story: "once:<name>[@<object>](<params>)[#<n>]", n for
+-- the same done again by one step (two squads alike)
+local function once_for_world(name, f)
+	return function(actor, obj, p)
+		if scope == 0 or not coop.connected() then
+			return f(actor, obj, p)
+		end
+		local args = {}
+		for i, v in ipairs(type(p) == "table" and p or {}) do
+			args[i] = tostring(v)
+		end
+		local id, obj_name
+		if obj then
+			id, obj_name = object_of(obj)
+		end
+		local at = id and id ~= AC_ID and ("@" .. obj_name) or ""
+		local key = "once:" .. name .. at .. "(" .. table.concat(args, ",") .. ")"
+		local n = (times[key] or 0) + 1
+		times[key] = n
+		claim(n > 1 and key .. "#" .. n or key, function()
+			local now = id and (id == AC_ID and db.actor or level.object_by_id(id))
+			coop.begin_shared() -- everyone's
+			local ok, err = pcall(f, db.actor, now, p)
+			coop.end_shared()
+			if not ok then
+				error(err, 0)
+			end
+		end)
+	end
+end
+
+-- a condlist that checks or gives a world story info (xr_logic.parse_condlist's: cond[2] checks, cond[3] does;
+-- type 1 has / gives, 2 hasn't / takes)
+local function checks_story(condlist)
+	local known = checks[condlist]
+	if known == nil then
+		known = false
+		for _, cond in ipairs(condlist) do
+			for part = 2, 3 do
+				for _, infop in ipairs(type(cond[part]) == "table" and cond[part] or {}) do
+					if (infop[2] == 1 or infop[2] == 2) and story[infop[1]] then
+						known = true
+					end
+				end
+			end
+		end
+		checks[condlist] = known
+	end
+	return known
+end
+
+local function wrap_story_scopes()
+	for _, name in ipairs(WORLD_EFFECTS) do
+		local f = xr_effects[name]
+		if type(f) == "function" then
+			xr_effects[name] = once_for_world(name, f)
+		else
+			printf("! [coop] xr_effects.%s not found: not once for the world", name)
+		end
+	end
+
+	-- a story task given, checked (its condlists and status functor) or ended
+	local general = task_objects.CGeneralTask
+	for _, method in ipairs({ "give_task", "check_task", "deactivate_task" }) do
+		local original = general[method]
+		general[method] = function(self, ...)
+			if worlds_step(self.id) then
+				return in_story(original, self, ...)
+			end
+			return original(self, ...)
+		end
+	end
+
+	-- level logic that checks or gives a story info
+	local pick = xr_logic.pick_section_from_condlist
+	xr_logic.pick_section_from_condlist = function(obj, npc, condlist)
+		if scope == 0 and type(condlist) == "table" and checks_story(condlist) then
+			return in_story(pick, obj, npc, condlist)
+		end
+		return pick(obj, npc, condlist)
+	end
+
+	-- the Lost to the Zone dialogs' actions
+	for name, f in pairs(dialogs_lostzone) do
+		if type(f) == "function" and name ~= "on_game_start" then
+			dialogs_lostzone[name] = function(...)
+				return in_story(f, ...)
+			end
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- A story, ours or another's
+
+local function all_story_tasks()
+	if not story_tasks then
+		story_tasks = {}
+		task_manager.task_ini:section_for_each(function(section)
+			if task_manager.task_ini:r_bool_ex(section, "storyline", false) then
+				story_tasks[#story_tasks + 1] = section
+			end
+		end)
+	end
+	return story_tasks
+end
+
+local function our_story()
+	local out = { faction = get_actor_true_community(), infos = {}, done = {}, active = {}, drx = {} }
+	for _, info in ipairs(coop.infos()) do
+		if is_story_info(info) then
+			out.infos[#out.infos + 1] = info
+		end
+	end
+	for _, task_id in ipairs(all_story_tasks()) do
+		local done = coop.done_task(task_id)
+		if done then
+			out.done[task_id] = { title = done.title, descr = done.descr, icon = done.icon }
+		end
+	end
+	for task_id, rtask in pairs(task_manager.get_task_manager().task_info) do
+		if storyline(task_id) and rtask.stage ~= 255 and db.actor:get_task(task_id, true) then
+			out.active[task_id] = { stage = rtask.stage, giver = rtask.task_giver_id, var = load_var(db.actor, task_id) }
+		end
+	end
+	for _, name in ipairs(DRX_VARS) do
+		out.drx[name] = load_var(db.actor, name)
+	end
+	return out
+end
+
+-- an info or task of a faction's Lost to the Zone variant as the other faction's (dialogs_lostzone)
+local function for_faction(name, kind, from, to)
+	local t = lttz
+	if not (t and from ~= to and t[from] and t[to]) then
+		return name
+	end
+	for k, v in pairs(t[from][kind] or {}) do
+		if v == name then
+			return t[to][kind][k] or name
+		end
+	end
+	return name
+end
+
+-- their DRX chain is further than ours
+local function drx_further(drx)
+	local theirs = tonumber(drx.drx_sl_current_task_number)
+	local ours = tonumber(load_var(db.actor, "drx_sl_current_task_number"))
+	return theirs ~= nil and (ours == nil or theirs > ours)
+end
+
+-- what of their story we haven't: infos, tasks done, tasks under way; their DRX chain if it is further
+local function what_we_get(theirs)
+	local get = { infos = {}, done = {}, active = {}, drx = drx_further(theirs.drx or {}) }
+	local from, to = theirs.faction, get_actor_true_community()
+	local tm = task_manager.get_task_manager()
+	local ini = task_manager.task_ini
+	local function wanted(id)
+		return get.drx or not is_drx(id)
+	end
+	for _, info in ipairs(theirs.infos or {}) do
+		local ours = for_faction(info, "info", from, to)
+		if wanted(ours) and not has_alife_info(ours) then
+			get.infos[#get.infos + 1] = ours
+		end
+	end
+	for task_id, done in pairs(theirs.done or {}) do
+		local ours = for_faction(task_id, "task", from, to)
+		if wanted(ours) and ini:section_exist(ours) and not coop.done_task(ours) then
+			get.done[ours] = done
+		end
+	end
+	for task_id, t in pairs(theirs.active or {}) do
+		local ours = for_faction(task_id, "task", from, to)
+		if wanted(ours) and ini:section_exist(ours) and not get.done[ours] and not tm.task_info[ours]
+			and not db.actor:get_task(ours, true) and not coop.done_task(ours) then
+			get.active[ours] = t
+		end
+	end
+	return get
+end
+
+-- task news and fading titles held back
+local function held(f, ...)
+	quiet = quiet + 1
+	local fade = actor_menu.set_fade_msg
+	actor_menu.set_fade_msg = function() end
+	local res = pack(pcall(f, ...))
+	actor_menu.set_fade_msg = fade
+	quiet = quiet - 1
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2, res.n)
+end
+
+-- a task of ours off our list, completed or failed, with none of its on_complete / on_fail
+local function close_task(task_id, state)
+	task_manager.get_task_manager().task_info[task_id] = nil -- first: task_callback finds nothing to run
+	save_var(db.actor, task_id, nil)
+	if db.actor:get_task(task_id, true) then
+		db.actor:set_task_state(state, task_id)
+	end
+end
+
+-- a task done elsewhere put in our PDA as done
+local function add_done(task_id, done)
+	local ini = task_manager.task_ini
+	local t = CGameTask()
+	t:set_id(task_id)
+	t:set_type(ini:r_bool_ex(task_id, "storyline", false) and task.storyline or task.additional)
+	t:set_title(done.title and done.title ~= "" and done.title or game.translate_string(ini:r_string_ex(task_id, "title") or task_id))
+	t:set_description(done.descr or "")
+	t:set_icon_name(done.icon and done.icon ~= "" and done.icon or ini:r_string_ex(task_id, "icon") or "ui_pda2_mtask_overlay")
+	t:set_priority(ini:r_float_ex(task_id, "prior") or 0)
+	db.actor:give_task(t, 0, false, 0)
+	db.actor:set_task_state(task.completed, task_id)
+end
+
+-- a task under way elsewhere, ours at its stage: given there, nothing of its on_init again
+local function add_active(task_id, t)
+	local tm = task_manager.get_task_manager()
+	local obj = task_objects.CGeneralTask(task_id)
+	obj.on_init = nil
+	tm.task_info[task_id] = obj
+	obj:give_task()
+	obj.stage = tonumber(t.stage) or 0
+	obj.task_giver_id = t.giver
+	if t.var ~= nil then
+		save_var(db.actor, task_id, t.var)
+	end
+end
+
+-- their story onto ours (what_we_get)
+local function take(theirs, get)
+	local tm = task_manager.get_task_manager()
+	if get.drx then -- their chain in place of ours
+		local their_infos = {}
+		for _, info in ipairs(theirs.infos or {}) do
+			their_infos[info] = true
+		end
+		for task_id in pairs(tm.task_info) do
+			if is_drx(task_id) and not (theirs.active or {})[task_id] then
+				close_task(task_id, task.fail)
+			end
+		end
+		for _, info in ipairs(coop.infos()) do
+			if string.find(info, "^drx_sl_meet_honcho_") and not their_infos[info] then
+				db.actor:disable_info_portion(info)
+			end
+		end
+		for _, name in ipairs(DRX_VARS) do
+			save_var(db.actor, name, theirs.drx[name])
+		end
+	end
+	for _, info in ipairs(get.infos) do
+		if not has_alife_info(info) then
+			db.actor:give_info_portion(info)
+		end
+	end
+	for task_id, done in pairs(get.done) do
+		if db.actor:get_task(task_id, true) then
+			close_task(task_id, task.completed)
+		else
+			add_done(task_id, done)
+		end
+	end
+	for task_id, t in pairs(get.active) do
+		add_active(task_id, t)
+	end
+end
+
+local function taking(f, ...)
+	applying = true
+	local res = pack(pcall(f, ...))
+	applying = false
+	if not res[1] then
+		printf("! [coop] another's story onto ours: %s", tostring(res[2]))
+	end
+	return unpack(res, 2, res.n)
+end
+
+------------------------------------------------------------------------------------------------
+-- Passing it on: the wheel, a group's member asking
+
+local function send_story(to, kind)
+	local text = coop_sync.serialize(our_story())
+	local parts = math.max(1, math.ceil(#text / CHUNK))
+	for i = 1, parts do
+		coop_sync.send_event("story", to, kind, i, parts, string.sub(text, (i - 1) * CHUNK + 1, i * CHUNK))
+	end
+	printf("[coop] our story to %s (%s, %s characters)", to, kind, #text)
+end
+
+-- the wheel: our story to that player, they say yes or no
+function share(to)
+	send_story(to, "share")
+	news(tr("st_coop_story_sent", to))
+end
+
+local function answer(to, result, steps)
+	coop_sync.send_event("story_answer", to, result, steps or 0)
+end
+
+local function offer(sender, kind, theirs)
+	local get = what_we_get(theirs)
+	local steps, marks = count(get.done) + count(get.active), #get.infos
+	if steps == 0 and marks == 0 then
+		if kind == "share" then
+			news(tr("st_coop_story_nothing", sender))
+			answer(sender, "nothing")
+		end
+		return
+	end
+	local text = tr(kind == "share" and "st_coop_story_offer" or "st_coop_story_offer_group", sender, steps, marks)
+	table.insert(offers, { text = text, yes = function()
+		get = what_we_get(theirs) -- as it is now
+		steps, marks = count(get.done) + count(get.active), #get.infos
+		taking(held, take, theirs, get)
+		news(tr("st_coop_story_taken", steps, marks))
+		answer(sender, "accepted", steps)
+	end, no = function()
+		answer(sender, "declined")
+	end })
+end
+
+local function on_story(sender, payload)
+	local to, kind, i, parts, part = string.match(payload, "^([^\t]*)\t([^\t]*)\t(%d+)\t(%d+)\t(.*)$")
+	if to ~= coop.my_name() or not db.actor then
+		return
+	end
+	i, parts = tonumber(i), tonumber(parts)
+	local got = incoming[sender]
+	if i == 1 or not got then
+		got = {}
+		incoming[sender] = got
+	end
+	got[i] = part
+	if i < parts then
+		return
+	end
+	incoming[sender] = nil
+	local theirs = coop_sync.deserialize(table.concat(got))
+	if type(theirs) ~= "table" then
+		return printf("! [coop] %s's story can't be read", sender)
+	end
+	offer(sender, kind, theirs)
+end
+
+local function on_answer(sender, payload)
+	local f = str_explode(payload, "\t")
+	if f[1] ~= coop.my_name() then
+		return
+	end
+	if f[2] == "accepted" then
+		news(tr("st_coop_story_accepted", sender, tonumber(f[3]) or 0))
+	elseif f[2] == "declined" then
+		news(tr("st_coop_story_declined", sender))
+	elseif f[2] == "nothing" then
+		news(tr("st_coop_story_has_all", sender))
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- A group sharing its story
+
+local function sharing()
+	return coop.connected() and coop.group_story() and #coop.group() > 1
+end
+
+local function in_our_group(name)
+	for _, member in ipairs(coop.group()) do
+		if member == name then
+			return true
+		end
+	end
+	return false
+end
+
+local function online(name)
+	for _, p in ipairs(coop.peers()) do
+		if p.name == name and p.age < ONLINE_MS then
+			return true
+		end
+	end
+	return false
+end
+
+-- our story from the leader (or the first member in the game), to say yes or no to
+local function ask_group()
+	local me = coop.my_name()
+	for _, name in ipairs(coop.group()) do
+		if name == me then
+			return -- the leader, or the first one here: ours is the group's
+		elseif online(name) then
+			coop_sync.send_event("story_ask", name)
+			return printf("[coop] the group's story asked of %s", name)
+		end
+	end
+end
+
+local function step(kind, data)
+	coop_sync.send_event("story_step", kind, coop_sync.serialize(data))
+end
+
+-- a step's reward of the group's member's step, if the server says the others get it
+local function reward_of(rtask)
+	if not (rtask and rtask.on_complete and coop_rules.flag("story_rewards_all", false)) then
+		return
+	end
+	local kept = {}
+	for name, f in pairs(xr_effects) do
+		if type(f) == "function" and not REWARD_EFFECTS[name] then
+			kept[name] = f
+			xr_effects[name] = function() end
+		end
+	end
+	local ok, err = pcall(xr_logic.pick_section_from_condlist, db.actor, db.actor, rtask.on_complete)
+	for name, f in pairs(kept) do
+		xr_effects[name] = f
+	end
+	if not ok then
+		printf("! [coop] the reward of %s: %s", rtask.id, tostring(err))
+	end
+end
+
+-- a member did that step: ours closes, with its reward if the server says so
+local function theirs_done(task_id, done)
+	local rtask = task_manager.get_task_manager().task_info[task_id]
+	if rtask then
+		taking(function()
+			reward_of(rtask)
+			close_task(task_id, task.completed)
+		end)
+	elseif not coop.done_task(task_id) then
+		taking(held, add_done, task_id, done)
+	end
+end
+
+local function on_step(sender, payload)
+	local kind, text = string.match(payload, "^([^\t]*)\t(.*)$")
+	if not (kind and db.actor and sharing() and in_our_group(sender)) then
+		return
+	end
+	local data = coop_sync.deserialize(text)
+	if type(data) ~= "table" then
+		return
+	end
+	local to = get_actor_true_community()
+	if kind == "info" then
+		local info = for_faction(data.info or "", "info", data.faction, to)
+		heard_info = time_global()
+		taking(function()
+			if data.given and not has_alife_info(info) then
+				db.actor:give_info_portion(info)
+			elseif not data.given and has_alife_info(info) then
+				db.actor:disable_info_portion(info)
+			end
+		end)
+		return
+	end
+	local task_id = for_faction(data.id or "", "task", data.faction, to)
+	if not storyline(task_id) then
+		return
+	end
+	local tm = task_manager.get_task_manager()
+	if kind == "new" then
+		if not tm.task_info[task_id] and not db.actor:get_task(task_id, true) then
+			taking(function()
+				if is_drx(task_id) then
+					for _, name in ipairs(DRX_VARS) do
+						save_var(db.actor, name, (data.drx or {})[name])
+					end
+				end
+				add_active(task_id, data)
+			end)
+		end
+	elseif kind == "done" then
+		done_by[task_id] = { name = sender, at = time_global() }
+		if tm.task_info[task_id] then
+			news(tr("st_coop_story_step_by", sender))
+		end
+		theirs_done(task_id, data)
+	elseif kind == "fail" then
+		if tm.task_info[task_id] then
+			taking(close_task, task_id, task.fail)
+		end
+	end
+end
+
+-- a story task of ours given (told next update: its giver is set after), done or failed (told now); one done right
+-- after a member did it is theirs
+local function wrap_tasks()
+	local task_callback = task_manager.task_callback
+	task_manager.task_callback = function(tsk, state)
+		local task_id = tsk and tsk:get_id()
+		if not (coop.connected() and storyline(task_id)) then
+			return task_callback(tsk, state)
+		end
+		local rtask = task_manager.get_task_manager().task_info[task_id]
+		if state == task.completed and rtask and sharing() then
+			local by = done_by[task_id]
+			if by and time_global() - by.at < DONE_MS then
+				return theirs_done(task_id, {})
+			end
+		end
+		if worlds_step(task_id) then
+			in_story(task_callback, tsk, state)
+		else
+			task_callback(tsk, state)
+		end
+		if applying or not rtask or not sharing() then
+			return
+		end
+		local faction = get_actor_true_community()
+		if state == task.completed then
+			local done = coop.done_task(task_id) or {}
+			step("done", { id = task_id, faction = faction, title = done.title, descr = done.descr, icon = done.icon })
+		elseif state == task.fail then
+			step("fail", { id = task_id, faction = faction })
+		else
+			pending_new[task_id] = true
+		end
+	end
+
+	-- right after a member's story info our story task may be theirs: it waits for their word
+	local task_complete = task_manager.task_complete
+	task_manager.task_complete = function(task_id)
+		if time_global() - heard_info < HOLD_MS and heard_info > 0 and storyline(task_id) and sharing() then
+			return false
+		end
+		return task_complete(task_id)
+	end
+
+	local send_task = news_manager.send_task
+	news_manager.send_task = function(...)
+		if quiet > 0 then
+			return
+		end
+		return send_task(...)
+	end
+end
+
+local function tell_new()
+	local tm = task_manager.get_task_manager()
+	for task_id in pairs(pending_new) do
+		pending_new[task_id] = nil
+		local rtask = tm.task_info[task_id]
+		if rtask and sharing() then
+			local drx = {}
+			for _, name in ipairs(DRX_VARS) do
+				drx[name] = load_var(db.actor, name)
+			end
+			step("new", { id = task_id, faction = get_actor_true_community(), stage = rtask.stage,
+				giver = rtask.task_giver_id, var = load_var(db.actor, task_id), drx = drx })
+		end
+	end
+end
+
+-- the group shares its story now: ours from the leader; told when it turns on or off
+local function on_groups()
+	local now = sharing()
+	if now ~= was_sharing and db.actor then
+		news(game.translate_string(now and "st_coop_story_group_on" or "st_coop_story_group_off"))
+		if now then
+			ask_group()
+		end
+	end
+	was_sharing = now
+end
+
+------------------------------------------------------------------------------------------------
+
+local function update()
+	tell_new()
+	local now = time_global()
+	for key, waiting in pairs(claims) do
+		if now - waiting.since > CLAIM_MS then
+			claims[key] = nil
+			printf("! [coop] %s: no word from the server, not done", key)
+		end
+	end
+	if #offers > 0 and actor_menu.is_hud_free() then
+		local o = table.remove(offers, 1)
+		ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, o.text, o.yes, o.no)
+	end
+end
+
+-- dialogs_lostzone keeps it in a local table: reached through the function that uses it
+local function read_lttz()
+	local f = dialogs_lostzone.update_lttz_faction_info
+	for i = 1, 32 do
+		local name, value = debug.getupvalue(f, i)
+		if not name then
+			break
+		end
+		if name == "lttz_faction_infos" then
+			return value
+		end
+	end
+	printf("! [coop] dialogs_lostzone's faction table not found: Lost to the Zone goes as the giver's faction has it")
+end
+
+function on_game_start()
+	if not (coop and coop.group_story and coop_sync and coop_facts and coop_rules and task_objects and xr_logic
+		and dialogs_lostzone and news_manager) then
+		return -- not the co-op engine
+	end
+	for _, info in ipairs(utils_data.collect_section(ini_sys, "coop_story_infos")) do
+		if string.sub(info, -1) == "*" then
+			prefixes[#prefixes + 1] = string.sub(info, 1, -2)
+		else
+			story[info] = true
+		end
+	end
+	lttz = read_lttz() -- before dialogs_lostzone's functions are wrapped
+	wrap_story_scopes()
+	wrap_tasks()
+
+	coop_facts.on_fact("once:", on_claim)
+	coop_sync.on_event("story", on_story)
+	coop_sync.on_event("story_answer", on_answer)
+	coop_sync.on_event("story_ask", function(sender, payload)
+		if payload == coop.my_name() and db.actor and sharing() and in_our_group(sender) then
+			send_story(sender, "group")
+		end
+	end)
+	coop_sync.on_event("story_step", on_step)
+
+	_G.coop_on_info = function(info, given)
+		if not applying and db.actor and is_story_info(info) and sharing() then
+			step("info", { info = info, given = given, faction = get_actor_true_community() })
+		end
+	end
+	local groups = _G.coop_on_groups
+	_G.coop_on_groups = function(...)
+		if groups then
+			groups(...)
+		end
+		on_groups()
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		was_sharing = sharing()
+		if was_sharing then -- the group may have gone on while we were away
+			CreateTimeEvent("coop_story", "ask_group", 5, function()
+				ask_group()
+				return true
+			end)
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+end

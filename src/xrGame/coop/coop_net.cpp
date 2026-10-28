@@ -99,6 +99,7 @@ namespace coop
 
 	public:
 		xr_vector<xr_vector<xr_string>> m_groups; // as the server has them
+		xr_vector<bool> m_group_story;            // each group shares its story
 	};
 
 	static CClient g_client;
@@ -511,11 +512,13 @@ namespace coop
 		case M_GROUPS:
 		{
 			m_groups.clear();
+			m_group_story.clear();
 			for (u8 count = P.r_u8(); count; --count)
 			{
 				xr_vector<xr_string>& group = m_groups.emplace_back();
 				for (u8 size = P.r_u8(); size; --size)
 					P.r_stringZ(group.emplace_back());
+				m_group_story.push_back((P.r_u8() & 1) != 0); // GROUP_FLAG.STORY
 			}
 			call_lua("_G.coop_on_groups");
 			break;
@@ -809,6 +812,26 @@ namespace coop
 			if (std::find(group.begin(), group.end(), name) != group.end())
 				return &group;
 		return nullptr;
+	}
+
+	bool group_story(const xr_string& name)
+	{
+		for (u32 i = 0; i < g_client.m_groups.size(); ++i)
+		{
+			const auto& group = g_client.m_groups[i];
+			if (std::find(group.begin(), group.end(), name) != group.end())
+				return i < g_client.m_group_story.size() && g_client.m_group_story[i];
+		}
+		return false;
+	}
+
+	void group_set_story(bool on)
+	{
+		NET_Packet P;
+		P.w_begin(M_GROUP);
+		P.w_u8(eGroupStory);
+		P.w_u8(on ? 1 : 0);
+		send(P);
 	}
 
 	static const xr_string* name_of(u32 id)

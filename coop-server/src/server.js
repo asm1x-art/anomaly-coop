@@ -1,6 +1,6 @@
 import net from 'node:net';
 import zlib from 'node:zlib';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
+import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
@@ -42,14 +42,16 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   };
 
   // Groups of players, by character name, leader first; kept between runs like the characters.
-  // An invite lasts a minute and makes a group of two when the inviter has none.
+  // An invite lasts a minute and makes a group of two when the inviter has none. The leader may make the group
+  // share its story ({ members, story }).
   const INVITE_MS = 60000;
   const PDA_INVITE_MS = 30 * 60000; // one sent from the PDA waits there to be answered
   const groups = storage.loadGroups();
   const invites = new Map(); // `${inviter id}:${invited id}` -> when it runs out
-  const groupOf = (name) => groups.find((g) => g.includes(name));
+  const groupOf = (name) => groups.find((g) => g.members.includes(name));
   const groupsPayload = () => Buffer.concat([Buffer.from([groups.length]),
-    ...groups.map((g) => Buffer.concat([Buffer.from([g.length]), ...g.map(stringZ)]))]);
+    ...groups.map((g) => Buffer.concat([Buffer.from([g.members.length]), ...g.members.map(stringZ),
+      Buffer.from([g.story ? GROUP_FLAG.STORY : 0])]))]);
   const announceGroups = () => {
     storage.saveGroups(groups);
     const payload = groupsPayload();
@@ -58,8 +60,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   const leaveGroup = (name) => {
     const g = groupOf(name);
     if (!g) return;
-    g.splice(g.indexOf(name), 1);
-    if (g.length < 2) groups.splice(groups.indexOf(g), 1);
+    g.members.splice(g.members.indexOf(name), 1);
+    if (g.members.length < 2) groups.splice(groups.indexOf(g), 1);
   };
   const groupNote = (c, note, name) => c.send(M.GROUP_NOTE, Buffer.concat([Buffer.from([note]), stringZ(name)]));
   const onGroup = (id, client, payload) => {
@@ -71,8 +73,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (!other) return;
       if (action === GROUP.INVITE) {
         const g = groupOf(client.name);
-        if (g?.includes(other.name)) return groupNote(client, GROUP_NOTE.ALREADY, other.name);
-        if (g && g.length >= max) return groupNote(client, GROUP_NOTE.FULL, other.name);
+        if (g?.members.includes(other.name)) return groupNote(client, GROUP_NOTE.ALREADY, other.name);
+        if (g && g.members.length >= max) return groupNote(client, GROUP_NOTE.FULL, other.name);
         const viaPda = payload[5] === 1;
         invites.set(`${id}:${otherId}`, Date.now() + (viaPda ? PDA_INVITE_MS : INVITE_MS));
         other.send(M.GROUP_INVITE, Buffer.concat([u32(id), stringZ(client.name), Buffer.from([viaPda ? 1 : 0])]));
@@ -85,11 +87,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (action === GROUP.DECLINE) return groupNote(other, GROUP_NOTE.DECLINED, client.name);
       if (!valid) return groupNote(client, GROUP_NOTE.EXPIRED, other.name);
       const g = groupOf(other.name);
-      if (g?.includes(client.name)) return;
-      if (g && g.length >= max) return groupNote(client, GROUP_NOTE.FULL, other.name);
+      if (g?.members.includes(client.name)) return;
+      if (g && g.members.length >= max) return groupNote(client, GROUP_NOTE.FULL, other.name);
       leaveGroup(client.name);
-      if (g) g.push(client.name);
-      else groups.push([other.name, client.name]);
+      if (g) g.members.push(client.name);
+      else groups.push({ members: [other.name, client.name], story: false });
       log(`[${id}] '${client.name}' joined the group of '${other.name}'`);
     } else if (action === GROUP.LEAVE) {
       if (!groupOf(client.name)) return;
@@ -98,9 +100,14 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     } else if (action === GROUP.KICK) {
       const name = readStringZ(payload, 1);
       const g = groupOf(client.name);
-      if (!g || g[0] !== client.name || name === client.name || !g.includes(name)) return;
+      if (!g || g.members[0] !== client.name || name === client.name || !g.members.includes(name)) return;
       leaveGroup(name);
       log(`[${id}] '${client.name}' put '${name}' out of the group`);
+    } else if (action === GROUP.STORY) {
+      const g = groupOf(client.name);
+      if (!g || g.members[0] !== client.name) return;
+      g.story = payload[1] === 1;
+      log(`[${id}] '${client.name}' turned the group's common story ${g.story ? 'on' : 'off'}`);
     } else return;
     announceGroups();
   };
@@ -296,6 +303,16 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           const [key, value] = readStringsZ(payload, 0, 2);
           // who brought a mechanic his tools: the first one stays (two finishing the task at once)
           if (key.startsWith('tool:') && value && storage.facts()[key]) break;
+          // a claim: the first stays, and the claimer learns whether it is theirs
+          if (key.startsWith('once:')) {
+            const kept = storage.facts()[key];
+            if (!kept && value) {
+              storage.setFact(key, value);
+              broadcast(id, M.FACT, Buffer.from(payload));
+            }
+            send(M.FACT, Buffer.concat([stringZ(key), stringZ(kept || value)]));
+            break;
+          }
           if (key && storage.setFact(key, value)) broadcast(id, M.FACT, Buffer.from(payload));
           break;
         }

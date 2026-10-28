@@ -1,6 +1,7 @@
 -- Co-op: the PDA's Group tab (pda_dynamic_tabs.script): who is in our group and where, the players in the
 -- world to invite, leaving the group or putting one out of it (the leader), invites sent to us from a PDA
--- (answered here, no box: coop_group.script), and sending money to a player.
+-- (answered here, no box: coop_group.script), sending money to a player, and the group's common story (the leader
+-- turns it on or off: coop_story.script).
 -- The group itself is the server's (coop_group.script); money goes as in a trade (coop_trade.send_money).
 
 local REFRESH_MS = 1000
@@ -69,7 +70,7 @@ function pda_coop_group_tab:InitControls()
 	xml:InitTextWnd("cap_money", self)
 	self.edit_money = xml:InitEditBox("edit_money", self)
 	self.status = xml:InitTextWnd("status", self)
-	for _, name in ipairs({ "btn_leave", "btn_kick", "btn_invite", "btn_money", "btn_accept", "btn_decline" }) do
+	for _, name in ipairs({ "btn_leave", "btn_kick", "btn_invite", "btn_money", "btn_accept", "btn_decline", "btn_story" }) do
 		self[name] = xml:Init3tButton(name, self)
 		self:Register(self[name], name)
 	end
@@ -79,6 +80,7 @@ function pda_coop_group_tab:InitControls()
 	self:AddCallback("btn_money", ui_events.BUTTON_CLICKED, self.OnMoney, self)
 	self:AddCallback("btn_accept", ui_events.BUTTON_CLICKED, self.OnAccept, self)
 	self:AddCallback("btn_decline", ui_events.BUTTON_CLICKED, self.OnDecline, self)
+	self:AddCallback("btn_story", ui_events.BUTTON_CLICKED, self.OnStory, self)
 end
 
 function pda_coop_group_tab:Reset()
@@ -160,6 +162,8 @@ function pda_coop_group_tab:Refresh()
 	local leader = group[1] == coop.my_name()
 	self.btn_leave:Enable(#group > 0)
 	self.btn_kick:Enable(leader and #group > 1)
+	self.btn_story:TextControl():SetText(tr(coop.group_story() and "st_coop_pda_story_on" or "st_coop_pda_story_off"))
+	self.btn_story:Enable(leader and #group > 1)
 end
 
 function pda_coop_group_tab:Update()
@@ -217,6 +221,12 @@ function pda_coop_group_tab:OnDecline()
 	end
 	coop_group.answer_pda(id, false)
 	self:Refresh()
+end
+
+function pda_coop_group_tab:OnStory()
+	local on = not coop.group_story()
+	coop.group_set_story(on) -- the server tells everyone; the button follows
+	self.status:SetText(tr(on and "st_coop_pda_story_turned_on" or "st_coop_pda_story_turned_off"))
 end
 
 function pda_coop_group_tab:OnMoney()

@@ -19,7 +19,7 @@ import { normalizeSettings } from './settings.js';
 //   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
 //                            copy of the folder (saves/<revision>/progress/), a rollback brings it back
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
-//   groups.json             [[leader, member...]]: groups of players, by character name
+//   groups.json             [{ members: [leader, member...], story }]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
@@ -158,9 +158,13 @@ export function openStorage(dir) {
       characters = {};
     },
 
+    // [{ members: [leader, ...], story }]; a group was a plain list of names before
     loadGroups() {
       const groups = readJson('groups.json', []);
-      return Array.isArray(groups) ? groups.filter((g) => Array.isArray(g) && g.length > 1) : [];
+      if (!Array.isArray(groups)) return [];
+      return groups.map((g) => (Array.isArray(g) ? { members: g, story: false } : g))
+        .filter((g) => Array.isArray(g?.members) && g.members.length > 1)
+        .map((g) => ({ members: g.members, story: g.story === true }));
     },
     saveGroups(groups) {
       writeAtomic('groups.json', JSON.stringify(groups, null, 1));

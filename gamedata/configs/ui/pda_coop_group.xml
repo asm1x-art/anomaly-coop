@@ -68,6 +68,11 @@
 		<text font="letterica16">st_coop_pda_send_money</text>
 	</btn_money>
 
+	<btn_story x="438" y="422" width="330" height="24" stretch="1">
+		<texture>ui_button_ordinary</texture>
+		<text font="letterica16">st_coop_pda_story_off</text>
+	</btn_story>
+
 	<status x="52" y="466" width="716" height="56" stretch="1">
 		<text font="letterica16" align="l" vert_align="t" r="200" g="200" b="120" complex_mode="1"/>
 	</status>

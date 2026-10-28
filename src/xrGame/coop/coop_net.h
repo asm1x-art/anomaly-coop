@@ -82,9 +82,10 @@ namespace coop
 		eGroupDecline,
 		eGroupLeave,
 		eGroupKick,
+		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 18;
+	const u16 PROTOCOL_VERSION = 19;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -154,6 +155,8 @@ namespace coop
 	// Groups of players: names, leader first. same_group: either may be my_id()
 	const xr_vector<xr_string>* group_of(const xr_string& name);
 	bool same_group(u32 a, u32 b);
+	bool group_story(const xr_string& name); // that player's group shares its story
+	void group_set_story(bool on);
 	// pda: an invite sent from the PDA, answered there (coop_group.script), not in a box
 	void group_request(EGroupAction action, u32 peer, LPCSTR name = "", bool pda = false);
 

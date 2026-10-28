@@ -25,6 +25,11 @@
 			<texture>ui_companion_distance_btn</texture>
 		</btn_routes>
 
+		<box_story x="39" y="164" width="100" height="100" stretch="1"/>
+		<btn_story x="39" y="164" width="100" height="100" stretch="1">
+			<texture>ui_companion_stealth_btn</texture>
+		</btn_story>
+
 		<hint x="140" y="185" width="160" height="70" stretch="1">
 			<text complex_mode="1" r="200" g="200" b="200" align="c" vert_align="c" font="letterica18"/>
 		</hint>

@@ -5,7 +5,7 @@
 // in co-op for now (maybe their own modes later): kept here, always false, as the game reads the keys.
 // Difficulty and economy are the world's, the same for everyone: a game loading the world takes them from here
 // (coop_rules.script), so a change shows from the next load.
-// The rules are co-op's own (groups, fights, death, fast travel) and apply at once (coop_rules.script).
+// The rules are co-op's own (groups, fights, death, fast travel, story) and apply at once (coop_rules.script).
 
 export const FACTIONS = ['stalker', 'dolg', 'freedom', 'csky', 'ecolog', 'killer', 'army', 'bandit', 'monolith',
   'renegade', 'greh', 'isg'];
@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS = {
     tool_discount_2: 25, // fine work
     tool_discount_3: 30, // calibration
     tool_group_share: 50, // % of that discount for the bringer's group
+    story_rewards_all: false, // a group sharing its story: a step's reward for every member, not only who handed it in
   },
 };
 

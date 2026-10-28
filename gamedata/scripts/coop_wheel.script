@@ -1,6 +1,6 @@
 -- Co-op: F on another player (on their stand-in, src/xrGame/coop/coop_combat.h) opens this wheel, as F on
--- a companion opens the companions' one: trade, the group, passing notes and routes. On a player lying
--- wounded F helps them up instead (coop_death.script).
+-- a companion opens the companions' one: trade, the group, passing notes, routes and the story (coop_story.script).
+-- On a player lying wounded F helps them up instead (coop_death.script).
 
 local GUI = nil
 local opened_at = 0
@@ -37,6 +37,10 @@ local ACTIONS = {
 		hint = function() return "st_coop_wheel_routes" end,
 		run = function(id, name) coop_share.routes(name) end,
 	},
+	story = {
+		hint = function() return "st_coop_wheel_story" end,
+		run = function(id, name) coop_story.share(name) end,
+	},
 }
 
 class "UICoopWheel" (CUIScriptWnd)
@@ -50,7 +54,7 @@ function UICoopWheel:__init() super()
 	self.dialog = xml:InitStatic("wheel", self)
 	xml:InitStatic("wheel:background", self.dialog)
 	self.buttons = {}
-	local pictures = { trade = "trade", group = "movement", notes = "loot", routes = "distance" }
+	local pictures = { trade = "trade", group = "movement", notes = "loot", routes = "distance", story = "stealth" }
 	for action in pairs(ACTIONS) do
 		local picture = xml:InitStatic("wheel:box_" .. action, self.dialog)
 		picture:InitTexture("ui_companion_" .. pictures[action])

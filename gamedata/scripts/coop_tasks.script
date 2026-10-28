@@ -26,7 +26,7 @@
 -- * shooting a helicopter down (HELI_TASKS, completed by bind_heli.heli_die): the one who downed it, as an
 --   elimination: "killed:<helicopter id>" from the game it was downed in (a destroyed vehicle reaches the others
 --   too: src/xrGame/coop/coop_world.cpp on_vehicle_death).
--- Story tasks stay as in a game of one: story is personal, cancelling one would stop the player's chain.
+-- Story tasks are not here: story is personal, cancelling one would stop the player's chain (coop_story.script).
 
 local QUIET_MS = 5000 -- the fail news of a task taken off this way are dropped for so long
 local quiet = {}      -- task id -> time_global() it was taken off

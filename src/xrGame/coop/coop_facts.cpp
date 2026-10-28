@@ -108,8 +108,16 @@ namespace coop
 
 	void on_actor_info(const shared_str& info, bool given)
 	{
-		if (g_applying || !g_live || !is_world_info(info))
+		if (g_applying || !g_live)
 			return;
+		if (!is_world_info(info))
+		{
+			// one of ours: the story goes to the group sharing it (coop_story.script)
+			::luabind::functor<void> on_info;
+			if (is_connected() && ai().script_engine().functor("_G.coop_on_info", on_info))
+				on_info(info.c_str(), given);
+			return;
+		}
 		string256 key;
 		xr_sprintf(key, "%s%s", INFO, info.c_str());
 		report_fact(key, given ? "1" : "");

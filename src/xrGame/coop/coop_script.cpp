@@ -8,6 +8,11 @@
 #include "coop_facts.h"
 #include "ai_space.h"
 #include "script_engine.h"
+#include "Level.h"
+#include "GameTaskManager.h"
+#include "GameTask.h"
+#include "alife_simulator.h"
+#include "alife_registry_container.h"
 
 using namespace luabind;
 
@@ -75,6 +80,44 @@ namespace coop
 	static void script_group_leave() { group_request(eGroupLeave, 0); }
 	static void script_group_kick(LPCSTR name) { group_request(eGroupKick, 0, name); }
 
+	static bool script_group_story() { return group_story(my_name()); }
+
+	// coop.done_task(id) -> { title, descr, icon } of that task completed in our PDA (once or more), nil if it isn't
+	// (get_task_state sees only one in progress)
+	static ::luabind::object script_done_task(LPCSTR id)
+	{
+		if (g_pGameLevel)
+		{
+			const shared_str task_id = id;
+			for (const SGameTaskKey& key : Level().GameTaskManager().GetGameTasks())
+			{
+				const CGameTask* t = key.game_task;
+				if (key.task_id == task_id && t && t->GetTaskState() == eTaskStateCompleted)
+				{
+					::luabind::object result = ::luabind::newtable(ai().script_engine().lua());
+					result["title"] = t->m_Title.c_str() ? t->m_Title.c_str() : "";
+					result["descr"] = t->m_Description.c_str() ? t->m_Description.c_str() : "";
+					result["icon"] = t->m_icon_texture_name.c_str() ? t->m_icon_texture_name.c_str() : "";
+					return result;
+				}
+			}
+		}
+		return ::luabind::object();
+	}
+
+	// coop.infos() -> { info... } our actor has
+	static ::luabind::object script_infos()
+	{
+		::luabind::object result = ::luabind::newtable(ai().script_engine().lua());
+		const KNOWN_INFO_VECTOR* infos = ai().get_alife() ?
+			ai().alife().registry((CInfoPortionRegistry*)nullptr).object(0, true) : nullptr;
+		int i = 1;
+		if (infos)
+			for (const shared_str& info : *infos)
+				result[i++] = info.c_str();
+		return result;
+	}
+
 	static u32 script_stand_in_peer(u16 object) { return peer_of_stand_in(object); }
 	static LPCSTR script_settings() { return world_settings().c_str(); }
 
@@ -124,6 +167,10 @@ namespace coop
 			def("group_answer", &script_group_answer),   // (inviter id, accept)
 			def("group_leave", &script_group_leave),
 			def("group_kick", &script_group_kick),       // (name), the leader only
+			def("group_story", &script_group_story),     // our group shares its story
+			def("group_set_story", &group_set_story),    // (on), the leader only
+			def("done_task", &script_done_task),
+			def("infos", &script_infos),
 
 			def("set_downed", &set_downed),              // our player lies wounded (coop_death.script)
 			def("fell", &on_player_fell),               // our player fell: squads that turned on them calm down

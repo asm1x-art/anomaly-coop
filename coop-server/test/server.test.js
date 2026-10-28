@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
+import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -568,24 +568,27 @@ test('actor actions reach others with the sender id, not the sender', async () =
   }
 });
 
+// GROUPS as [[members...]], or with story: [{ members, story }]
+function groupsOf(payload, withFlags = false) {
+  const out = [];
+  let at = 1;
+  for (let g = 0; g < payload[0]; g++) {
+    const members = [];
+    for (let n = payload[at++]; n > 0; n--) {
+      members.push(readStringZ(payload, at));
+      at = payload.indexOf(0, at) + 1;
+    }
+    const flags = payload[at++];
+    out.push(withFlags ? { members, story: (flags & GROUP_FLAG.STORY) !== 0 } : members);
+  }
+  return out;
+}
+
 test('groups: invite, accept, leader kicks, leaving dissolves a group of two', async () => {
   const server = await startServer(options());
   const { port } = server.address();
   const wait = () => new Promise((r) => setTimeout(r, 30));
-  const names = (payload) => {
-    const out = [];
-    let at = 1;
-    for (let g = 0; g < payload[0]; g++) {
-      const members = [];
-      for (let n = payload[at++]; n > 0; n--) {
-        const name = readStringZ(payload, at);
-        members.push(name);
-        at = payload.indexOf(0, at) + 1;
-      }
-      out.push(members);
-    }
-    return out;
-  };
+  const names = (payload) => groupsOf(payload);
   const action = (kind, id) => {
     const p = Buffer.alloc(5);
     p[0] = kind;
@@ -621,11 +624,19 @@ test('groups: invite, accept, leader kicks, leaving dissolves a group of two', a
     await wait();
     assert.deepEqual(names(a.groups.at(-1)), [['artem', 'друг', 'third']]);
 
+    // only the leader shares the group's story, and stops it
+    b.send(M.GROUP, Buffer.from([GROUP.STORY, 1]));
+    await wait();
+    assert.deepEqual(groupsOf(a.groups.at(-1), true), [{ members: ['artem', 'друг', 'third'], story: false }]);
+    a.send(M.GROUP, Buffer.from([GROUP.STORY, 1]));
+    await wait();
+    assert.deepEqual(groupsOf(c.groups.at(-1), true), [{ members: ['artem', 'друг', 'third'], story: true }]);
+
     // only the leader puts one out
     b.send(M.GROUP, Buffer.concat([Buffer.from([GROUP.KICK]), encodeText('third'), Buffer.from([0])]));
     a.send(M.GROUP, Buffer.concat([Buffer.from([GROUP.KICK]), encodeText('third'), Buffer.from([0])]));
     await wait();
-    assert.deepEqual(names(a.groups.at(-1)), [['artem', 'друг']]);
+    assert.deepEqual(groupsOf(a.groups.at(-1), true), [{ members: ['artem', 'друг'], story: true }]);
 
     // an invite not accepted in time, or never sent, joins nobody
     c.send(M.GROUP, action(GROUP.ACCEPT, idA));
@@ -942,6 +953,19 @@ test('facts: kept by the server, passed on when they change, given with the worl
     b.send(M.PING, Buffer.alloc(4));
     await until(b, M.PONG);
     assert.equal(server.coop.facts()['tool:esc_mechanic:1'], 'artem');
+    // a claim: the first stays, each claimer is told who has it
+    a.send(M.FACT, fact('once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'artem'));
+    got = await until(a, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'artem']);
+    got = await until(b, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'artem']);
+    b.send(M.FACT, fact('once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'друг'));
+    got = await until(b, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'artem']);
+    assert.equal(server.coop.facts()['once:create_squad(lazarus_dolg_squad,bar_dolg_general)'], 'artem');
+    a.send(M.FACT, fact('once:create_squad(lazarus_dolg_squad,bar_dolg_general)', '')); // a claim stays
+    got = await until(a, M.FACT);
+    assert.deepEqual(readStringsZ(got.payload, 0, 2), ['once:create_squad(lazarus_dolg_squad,bar_dolg_general)', 'artem']);
     a.send(M.FACT, fact('tool:esc_mechanic:1', '')); // cleared, as any fact can be
     a.send(M.PING, Buffer.alloc(4));
     await until(a, M.PONG);
@@ -950,13 +974,15 @@ test('facts: kept by the server, passed on when they change, given with the worl
     b.send(M.FACT, fact('rel:dolg:freedom', '0'));
     b.send(M.FACT, fact('info:esc_bandit_squad_dead', '')); // gone
     await roundTrip(b);
-    assert.deepEqual(server.coop.facts(), { 'rel:dolg:freedom': '0' });
+    assert.deepEqual(server.coop.facts(), { 'rel:dolg:freedom': '0',
+      'once:create_squad(lazarus_dolg_squad,bar_dolg_general)': 'artem' });
 
     const c = await player(port, 'третий');
     c.send(M.WORLD_REQUEST);
     await until(a, M.SAVE_NOW);
     await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'join', 'третий');
-    assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0' });
+    assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0',
+      'once:create_squad(lazarus_dolg_squad,bar_dolg_general)': 'artem' });
 
     assert.ok(server.coop.rollback(2));
     assert.deepEqual(server.coop.facts(), { 'info:esc_bandit_squad_dead': '1', 'rel:dolg:freedom': '-5000' });

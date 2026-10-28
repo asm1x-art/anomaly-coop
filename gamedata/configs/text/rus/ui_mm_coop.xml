@@ -475,4 +475,52 @@
 	<string id="st_coop_save_level">
 		<text>Переход: %s</text>
 	</string>
+	<string id="st_coop_wheel_story">
+		<text>Поделиться сюжетом</text>
+	</string>
+	<string id="st_coop_story_sent">
+		<text>Твой сюжет отправлен игроку %s.</text>
+	</string>
+	<string id="st_coop_story_offer">
+		<text>%s предлагает синхронизировать сюжет: шагов %s, сюжетных отметок %s. Только добавится, награды за эти шаги не будет. Принять?</text>
+	</string>
+	<string id="st_coop_story_offer_group">
+		<text>Синхронизировать сюжет с группой (%s): шагов %s, сюжетных отметок %s. Только добавится, награды за эти шаги не будет. Принять?</text>
+	</string>
+	<string id="st_coop_story_nothing">
+		<text>%s предлагает свой сюжет, но у тебя всё это уже есть.</text>
+	</string>
+	<string id="st_coop_story_has_all">
+		<text>У %s уже есть весь твой сюжет.</text>
+	</string>
+	<string id="st_coop_story_taken">
+		<text>Сюжет синхронизирован: шагов %s, сюжетных отметок %s.</text>
+	</string>
+	<string id="st_coop_story_accepted">
+		<text>%s принял твой сюжет (шагов: %s).</text>
+	</string>
+	<string id="st_coop_story_declined">
+		<text>%s отказался от твоего сюжета.</text>
+	</string>
+	<string id="st_coop_story_group_on">
+		<text>В группе общий сюжет: шаги одного — у всех.</text>
+	</string>
+	<string id="st_coop_story_group_off">
+		<text>Общий сюжет в группе выключен.</text>
+	</string>
+	<string id="st_coop_story_step_by">
+		<text>Сюжетный шаг группы сдал %s.</text>
+	</string>
+	<string id="st_coop_pda_story_on">
+		<text>Общий сюжет: включён</text>
+	</string>
+	<string id="st_coop_pda_story_off">
+		<text>Общий сюжет: выключен</text>
+	</string>
+	<string id="st_coop_pda_story_turned_on">
+		<text>Общий сюжет включён: шаги одного будут у всех, остальным предложено синхронизироваться с тобой.</text>
+	</string>
+	<string id="st_coop_pda_story_turned_off">
+		<text>Общий сюжет выключен.</text>
+	</string>
 </string_table>

@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 18;
+export const PROTOCOL_VERSION = 19;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -40,10 +40,12 @@ export const M = {
   NPC_STATES: 24,     // c->s: the level authority's online NPCs, for the others' NPC puppets; relayed like the above
   COOP_HIT: 25,       // c->s: a hit for another game (an NPC it runs, a player's stand-in) or a grudge; relayed like the above
   // groups of players (server.js keeps them, by character name)
-  GROUP: 26,          // c->s: u8 GROUP action, then u32 peer id (INVITE, ACCEPT, DECLINE) or stringZ name (KICK);
-                      // INVITE then u8 1 when sent from the PDA (answered there, later)
+  GROUP: 26,          // c->s: u8 GROUP action, then u32 peer id (INVITE, ACCEPT, DECLINE) or stringZ name (KICK)
+                      // or u8 1/0 (STORY, the leader only); INVITE then u8 1 when sent from the PDA (answered
+                      // there, later)
   GROUP_INVITE: 27,   // s->c: u32 inviter id, stringZ inviter name, u8 1 from the PDA
-  GROUPS: 28,         // s->c: u8 count, per group u8 size and the names, leader first; to all on every change
+  GROUPS: 28,         // s->c: u8 count, per group u8 size, the names (leader first), u8 GROUP_FLAG bits; to all on
+                      // every change
   GROUP_NOTE: 29,     // s->c: u8 GROUP_NOTE, stringZ the other player's name: why an invite came to nothing
   // the world's saves (storage.js): every upload is one, the last is the world
   LEFT_WORLD: 32,     // c->s: our game went back to the main menu, still connected
@@ -73,7 +75,8 @@ export const M = {
   // Facts about the world the server keeps itself (storage.js facts.json): world infos, faction relations...
   // A game reports a change, the server keeps it and passes it on; a game loading the world gets them all.
   FACT: 49,           // both: stringZ key ("info:<name>", "rel:<faction>:<faction>"...), stringZ value ('' gone);
-                      // s->c also every one kept, right before WORLD_DONE
+                      // s->c also every one kept, right before WORLD_DONE. "once:" keys: the first value stays, and
+                      // the one who reported gets the fact back either way (theirs: it's theirs; another: it isn't)
   REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version; then it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up
@@ -82,7 +85,8 @@ export const M = {
 export const REFUSED = { FULL: 0, VERSION: 1 };
 export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 };
 export const MAX_SAVES_LISTED = 200;
-export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4 };
+export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4, STORY: 5 };
+export const GROUP_FLAG = { STORY: 1 }; // the group shares its story (coop_story.script)
 export const GROUP_NOTE = { DECLINED: 0, FULL: 1, ALREADY: 2, EXPIRED: 3 };
 
 const MAX_MESSAGE_SIZE = 16 * 1024; // NET_PacketSizeLimit

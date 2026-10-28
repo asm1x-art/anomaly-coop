@@ -475,4 +475,52 @@
 	<string id="st_coop_save_level">
 		<text>Level change: %s</text>
 	</string>
+	<string id="st_coop_wheel_story">
+		<text>Share the story</text>
+	</string>
+	<string id="st_coop_story_sent">
+		<text>Your story went to %s.</text>
+	</string>
+	<string id="st_coop_story_offer">
+		<text>%s offers their story: %s steps, %s story marks. Only added, no rewards for those steps. Take it?</text>
+	</string>
+	<string id="st_coop_story_offer_group">
+		<text>Take the group's story (%s): %s steps, %s story marks. Only added, no rewards for those steps. Take it?</text>
+	</string>
+	<string id="st_coop_story_nothing">
+		<text>%s offers their story, but you have all of it.</text>
+	</string>
+	<string id="st_coop_story_has_all">
+		<text>%s has all of your story already.</text>
+	</string>
+	<string id="st_coop_story_taken">
+		<text>Story taken: %s steps, %s story marks.</text>
+	</string>
+	<string id="st_coop_story_accepted">
+		<text>%s took your story (%s steps).</text>
+	</string>
+	<string id="st_coop_story_declined">
+		<text>%s turned your story down.</text>
+	</string>
+	<string id="st_coop_story_group_on">
+		<text>The group shares its story: one's steps are everyone's.</text>
+	</string>
+	<string id="st_coop_story_group_off">
+		<text>The group no longer shares its story.</text>
+	</string>
+	<string id="st_coop_story_step_by">
+		<text>%s handed in the group's story step.</text>
+	</string>
+	<string id="st_coop_pda_story_on">
+		<text>Common story: on</text>
+	</string>
+	<string id="st_coop_pda_story_off">
+		<text>Common story: off</text>
+	</string>
+	<string id="st_coop_pda_story_turned_on">
+		<text>Common story on: one's steps will be everyone's; the others are offered yours.</text>
+	</string>
+	<string id="st_coop_pda_story_turned_off">
+		<text>Common story off.</text>
+	</string>
 </string_table>
