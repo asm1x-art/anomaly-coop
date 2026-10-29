@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	Weapons
+-->
+
+<string_table>
+
+	<string id="st_wpn_shak12">
+		<text>ShAK-12</text>
+	</string>
+	<string id="st_wpn_shak12_descr">
+		<text>The newly adopted Close Quarters Battle rifle made by Izhmash. Developed in response to a growing need made apparent by the FSB, the ShAK-12 was purpose built to house an enormous stopping power ability inside of a compact rifle package. It borrows its 12.7x55mm cartridge from the VSSK Vykhlop sniper rifle and utilizes 20 round magazines. Along with sporting a full array of picatinny attachment rails, it also features a removable carry handle for larger optic mounting options. The short recoil operation of the barrel behaves much in the same way as a Barrett M82 does with the barrel recoiling with the bolt to assist in controllability and cartridge extraction. A weapon like this is sure to make it into any STALKER's wishlist, but few will know what it feels like to own it. Whatever the case, there is no suit in the Zone that can withstand the power this gun deals out. Just make sure you aim well, are close and have a good stash of money, because the ammunition is anything but "cheap and available."\n \n
+		%c[ui_gray_2]ATTACHMENTS: \n
+		%c[d_purple] • %c[ui_gray_2] ACOG, Barska ES AC10632, C-more Railway Tactical, EOTech scopes\n
+		%c[d_purple] • %c[ui_gray_2] 12.7x55mm compatible suppressor\n</text>
+	</string>
+
+	<string id="st_addon_silencer_shak12">
+		<text>ShAK-12 Tactical Suppressor</text>
+	</string>
+	<string id="st_addon_silencer_shak12_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2] 12.7x55 calibre weapons\n \n%c[ui_gray_1]A relatively small Suppressor for the ShAK-12, not big and strong enough to completely silence the gun or to reduce the muzzleflash enough to be just whiffs of smoke, but still enough to suppress it nicely and further reduce the muzzleflash.\n \n%c[d_purple] • %c[ui_gray_2] Sound suppression: %c[ui_gray_1]medium</text>
+	</string>
+
+</string_table>

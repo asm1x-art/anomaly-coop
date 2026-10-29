@@ -1,0 +1,307 @@
+![markswitch_colors]
+	scope_acog = 1, 0.2, 0.2, 1
+	scope_orange = 0.8, 0.35, 0, 1
+
+[gee36_dove]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 5230
+inv_name        		                            = st_addon_scope_gee36_dove
+inv_name_short  		                            = st_addon_scope_gee36_dove
+description    			                            = st_addon_scope_gee36_dove_descr
+inv_weight        		                            = 0.650
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 2
+repair_type                                         = scope	
+hud = gee36_dove_hud
+scope_zoom_factor = 25
+scope_dynamic_zoom = off
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 4.1
+	s3ds_eye_relief = 1.82
+	s3ds_exit_pupil = 0.57	
+	magnification = 3
+	s3ds_dirt_intensity = 0.5
+	s3ds_reflection_hue = 0.55
+	scope_objective_lens_offset = 0, 0, 16.3, .6
+
+[gee36_dove_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\gee36_dove
+        aim_hud_offset_alt_pos           = -0.020526, -0.124224, 0.073664
+        aim_hud_offset_alt_pos_16x9      = -0.020526, -0.124224, 0.073664
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+        aim_hud_offset_pos               = -0.020433, -0.10496, 0.047872
+        aim_hud_offset_pos_16x9          = -0.020433, -0.10496, 0.047872
+
+![scope_group_dovetail]
+    >scopes                          = gee36_dove
+
+![addons_table]
+vudu                                              = scope
+
+[vudu]:scope_base
+visual          		                            = dynamics\weapons\wpn_vssk\wpn_cortex.ogf
+cost				                                = 11700
+inv_name			                                = st_vudu_scope
+inv_name_short			                                = st_vudu_scope
+description			                                = st_vudu_scope_desc
+inv_weight			                                = 0.690
+icons_texture                                       = ui\vssk_icon_sheet
+inv_grid_width     		                            = 2
+inv_grid_height    		                            = 1
+inv_grid_x         		                            = 0
+inv_grid_y         		                            = 2
+repair_type                                         = scope
+hud = vudu_hud
+scope_zoom_factor = 15
+scope_dynamic_zoom = on
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 4.5
+	s3ds_eye_relief = 4.125
+	s3ds_exit_pupil = 0.475
+	magnification = 6
+	min_magnification = 1
+	s3ds_ffp = 6
+	s3ds_min_zoom_1x = 1
+	s3ds_dirt_intensity = 0.2
+	s3ds_lens_color = lens_new_bright
+	scope_objective_lens_offset = 0, 0, 13.3, 0.73
+
+[vudu_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\vudu
+        aim_hud_offset_pos               = -0.000852, -0.029184, 0.137024
+        aim_hud_offset_pos_16x9          = -0.000852, -0.029184, 0.137024
+
+![scope_group_picatinny_medium]
+    >scopes                          = vudu
+
+![addons_table]
+tango6                                              = scope
+
+[tango6]:scope_base
+visual          		                            = dynamics\weapons\wpn_vssk\wpn_cortex.ogf
+cost				                                = 11700
+inv_name			                                = st_tango6_scope
+inv_name_short			                                = st_tango6_scope
+description			                                = st_tango6_scope_desc
+inv_weight			                                = 0.690
+icons_texture                                       = ui\pizza_addon_icon
+inv_grid_width     		                            = 2
+inv_grid_height    		                            = 1
+inv_grid_x         		                            = 0
+inv_grid_y         		                            = 0
+repair_type                                         = scope
+hud = tango6_hud
+scope_zoom_factor = 15
+scope_dynamic_zoom = on
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 4.5
+	s3ds_eye_relief = 4.125
+	s3ds_exit_pupil = 0.475
+	magnification = 6
+	min_magnification = 1
+	s3ds_ffp = 6
+	s3ds_min_zoom_1x = 1
+	s3ds_dirt_intensity = 0.2
+	s3ds_lens_color = lens_new_bright
+
+scope_objective_lens_offset = 0, 0, 13.4, 0.6
+
+[tango6_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\tango6
+        aim_hud_offset_pos               = -0.000106, -0.030592, 0.121216
+        aim_hud_offset_pos_16x9          = -0.000106, -0.030592, 0.121216
+
+![scope_group_picatinny_medium]
+    >scopes                          = tango6
+
+[delta_high]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_deltapoint.ogf
+cost                		                        = 21500
+inv_name        		                            = st_addon_scope_deltapoint_high
+inv_name_short  		                            = st_addon_scope_deltapoint_high
+description    			                            = st_addon_scope_deltapoint_high_descr
+inv_weight        		                            = 0.041
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 81
+inv_grid_y         = 3
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+hud = delta_high_hud
+
+[delta_high_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\delta_high
+        aim_hud_offset_pos               = -0.000216, -0.029184, 0.121728
+        aim_hud_offset_pos_16x9          = -0.000216, -0.029184, 0.121728
+
+
+![scope_group_picatinny_2inch]
+    >scopes                          = delta_high
+
+[rmr_high]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_rmr.ogf
+cost                		                        = 4350
+inv_name        		                            = st_addon_scope_rmr_high
+inv_name_short  		                            = st_addon_scope_rmr_high
+description    			                            = st_addon_scope_rmr_high_descr
+inv_weight        		                            = 0.034
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 84
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+hud = rmr_high_hud
+
+[rmr_high_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\rmr_high
+        aim_hud_offset_pos               = -0.000214, -0.026816, 0.116672
+        aim_hud_offset_pos_16x9          = -0.000214, -0.026816, 0.116672
+
+![scope_group_picatinny_2inch]
+    >scopes                          = rmr_high
+
+
+![wpn_gauss]
+	s3ds_image_type 	= 3
+
+![pks07]
+        s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.13
+	s3ds_exit_pupil = 0.14
+	magnification = 7
+	scope_objective_lens_offset = 0, 1.4, 17, 1
+
+![pks07_hud]
+        aim_hud_offset_pos               = 2e-06, -0.027776, 0.091968
+        aim_hud_offset_pos_16x9          = 2e-06, -0.027776, 0.091968
+
+![mark4]
+        s3ds_reticle_size = 4.9
+	s3ds_eye_relief = 2.24
+	s3ds_exit_pupil = 0.155
+	scope_objective_lens_offset = 0, 0, 19.5, 1.4
+
+![mark4_hud]
+        aim_hud_offset_pos               = 5.8e-05, -0.025856, 0.103936
+        aim_hud_offset_pos_16x9          = 5.8e-05, -0.025856, 0.103936
+
+![eot_hud]
+        aim_hud_offset_pos               = 0.000315, -0.0336, 0.12896
+        aim_hud_offset_pos_16x9          = 0.000315, -0.0336, 0.12896
+
+![ts12x]
+        s3ds_reticle_size = 4.7
+	s3ds_eye_relief = 2.46
+	s3ds_exit_pupil = 0.14
+	magnification = 12
+	min_magnification = 3
+	scope_objective_lens_offset = 0, 0, 19, 1.1
+
+![ts12x_hud]
+        aim_hud_offset_pos               = -0.00021, -0.029696, 0.10144
+        aim_hud_offset_pos_16x9          = -0.00021, -0.029696, 0.10144
+
+![ac10632_hud]
+        aim_hud_offset_pos               = 0.000213, -0.02464, 0.110912
+        aim_hud_offset_pos_16x9          = 0.000213, -0.02464, 0.110912
+
+![scope_group_picatinny_tiny]
+    >scopes                          = ac10632
+
+![ac11090]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 15000
+inv_name        		                            = st_addon_scope_monstrum_2x32
+inv_name_short  		                            = st_addon_scope_monstrum_2x32
+description    			                            = st_addon_scope_monstrum_2x32_descr
+inv_weight        		                            = 0.425
+icons_texture                                       = ui\ui_icon_new_scopes_eft
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 3
+inv_grid_y         = 3
+repair_type                                         = scope
+hud = monstrum_hud
+scope_zoom_factor = 40
+scope_dynamic_zoom = off
+
+	s3ds_reticle_size = 2.9
+	s3ds_eye_relief = 3.175
+	s3ds_exit_pupil = 0.5
+	s3ds_reticle_type 	= 1
+	ms_count 			= 2
+	ms_colors 			= scope_red, scope_black
+	magnification = 2
+	scope_objective_lens_offset = 0, 0, 6.3, 1
+
+![scope_group_picatinny_2inch]
+    >scopes                          = ac11090
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = eot
+
+![c-more_hud]
+        aim_hud_offset_pos               = 1e-06, -0.025472, 0.112448
+        aim_hud_offset_pos_16x9          = 1e-06, -0.025472, 0.112448
+
+![scope_group_picatinny_tiny]
+    >scopes                          = c-more
+
+![kobra_hud]:dovetail_alt_positions
+	aim_hud_offset_pos               = -0.018245, -0.079744, 0.143872
+	aim_hud_offset_pos_16x9          = -0.018245, -0.079744, 0.143872
+        aim_hud_offset_rot               = 0, 0, 0
+        aim_hud_offset_rot_16x9          = 0, 0, 0
+
+![pk-a_hud]:dovetail_alt_positions
+        aim_hud_offset_pos               = -0.021907, -0.08192, 0.092608
+        aim_hud_offset_pos_16x9          = -0.021907, -0.08192, 0.092608
+
+![wpn_addon_scope_pu]
+	s3ds_reticle_size = 3.4
+	s3ds_eye_relief = 3.43
+	s3ds_exit_pupil = 0.285
+
+![wpn_addon_scope_zf4]
+	s3ds_reticle_size = 2.65
+	s3ds_eye_relief = 2.4
+	s3ds_exit_pupil = 0.66
+
+![wpn_addon_scope_po4x34]
+	s3ds_reticle_size = 4.5
+	s3ds_eye_relief = 2.4
+	s3ds_exit_pupil = 0.25
+
+![wpn_addon_scope_galil]
+	s3ds_reticle_size = 4.75
+	s3ds_eye_relief = 2.18
+	s3ds_exit_pupil = 0.2
+
+![wpn_addon_scope_galil_hud]
+        aim_hud_offset_pos               = -0.020679, -0.114087, 0.244133
+        aim_hud_offset_pos_16x9          = -0.020679, -0.114087, 0.244133
+ 
+![wpn_addon_scope_po4x34_hud]
+        aim_hud_offset_pos               = 5.3e-05, -0.033847, 0.205232
+        aim_hud_offset_pos_16x9          = 5.3e-05, -0.033847, 0.205232
+ 
+![wpn_addon_scope_pu_hud]
+        aim_hud_offset_pos               = -0.014878, -0.058734, 0.185888
+        aim_hud_offset_pos_16x9          = -0.014878, -0.058734, 0.185888
+ 
+![wpn_addon_scope_zf4_hud]
+        aim_hud_offset_pos               = -5.3e-05, -0.031676, 0.250072
+        aim_hud_offset_pos_16x9          = -5.3e-05, -0.031676, 0.250072
+
+
+

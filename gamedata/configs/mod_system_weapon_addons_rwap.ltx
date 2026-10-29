@@ -1,0 +1,240 @@
+![addons_table]
+exps3						                = scope
+he510								= scope
+bravo4								= scope
+hamr								= scope
+razorhd								= scope
+exps3_mag							= scope
+exps3_mag_flipped						= scope
+
+;-------------------------------------------------------------------------------
+![exps3]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_exps3.ogf
+cost                		                        = 7350
+inv_name        		                            = st_addon_scope_exps3
+inv_name_short  		                            = st_addon_scope_exps3
+description    			                            = st_addon_scope_exps3_descr
+inv_weight         		                            = 0.317
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 0
+repair_type                                         = scope
+icons_texture                                       = ui\rwap_addon_icons
+!ms_count = 0
+hud = exps3_hud
+
+[exps3_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\exps3
+        aim_hud_offset_pos               = -0.000329, -0.0322, 0.12896
+        aim_hud_offset_pos_16x9          = -0.000329, -0.0322, 0.12896
+
+![scope_group_picatinny_2inch]
+    >scopes                          = exps3
+;-------------------------------------------------------------------------------
+[exps3_mag]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_exps3.ogf
+cost                		                        = 23280
+inv_name        		                            = st_addon_scope_exps3_mag
+inv_name_short  		                            = st_addon_scope_exps3_mag
+description    			                            = st_addon_scope_exps3_mag_descr
+inv_weight         		                            = 0.5800
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\pizza_addon_icon
+scope_zoom_factor = 30
+ms_count = 6
+hud = exps3_mag_hud
+
+flippable = true
+flip_to = exps3_mag_flipped
+use_alt_aim_hud = true
+
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.235
+	s3ds_exit_pupil = 0.34
+	s3ds_reticle_type = 10
+	s3ds_dirt_intensity = 0.3
+	scope_objective_lens_offset = 0, 0, 6.5, 0.85
+
+[exps3_mag_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\exps3_mag
+        aim_hud_offset_pos               = 9.6e-05, -0.032264, 0.0864
+        aim_hud_offset_pos_16x9          = 9.6e-05, -0.032264, 0.0864
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = exps3_mag
+;-------------------------------------------------------------------------------
+[exps3_mag_flipped]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_exps3.ogf
+cost                		                        = 23280
+inv_name        		                            = st_addon_scope_exps3_mag
+inv_name_short  		                            = st_addon_scope_exps3_mag
+description    			                            = st_addon_scope_exps3_mag_descr
+inv_weight         		                            = 0.5800
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\pizza_addon_icon
+ms_count = 6
+hud = exps3_mag_flipped_hud
+
+	s3ds_reticle_type = 1
+
+flippable = true
+flip_to = exps3_mag
+use_alt_aim_hud = true
+
+[exps3_mag_flipped_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\exps3_mag_flipped
+        aim_hud_offset_pos               = 9.6e-05, -0.032264, 0.12896
+        aim_hud_offset_pos_16x9          = 9.6e-05, -0.032264, 0.12896
+
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = exps3_mag_flipped
+;-------------------------------------------------------------------------------
+
+![he510]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_he510.ogf
+cost                		                        = 7350
+inv_name        		                            = st_addon_scope_he510
+inv_name_short  		                            = st_addon_scope_he510
+description    			                            = st_addon_scope_he510_descr
+inv_weight         		                            = 0.255
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 1
+inv_grid_y         = 0
+repair_type                                         = scope
+icons_texture                                       = ui\rwap_addon_icons
+!ms_count = 0
+hud = he510_hud
+
+[he510_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\he510
+        aim_hud_offset_pos               = 4.8e-05, -0.02752, 0.117504
+        aim_hud_offset_pos_16x9          = 4.8e-05, -0.02752, 0.117504
+
+![scope_group_picatinny_2inch]
+    >scopes                          = he510
+;-------------------------------------------------------------------------------
+![bravo4]:scope_base
+visual          		                            = dynamics\weapons\wpn_upgrade\wpn_scope_bravo4.ogf
+cost				                                = 58000
+inv_name			                                = st_addon_scope_bravo4
+inv_name_short			                            = st_addon_scope_bravo4
+description			                                = st_addon_scope_bravo4_descr
+inv_weight			                                = 0.419
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 2
+repair_type                                         = scope
+icons_texture                                       = ui\rwap_addon_icons
+hud = bravo4_hud
+scope_zoom_factor = 20
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 5.5
+	s3ds_eye_relief = 1.86
+	s3ds_exit_pupil = 0.25
+	s3ds_reticle_type = 0
+	magnification = 4
+	s3ds_dirt_intensity = 0.5
+	scope_objective_lens_offset = 0, 0, 6, 0.75
+
+[bravo4_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\bravo4
+        aim_hud_offset_pos               = 5.9e-05, -0.026432, 0.105792
+        aim_hud_offset_pos_16x9          = 5.9e-05, -0.026432, 0.105792
+        aim_hud_offset_alt_pos               = 0.000216, -0.068032, 0.11872
+        aim_hud_offset_alt_pos_16x9          = 0.000216, -0.068032, 0.11872
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = bravo4
+;-------------------------------------------------------------------------------
+![hamr]:scope_base
+visual          		                            = dynamics\weapons\wpn_upgrade\wpn_scope_hamr.ogf
+cost				                                = 58000
+inv_name			                                = st_addon_scope_hamr
+inv_name_short			                            = st_addon_scope_hamr
+description			                                = st_addon_scope_hamr_descr
+inv_weight			                                = 0.411
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\rwap_addon_icons
+hud = hamr_hud
+scope_zoom_factor = 20
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 3.85
+	s3ds_eye_relief = 2.91
+	s3ds_exit_pupil = 0.25
+	s3ds_reticle_type = 0
+	magnification = 4
+	s3ds_dirt_intensity = 0.2
+	s3ds_chroma_power = 0.035
+	s3ds_lens_color = lens_new_bright
+
+[hamr_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\hamr
+        aim_hud_offset_pos               = -0.000107, -0.032256, 0.141056
+        aim_hud_offset_pos_16x9          = -0.000107, -0.032256, 0.141056
+        aim_hud_offset_alt_pos           = 5.3e-05, -0.059712, 0.15008
+        aim_hud_offset_alt_pos_16x9      = 5.3e-05, -0.059712, 0.15008
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = hamr
+;-------------------------------------------------------------------------------
+![razorhd]:scope_base
+visual          		                            = dynamics\weapons\wpn_upgrade\wpn_scope_razorhd.ogf
+cost				                                = 69950
+inv_name			                                = st_addon_scope_razorhd
+inv_name_short			                            = st_addon_scope_razorhd
+description			                                = st_addon_scope_razorhd_descr
+inv_weight			                                = 0.764
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\rwap_addon_icons
+hud = razorhd_hud
+scope_zoom_factor = 15
+scope_dynamic_zoom               = on
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 4.5
+	s3ds_eye_relief = 4.24
+	s3ds_exit_pupil = 0.5
+	s3ds_ffp = 0
+	s3ds_min_zoom_1x = 1
+	magnification = 6
+	min_magnification = 1
+	s3ds_dirt_intensity = 0.2
+	s3ds_lens_color = lens_new_bright
+
+[razorhd_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\razorhd
+        aim_hud_offset_pos               = -0.000161, -0.02976, 0.126336
+        aim_hud_offset_pos_16x9          = -0.000161, -0.02976, 0.126336
+        aim_hud_offset_alt_pos           = -0.00016, -0.071168, 0.11552
+        aim_hud_offset_alt_pos_16x9      = -0.00016, -0.071168, 0.11552
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_medium]
+    >scopes                          = razorhd

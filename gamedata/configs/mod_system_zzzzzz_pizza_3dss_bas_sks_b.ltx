@@ -1,0 +1,37 @@
+;=== SKS ===
+
+![wpn_sks_b]
+
+parent_section				 = wpn_sks_b
+
+scopes						 = wpn_addon_scope_pu
+scopes_sect                  =
+scope_status                 = 0
+
+![wpn_sks_b_hud]
+item_visual                              = dynamics\weapons\wpn_sks_b\wpn_sks_b_hud.ogf
+
+!![scope_sks_b]
+
+[wpn_sks_b_wpn_addon_scope_pu]:wpn_sks_b
+hud				= wpn_sks_b_wpn_addon_scope_pu_hud
+
+1icon_layer                              = wpn_addon_scope_pu
+1icon_layer_x                            = 58
+1icon_layer_y                            = -21
+
+	scope_status					 = 1
+        scope_texture                    =
+	scope_zoom_factor                = 25
+	use_alt_aim_hud                  = true
+
+	s3ds_reticle_size = 4.0
+	s3ds_eye_relief = 2.35
+	s3ds_reticle_type = 0
+	magnification = 3.5
+	s3ds_dirt_intensity = 0.75
+	s3ds_chroma_power = 0.05
+	s3ds_reflection_hue = 0.25
+		
+[wpn_sks_b_wpn_addon_scope_pu_hud]:wpn_sks_b_hud
+        item_visual                 =  dynamics\weapons\wpn_sks_b\wpn_sks_b_pu_hud.ogf

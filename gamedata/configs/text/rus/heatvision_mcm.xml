@@ -1,0 +1,104 @@
+<!--
+Anomaly Modconfiguration Menu strings
+
+-->
+
+<string_table>
+
+    <string id="ui_mcm_heatvision_title">
+        <text>HeatVision Настройки</text>
+    </string>
+    
+    <string id="ui_mcm_menu_heatvision">
+        <text>HeatVision</text>
+    </string>
+    
+    
+    <string id="ui_mcm_heatvision_nvg_view_through_scope_mcm">
+    	<text>Возможность использовать тепловизр при прицеливании:</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_view_through_scope_mcm_desc">
+    	<text>Если эта опция включена, вы можете держать свой тепловизор включенным во время прицеливания. Если опция отключена, ваш персонаж отключает ПНВ при прицеливании.</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_stays_pda_mcm">
+    	<text>Тепловизор остается включенным в КПК:</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_stays_pda_mcm_desc">
+    	<text>Если эта опция отключена, тепловизор автоматически отключается при просмотре вашего КПК.</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_tubes_mcm">
+    	<text>Расположение трубок:</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_tubes_mcm_desc">
+    	<text>Выберите количество трубок. (по умолчанию 4 трубки посередине)</text>
+    </string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_mcm">
+		<text>Трупы остывают со временем:</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_mcm_desc">
+		<text>Если этот флажок установлен, трупы NPC и мутантов со временем потеряют тепло. Если этот флажок снят, трупы всегда будут отображаться как горячие.</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_time_mcm">
+		<text>Время полного остывания трупа (в секундах):</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_time_mcm_desc">
+		<text>Количество секунд, в течение которых труп потеряет все тепло.</text>
+	</string>
+    
+    
+    <string id="ui_mcm_lst_single_centered">
+    	<text>Одна трубка, посеридине</text>
+    </string>
+    
+    <string id="ui_mcm_lst_single_left">
+    	<text>Одна трубка, слева</text>
+    </string>
+    
+    <string id="ui_mcm_lst_single_right">
+    	<text>Одна трубка, справа</text>
+    </string>
+    
+    <string id="ui_mcm_lst_dual_centered">
+    	<text>Две трубки, посередине</text>
+    </string>
+    
+    <string id="ui_mcm_lst_quad_centered">
+    	<text>Четыре трубки, посередине</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_mode_mcm">
+    	<text>Оверлей:</text>
+    </string>
+    
+    <string id="ui_mcm_heatvision_nvg_mode_mcm_desc">
+    	<text>Выберите желаемый фоновый оверлей (по умолчанию Размытый Оверлей)</text>
+    </string>
+    
+    
+    <string id="ui_mcm_lst_blurred_background">
+    	<text>Размытый Оверлей</text>
+    </string>
+    
+    <string id="ui_mcm_lst_black_background">
+    	<text>Чёрный Оверлей</text>
+    </string>
+    
+    <string id="ui_mcm_lst_image_overlay">
+    	<text>(Не реализовано) Оверлей Картинка</text>
+    </string>
+    
+    <string id="ui_mcm_lst_clear_vision">
+	    <text>Без оверлея (четкая видимость)</text>
+    </string>
+
+
+</string_table>

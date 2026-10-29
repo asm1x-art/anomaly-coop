@@ -1,0 +1,97 @@
+local device = device()
+
+function string_is_nil_or_empty(str)
+	if str == nil or #str == 0 then
+		return true
+	end
+	return false
+end
+
+function string_contains(str, sub_str)
+	if string_is_nil_or_empty(str) or string_is_nil_or_empty(sub_str) then
+		return false
+	end
+	return string.find(str, sub_str) ~= nil
+end
+
+function string_starts_with(str, sub_str)
+	if string_is_nil_or_empty(str) or string_is_nil_or_empty(sub_str) then
+		return false
+	end
+
+	local begin = string.find(str, sub_str)
+	return begin and begin == 1
+end
+
+function smooth_value(value_table)
+	local smoothing = math.min(0.1 * device.time_delta / 20, 0.19)
+
+	if value_table.from < value_table.to then
+		value_table.from = value_table.from + smoothing
+	else
+		value_table.from = value_table.from - smoothing
+	end
+
+	if math.abs(value_table.from - value_table.to) <= 0.1 then
+		value_table.from = value_table.to
+	end
+	return value_table.from
+end
+
+function clear_table(table_to_clear)
+	if table_to_clear == nil or size_table(table_to_clear) == 0 then
+		return
+	end
+
+	for k in next, table_to_clear do 
+		rawset(table_to_clear, k, nil)
+	end
+end
+
+function int_to_rgba(i)
+	if not (i and type(i) == "number") then 
+		return 
+	end
+
+	local a
+	if i <= 0xffffff then 
+		a = 255 
+	end
+
+	return bit.band(bit.rshift(i, 16), 255), bit.band(bit.rshift(i, 8), 255), bit.band(i, 255), a or bit.band(bit.rshift(i, 24), 255)
+end
+
+function get_argb(a, r, g, b, def_a, def_r, def_g, def_b)
+    return GetARGB(tonumber(a or def_a) or 255, tonumber(r or def_r) or 255, tonumber(g or def_g) or 255, tonumber(b or def_b) or 255)
+end
+
+function has_animation(section, animation)
+	if string_is_nil_or_empty(section) or string_is_nil_or_empty(animation) then
+		return false
+	end
+
+	local hud_section = ini_sys:r_string_ex(section, "hud")
+	if string_is_nil_or_empty(hud_section) then
+		return false
+	end
+
+	local animation_section = ini_sys:r_string_ex(hud_section, animation)
+	return not string_is_nil_or_empty(animation_section)
+end
+
+function get_sound(section, sound)
+	if string_is_nil_or_empty(section) or string_is_nil_or_empty(sound) then
+		return "$no_sound"
+	end
+
+	local sound_section = ini_sys:r_string_ex(section, sound)
+	return (string_is_nil_or_empty(sound_section) and {"$no_sound"} or {sound_section})[1]
+end
+
+function get_current_weapon()
+	local item = db.actor:active_item()
+	if item == nil or not IsWeapon(item) then
+		return nil
+	end
+	return item
+end

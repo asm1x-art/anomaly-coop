@@ -1,0 +1,35 @@
+function utils_ui_UICellItem_Add_ProgressBar_orig (self, xml, obj, sec, clsid) end
+
+function utils_ui_UICellItem_Add_ProgressBar_for_WPO (self, xml, obj, sec, clsid)
+  utils_ui_UICellItem_Add_ProgressBar_orig (self, xml, obj, sec, clsid)
+  if self.container.stack_all and (self.childs and is_not_empty (self.childs)) then return end
+  if (self.showcase ~= 0) or self.disable_bar then return end
+
+  -- An outfit part. Don't override condition bar color for them, they have no meaningful thresholds
+  local outfit_prefix = "prt_o_"
+  if sec.sub (1, #outfit_prefix) == outfit_prefix then return end
+	
+  -- Not a weapon part (all parts are derived from [tch_part_con], which has cond_part=true and use_condition=true)
+  if not SYS_GetParam (1, sec, "use_condition") or not SYS_GetParam (1, sec, "cond_part") then return end
+
+  if self.bar
+  then
+    -- Hide the bar while we're changing it
+    self.bar:Show (false)
+  else
+    -- No bar, nothing to do
+    return
+  end
+
+  local cond = clamp (round_idp (obj:condition (), 1), 0, 1)
+  z_utils_xml_override_part_color_for_wpo.in_part_condition_bar_override = 1
+  local color_to_use = z_utils_xml_override_part_color_for_wpo.utils_xml_get_color_con_WPO (cond * 100, true)
+  z_utils_xml_override_part_color_for_wpo.in_part_condition_bar_override = 0
+  self.bar:SetColor (color_to_use)
+  self.bar:Show (true)
+end
+
+function on_game_start()
+  utils_ui_UICellItem_Add_ProgressBar_orig = utils_ui.UICellItem.Add_ProgressBar
+  utils_ui.UICellItem.Add_ProgressBar = utils_ui_UICellItem_Add_ProgressBar_for_WPO
+end

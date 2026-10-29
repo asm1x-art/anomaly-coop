@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!--
+	Devices
+-->
+
+<string_table>
+	
+	<string id="st_device_torch_nv_4_name">
+		<text>Thermal visor</text>
+	</string>
+	<string id="st_device_torch_nv_4_descr">
+		<text>Thermal background recognition device (thermal visor) equipped with a built-in flashlight. Allows to distinguish thermal signatures of warm objects, including people, animals, fire, anomalous fields, and more. \n \n
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_blue]  %c[ui_gray_2] technological item\n
+		%c[d_blue]  %c[ui_gray_2] high electric power consumption\n
+		</text>
+	</string>
+	
+</string_table>

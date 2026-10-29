@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	Ammunition
+-->
+
+<string_table>
+	
+	<string id="ammo_pg_26_descr">
+		<text>Кумулятивный противопехотный снаряд для гранатомёта. При помощи пусковой установки РПГ-26 позволяет поражать укрывшегося противника и бронетехнику на расстоянии, превышающем дальность броска ручной гранаты.\n \n%c[d_purple] • %c[ui_gray_2] взрывная сила: %c[ui_gray_1]высокая\n%c[d_purple] • %c[ui_gray_2] радиус взрыва: %c[ui_gray_1]4.2 м\n%c[d_purple] • %c[ui_gray_2] радиус поражения осколками: %c[ui_gray_1]36 м\n%c[d_purple] • %c[ui_gray_2] количество осколков: %c[ui_gray_1]153 (мелкая шрапнель)\n%c[d_purple] • %c[ui_gray_2] задержка взрыва: %c[ui_gray_1]отсутствует (взрывается при контакте)</text>
+	</string>
+	<string id="ammo_pg_26">
+		<text>Выстрел РГ-26</text>
+	</string>
+	
+</string_table>

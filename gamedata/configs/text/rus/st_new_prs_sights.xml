@@ -1,0 +1,15 @@
+<string_table>
+
+	<string id="st_addon_scope_bossxe">
+        <text>Wilcox BOSS-Xe коллиматорный прицел</text>
+    </string>
+    <string id="st_addon_scope_bossxe_descr">
+		<text>%c[0,255,255,255]’ј–ј “≈–»—“» »:\n
+		%c[d_cyan] Х %c[0,255,255,255] —трана: %c[ui_gray_2]—Ўј\n
+		%c[d_cyan] Х %c[0,255,255,255] ѕроизводитель: %c[ui_gray_2]Wilcox\n
+		%c[d_cyan] Х %c[0,255,255,255] ”величение: %c[ui_gray_2]1.0x\n \n
+		%c[d_cyan] Х %c[0,255,255,255] %c[ui_gray_2]¬ключение/выключение лазера\n \n
+		</text>
+    </string>
+	
+</string_table>	

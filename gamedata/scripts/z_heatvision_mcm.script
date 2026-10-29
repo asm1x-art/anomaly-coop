@@ -1,0 +1,25 @@
+-- If you don't use MCM, change your defaults from here.
+local defaults = {
+	["nvg_view_through_scope_mcm"] = true,
+	["nvg_stays_pda_mcm"] = false,
+	["nvg_tubes_mcm"] = 2.0,
+	["nvg_body_cooldown_mcm"] = true,
+	["nvg_body_cooldown_time_mcm"] = 20.0,
+}
+
+function get_config(key)
+    if ui_mcm then return ui_mcm.get("heatvision/"..key) else return defaults[key] end
+end
+
+function on_mcm_load()
+    op = { id= "heatvision",sh=true ,gr={
+            {id = "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_heatvision_title",size= {512,50},spacing= 20 },
+			{id = "nvg_view_through_scope_mcm", type = "check", val = 1, def=true},
+			{id = "nvg_stays_pda_mcm", type = "check", val = 1, def=false},			
+			{id = "nvg_tubes_mcm", type = "list", val = 2, content={ {1.0,"single_centered"} , {1.1,"single_left"}, {1.2,"single_right"}, {2.0,"dual_centered"}, {4.0,"quad_centered"}}, def=2.0},
+			{id = "nvg_body_cooldown_mcm", type = "check", val = 1, def=true},
+			{id = "nvg_body_cooldown_time_mcm", type = "track", val = 2, min=0,max=300,step=1, def = 20},
+	  }
+    }
+    return op
+end

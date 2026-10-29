@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!--
+	Devices
+-->
+
+<string_table>
+	
+	<string id="st_device_torch_nv_4_name">
+		<text>Тепловизор</text>
+	</string>
+	<string id="st_device_torch_nv_4_descr">
+		<text>Прибор распознавания термального фона (тепловизор) оборудованный встроенным фонариком. Позволяет различать термальные сигнатуры теплых обьектов, включая людей, животных, огонь, аномальные поля, и прочее. \n \n
+		%c[ui_gray_3]ХАРАКТЕРИСТИКИ:\n
+		%c[d_blue] • %c[ui_gray_2] технологическое приспособление\n
+		%c[d_blue] • %c[ui_gray_2] высокое потребление энергии\n
+		</text>
+	</string>
+	
+</string_table>

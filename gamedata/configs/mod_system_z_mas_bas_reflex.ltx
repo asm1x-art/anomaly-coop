@@ -1,0 +1,376 @@
+;--- Dovetail ---
+
+;-------------------------------------------------------------------------------
+![ekp8_02]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_ekp.ogf
+cost                		                        = 2150
+inv_name        		                            = st_addon_scope_ekp8_02
+inv_name_short  		                            = st_addon_scope_ekp8_02
+description    			                            = st_addon_scope_ekp8_02_descr
+inv_weight        		                            = 0.273
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 85
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = ekp8_02_hud
+
+[ekp8_02_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\ekp8_02
+        aim_hud_offset_pos               = -0.017977, -0.087296, 0.143872
+        aim_hud_offset_pos_16x9          = -0.017977, -0.087296, 0.143872
+        aim_hud_offset_rot               = 0, 0, 0
+        aim_hud_offset_rot_16x9          = 0, 0, 0
+
+![scope_group_dovetail]
+    >scopes                          = ekp8_02
+
+;-------------------------------------------------------------------------------
+![okp]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_okp.ogf
+cost                		                        = 2350
+inv_name        		                            = st_addon_scope_okp-7
+inv_name_short  		                            = st_addon_scope_okp-7
+description    			                            = st_addon_scope_okp-7_descr
+inv_weight        		                            = 0.255
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 87
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = okp_hud
+
+[okp_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\okp
+        aim_hud_offset_pos               = -0.013638, -0.068736, 0.092608
+        aim_hud_offset_pos_16x9          = -0.013638, -0.068736, 0.092608
+
+
+![scope_group_dovetail]
+    >scopes                          = okp
+
+;-------------------------------------------------------------------------------
+
+;--- Picatinny ---
+
+
+![deltapoint]:scope_base
+cost                		                        = 21500
+inv_name        		                            = st_addon_scope_deltapoint
+inv_name_short  		                            = st_addon_scope_deltapoint
+description    			                            = st_addon_scope_deltapoint_descr
+inv_weight        		                            = 0.041
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 81
+inv_grid_y         = 3
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = deltapoint_hud
+
+[deltapoint_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\deltapoint
+        aim_hud_offset_pos               = 0.000153, -0.019008, 0.097088
+        aim_hud_offset_pos_16x9          = 0.000153, -0.019008, 0.097088
+
+
+![scope_group_picatinny_2inch]
+    >scopes                          = deltapoint
+
+;-------------------------------------------------------------------------------
+![0kp2]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_0kp2.ogf
+cost                		                        = 5280
+inv_name        		                            = st_addon_scope_0kp2
+inv_name_short  		                            = st_addon_scope_0kp2
+description    			                            = st_addon_scope_0kp2_descr
+inv_weight        		                            = 0.2
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 88
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = 0kp2_hud
+
+[0kp2_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\0kp2
+        aim_hud_offset_pos               = 0.002561, -0.02176, 0.103552
+        aim_hud_offset_pos_16x9          = 0.002561, -0.02176, 0.103552
+
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = 0kp2
+;-------------------------------------------------------------------------------
+![aimpoint]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_aimpoint.ogf
+cost                		                        = 6350
+inv_name        		                            = st_addon_scope_aimpoint
+inv_name_short  		                            = st_addon_scope_aimpoint
+description    			                            = st_addon_scope_aimpoint_descr
+inv_weight        		                            = 0.130
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 86
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = aimpoint_hud
+
+![aimpoint_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\aimpoint
+        aim_hud_offset_pos               = 5.7e-05, -0.0304, 0.124224
+        aim_hud_offset_pos_16x9          = 5.7e-05, -0.0304, 0.124224
+
+![scope_group_picatinny_2inch]
+    >scopes                          = aimpoint
+;-------------------------------------------------------------------------------
+![d0cter]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_docter_sight.ogf
+cost                		                        = 4280
+inv_name        		                            = st_addon_scope_d0cter
+inv_name_short  		                            = st_addon_scope_d0cter
+description    			                            = st_addon_scope_d0cter_descr
+inv_weight        		                            = 0.03
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 88
+inv_grid_y         = 2
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = d0cter_hud
+
+[d0cter_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\docter
+        aim_hud_offset_pos               = -5.3e-05, -0.013888, 0.08512
+        aim_hud_offset_pos_16x9          = -5.3e-05, -0.013888, 0.08512
+
+
+![scope_group_picatinny_2inch]
+    >scopes                          = d0cter
+;-------------------------------------------------------------------------------
+![mepro]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_mepro.ogf
+cost                		                        = 6580
+inv_name        		                            = st_addon_scope_mepro
+inv_name_short  		                            = st_addon_scope_mepro
+description    			                            = st_addon_scope_mepro_descr
+inv_weight        		                            = 0.372
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 79
+inv_grid_y         = 2
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = mepro_hud
+
+[mepro_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\mepro
+        aim_hud_offset_pos               = 0.00053, -0.030016, 0.123008
+        aim_hud_offset_pos_16x9          = 0.00053, -0.030016, 0.123008
+
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = mepro
+;-------------------------------------------------------------------------------
+![aim_low]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_aim_low.ogf
+cost                		                        = 10280
+inv_name        		                            = st_addon_scope_aim_low
+inv_name_short  		                            = st_addon_scope_aim_low
+description    			                            = st_addon_scope_aim_low_descr
+inv_weight        		                            = 0.105
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 78
+inv_grid_y         = 2
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = aim_low_hud
+
+[aim_low_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\aim_low
+        aim_hud_offset_pos               = 0.000107, -0.015104, 0.087616
+        aim_hud_offset_pos_16x9          = 0.000107, -0.015104, 0.087616
+
+
+![scope_group_picatinny_2inch]
+    >scopes                          = aim_low
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+![ekp8_18]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_ekp.ogf
+cost                		                        = 4350
+inv_name        		                            = st_addon_scope_ekp8_18
+inv_name_short  		                            = st_addon_scope_ekp8_18
+description    			                            = st_addon_scope_ekp8_18_descr
+inv_weight         		                            = 0.340
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 80
+inv_grid_y         = 3
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = ekp8_18_hud
+
+[ekp8_18_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\ekp8_18
+        aim_hud_offset_pos               = 0, -0.033408, 0.135104
+        aim_hud_offset_pos_16x9          = 0, -0.033408, 0.135104
+        aim_hud_offset_rot               = 0, 0, 0
+        aim_hud_offset_rot_16x9          = 0, 0, 0
+
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = ekp8_18
+;-------------------------------------------------------------------------------
+![e0t2]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_eotech2.ogf
+cost                		                        = 7350
+inv_name        		                            = st_addon_scope_e0t2
+inv_name_short  		                            = st_addon_scope_e0t2
+description    			                            = st_addon_scope_e0t2_descr
+inv_weight         		                            = 0.227
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 84
+inv_grid_y         = 3
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = e0t2_hud
+
+[e0t2_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\e0t2
+        aim_hud_offset_pos               = 0.000153, -0.02656, 0.115072
+        aim_hud_offset_pos_16x9          = 0.000153, -0.02656, 0.115072
+
+
+![scope_group_picatinny_tiny]
+    >scopes                          = e0t2
+;-------------------------------------------------------------------------------
+![compm4s]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_compm4s.ogf
+cost                		                        = 16000
+inv_name        		                            = st_addon_scope_compm4s
+inv_name_short  		                            = st_addon_scope_compm4s
+description    			                            = st_addon_scope_compm4s_descr
+inv_weight         		                            = 0.380
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 88
+inv_grid_y         = 3
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = compm4s_hud
+
+[compm4s_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\compm4s
+        aim_hud_offset_pos               = 0.00064, -0.026624, 0.115264
+        aim_hud_offset_pos_16x9          = 0.00064, -0.026624, 0.115264
+
+
+![scope_group_picatinny_tiny]
+    >scopes                          = compm4s
+;-------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
+![kemper]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_kemper.ogf
+cost                		                        = 33000
+inv_name        		                            = st_addon_scope_kemper
+inv_name_short  		                            = st_addon_scope_kemper
+description    			                            = st_addon_scope_kemper_descr
+inv_weight         		                            = 0.266
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 83
+inv_grid_y         = 0
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = kemper_hud
+
+[kemper_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\kemper
+        aim_hud_offset_pos               = 0.000155, -0.027648, 0.117568
+        aim_hud_offset_pos_16x9          = 0.000155, -0.027648, 0.117568
+
+
+![scope_group_picatinny_tiny]
+    >scopes                          = kemper
+;-------------------------------------------------------------------------------
+![rmr]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_rmr.ogf
+cost                		                        = 4350
+inv_name        		                            = st_addon_scope_rmr
+inv_name_short  		                            = st_addon_scope_rmr
+description    			                            = st_addon_scope_rmr_descr
+inv_weight        		                            = 0.034
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 84
+inv_grid_y         = 1
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = rmr_hud
+
+[rmr_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\rmr
+        aim_hud_offset_pos               = 0.000264, -0.015168, 0.087808
+        aim_hud_offset_pos_16x9          = 0.000264, -0.015168, 0.087808
+
+![scope_group_picatinny_2inch]
+    >scopes                          = rmr
+;--------------------------------------------------------------------------------
+![point_aimpro]:scope_base
+visual				                                = dynamics\weapons\wpn_upgrade\wpn_scope_aimpoint_pro.ogf
+cost                		                        = 8280
+inv_name        		                            = st_addon_scope_aimpoint_pro
+inv_name_short  		                            = st_addon_scope_aimpoint_pro
+description    			                            = st_addon_scope_aimpoint_pro_descr
+inv_weight        		                            = 0.330
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 84
+inv_grid_y         = 2
+repair_type                                         = scope
+icons_texture                                       = ui\ui_icon_bas
+
+!ms_count = 0
+hud = point_aimpro_hud
+
+[point_aimpro_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\aimpoint_pro
+        aim_hud_offset_pos               = 5.3e-05, -0.02784, 0.117376
+        aim_hud_offset_pos_16x9          = 5.3e-05, -0.02784, 0.117376
+
+
+![scope_group_picatinny_tiny]
+    >scopes                          = point_aimpro

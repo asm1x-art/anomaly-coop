@@ -1,0 +1,73 @@
+local physical_durability = {
+	explosion_immunity = { min = 0.25, max = 0.085 },
+	fire_wound_immunity = { min = 0.1, max = 0.0102 },
+	wound_immunity = { min = 0.16, max = 0.073 },
+	strike_immunity = { min = 0.15, max = 0.073 },
+}
+
+local anomaly_durability = {
+	burn_immunity = { min = 0.25, max = 0.01 },
+	chemical_burn_immunity = { min = 0.07, max = 0.006 },
+	shock_immunity = { min = 0.16, max = 0.006 },
+}
+
+PrepStats = utils_ui.prepare_stats_table
+function utils_ui.prepare_stats_table()
+    PrepStats()
+    if not utils_ui.stats_table.outfit.durability then
+        utils_ui.stats_table.outfit.durability_physical = { index= 200, typ= "float",   name= "ui_inv_outfit_durability_physical", icon_p= "ui_am_prop_damage",   icon_n= "", track= false, magnitude= 100, unit= "%", compare= false, sign= false, show_always= false , value_functor= {"outfit_durability","get_outfit_durability_physical"}}
+        utils_ui.stats_table.outfit.durability_anomaly = { index= 205, typ= "float",   name= "ui_inv_outfit_durability_anomaly", icon_p= "ui_am_prop_Vibros",   icon_n= "", track= false, magnitude= 100, unit= "%", compare= false, sign= false, show_always= false , value_functor= {"outfit_durability","get_outfit_durability_anomaly"}}
+    end
+end
+
+function get_outfit_durability_physical(obj, sec)
+    if not sec then sec = obj:section() end
+		
+	local sum_dur = 0
+	local imm_sec = ini_sys:r_string_ex(sec, "immunities_sect")			
+	for dname, ldur in pairs(physical_durability) do
+		local dur = clamp(ini_sys:r_float_ex(imm_sec, dname), ldur.max, ldur.min*2)
+		local percent_dur = 1 - ((dur - ldur.max) / (ldur.min - ldur.max))
+			--treasure_manager.send_treasure_with_string(0,"percent_dur: " .. tostring(percent_dur).."   ldur.max: " .. tostring(dur).."   dname: " .. tostring(dname))		
+		sum_dur = sum_dur + percent_dur
+	end				
+	
+	if sum_dur <= 0 then sum_dur = 0.01 end
+	return sum_dur / 4
+end
+
+function get_outfit_durability_anomaly(obj, sec)
+    if not sec then sec = obj:section() end
+		
+	local sum_dur = 0
+	local imm_sec = ini_sys:r_string_ex(sec, "immunities_sect")			
+	for dname, ldur in pairs(anomaly_durability) do
+		local dur = clamp(ini_sys:r_float_ex(imm_sec, dname), ldur.max, ldur.min*2)
+		local percent_dur = 1 - ((dur - ldur.max) / (ldur.min - ldur.max))
+			--treasure_manager.send_treasure_with_string(0,"percent_dur: " .. tostring(percent_dur).."   ldur.max: " .. tostring(dur).."   dname: " .. tostring(dname))		
+		sum_dur = sum_dur + percent_dur
+	end		
+	
+	if sum_dur <= 0 then sum_dur = 0.01 end
+	return sum_dur / 3
+end
+
+function get_outfit_fire_protection_helmet(obj, sec)
+    if not sec then sec = obj:section() end
+	local cond = 1
+	if obj then cond = obj:condition() end
+	
+	local bones_koeff_protection = SYS_GetParam(0,sec,"bones_koeff_protection")
+	
+	-- Outfit
+	if IsItem("outfit", sec) then
+		if (not SYS_GetParam(1,sec,"helmet_avaliable")) then
+			local bone_values = parse_list(ini_sys, bones_koeff_protection, "bip01_head")
+			local bone_value = tonumber(bone_values[2])
+			return bone_value * cond
+		end	
+	end
+	
+	return 0
+end
+

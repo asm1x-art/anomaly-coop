@@ -1,0 +1,132 @@
+ini_drops = ini_file("items\\settings\\wpo_drop_cond.ltx")
+ini_prices = ini_file("items\\settings\\part_prices.ltx")
+ini_parts   = itms_manager.ini_parts
+-- temp condition for trade
+print_dbg 			= arti_jamming.print_dbg
+has_parts 			= arti_jamming.has_parts
+is_part 			= arti_jamming.is_part
+get_parts_list 		= arti_jamming.get_parts_list
+get_config 			= a_arti_jamming_mcm.get_config
+math_ceil = math.ceil
+parts_list = a_wpo_parts.parts_list
+
+TraderAuto = trader_autoinject.update
+function trader_autoinject.update(npc)
+    TraderAuto(npc)
+    add_parts(npc) -- you define this function ok
+end
+
+local BASE_AMT = 15
+function add_parts(npc)
+	if trader_autoinject.get_trader_type(npc) == trader_autoinject.MECHANIC then
+		-- purge any existing parts
+		function itr(temp, item)
+			if item and is_part(item:section()) then
+				local se_itm = alife_object(item:id())
+				if se_item then 
+					alife_release_id(item:id())
+				end
+			end
+		end
+		npc:iterate_inventory(itr)
+		-- generate an amount of parts based on trader type
+		local tbl = {}
+		local supply_level = trader_autoinject.supply_level(npc, true) or 1
+		print_dbg("npc %s has supply level %s", npc:name(), supply_level)
+		for i=1,supply_level * BASE_AMT do
+			local part = random_key_table(parts_list)
+			print_dbg("Adding %s to trader %s", part, npc:name())
+			if tbl[part] then
+				tbl[part] = tbl[part] + 1
+			else
+				tbl[part] = 1
+			end
+		end
+		if supply_level > 1 then
+			tbl["partskit_tool"] = 1
+		end
+		-- add the parts
+		trader_autoinject.spawn_items(npc, tbl, true)
+	end
+end
+
+function on_get_item_cost(kind, obj, profile, calculated_cost, ret)
+	-- ret.new_cost = 500
+	if profile.mode == 2 then
+		local sec = obj:section()
+		local price = ini_prices:r_float_ex("wpo_part_prices", sec) or 0
+		if price and price > 0 then 
+			ret.new_cost = price * profile.discount*0.8
+		end
+	elseif has_parts(obj) and get_config("saletype") == 1 then
+		local parts = se_load_var(obj:id(), obj:name(), "parts")
+		local count, count_dmg = 0, 0
+		calculated_cost = ret.new_cost or calculated_cost
+		for k,v in pairs(parts) do
+			if is_part(k) then
+				count = count + 1
+				if v < 60 then
+					count_dmg = count_dmg + 1
+				end
+			end
+		end
+		ret.new_cost = clamp(calculated_cost * (1 - count_dmg/count), 1, calculated_cost)
+	end 
+end
+
+DeathWeaponDrop = death_manager.set_weapon_drop_condition
+-- weapon drop patching
+-- read the custom drop configs and apply lagrange formula to decide condition
+
+function death_manager.set_weapon_drop_condition(npc,itm)
+
+	DeathWeaponDrop(npc, itm)
+
+	local has_part = has_parts(itm)
+	
+	if not has_part then return end
+
+	local rank = npc:character_community() == "zombied" and "novice" or ranks.get_obj_rank_name(npc)
+	local condition = 0
+	local drop_sec = get_config("altroll") and "weapons_larp" or "weapons"
+	local rank_drops = ini_drops:r_string_ex(drop_sec, rank)
+	if get_config("altroll") then
+		print_dbg("Using larp eval")
+		condition = larp.pick(larp.str_to_coords(rank_drops), 10)
+	else
+		conds = larp.str_explode_num(rank_drops, ",")
+		condition = math.random(conds[1], conds[2])
+	end
+	print_dbg("New custom condition for item %s, rank %s is %s", itm:section(), rank, condition)
+	condition = clamp(condition,5,100)
+	condition = condition / 100
+	
+	-- itm:set_condition(condition)
+	-- custom eval parts
+	if has_part and get_config("altpartroll") then
+		print_dbg("alt eval for weapon")
+		weapon_eval_parts(itm)
+	end
+end
+
+function weapon_eval_parts(wpn)
+    local parts = get_parts_list(wpn)
+	local con = math_ceil(wpn:condition()*100)
+	local parts_data = {}
+	local final_chance = 25 + math_ceil(con/2.5)
+	print_dbg("Chance to beat is %s", final_chance)
+	for i,part in pairs(str_explode(parts, ",")) do
+		drop = math.random(100) < final_chance and "above" or "below"
+		coords = ini_drops:r_string_ex("weapon_parts", drop)
+		parts_data[part] = larp.pick(larp.str_to_coords(coords), 10)
+		
+    end
+	se_save_var( wpn:id(), wpn:name(), "parts", parts_data )
+end
+
+
+function on_game_start()
+	if utils_item.on_get_item_cost then
+		RegisterScriptCallback("on_get_item_cost", on_get_item_cost)
+	end
+end

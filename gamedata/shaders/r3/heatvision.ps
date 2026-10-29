@@ -1,0 +1,47 @@
+#include "common.h"
+#include "infrared.h"
+#include "infrared_utils.h"
+
+float4 main(p_screen I) : SV_Target
+{
+
+	float2 corrected_texcoords = aspect_ratio_correction(I.tc0);
+	float num_of_tubes = frac(heatvision_params3.x) * 10.0f;
+    
+    // Compute stuff only inside the lens mask
+	if (compute_lens_mask(corrected_texcoords, num_of_tubes) == 1)
+	{
+        gbuffer_data gbd = gbuffer_load_data(I.tc0, I.hpos, 0 );
+        
+        // CALCULATE INFARED COLOR
+        float3 image = infrared(gbd, I.hpos, I.tc0);
+        
+   		// APPLY NOISE
+   		float4 jitter = float4( 					
+    			frac(sin(dot(I.tc0, float2(12.0, 78.0) + (timers.x) )) * 12345.0), 
+    			frac(sin(dot(I.tc0-fmod(I.tc0,float2(3.0,3.0)/screen_res.xy), float2(12.0, 78.0) + (timers.x) )) * 22738.0), 
+    			frac(sin(dot(I.tc0-fmod(I.tc0,float2(3.0,3.0)/screen_res.xy), float2(12.0, 78.0) + (timers.x) )) * 78372.0), 
+    			frac(sin(dot(I.tc0, float2(12.0, 78.0) + (timers.x) )) * 37857.0));
+
+		image.r += jitter.y * (gen_3_nvg_noise_factor * (pow(gain_current, 0.5) ));
+		
+		// APPLY SCINTILLATION EFFECT 
+		if (jitter.z > (gen_3_scintillation_constant - ( (1.0-gen_3_scintillation_constant) * (gain_current - 1.0f) ) ) )
+		{ 
+            image.r = 1.0f; 
+        }
+		
+		// APPLY VIGNETTE
+		float vignette_current = floor(heatvision_params3.z) / 100.0f;
+		float vignette = calc_vignette(num_of_tubes, I.tc0, vignette_current);
+		image = clamp(image,0.0,1.0);
+		image *= vignette;
+
+		// RETURN THE RESULTING IMAGE
+		return float4(image, 1.0);
+	}
+	else
+	{	
+		return float4(0.0, 0.0, 0.0, 1.0);
+	}
+} 

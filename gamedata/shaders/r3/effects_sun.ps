@@ -9,8 +9,8 @@ uniform float4 timers_game;
 #define TIME_HOURS    (timers_game.w) // {0, 1, ..., 24}
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// Pixel
-float4 main ( p_TL I ) : SV_Target
+// The sun's colour (HDR10's when it's on)
+float4 sun_color ( p_TL I )
 {
     if (HDR10_IS_ENABLED && HDR10_SUN_ON) {
         const float amplitude = HDR10_SUN_INTENSITY;
@@ -56,4 +56,23 @@ float4 main ( p_TL I ) : SV_Target
 //	clip(res-m_AlphaRef);
 //	clip(res-0.5);
 //	return res;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Pixel: the colour, and for the heat vision (the HeatVision mod's third target) the sun's heat where it's opaque
+struct p_sun_out
+{
+	float4 rt1  : SV_Target0;
+	float4 rt2  : SV_Target1;
+	float4 heat : SV_Target2;
+};
+
+p_sun_out main ( p_TL I )
+{
+	p_sun_out O;
+	O.rt1 = sun_color(I);
+	O.rt2 = float4(0.0, 0.0, 0.0, 0.0);
+	float4 base = s_base.Sample( smp_base, I.Tex0 ) * I.Color;
+	O.heat = base.a > 0.4 ? float4(0.0, (base.r + base.g + base.b) / 3.0, 0.0, 1.0) : float4(0.0, 0.0, 0.0, 0.0);
+	return O;
 }

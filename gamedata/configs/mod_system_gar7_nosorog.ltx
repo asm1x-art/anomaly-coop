@@ -1,0 +1,207 @@
+![army_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_mid
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.46
+shock_protection              = 1.6
+chemical_burn_protection      = 0.30
+radiation_protection          = 0.032
+
+wound_protection              = 1.24
+strike_protection             = 1.22
+explosion_protection          = 1.30
+
+artefact_count                = 2
+cost                          = 186420
+inv_weight                    = 43.10
+
+additional_inventory_weight   = 108
+additional_inventory_weight2  = 108
+
+
+![dolg_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_low
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.50
+shock_protection              = 1.8
+chemical_burn_protection      = 0.38
+radiation_protection          = 0.034
+
+wound_protection              = 1.34
+strike_protection             = 1.34
+explosion_protection          = 1.14
+
+artefact_count                = 2
+cost                          = 185400
+inv_weight                    = 45.70
+
+additional_inventory_weight   = 105
+additional_inventory_weight2  = 105
+
+![freedom_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_low
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.52
+shock_protection              = 2.0
+chemical_burn_protection      = 0.40
+radiation_protection          = 0.034
+
+wound_protection              = 1.24
+strike_protection             = 1.22
+explosion_protection          = 1.20
+
+artefact_count                = 2
+cost                          = 183300
+inv_weight                    = 42.50
+
+additional_inventory_weight    = 110
+additional_inventory_weight2   = 110
+
+![isg_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_mid
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.40
+shock_protection              = 1.6
+chemical_burn_protection      = 0.34
+radiation_protection          = 0.032
+
+wound_protection              = 1.37
+strike_protection             = 1.37
+explosion_protection          = 1.30
+
+artefact_count                = 2
+cost                          = 212560
+inv_weight                    = 51.30
+
+additional_inventory_weight   = 105
+additional_inventory_weight2  = 105
+
+![merc_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_mid
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.40
+shock_protection              = 1.6
+chemical_burn_protection      = 0.34
+radiation_protection          = 0.032
+
+wound_protection              = 1.27
+strike_protection             = 1.27
+explosion_protection          = 1.42
+
+artefact_count                = 2
+cost                          = 187420
+inv_weight                    = 49.10
+
+additional_inventory_weight    = 108
+additional_inventory_weight2   = 108
+
+![monolith_nosorog_outfit]
+bones_koeff_protection        = actor_armor_nosorog_low
+immunities_sect               = sect_heavy_immunities_exn
+
+burn_protection               = 0.56
+shock_protection              = 2.4
+chemical_burn_protection      = 0.46
+radiation_protection          = 0.038
+
+wound_protection              = 1.27
+strike_protection             = 1.27
+explosion_protection          = 1.50
+
+artefact_count                = 2
+cost                          = 198820
+inv_weight                    = 45.30
+
+additional_inventory_weight    = 110
+additional_inventory_weight2   = 110
+
+; Прочность (бекап: [sect_heavy_immunities])
+;==============================================
+
+[sect_heavy_immunities_exn]
+burn_immunity                 = 0.06
+chemical_burn_immunity        = 0.037
+shock_immunity                = 0.031
+explosion_immunity            = 0.085
+fire_wound_immunity           = 0.0102
+wound_immunity                = 0.0765 
+strike_immunity               = 0.0765
+telepatic_immunity            = 0
+radiation_immunity            = 0
+
+[sect_heavy_immunities_exnup]
+burn_immunity                 = 0.06
+chemical_burn_immunity        = 0.037
+shock_immunity                = 0.031
+explosion_immunity            = 0.085
+fire_wound_immunity           = 0.0102
+wound_immunity                = 0.0765 
+strike_immunity               = 0.0765
+telepatic_immunity            = 0
+radiation_immunity            = 0
+
+
+; Пулестойкость
+;=====================================================================
+[actor_armor_nosorog_low]:body_damage_nosorog_low, head_damage_nosorog28
+ap_scale						= 0.75
+
+[body_damage_nosorog_low]
+bip01_pelvis 				= 1, 0.74
+bip01_spine 		 		= 1, 0.74
+bip01_spine1 		 		= 1, 0.74
+bip01_spine2 		 		= 1, 0.74
+
+bip01_l_clavicle	 		= 1, 0.74
+bip01_l_upperarm	 		= 1, 0.74
+bip01_l_forearm	 	 		= 1, 0.74
+
+bip01_r_clavicle	 		= 1, 0.74
+bip01_r_upperarm	 		= 1, 0.74
+bip01_r_forearm	 	 		= 1, 0.74
+
+bip01_l_thigh	 	 		= 1, 0.74
+bip01_l_calf	 	 		= 1, 0.74
+bip01_r_thigh	 	 		= 1, 0.74
+bip01_r_calf	 	 		= 1, 0.74
+
+bip01_l_hand	 	 		= 1, 0.28
+bip01_r_hand	 	 		= 1, 0.28
+bip01_r_foot	 	 		= 1, 0.28
+bip01_l_foot	 	 		= 1, 0.28
+
+;=====================================================================
+[actor_armor_nosorog_mid]:body_damage_nosorog_mid, head_damage_nosorog28
+ap_scale						= 0.75
+
+[body_damage_nosorog_mid]
+bip01_pelvis 				= 1, 0.80
+bip01_spine 		 		= 1, 0.80
+bip01_spine1 		 		= 1, 0.80
+bip01_spine2 		 		= 1, 0.80
+
+bip01_l_clavicle	 		= 1, 0.80
+bip01_l_upperarm	 		= 1, 0.80
+bip01_l_forearm	 	 		= 1, 0.80
+
+bip01_r_clavicle	 		= 1, 0.80
+bip01_r_upperarm	 		= 1, 0.80
+bip01_r_forearm	 	 		= 1, 0.80
+
+bip01_l_thigh	 	 		= 1, 0.80
+bip01_l_calf	 	 		= 1, 0.80
+bip01_r_thigh	 	 		= 1, 0.80
+bip01_r_calf	 	 		= 1, 0.80
+
+bip01_l_hand	 	 		= 1, 0.3
+bip01_r_hand	 	 		= 1, 0.3
+bip01_r_foot	 	 		= 1, 0.3
+bip01_l_foot	 	 		= 1, 0.3
+
+
+
+

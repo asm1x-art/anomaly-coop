@@ -1,0 +1,208 @@
+; Fields:
+; s3ds_reticle_size - reticle size multiplier (default 4)
+; s3ds_eye_relief - distance from scope lens to projected shadow, or eye relief (default 4)
+; s3ds_exit_pupil - exit pupil diameter relative to ocular lens diameter, or parallax shadow diameter (default 0.3)
+; s3ds_ffp - enable first focal plane feature, reticle sizes up while zooming. Can be 0 or 1 (default 0)
+
+; s3ds_reflection_hue - hue parameter of lens reflections, range [0 .. 1] (default 0.65)
+; s3ds_min_zoom_1x - at minimal FOV magnification, disable image scale up inside scope. Needed for 1x optic sights and 1-Nx LPVO scopes. Can be 0 or 1 (default 0)
+
+; s3ds_image_type - background image processor (default 0)
+;   0 - None
+;   1 - NV scope (with ms_count = 2 becomes switchable on/off)
+;   2 - Black-white thermal scope (with ms_count = 2 becomes switchable white-hot/black-hot, with ms_count = 3 becomes also switchable on/off)
+;   3 - Colored thermal scope (same as previous)
+; s3ds_reticle_type - reticle processor (default 0)
+;   0 - None
+;   1 - LED illuminated reticle
+;   2 - Masked LED illuminated reticle (red channel is regular black reticle, green channel is illuminated area)
+;   3 - ACOG, sun illuminated reticle (red channel is regular black reticle, green channel is illuminated area, blue channel is gray text)
+;         Use ms_colors parameter to set illumination color
+;   4 - ELCAN Specter, LED illuminated reticle with zoom switch (red channel is regular black reticle, green channel is illuminated area 1, blue channel is illuminated area 2).
+;         Use with ms_count = 3 and ms_colors = scope_black, scope_red_dim, scope_red
+;   5 - 1P59 Giperon scope (red channel at first focal plane, green channel at second focal plane, blue channel rotated by zoom), has LED illumination
+;   6 - Screen (used for classic thermal scopes like Trijicon Reap-IR, disables parallax shadow and circle sight bound)
+;   7 - Projected reticle (additive blend mode, use for NVs and magnifiers of reflex/holographic sights)
+;   8 - Flat screen (used for plain LCD screens of thermal sights like T12, disables almost all lens effects)
+; s3ds_dirt_intensity - dirtness. 0 is clear vision, 1 is severe contamination (default 0)
+; s3ds_chroma_power - chromatic abberation intensity. Represents scope overall quality. 0 is no chroma, 0.02 is barely noticeable chroma, 0.05 is trash-tier scope (default 0.02)
+
+; s3ds_lens_color - image color affection by lens. Represents lens quality and condition. Also may be used for contrast lens caps.
+
+; ms_colors - list of colors for illumination
+; ms_count - count of different reticles
+
+; Ingame testing (console commands, put actual parameters)
+; s3ds_param_1 s3ds_reticle_size, s3ds_eye_relief, s3ds_exit_pupil, s3ds_ffp
+; s3ds_param_2 s3ds_reflection_hue, 0, s3ds_min_zoom_1x, 0
+; s3ds_param_3 s3ds_image_type, s3ds_reticle_type, s3ds_dirt_intensity, s3ds_chroma_power
+; s3ds_param_4 s3ds_lens_color, 0
+
+; Sights
+
+![1p29]
+	s3ds_reticle_size = 4.6
+	s3ds_eye_relief = 2
+	s3ds_reflection_hue = 0.75
+
+![acog]
+	s3ds_reticle_size = 3.9
+	s3ds_eye_relief = 1.7
+	s3ds_reticle_type = 3
+	s3ds_dirt_intensity = 0.1
+	s3ds_reflection_hue = 0.55
+	ms_colors = scope_red
+
+![ps01]
+	s3ds_reticle_size = 4.7
+	s3ds_eye_relief = 2
+	s3ds_reticle_type = 1
+	s3ds_dirt_intensity = 0.5
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+![pso1m21]
+	s3ds_reticle_size = 4.7
+	s3ds_eye_relief = 2
+	s3ds_reticle_type = 1
+	s3ds_dirt_intensity = 0.2
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+; Integrated
+
+![wpn_aug]
+	s3ds_reticle_size = 2.2
+	s3ds_eye_relief = 4
+	s3ds_chroma_power = 0.04
+	s3ds_reflection_hue = 0.15
+
+![wpn_fn2000]
+	s3ds_reticle_size = 2.5
+	s3ds_eye_relief = 3.2
+	s3ds_chroma_power = 0.04
+
+![wpn_g36]
+	s3ds_reticle_size = 2.2
+	s3ds_eye_relief = 2.5
+	s3ds_reflection_hue = 0.7
+
+![wpn_g3sg1]
+	s3ds_reticle_size = 4.3
+	s3ds_eye_relief = 2.4
+	s3ds_reflection_hue = 0.2
+
+![wpn_g43]
+	s3ds_reticle_size = 3.3
+	s3ds_eye_relief = 4
+	s3ds_lens_color = lens_old_yellow
+	s3ds_dirt_intensity = 1
+
+![wpn_gauss]
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.5
+	s3ds_image_type = 2
+	s3ds_reticle_type = 6
+	ms_count = 2
+
+![wpn_l85]
+	s3ds_reticle_size = 3
+	s3ds_eye_relief = 2.2
+	s3ds_exit_pupil = 0.6
+
+![wpn_l96a1]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_chroma_power = 0.01
+	s3ds_reflection_hue = 0.55
+
+![wpn_m24]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_ffp = 1
+	s3ds_reflection_hue = 0.55
+
+![wpn_m82]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_ffp = 1
+	s3ds_reflection_hue = 0.55
+
+![wpn_m98b]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_ffp = 1
+	s3ds_chroma_power = 0
+
+![wpn_remington700]
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.9
+
+![wpn_sig550_sniper]
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.2
+
+![wpn_sr25]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_ffp = 1
+	s3ds_chroma_power = 0.01
+
+![wpn_sv98]
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 0.7
+	s3ds_reticle_type = 2
+	s3ds_lens_color = lens_russian_blue
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+![wpn_svd_nimble]
+	s3ds_reticle_size = 4.1
+	s3ds_eye_relief = 1.7
+	s3ds_reticle_type = 5
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+![wpn_toz34_mark4]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+
+![wpn_trg]
+	s3ds_reticle_size = 3.1
+	s3ds_eye_relief = 3.2
+
+![wpn_vintorez_1pn93]
+	s3ds_reticle_size = 4.7
+	s3ds_eye_relief = 2
+	s3ds_image_type = 1
+	s3ds_reticle_type = 7
+	ms_count = 2
+
+![wpn_vintorez_nimble]
+	s3ds_reticle_size = 4.7
+	s3ds_eye_relief = 2
+	s3ds_reticle_type = 1
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+![wpn_vssk]
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 0.7
+	s3ds_reticle_type = 2
+	s3ds_lens_color = lens_russian_blue
+	s3ds_reflection_hue = 0.75
+	ms_count = 2
+	ms_colors = scope_black, scope_red
+
+![wpn_wa2000]
+	s3ds_reticle_size = 5
+	s3ds_eye_relief = 2.2
+	s3ds_reticle_type = 2
+	s3ds_chroma_power = 0.01
+	ms_count = 2
+	ms_colors = scope_black, scope_red

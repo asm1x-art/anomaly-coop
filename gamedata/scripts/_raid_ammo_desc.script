@@ -1,0 +1,130 @@
+local gt = game.translate_string
+
+local penetration_thresholds = {
+	[0] = 10,
+	[1] = 20,
+	[2] = 30,
+	[3] = 40,
+	[4] = 50,
+	[5] = 70,
+	[6] = 10000,
+}
+
+local damage_thresholds = {
+	[1] = 24,
+	[2] = 35,
+	[3] = 45,
+	[4] = 130,
+	[5] = 1000,
+	[6] = 10000,
+}
+
+original_build_desc_header = ui_item.build_desc_header
+function ui_item.build_desc_header(obj, sec, str)
+	local _str = ""
+	local _str = original_build_desc_header(obj, sec, str)
+	
+	local obj_kind = ini_sys:r_string_ex(sec, "kind") or "nil"
+	if IsAmmo(obj) or obj_kind == "w_ammo" then
+	
+		local penetration = get_penetration(obj,sec)
+		
+		local dmg, buck_shot = get_damage(obj,sec)
+		if dmg == -1 and buck_shot == -1 then return _str end
+		
+		local str_buck_shot = ""
+		if buck_shot > 1 then 
+			str_buck_shot = "["..tostring(dmg).."x"..tostring(buck_shot).."]"
+		end
+		
+		
+		local num_pen_descr = "1"
+		for num, val in pairs(penetration_thresholds) do
+			if penetration < val then
+				num_pen_descr = tostring(num)
+				break
+			end
+		end
+		local num_pen_descr_ = gt("st_raid_penetrates_class_armor_desc") .. " " .. gt("st_raid_penetrates_class_armor_" .. num_pen_descr .. "_desc")
+		if num_pen_descr == "0" then
+			num_pen_descr_ = gt("st_raid_penetrates_class_armor_" .. num_pen_descr .. "_desc")
+		end
+		_str = "\\n" .. _str .. "\\n" .. num_pen_descr_ .. " (" .. tostring(penetration) .. ")"
+		
+		
+		local num_dmg_descr = "1"
+		for num, val in pairs(damage_thresholds) do
+			if (dmg * buck_shot) < val then
+				num_dmg_descr = tostring(num)
+				break
+			end
+		end
+		local num_dmg_descr_ = "st_raid_tissue_damage_" .. num_dmg_descr .. "_desc"
+		_str = _str .. "\\n" .. gt("st_raid_tissue_damage_desc") .. " " .. gt(num_dmg_descr_) .. " (" .. tostring(dmg * buck_shot) .. ")" .. str_buck_shot
+	end
+	
+	return _str
+end
+
+local kinds_weapons = {["w_pistol"] = true, ["w_shotgun"] = true, ["w_smg"] = true, ["w_rifle"] = true, ["w_sniper"] = true}
+local weapons_for_ammo = {}
+local weapons_filled = false
+-- This project: the weapons from all base weapon sections, once. GRA's stash managers export
+-- treasure_manager.item_list for this; vanilla's keeps it local (an ammo's description crashed the game). Filled
+-- again for every ammo no weapon takes, it scanned on each tooltip update and counted the weapons twice.
+function fill_list_weapons_for_ammo()
+	if weapons_filled then return end
+	weapons_filled = true
+
+	ini_sys:section_for_each(function(sec_weapon)
+		local parent = ini_sys:r_string_ex(sec_weapon, "parent_section")
+		if kinds_weapons[ini_sys:r_string_ex(sec_weapon, "kind") or ""] and (not parent or parent == sec_weapon) then
+			local ammo_list = utils_item.get_ammo(sec_weapon)
+			local hit_power = utils_item.get_wpn_param(nil, sec_weapon, "hit_power", 0)
+			for ind,ammo in pairs(ammo_list) do
+				if ammo and hit_power then
+					local ammo = ammo
+					if not weapons_for_ammo[ammo] then weapons_for_ammo[ammo] = {average = 0, number  = 0} end
+					local weap = weapons_for_ammo[ammo]
+					weapons_for_ammo[ammo].number = weap.number + 1
+					weapons_for_ammo[ammo].average = weap.average + ((hit_power - weap.average) / weap.number)
+				end
+			end
+		end
+	end)
+end
+
+function get_damage(obj,sec)
+	local sec_ammo = sec or obj:section()
+
+	local buck_shot = ini_sys:r_float_ex(sec_ammo, "buck_shot") or 1
+	if buck_shot == 0 then buck_shot = 1 end
+	
+	local ammo_mult_monst = 0.85
+	if grok_bo and grok_bo.monster_ammo_damage_mult[sec_ammo] then
+		ammo_mult_monst = grok_bo.monster_ammo_damage_mult[sec_ammo]
+	end
+	local ammo_mult = (ammo_mult_monst - 0.85) / 2
+	
+	local k_hit = ini_sys:r_float_ex(sec_ammo, "k_hit") or 1	
+	k_hit = k_hit + (k_hit * ammo_mult)
+	if sec_ammo and sec_ammo == "ammo_12x70_raid" then k_hit = k_hit * 20 end
+
+	if not weapons_for_ammo[sec_ammo] then fill_list_weapons_for_ammo() end
+	if not weapons_for_ammo[sec_ammo] or not weapons_for_ammo[sec_ammo].average then return -1, -1 end
+	
+	local hit_power_avg = weapons_for_ammo[sec_ammo] and weapons_for_ammo[sec_ammo].average or 1.0
+	
+	local hit_power = normalize(k_hit*hit_power_avg, 0, 1.5) * 100
+		
+	return math.floor(hit_power + 0.5), buck_shot
+end
+
+function get_penetration(obj,sec)
+	local sec_ammo = sec or obj:section()
+
+	local k_ap = ini_sys:r_float_ex(sec_ammo, "k_ap") or 1	
+	local hit_power = normalize(k_ap, 0, 1.5) * 100
+
+	return math.floor(hit_power + 0.5)
+end

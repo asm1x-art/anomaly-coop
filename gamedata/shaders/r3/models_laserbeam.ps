@@ -1,0 +1,34 @@
+#include "common.h"
+
+struct 	v2p
+{
+ 	float2 	tc0: TEXCOORD0;	// base
+  	float4	c0: COLOR0;		// sun
+};
+
+struct p_laser_out
+{
+    float4 main         : SV_Target0;
+    float4 additional   : SV_Target1;
+};
+
+float4 shader_param_5;
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Pixel
+p_laser_out main( v2p I ) : SV_Target
+{
+	float4 t_base = s_base.Sample(smp_base, I.tc0);
+
+	t_base *= shader_param_5.x; //Only first component is used
+
+    p_laser_out O;
+    
+    O.main = float4(t_base.xyz, t_base.w * I.c0.w);
+    if (O.main.a > 0.2)
+        O.additional = float4(0.0, 0.0, 1.0, 1.0);
+    else
+        O.additional = float4(0.0, 0.0, 0.0, 0.0);
+
+    return O;
+}

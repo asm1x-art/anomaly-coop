@@ -1,0 +1,182 @@
+-- If you don't use MCM, change your defaults from here.
+local defaults = {
+    ["jamchance"] = 1,
+    ["superjam"] = false,
+    ["simplejam"] = false,
+    -- ["heat"] = false,
+    ["oldammo"] = false,
+
+    ["degradation"] = 1.4,
+    ["threshold"] = 85,
+    ["repairkit"] = true,
+    ["altroll"] = false,
+    ["altpartroll"] = false,
+    ["saletype"] = 1,
+    -- ["fullservice"] = 2,
+    ["easybarrel"] = false,
+    ["easytrigger"] = true,
+
+    ["profanity"] = true,
+    ["profanity_timeout"] = true,
+    ["profanity_language"] = "rus",
+    ["verbosity"] = true,
+    ["debug"] = false,
+    ["fun"] = 0
+}
+
+local mcm_map = {
+    ["jamchance"] = "wpojam",
+    ["superjam"] = "wpojam",
+    ["simplejam"] = "wpojam",
+    -- ["heat"] = "wpojam",
+    ["oldammo"] = "wpojam",
+
+    ["degradation"] = "wpoecon",
+    ["threshold"] = "wpoecon",
+    ["repairkit"] = "wpoecon",
+    ["altroll"] = "wpoecon",
+    ["altpartroll"] = "wpoecon",
+    ["saletype"] = "wpoecon",
+    -- ["fullservice"] = "wpoecon",
+    ["easybarrel"] = "wpoecon",
+    ["easytrigger"] = "wpoecon",
+
+    ["profanity"] = "wpomisc",
+    ["profanity_timeout"] = "wpomisc",
+    ["profanity_language"] = "wpomisc",
+    ["verbosity"] = "wpomisc",
+    ["debug"] = "wpomisc",
+    ["fun"] = "wpomisc",
+    ["display"] = "wpomisc"
+
+}
+
+local last_click = nil
+local mcm_key = DIK_keys.DIK_R -- your default key
+local key_function = "key_func" -- this too if you renamed the function
+
+function key_func()
+    arti_jamming.unjam()
+end
+
+local mcm_id = "clear_jam"
+local mcm_keybinds = ui_mcm and ui_mcm.key_hold
+local modifier = 0
+local second_key = 0
+
+function get_config(key)
+    if ui_mcm then return ui_mcm.get("wpo/"..mcm_map[key].."/"..key) else return defaults[key] end
+end
+
+function on_mcm_load()
+    op = { id= "wpo" ,gr={
+            {
+                id="wpojam",sh=true,gr={
+                    {id= "jamtitle",type= "slide",text="ui_mcm_wpo_wpojam",link= "ui_options_slider_player",size= {512,50},spacing= 20},
+                    {id = "jamchance", type = "track", val = 2, min=0.5,max=2,step=0.01, def = 1},
+                    {id = "superjam", type = "check", val = 1, def = false},
+                    {id = "simplejam", type = "check", val = 1, def = false},
+                    {id = "oldammo", type = "check", val = 1, def = false},
+                    { id = "keybind", type = "key_bind"          , val = 2, def = mcm_key },
+                    { id = "modifier", type = ui_mcm.kb_mod_radio , val = 2, def = 0, hint = "mcm_kb_mode" , 
+                        content = {
+                            { 0, "mcm_kb_mode_press"},
+                            { 1, "mcm_kb_mode_dtap"},
+                            { 2, "mcm_kb_mode_hold"} 
+                        }
+                    },
+                    { id = "second_key", type = ui_mcm.kb_mod_radio, val = 2, def = 0, hint = "mcm_kb_modifier" , 
+                        content = { 
+                            {0,"mcm_kb_mod_none"} , 
+                            {1,"mcm_kb_mod_shift"} , 
+                            {2,"mcm_kb_mod_ctrl"},
+                            {3,"mcm_kb_mod_alt"}
+                        }},
+                    { id = "desc_mcm", type = "desc", text = "ui_mcm_unjam_mcm", clr = {255, 175 ,0 ,0}, precondition = {function() return not mcm_keybinds end} }
+                }
+            },
+            {
+                id="wpoecon",sh=true,gr={
+                    {id= "econtitle",type= "slide",text="ui_mcm_wpo_wpoecon",link="ui_options_slider_player",size= {512,50},spacing= 20},
+                    {id = "degradation", type = "track", val = 2, min=1,max=3,step=0.1, def = 1.4},
+                    {id = "threshold", type = "track", val = 2, min=60,max=99,step=1, def = 85},
+                    {id = "repairkit", type = "check", val = 1, def = true},
+                    {id = "altroll", type = "check", val = 1, def = false},
+                    {id = "altpartroll", type = "check", val = 1, def = false},
+                    -- {id = "fullservice", type = "radio_h",  content={ {0, "clean"} , {1, "parts"}, {2, "full"}} ,val = 2, def = 2},
+                    {id = "saletype", type = "list", val = 2, content={ {0,"vanilla"} , {1,"easy"}, {2,"hard"}}, def=1},                   
+                    {id = "easybarrel", type = "check", val = 1, def = false},
+                    {id = "easytrigger", type = "check", val = 1, def = true},
+                }
+            },
+            {
+                id="wpomisc",sh=true,gr={
+                    {id= "misctitle",type= "slide",text="ui_mcm_wpo_wpomisc",link= "ui_options_slider_player",size= {512,50},link="",spacing= 20},
+                    {id = "debug", type = "check", val = 1, def=false},
+                    {id = "profanity", type = "check", val = 1, def = false},
+                    {id = "profanity_timeout", type = "check", val = 1, def = true},
+                    {id = "profanity_language", type = "radio_h",  content={ {"eng","eng"} , {"rus","rus"}} ,val = 0, def ="rus"},
+                    {id = "display", type = "check", val = 1, def = true},
+
+                    {id = "verbosity", type = "check", val = 1, def = true},
+                    {id = "fun", type = "list", val = 2, content={ {0,"no"} , {1,"yes"}, {2,"ofc"}}, def=0},
+                }
+            }
+        }
+    }
+    return op
+end
+
+local modes = {
+    [0] = { ["call"] = {"on_key_press", "on_key_hold"}, ["function"] = function(key) ui_mcm.simple_press(mcm_id, key, key_function) end },
+    [1] = { ["call"] = {"on_key_press", "on_key_hold"}, ["function"] = function(key) if ui_mcm.double_tap(mcm_id, key) then key_function() end end },
+    [2] = { ["call"] = {"on_key_hold", "on_key_press"}, ["function"] = function(key) if ui_mcm.key_hold(mcm_id, key) then key_function() end end }
+}
+function on_key_press(key)
+	if not ui_mcm then
+		local bind = dik_to_bind(key)
+		local tg = time_global()
+		if bind == key_bindings.kUSE then
+	
+			if not last_click then last_click = tg
+			else
+				if tg < last_click + 400 then 
+                    key_func()
+				end
+				last_click = nil
+			end
+		end
+	end
+	if key ~= mcm_key then return end
+    if not mcm_keybinds then 
+        key_function() 
+        return 
+    end
+    if ui_mcm.get_mod_key(second_key) then
+        modes[modifier]["function"](key)
+    end
+end
+
+function on_key_hold(key)
+    if key ~= mcm_key then return end
+    if ui_mcm.get_mod_key(second_key) then
+        modes[modifier]["function"](key)
+    end
+end
+
+function on_option_change(mcm)
+	if mcm then
+		mcm_key = ui_mcm.get("wpo/wpojam/keybind")
+		modifier = ui_mcm.get("wpo/wpojam/modifier")
+        second_key = ui_mcm.get("wpo/wpojam/second_key")
+        RegisterScriptCallback(modes[modifier]["call"][1], this[modes[modifier]["call"][1]])
+        UnregisterScriptCallback(modes[modifier]["call"][2], this[modes[modifier]["call"][2]])
+	end
+end
+
+function on_game_start()
+    RegisterScriptCallback("on_option_change", on_option_change)
+    RegisterScriptCallback("on_key_press", on_key_press)
+    key_function = this[key_function]
+    on_option_change(mcm_keybinds)
+end

@@ -1,0 +1,30 @@
+local console = get_console()
+
+local inspect_ui_state = { hud_enabled = nil, crosshair_enabled = nil }
+
+function inspect_update_ui_state()
+	inspect_ui_state.hud_enabled = console:get_integer("hud_draw")
+	inspect_ui_state.crosshair_enabled = console:get_integer("hud_crosshair")
+end
+
+function inspect_hide_ui()
+	inspect_update_ui_state()
+
+	if inspect_ui_state.hud_enabled ~= nil and inspect_ui_state.hud_enabled == 1 then
+		console:execute("hud_draw 0")
+	end
+	if inspect_ui_state.crosshair_enabled ~= nil and inspect_ui_state.crosshair_enabled == 1 then
+		console:execute("hud_crosshair 0")
+	end
+end
+
+function inspect_show_ui()
+	RemoveTimeEvent(0, "inspect_show_ui")
+
+	if inspect_ui_state.hud_enabled ~= nil and inspect_ui_state.hud_enabled == 1 then
+		console:execute("hud_draw 1")
+	end
+	if inspect_ui_state.crosshair_enabled ~= nil and inspect_ui_state.crosshair_enabled == 1 then
+		console:execute("hud_crosshair 1")
+	end
+end

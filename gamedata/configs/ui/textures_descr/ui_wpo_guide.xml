@@ -1,0 +1,12 @@
+<w>
+	<file name="ui\guide\article_wpo_image">
+		<texture id="article_wpo_image" x="0" y="0" width="700" height="271"/>
+    </file>
+	
+	<file name="ui\ui_actor_menu">
+		<texture id="ui_inGame2_btn_sort_weapon_wpo_d"   x="56"  y="1824" width="56" height="56" />
+		<texture id="ui_inGame2_btn_sort_weapon_wpo_e"   x="56"  y="1824" width="56" height="56" />
+		<texture id="ui_inGame2_btn_sort_weapon_wpo_h"   x="56"  y="1768" width="56" height="56" />
+		<texture id="ui_inGame2_btn_sort_weapon_wpo_t"   x="56"  y="1768" width="56" height="56" />
+    </file>
+</w>	

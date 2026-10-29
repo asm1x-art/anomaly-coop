@@ -948,13 +948,18 @@ xr_vector<char*>* CLocatorAPI::file_list_open(const char* _path, u32 flags)
 
 	file desc;
 	desc.name = N;
-	files_it I = m_files.find(desc);
-	if (I == m_files.end()) return 0;
+	// From the first entry under the folder: the folder's own entry can be gone while files from archives stay under it
+	// (a rescan of a path drops the entries it doesn't find on disk, archive files' parent folders among them)
+	size_t base_len = xr_strlen(N);
+	files_it I = m_files.lower_bound(desc);
+	if (I != m_files.end() && 0 == xr_strcmp(I->name, N))
+		++I;
+	else if (I == m_files.end() || 0 != strncmp(I->name, N, base_len))
+		return 0;
 
 	xr_vector<char*>* dest = xr_new<xr_vector<char*>>();
 
-	size_t base_len = xr_strlen(N);
-	for (++I; I != m_files.end(); I++)
+	for (; I != m_files.end(); I++)
 	{
 		const file& entry = *I;
 		if (0 != strncmp(entry.name, N, base_len)) break; // end of list
@@ -1009,15 +1014,19 @@ int CLocatorAPI::file_list(FS_FileSet& dest, LPCSTR path, u32 flags, LPCSTR mask
 
 	file desc;
 	desc.name = N;
-	files_it I = m_files.find(desc);
-	if (I == m_files.end()) return 0;
+	// From the first entry under the folder, as in file_list_open: its own entry can be gone
+	size_t base_len = xr_strlen(N);
+	files_it I = m_files.lower_bound(desc);
+	if (I != m_files.end() && 0 == xr_strcmp(I->name, N))
+		++I;
+	else if (I == m_files.end() || 0 != strncmp(I->name, N, base_len))
+		return 0;
 
 	SStringVec masks;
 	_SequenceToList(masks, mask);
 	BOOL b_mask = !masks.empty();
 
-	size_t base_len = xr_strlen(N);
-	for (++I; I != m_files.end(); ++I)
+	for (; I != m_files.end(); ++I)
 	{
 		const file& entry = *I;
 		if (0 != strncmp(entry.name, N, base_len)) break; // end of list

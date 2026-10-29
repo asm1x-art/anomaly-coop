@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+
+	<string id="ui_mcm_menu_focused">
+		<text>Focus Zoom</text>
+	</string>
+	
+	<string id="ui_mcm_focused_keybind">
+		<text>Клавиша фокусировки при прицеливании</text>
+	</string>
+	
+	<string id="ui_mcm_focused_keybind_desc">
+		<text>Зажмите эту клавишу, прицеливаясь из оружия, чтобы сфокусироваться. Не работает с 2D-оверлейными прицелами.</text>
+	</string>
+
+	<string id="ui_mcm_focused_drain_stamina_mcm">
+		<text>Трата выносливости при фокусировке</text>
+	</string>
+	
+	<string id="ui_mcm_focused_drain_stamina_mcm_desc">
+		<text>При включении фокусировка будет расходовать вашу выносливость.</text>
+	</string>
+	
+	<string id="ui_mcm_focused_stamina_drain_mult_mcm">
+		<text>Множитель траты выносливости при фокусировке</text>
+	</string>
+	
+	<string id="ui_mcm_focused_stamina_drain_mult_mcm_desc">
+		<text>Более высокие значения означают более быстрый расход выносливости при фокусировке. По умолчанию: 0.75</text>
+	</string>
+
+	<string id="ui_mcm_focused_holstered_fov_mcm">
+		<text>Множитель зума при фокусировке без оружия</text>
+	</string>
+	
+	<string id="ui_mcm_focused_holstered_fov_mcm_desc">
+		<text>Применяется только если оружие убрано или не экипировано. Более высокие значения означают большее приближение. По умолчанию: 0.9</text>
+	</string>
+	
+	<string id="ui_mcm_focused_aiming_hud_fov_mcm">
+		<text>Дистанция до оружия при фокусировке в прицеле</text>
+	</string>
+	
+	<string id="ui_mcm_focused_aiming_hud_fov_mcm_desc">
+		<text>Более низкие значения приближают прицельные приспособления к вам. По умолчанию: 1.35</text>
+	</string>
+
+	<string id="ui_mcm_focused_aiming_fov_mcm">
+		<text>Множитель зума при фокусировке в прицеле</text>
+	</string>
+	
+	<string id="ui_mcm_focused_aiming_fov_mcm_desc">
+		<text>Работает для большинства прицельных приспособлений. Не работает с 2D-прицелами. Более высокие значения означают большее приближение. По умолчанию: 0.65</text>
+	</string>
+	
+
+</string_table>

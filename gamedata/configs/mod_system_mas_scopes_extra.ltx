@@ -1,0 +1,167 @@
+;
+; 1P59
+;
+
+![1p59]:scope_base
+	scope_dynamic_zoom               = on
+    scope_texture                    =
+    scope_zoom_factor                = 10
+	hud                              = 1p59_hud
+
+[1p59_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\1p59
+    aim_hud_offset_pos               = -0.006614, -0.071956, 0.084218
+    aim_hud_offset_pos_16x9          = -0.006614, -0.071956, 0.084218
+
+;
+; 1PN93
+;
+
+![1pn93]:scope_base
+	scope_texture                    =
+	scope_zoom_factor                = 15
+	hud                              = 1pn93_hud
+
+[1pn93_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\1pn93
+    aim_hud_offset_pos               = -0.006242, -0.085804, 0.102765
+    aim_hud_offset_pos_16x9          = -0.006242, -0.085804, 0.102765
+
+;
+; PK-A
+;
+
+[pk-a]:scope_base
+	visual          	             = dynamics\weapons\wpn_upgrade\wpn_scope_acog.ogf
+	cost                             = 2460
+	inv_name                         = st_addon_scope_pk-a
+	inv_name_short                   = st_addon_scope_pk-a
+	description                      = st_addon_scope_pk-a_descr
+	inv_weight                       = 0.46
+    inv_grid_width                   = 1
+    inv_grid_height                  = 1
+	icons_texture                    = ui\icon\scopes
+    inv_grid_x                       = 1
+    inv_grid_y                       = 1
+	inv_offset_x                     = 13
+	inv_offset_y                     = 34
+	hud                              = pk-a_hud
+
+[pk-a_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\pk-a
+    aim_hud_offset_pos               = -0.021604, -0.082045, 0.162773
+    aim_hud_offset_pos_16x9          = -0.021604, -0.082045, 0.162773
+
+![scope_group_dovetail]
+    >scopes                          = pk-a
+
+;
+; Aimpoint
+;
+
+![aimpoint]:scope_base
+	hud                              = aimpoint_hud
+
+[aimpoint_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\aimpoint
+    aim_hud_offset_pos               = -0.000106, -0.024477, 0.205947
+    aim_hud_offset_pos_16x9          = -0.000106, -0.024477, 0.205947
+
+;
+; Leupold Mark 4
+;
+
+[mark4]:scope_base
+	visual          	             = dynamics\weapons\wpn_upgrade\wpn_scope_acog.ogf
+	cost                             = 12630
+	inv_name                         = st_addon_scope_mark4
+	inv_name_short                   = st_addon_scope_mark4
+	description                      = st_addon_scope_mark4_descr
+	inv_weight                       = 0.5
+    inv_grid_width                   = 2
+    inv_grid_height                  = 1
+	icons_texture                    = ui\icon\scopes
+    inv_grid_x                       = 2
+    inv_grid_y                       = 0
+	inv_offset_x                     = 37
+	inv_offset_y                     = 36
+	scope_dynamic_zoom               = on
+    scope_texture                    =
+    scope_zoom_factor                = 12
+	hud                              = mark4_hud
+
+[mark4_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\mark4
+        aim_hud_offset_pos               = 1e-06, -0.025856, 0.123136
+        aim_hud_offset_pos_16x9          = 1e-06, -0.025856, 0.123136
+        aim_hud_offset_rot           = 0, 0, 0
+        aim_hud_offset_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_medium]
+    >scopes                          = mark4
+
+;
+; PKS07
+;
+
+[pks07]:scope_base
+	visual          	             = dynamics\weapons\wpn_upgrade\wpn_scope_acog.ogf
+	cost                             = 6790
+	inv_name                         = st_addon_scope_pks07
+	inv_name_short                   = st_addon_scope_pks07
+	description                      = st_addon_scope_pks07_descr
+	inv_weight                       = 0.88
+    inv_grid_width                   = 2
+    inv_grid_height                  = 1
+	icons_texture                    = ui\icon\scopes
+    inv_grid_x                       = 0
+    inv_grid_y                       = 4
+	inv_offset_x                     = 37
+	inv_offset_y                     = 36
+    scope_texture                    =
+    scope_zoom_factor                = 10
+	hud                              = pks07_hud
+
+[pks07_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\pks07
+        aim_hud_offset_pos               = 1e-06, -0.027712, 0.104384
+        aim_hud_offset_pos_16x9          = 1e-06, -0.027712, 0.104384
+
+![scope_group_picatinny_medium]
+    >scopes                          = pks07
+
+;
+; US Optics TS-12X
+;
+
+[ts12x]:scope_base
+	visual          	             = dynamics\weapons\wpn_upgrade\wpn_scope_acog.ogf
+	cost                             = 12280
+	inv_name                         = st_addon_scope_ts12x
+	inv_name_short                   = st_addon_scope_ts12x
+	description                      = st_addon_scope_ts12x_descr
+	inv_weight                       = 0.815
+    inv_grid_width                   = 2
+    inv_grid_height                  = 1
+	icons_texture                    = ui\icon\scopes
+    inv_grid_x                       = 0
+    inv_grid_y                       = 3
+	inv_offset_x                     = 37
+	inv_offset_y                     = 36
+	scope_dynamic_zoom               = on
+    scope_texture                    =
+    scope_zoom_factor                = 10
+    min_scope_zoom_factor            = 50
+	zoom_step_count                  = 6
+	use_alt_aim_hud					 = true
+	hud                              = ts12x_hud
+
+[ts12x_hud]:scope_hud_base,picatinny_alt_positions
+	item_visual                      = attachments\scopes\ts12x
+        aim_hud_offset_pos               = -0.000265, -0.02976, 0.10592
+        aim_hud_offset_pos_16x9          = -0.000265, -0.02976, 0.10592
+        aim_hud_offset_rot           = 0, 0, 0
+        aim_hud_offset_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_medium]
+    >scopes                          = ts12x

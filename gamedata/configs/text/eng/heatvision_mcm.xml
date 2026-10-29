@@ -1,0 +1,104 @@
+<!-- 
+	Anomaly Modconfiguration Menu strings
+	
+-->
+
+<string_table>
+
+	<string id="ui_mcm_heatvision_title">
+		<text>HeatVision Settings</text>
+	</string>	
+
+	<string id="ui_mcm_menu_heatvision">
+		<text>HeatVision</text>
+	</string>
+	
+	
+	<string id="ui_mcm_heatvision_nvg_view_through_scope_mcm">
+		<text>Can use while Aiming Down Sights:</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_view_through_scope_mcm_desc">
+		<text>If this box is checked, you can keep your heat visor on while ADS. If its is unchecked, your character will disable their NVGs while raising their weapon.</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_stays_pda_mcm">
+		<text>Heat visor stays on when viewing PDA:</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_stays_pda_mcm_desc">
+		<text>If this box is unchecked, your heat visor automatically disable when looking at your PDA.</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_tubes_mcm">
+		<text>Tube Setup: (Default quad tubes centered)</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_tubes_mcm_desc">
+		<text>Choose the number of tubes.</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_mcm">
+		<text>Corpses are cooling down with time:</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_mcm_desc">
+		<text>If this box is checked, corpses of NPCs and mutants will lose their heat while time passes. If its is unchecked, corpses will always be visible as hot.</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_time_mcm">
+		<text>Corpses cooling down time (in seconds):</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_body_cooldown_time_mcm_desc">
+		<text>The amount of seconds it will take for corpse to lose all the heat after the kill.</text>
+	</string>
+
+	
+	<string id="ui_mcm_lst_single_centered">
+		<text>Single Tube, Centered</text>
+	</string>
+	
+	<string id="ui_mcm_lst_single_left">
+		<text>Single Tube, Left Side</text>
+	</string>
+	
+	<string id="ui_mcm_lst_single_right">
+		<text>Single Tube, Right Side</text>
+	</string>
+	
+	<string id="ui_mcm_lst_dual_centered">
+		<text>Dual Tubes, Centered</text>
+	</string>
+	
+	<string id="ui_mcm_lst_quad_centered">
+		<text>Quad Tubes, Centered</text>
+	</string>
+	
+	
+	<string id="ui_mcm_heatvision_nvg_mode_mcm">
+		<text>Overlay Background: (Default is Blurred Overlay)</text>
+	</string>
+	
+	<string id="ui_mcm_heatvision_nvg_mode_mcm_desc">
+		<text>Choose what background overlay you want</text>
+	</string>
+	
+	
+	<string id="ui_mcm_lst_blurred_background">
+		<text>Blurred Overlay</text>
+	</string>
+	
+	<string id="ui_mcm_lst_black_background">
+		<text>Black Overlay</text>
+	</string>
+	
+	<string id="ui_mcm_lst_image_overlay">
+		<text>(Not implemented) Image Overlay</text>
+	</string>
+	
+	<string id="ui_mcm_lst_clear_vision">
+		<text>No Overlay (clear vision)</text>
+	</string>
+	
+</string_table>

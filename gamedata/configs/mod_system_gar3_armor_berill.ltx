@@ -1,0 +1,223 @@
+;================================================================Базовое=
+![specops_outfit]
+bones_koeff_protection        = actor_armor_berill_medium
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.25 ; 13%
+shock_protection              = 0.82 ; 9%
+chemical_burn_protection      = 0.18 ; 23%
+radiation_protection          = 0.006 ; 9%
+
+wound_protection              = 0.64
+strike_protection             = 0.58
+explosion_protection          = 0.82
+
+artefact_count                = 2
+inv_weight                    = 6.78
+cost                          = 38500
+
+additional_inventory_weight    = 15
+additional_inventory_weight2   = 15
+;============================================================Против людей=
+![dolg_specops_red_outfit]
+bones_koeff_protection        = actor_armor_berill_medium_up
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.2 
+shock_protection              = 0.6 
+chemical_burn_protection      = 0.14 
+radiation_protection          = 0.0045 
+
+wound_protection              = 0.58
+strike_protection             = 0.54
+explosion_protection          = 0.72
+
+artefact_count                = 2
+inv_weight                    = 7.66
+cost                          = 41500
+
+
+additional_inventory_weight    = 15
+additional_inventory_weight2   = 15
+;==========================================================Доп вес и слот=
+![specops_bandit_outfit]
+bones_koeff_protection        = body_damage_berill_medium_low
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.2 
+shock_protection              = 0.6 
+chemical_burn_protection      = 0.14 
+radiation_protection          = 0.0045
+
+wound_protection              = 0.56
+strike_protection             = 0.52
+explosion_protection          = 0.62 
+
+artefact_count                = 3
+inv_weight                    = 6.02
+cost                          = 35500
+
+
+additional_inventory_weight    = 22
+additional_inventory_weight2   = 22
+;=========================================================Против мутантов=
+![specops_dolg_outfit]
+bones_koeff_protection        = actor_armor_berill_medium
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.2 
+shock_protection              = 0.6 
+chemical_burn_protection      = 0.14 
+radiation_protection          = 0.0045 
+
+wound_protection              = 0.82
+strike_protection             = 0.7
+explosion_protection          = 1.1
+
+artefact_count                = 2
+inv_weight                    = 7.43
+cost                          = 41500
+
+
+additional_inventory_weight    = 15
+additional_inventory_weight2   = 15
+;====================================================Против людей + аном=
+![specops_merc_outfit]
+bones_koeff_protection        = actor_armor_berill_medium_up
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.62
+shock_protection              = 1.9
+chemical_burn_protection      = 0.26
+radiation_protection          = 0.007 
+
+wound_protection              = 0.54
+strike_protection             = 0.52
+explosion_protection          = 0.60 
+
+artefact_count                = 2
+inv_weight                    = 7.88
+cost                          = 42700
+
+
+additional_inventory_weight    = 18
+additional_inventory_weight2   = 18
+;========================================================Доп вес и слот=
+![svoboda_heavy_outfit]
+bones_koeff_protection        = actor_armor_berill_medium
+immunities_sect               = sect_heavy_immunities
+
+burn_protection               = 0.2 
+shock_protection              = 0.6 
+chemical_burn_protection      = 0.11 
+radiation_protection          = 0.007 
+
+wound_protection              = 0.60
+strike_protection             = 0.56
+explosion_protection          = 0.82
+
+artefact_count                = 3
+inv_weight                    = 6.24
+cost                          = 41200
+
+
+additional_inventory_weight    = 18
+additional_inventory_weight2   = 18
+
+;=========================================================================
+![sect_army_outfit_immunities]
+		burn_immunity                 = 0.12
+		chemical_burn_immunity        = 0.05
+		explosion_immunity            = 0.25
+		fire_wound_immunity           = 0.05
+		radiation_immunity            = 0.0
+		shock_immunity                = 0.014
+		wound_immunity                = 0.086
+		strike_immunity               = 0.086
+		telepatic_immunity            = 0.0
+
+;=========================================================================
+[actor_armor_berill_medium_low]:body_damage_berill_medium_low, head_damage_00
+ap_scale						= 0.85
+
+[body_damage_berill_medium_low]:body_damage_trenchcoat
+bip01_pelvis 				= 1, 0.4
+bip01_spine 		 		= 1, 0.4
+bip01_spine1 		 		= 1, 0.4
+bip01_spine2 		 		= 1, 0.4
+
+bip01_l_clavicle	 		= 1, 0.4
+bip01_l_upperarm	 		= 1, 0.4
+bip01_l_forearm	 	 		= 1, 0.4
+
+bip01_r_clavicle	 		= 1, 0.4
+bip01_r_upperarm	 		= 1, 0.4
+bip01_r_forearm	 	 		= 1, 0.4
+
+bip01_l_thigh	 	 		= 1, 0.4
+bip01_l_calf	 	 		= 1, 0.4
+bip01_r_thigh	 	 		= 1, 0.4
+bip01_r_calf	 	 		= 1, 0.4
+
+bip01_l_hand	 	 		= 1, 0.18
+bip01_r_hand	 	 		= 1, 0.18
+bip01_r_foot	 	 		= 1, 0.18
+bip01_l_foot	 	 		= 1, 0.18
+
+
+;=========================================================================
+[actor_armor_berill_medium]:body_damage_berill_medium, head_damage_00
+ap_scale						= 0.85
+
+[body_damage_berill_medium]:body_damage_trenchcoat
+bip01_pelvis 				= 1, 0.46
+bip01_spine 		 		= 1, 0.46
+bip01_spine1 		 		= 1, 0.46
+bip01_spine2 		 		= 1, 0.46
+
+bip01_l_clavicle	 		= 1, 0.46
+bip01_l_upperarm	 		= 1, 0.46
+bip01_l_forearm	 	 		= 1, 0.46
+
+bip01_r_clavicle	 		= 1, 0.46
+bip01_r_upperarm	 		= 1, 0.46
+bip01_r_forearm	 	 		= 1, 0.46
+
+bip01_l_thigh	 	 		= 1, 0.46
+bip01_l_calf	 	 		= 1, 0.46
+bip01_r_thigh	 	 		= 1, 0.46
+bip01_r_calf	 	 		= 1, 0.46
+
+bip01_l_hand	 	 		= 1, 0.2
+bip01_r_hand	 	 		= 1, 0.2
+bip01_r_foot	 	 		= 1, 0.2
+bip01_l_foot	 	 		= 1, 0.2
+
+
+;=========================================================================
+[actor_armor_berill_medium_up]:body_damage_berill_medium_up, head_damage_00
+ap_scale						= 0.85
+
+[body_damage_berill_medium_up]:body_damage_trenchcoat
+bip01_pelvis 				= 1, 0.52
+bip01_spine 		 		= 1, 0.52
+bip01_spine1 		 		= 1, 0.52
+bip01_spine2 		 		= 1, 0.52
+
+bip01_l_clavicle	 		= 1, 0.52
+bip01_l_upperarm	 		= 1, 0.52
+bip01_l_forearm	 	 		= 1, 0.52
+
+bip01_r_clavicle	 		= 1, 0.52
+bip01_r_upperarm	 		= 1, 0.52
+bip01_r_forearm	 	 		= 1, 0.52
+
+bip01_l_thigh	 	 		= 1, 0.52
+bip01_l_calf	 	 		= 1, 0.52
+bip01_r_thigh	 	 		= 1, 0.52
+bip01_r_calf	 	 		= 1, 0.52
+
+bip01_l_hand	 	 		= 1, 0.22
+bip01_r_hand	 	 		= 1, 0.22
+bip01_r_foot	 	 		= 1, 0.22
+bip01_l_foot	 	 		= 1, 0.22

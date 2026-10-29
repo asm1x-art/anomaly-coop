@@ -1,0 +1,32 @@
+![addons_table]
+t12                                                = scope
+;-----------------------------------------------------------------------------
+;                               THERMALS SIGHTS AND SCOPES
+;-----------------------------------------------------------------------------
+[t12]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_thermal_t12.ogf
+cost                		                        = 91500
+inv_name        		                            = st_addon_scope_t12
+inv_name_short  		                            = st_addon_scope_t12
+description    			                            = st_addon_scope_t12_descr
+inv_weight        		                            = 0.14 
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 1
+repair_type                                         = scope	
+hud = t12_hud
+
+	s3ds_reticle_size 	= 0.8
+	s3ds_image_type 	= 3
+	s3ds_reticle_type 	= 8
+	s3ds_min_zoom_1x	= 1	
+
+[t12_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\t12
+        aim_hud_offset_pos               = -0.000318, -0.018496, 0.07712
+        aim_hud_offset_pos_16x9          = -0.000318, -0.018496, 0.07712
+
+![scope_group_picatinny_2inch]
+    >scopes                          = t12

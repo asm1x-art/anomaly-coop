@@ -1,0 +1,11 @@
+function actor_on_hud_animation_play(anm_table)
+
+	if (anm_table.anm_name == "anm_add_cartridge") then
+		anm_table.anm_mixin = false
+	end
+
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_hud_animation_play", actor_on_hud_animation_play)
+end

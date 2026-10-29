@@ -1,0 +1,29 @@
+-- Fixes to the Grim Raid Addon weapon pack at run time (tools\gra\build_pack.py brings the pack in; this file is the
+-- repo's own, like configs\mod_system_gra_fixes.ltx)
+
+-- The pack's scopes (Shader 3D Scopes, Pizza's, MAS) draw their lenses and reticles only with the engine's 3D shader
+-- scopes on (r__3Dfakescope, off by default): without it an ACOG is an empty tube. GRA turned it on in its graphics
+-- preset script, left out of the pack as it forces a dozen other settings; this turns it on once per game, so the
+-- option can still be turned off in the settings.
+local scopes_on
+
+function actor_on_first_update()
+	if not scopes_on then
+		exec_console_cmd("r__3Dfakescope 1")
+		scopes_on = true
+	end
+end
+
+function save_state(m_data)
+	m_data.gra_3d_scopes_on = scopes_on
+end
+
+function load_state(m_data)
+	scopes_on = m_data.gra_3d_scopes_on
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("save_state", save_state)
+	RegisterScriptCallback("load_state", load_state)
+end
