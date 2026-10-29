@@ -6,20 +6,29 @@
 -- preset script, left out of the pack as it forces a dozen other settings; this turns it on once per game, so the
 -- option can still be turned off in the settings.
 local scopes_on
+-- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (its user.ltx): with the
+-- vanilla 0.45 hands and guns sit in the face. Set once per game the same way.
+local hud_fov_set
 
 function actor_on_first_update()
 	if not scopes_on then
 		exec_console_cmd("r__3Dfakescope 1")
 		scopes_on = true
 	end
+	if not hud_fov_set then
+		exec_console_cmd("hud_fov 0.64")
+		hud_fov_set = true
+	end
 end
 
 function save_state(m_data)
 	m_data.gra_3d_scopes_on = scopes_on
+	m_data.gra_hud_fov_set = hud_fov_set
 end
 
 function load_state(m_data)
 	scopes_on = m_data.gra_3d_scopes_on
+	hud_fov_set = m_data.gra_hud_fov_set
 end
 
 function on_game_start()
