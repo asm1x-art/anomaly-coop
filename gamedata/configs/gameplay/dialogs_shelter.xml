@@ -146,4 +146,25 @@
 			</phrase>
 		</phrase_list>
 	</dialog>
+	<!-- Herman: his half of the filled capsules, one of each nature -->
+	<dialog id="shelter_herman_pay">
+		<has_info>shelter_capsules_got</has_info>
+		<dont_has_info>shelter_capsules_paid</dont_has_info>
+		<precondition>shelter.dlg_has_filled_capsules</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_herman_4</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_herman_5</text>
+				<action>shelter.dlg_pay_capsules</action>
+				<give_info>shelter_capsules_paid</give_info>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_herman_6</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
 </game_dialogs>

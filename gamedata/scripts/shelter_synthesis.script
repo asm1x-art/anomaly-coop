@@ -1,0 +1,271 @@
+-- Artefact synthesis (docs/coop/shelter.md, "Камеры синтеза"): Herman's capsules filled in anomalies. A capsule of a
+-- nature goes into an anomaly of that nature near the actor ("Put into the anomaly"); about a minute later it lies
+-- there full, and the anomaly is burnt out till the next emission. All of it only in a suit the work allows
+-- ([shelter_synthesis] suits): in any other the capsule's discharge kills, and nothing's done. The capsules being
+-- filled and the anomalies burnt out are the world's (shelter.state), the filled ones count for the shelter's tasks.
+
+local SETTINGS = "shelter_synthesis"
+local FILLING = "shelter_capsule_filling" -- the capsule in the anomaly while it fills
+-- an anomaly's nature by the hit it deals; fields, campfires and the odd ones have none
+local NATURE_OF_HIT = { burn = "thermo", light_burn = "thermo", chemical_burn = "chem", shock = "electro", strike = "gravi" }
+local NO_NATURE_CLASS = { ZS_RADIO = true, Z_CFIRE = true } -- fields, campfires
+local NO_NATURE = { "zone_teleport", "zone_sarcofag", "zone_emi", "zone_monolith", "zone_mine_field" } -- by prefix
+local NATURE_OF = { zone_no_gravity = "gravi" } -- by prefix: an electric hit, a gravitational anomaly
+local HIT_OF_NATURE = { thermo = hit.burn, chem = hit.chemical_burn, electro = hit.shock, gravi = hit.strike }
+local UPDATE_MS = 1000
+local SAVE_EVERY = 5 -- s: a fill's time left kept in the world's state this often
+
+local suits -- the suits the work allows: section -> true
+local burnt_here = {} -- anomaly id -> burnt out in this game already
+local update_at = 0
+
+local function msg(id, ...)
+	actor_menu.set_msg(1, string.format(game.translate_string(id), ...), 6)
+end
+
+local function list(name)
+	local t = {}
+	for v in string.gmatch(shelter.state(name, "") or "", "[^,]+") do
+		t[#t + 1] = tonumber(v) or v
+	end
+	return t
+end
+
+local function set_list(name, t)
+	shelter.set_state(name, #t > 0 and table.concat(t, ",") or nil)
+end
+
+local function suited()
+	if not suits then
+		suits = {}
+		for _, s in ipairs(str_explode(ini_sys:r_string_ex(SETTINGS, "suits") or "", ",")) do
+			suits[s] = true
+		end
+	end
+	local outfit = db.actor:item_in_slot(7)
+	return outfit and suits[outfit:section()] or false
+end
+
+-- the capsule's discharge through a suit that can't take it
+local function kill(nature)
+	local h = hit()
+	h.type = HIT_OF_NATURE[nature] or hit.strike
+	h.power = 1000
+	h.impulse = 0
+	h.draftsman = db.actor
+	h.direction = vector():set(0, -1, 0)
+	db.actor:hit(h)
+	if db.actor:alive() then
+		db.actor:kill(db.actor)
+	end
+end
+
+local function starts(s, prefixes)
+	for _, p in ipairs(prefixes) do
+		if string.sub(s, 1, #p) == p then
+			return true
+		end
+	end
+	return false
+end
+
+-- an anomaly's nature, nil for none
+function nature_of(obj)
+	local sec = obj:section()
+	for prefix, nature in pairs(NATURE_OF) do
+		if string.sub(sec, 1, #prefix) == prefix then
+			return nature
+		end
+	end
+	if starts(sec, NO_NATURE) or NO_NATURE_CLASS[SYS_GetParam(0, sec, "class") or ""] then
+		return nil
+	end
+	return NATURE_OF_HIT[SYS_GetParam(0, sec, "hit_type") or ""]
+end
+
+local function burnt(id)
+	for _, b in ipairs(list("burnt")) do
+		if b == id then
+			return true
+		end
+	end
+	return false
+end
+
+-- the nearest anomaly in reach: of the nature, not burnt out; and whether there was one of another nature
+local function anomaly_for(nature)
+	local reach = ini_sys:r_float_ex(SETTINGS, "reach") or 4
+	local best, best_d, other
+	level.iterate_nearest(db.actor:position(), reach + 10, function(obj)
+		if IsAnomaly(obj) then
+			local d = obj:position():distance_to(db.actor:position())
+			local n = nature_of(obj)
+			if d <= reach and n then
+				if n == nature and not burnt(obj:id()) then
+					if not best_d or d < best_d then
+						best, best_d = obj, d
+					end
+				elseif n ~= nature then
+					other = true
+				end
+			end
+		end
+	end)
+	return best, other
+end
+
+-------------------------------------------------------------------------------
+-- the capsule into an anomaly
+
+function capsule_menu(obj)
+	local p = obj:parent()
+	if p and p:id() == AC_ID and not SYS_GetParam(1, obj:section(), "shelter_full", false) then
+		return game.translate_string("st_shelter_capsule_place")
+	end
+end
+
+function capsule_place(obj)
+	local nature = SYS_GetParam(0, obj:section(), "shelter_nature")
+	local anomaly, other = anomaly_for(nature)
+	if not anomaly then
+		return msg(other and "st_shelter_capsule_wrong_anomaly" or "st_shelter_capsule_no_anomaly")
+	elseif not suited() then
+		return kill(nature)
+	end
+	hide_hud_inventory()
+	local pos = anomaly:position()
+	local lv = level.vertex_id(pos)
+	if lv >= 4294967295 then
+		lv = db.actor:level_vertex_id()
+	end
+	shelter.everyones(function()
+		alife_release(obj)
+		local se = alife_create(FILLING, vector():set(pos.x, pos.y + 0.3, pos.z), lv, db.actor:game_vertex_id())
+		if se then
+			local fills = list("fills")
+			fills[#fills + 1] = se.id
+			set_list("fills", fills)
+			shelter.set_state("fill_" .. se.id, table.concat({ nature, anomaly:id(), ini_sys:r_float_ex(SETTINGS, "fill_seconds") or 60 }, ":"))
+		end
+	end)
+	msg("st_shelter_capsule_placed")
+end
+
+-------------------------------------------------------------------------------
+-- the capsules filling, the anomalies burnt out
+
+local function burn(anomaly_id)
+	local burnt_list = list("burnt")
+	burnt_list[#burnt_list + 1] = anomaly_id
+	set_list("burnt", burnt_list)
+end
+
+-- a fill's time up: the full capsule where it was, the anomaly burnt out, the capsule counted (once for the world)
+local function fill_done(id, nature, anomaly_id)
+	shelter.once("fill_done_" .. id, function()
+		local obj = level.object_by_id(id)
+		local se = alife_object(id)
+		if se then
+			local pos = obj and obj:position() or se.position
+			alife_create(table.concat({ "shelter_capsule", nature, "full" }, "_"), pos, se.m_level_vertex_id, se.m_game_vertex_id)
+			alife_release(se)
+		end
+		burn(anomaly_id)
+		shelter.set_state("capsules_filled_" .. nature, shelter.state("capsules_filled_" .. nature, 0) + 1)
+		if obj and obj:position():distance_to(db.actor:position()) < 30 then
+			msg("st_shelter_capsule_filled")
+		end
+	end)
+end
+
+local remaining_here = {} -- a fill's id -> its seconds left, counted down here (kept in the state now and then)
+
+local function update_fills(seconds)
+	local fills, left = list("fills"), {}
+	for _, id in ipairs(fills) do
+		local nature, anomaly_id, kept = string.match(shelter.state("fill_" .. id, "") or "", "^(%a+):(%d+):([%d%.%-]+)$")
+		local remaining = remaining_here[id] or tonumber(kept)
+		if not remaining then
+			-- unknown: dropped
+		elseif remaining - seconds <= 0 then
+			remaining_here[id] = nil
+			shelter.set_state("fill_" .. id, nil)
+			fill_done(id, nature, tonumber(anomaly_id))
+		else
+			left[#left + 1] = id
+			remaining_here[id] = remaining - seconds
+			if math.floor(remaining_here[id] / SAVE_EVERY) ~= math.floor(remaining / SAVE_EVERY) then
+				shelter.set_state("fill_" .. id, table.concat({ nature, anomaly_id, remaining_here[id] }, ":"))
+			end
+		end
+	end
+	if #left ~= #fills then
+		set_list("fills", left)
+	end
+end
+
+-- the burnt-out anomalies, online here: off
+local function update_burnt()
+	for _, id in ipairs(list("burnt")) do
+		if not burnt_here[id] then
+			local obj = level.object_by_id(id)
+			if obj then
+				obj:disable_anomaly()
+				burnt_here[id] = true
+			end
+		end
+	end
+end
+
+-- an emission brings them back
+local function on_interaction(kind, obj, what)
+	if kind == "anomalies" and what == "emission_end" then
+		for _, id in ipairs(list("burnt")) do
+			local a = level.object_by_id(id)
+			if a then
+				a:enable_anomaly()
+			end
+		end
+		burnt_here = {}
+		set_list("burnt", {})
+	end
+end
+
+local last_update = nil
+
+local function actor_on_update()
+	local now = time_global()
+	if now < update_at then
+		return
+	end
+	update_at = now + UPDATE_MS
+	local seconds = last_update and (now - last_update) / 1000 or 0
+	last_update = now
+	update_fills(seconds)
+	update_burnt()
+end
+
+local takes_from = nil -- time_global() from which the actor's takes are pickups (not the inventory a load puts back)
+
+local function actor_on_first_update()
+	takes_from = time_global() + 3000
+end
+
+-- a full capsule picked up in a suit that can't take it: its discharge, and it falls back
+local function actor_on_item_take(obj)
+	local sec = obj:section()
+	if not takes_from or time_global() < takes_from then
+		return
+	end
+	if SYS_GetParam(1, sec, "shelter_full", false) and not suited() then
+		db.actor:drop_item(obj)
+		kill(SYS_GetParam(0, sec, "shelter_nature"))
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("actor_on_interaction", on_interaction)
+end

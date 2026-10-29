@@ -591,6 +591,27 @@ function dlg_give_capsules(a, b)
 	end
 end
 
+-- a filled capsule of each nature on the actor (Herman's half)
+function dlg_has_filled_capsules(a, b)
+	for _, nature in ipairs(NATURES) do
+		if not db.actor:object("shelter_capsule_" .. nature .. "_full") then
+			return false
+		end
+	end
+	return true
+end
+
+function dlg_pay_capsules(a, b)
+	for _, nature in ipairs(NATURES) do
+		local section = "shelter_capsule_" .. nature .. "_full"
+		local capsule = db.actor:object(section)
+		if capsule then
+			alife_release(capsule)
+			news_manager.relocate_item(db.actor, "out", section, 1)
+		end
+	end
+end
+
 function dlg_give_container(a, b)
 	dialogs.relocate_item_section_to_actor(a, b, CONTAINER)
 end

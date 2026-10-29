@@ -4,7 +4,8 @@ local dialogs = {
 	[ [[gameplay\character_desc_escape.xml]] ] = { "esc_2_12_stalker_trader", "shelter_sid_laptop", "shelter_sid_container" },
 	[ [[gameplay\character_desc_yantar.xml]] ] = { "yan_stalker_sakharov", "shelter_sakharov_container" },
 	[ [[gameplay\character_desc_zaton.xml]] ] = { "zat_a2_stalker_mechanic", "shelter_kardan_tools", "shelter_kardan_pda" },
-	[ [[gameplay\character_desc_jupiter.xml]] ] = { "jup_b6_scientist_nuclear_physicist", "shelter_herman_capsules" },
+	[ [[gameplay\character_desc_jupiter.xml]] ] = { "jup_b6_scientist_nuclear_physicist", "shelter_herman_capsules",
+		"shelter_herman_pay" },
 }
 
 function on_xml_read()

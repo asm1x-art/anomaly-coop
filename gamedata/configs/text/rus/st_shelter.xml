@@ -462,4 +462,34 @@
 	<string id="st_shelter_goal_synthesis_electro_2">
 		<text>Капсулы наполнены.</text>
 	</string>
+	<string id="st_shelter_capsule_place">
+		<text>Поместить в аномалию</text>
+	</string>
+	<string id="st_shelter_capsule_no_anomaly">
+		<text>Рядом нет подходящей аномалии: подойдите ближе, до 4 м.</text>
+	</string>
+	<string id="st_shelter_capsule_wrong_anomaly">
+		<text>Эта аномалия другой природы: капсула не для неё.</text>
+	</string>
+	<string id="st_shelter_capsule_placed">
+		<text>Капсула в аномалии: около минуты — и среда внутри.</text>
+	</string>
+	<string id="st_shelter_capsule_filled">
+		<text>Капсула наполнена. Аномалия выгорела до следующего выброса.</text>
+	</string>
+	<string id="st_shelter_capsule_gravi_full_name">
+		<text>Капсула с гравитационной средой</text>
+	</string>
+	<string id="st_shelter_capsule_thermo_full_name">
+		<text>Капсула с термической средой</text>
+	</string>
+	<string id="st_shelter_capsule_chem_full_name">
+		<text>Капсула с химической средой</text>
+	</string>
+	<string id="st_shelter_capsule_electro_full_name">
+		<text>Капсула с электрической средой</text>
+	</string>
+	<string id="st_shelter_capsule_full_descr">
+		<text>Капсула профессора Германа, наполненная аномальной средой. Брать в руки только в ССП не ниже «Топаза» или в «Севе» Химика: в другом костюме разряд убивает на месте.</text>
+	</string>
 </string_table>

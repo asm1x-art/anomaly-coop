@@ -95,6 +95,8 @@ shelter_notes   = shelter_notes_chemist
 ; filled in an anomaly of theirs, one of each back to him, one of each into the shelter's chambers
 [shelter_capsule]:tch_quest
 visual          = dynamics\equipments\aa\aam
+use1_functor        = shelter_synthesis.capsule_menu
+use1_action_functor = shelter_synthesis.capsule_place
 inv_name        = st_shelter_capsule_name
 inv_name_short  = st_shelter_capsule_name
 description     = st_shelter_capsule_descr
@@ -123,6 +125,46 @@ shelter_nature  = chem
 inv_name        = st_shelter_capsule_electro_name
 inv_name_short  = st_shelter_capsule_electro_name
 shelter_nature  = electro
+
+; filled: picking one up in a suit the work doesn't allow kills (shelter_synthesis.script)
+[shelter_capsule_gravi_full]:shelter_capsule
+inv_name        = st_shelter_capsule_gravi_full_name
+inv_name_short  = st_shelter_capsule_gravi_full_name
+description     = st_shelter_capsule_full_descr
+shelter_nature  = gravi
+shelter_full    = true
+
+[shelter_capsule_thermo_full]:shelter_capsule
+inv_name        = st_shelter_capsule_thermo_full_name
+inv_name_short  = st_shelter_capsule_thermo_full_name
+description     = st_shelter_capsule_full_descr
+shelter_nature  = thermo
+shelter_full    = true
+
+[shelter_capsule_chem_full]:shelter_capsule
+inv_name        = st_shelter_capsule_chem_full_name
+inv_name_short  = st_shelter_capsule_chem_full_name
+description     = st_shelter_capsule_full_descr
+shelter_nature  = chem
+shelter_full    = true
+
+[shelter_capsule_electro_full]:shelter_capsule
+inv_name        = st_shelter_capsule_electro_full_name
+inv_name_short  = st_shelter_capsule_electro_full_name
+description     = st_shelter_capsule_full_descr
+shelter_nature  = electro
+shelter_full    = true
+
+; a capsule taking in an anomaly's matter, in the anomaly: not to be picked up till it's full
+[shelter_capsule_filling]:physic_object
+visual          = dynamics\equipments\aa\aam
+
+; the work with the capsules and the chambers (shelter_synthesis.script): the suits it allows, how long a capsule
+; takes to fill (s), how near an anomaly takes the actor's capsule (m)
+[shelter_synthesis]
+suits           = shelter_chemist_outfit, ecolog_outfit_yello, ecolog_outfit_blue, ecolog_outfit_green, ecolog_outfit_red
+fill_seconds    = 60
+reach           = 4
 
 ; Sakharov's samples for Sidorovich
 [shelter_af_container]:tch_quest

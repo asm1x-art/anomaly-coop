@@ -462,4 +462,34 @@
 	<string id="st_shelter_goal_synthesis_electro_2">
 		<text>The capsules are filled.</text>
 	</string>
+	<string id="st_shelter_capsule_place">
+		<text>Put into the anomaly</text>
+	</string>
+	<string id="st_shelter_capsule_no_anomaly">
+		<text>No anomaly near enough: come closer, within 4 m.</text>
+	</string>
+	<string id="st_shelter_capsule_wrong_anomaly">
+		<text>This anomaly is of another nature: the capsule isn't for it.</text>
+	</string>
+	<string id="st_shelter_capsule_placed">
+		<text>The capsule is in the anomaly: about a minute, and the matter is inside.</text>
+	</string>
+	<string id="st_shelter_capsule_filled">
+		<text>The capsule is filled. The anomaly has burnt out till the next emission.</text>
+	</string>
+	<string id="st_shelter_capsule_gravi_full_name">
+		<text>Capsule of gravitational matter</text>
+	</string>
+	<string id="st_shelter_capsule_thermo_full_name">
+		<text>Capsule of thermal matter</text>
+	</string>
+	<string id="st_shelter_capsule_chem_full_name">
+		<text>Capsule of chemical matter</text>
+	</string>
+	<string id="st_shelter_capsule_electro_full_name">
+		<text>Capsule of electrical matter</text>
+	</string>
+	<string id="st_shelter_capsule_full_descr">
+		<text>Professor Herman's capsule, filled with anomalous matter. Take it in hand only in an SSP from Topaz up or in the Chemist's SEVA: in another suit its discharge kills on the spot.</text>
+	</string>
 </string_table>
