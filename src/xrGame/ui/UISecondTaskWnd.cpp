@@ -135,23 +135,49 @@ void UITaskListWnd::UpdateList()
 
 	m_list->Clear();
 
-	u32 count_for_check = 0;
+	// the tasks in progress, each with its group from the script (none: "")
+	::luabind::functor<LPCSTR> group_of;
+	bool groups = ai().script_engine().functor("_G.CGameTask__group", group_of);
+	xr_vector<std::pair<CGameTask*, shared_str>> listed;
 	vGameTasks& tasks = Level().GameTaskManager().GetGameTasks();
-	vGameTasks::iterator itb = tasks.begin();
-	vGameTasks::iterator ite = tasks.end();
-	for (; itb != ite; ++itb)
+	for (vGameTasks::iterator it = tasks.begin(); it != tasks.end(); ++it)
 	{
-		CGameTask* task = (*itb).game_task;
+		CGameTask* task = (*it).game_task;
 		if (task && task->GetTaskState() == eTaskStateInProgress)
 		{
-			UITaskListWndItem* item = xr_new<UITaskListWndItem>();
-			if (item->init_task(task, this))
-			{
-				m_list->AddWindow(item, true);
-				++count_for_check;
-			}
+			LPCSTR group = NULL;
+			if (groups)
+				group = group_of(task->m_ID.c_str());
+			listed.push_back(std::make_pair(task, shared_str(group ? group : "")));
 		}
-	} // for
+	}
+
+	// a group sorts by its first task's priority, and that task carries the group's title
+	xr_map<shared_str, CGameTask*> group_first;
+	for (u32 i = 0; i < listed.size(); ++i)
+	{
+		if (!listed[i].second.size())
+			continue;
+		CGameTask*& first = group_first[listed[i].second];
+		if (!first || listed[i].first->m_priority > first->m_priority)
+			first = listed[i].first;
+	}
+
+	CUIXml xml;
+	xml.Load(CONFIG_PATH, UI_PATH, PDA_TASK_XML);
+	for (u32 i = 0; i < listed.size(); ++i)
+	{
+		UITaskListWndItem* item = xr_new<UITaskListWndItem>();
+		if (!item->init_task(listed[i].first, this))
+			continue;
+		const shared_str& group = listed[i].second;
+		if (group.size())
+		{
+			CGameTask* first = group_first[group];
+			item->set_group(group, first->m_priority, first == listed[i].first, xml);
+		}
+		m_list->AddWindow(item, true);
+	}
 	m_list->SetScrollPos(prev_scroll_pos);
 }
 
@@ -160,7 +186,7 @@ bool UITaskListWnd::SortingLessFunction(CUIWindow* left, CUIWindow* right)
 	UITaskListWndItem* lpi = smart_cast<UITaskListWndItem*>(left);
 	UITaskListWndItem* rpi = smart_cast<UITaskListWndItem*>(right);
 	VERIFY(lpi && rpi);
-	return (lpi->get_priority_task() > rpi->get_priority_task());
+	return lpi->sorts_before(*rpi);
 }
 
 /*
@@ -180,6 +206,8 @@ void UITaskListWnd::UpdateCounter()
 UITaskListWndItem::UITaskListWndItem()
 {
 	m_task = NULL;
+	m_group_priority = 0;
+	m_group_header = false;
 
 	m_color_states[0] = (u32)(-1);
 	m_color_states[1] = (u32)(-1);
@@ -194,6 +222,47 @@ IC u32 UITaskListWndItem::get_priority_task() const
 {
 	VERIFY(m_task);
 	return m_task->m_priority;
+}
+
+// by priority, a group's tasks together at its first task's place, its title first
+bool UITaskListWndItem::sorts_before(const UITaskListWndItem& other) const
+{
+	u32 mine = m_group.size() ? m_group_priority : get_priority_task();
+	u32 theirs = other.m_group.size() ? other.m_group_priority : other.get_priority_task();
+	if (mine != theirs)
+		return mine > theirs;
+	if (m_group != other.m_group)
+		return xr_strcmp(m_group, other.m_group) < 0;
+	if (m_group_header != other.m_group_header)
+		return m_group_header;
+	return get_priority_task() > other.get_priority_task();
+}
+
+void UITaskListWndItem::set_group(const shared_str& group, u32 group_priority, bool header, CUIXml& xml)
+{
+	m_group = group;
+	m_group_priority = group_priority;
+	m_group_header = header;
+
+	const float indent = 14.0f;
+	float shift = 0.0f;
+	if (header)
+	{
+		CUITextWnd* title = UIHelper::CreateTextWnd(xml, "second_task_wnd:task_item:name", this);
+		title->SetWndPos(Fvector2().set(0.0f, 0.0f));
+		title->SetHeight(22.0f);
+		title->SetTextST(group.c_str());
+		title->SetTextColor(m_color_states[stt_activ]);
+		shift = title->GetHeight();
+	}
+	CUIWindow* row[] = {m_st_story, m_name, m_bt_focus};
+	for (CUIWindow* w : row)
+	{
+		Fvector2 pos = w->GetWndPos();
+		w->SetWndPos(Fvector2().set(pos.x + (w == m_bt_focus ? 0.0f : indent), pos.y + shift));
+	}
+	m_name->SetWidth(m_name->GetWidth() - indent);
+	update_view();
 }
 
 bool UITaskListWndItem::init_task(CGameTask* task, UITaskListWnd* parent)

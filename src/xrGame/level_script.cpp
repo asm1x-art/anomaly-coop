@@ -54,6 +54,8 @@
 #include "GametaskManager.h"
 #include "xr_level_controller.h"
 #include "../xrEngine/GameMtlLib.h"
+#include "../xrEngine/vis_common.h"
+#include "../Include/xrRender/RenderVisual.h"
 #include "../xrEngine/xr_input.h"
 #include "script_ini_file.h"
 #include "EffectorBobbing.h"
@@ -2278,6 +2280,43 @@ xrTime get_start_time()
 	return (xrTime(Level().GetStartGameTime()));
 }
 
+// shelter (docs/coop/shelter.md): a piece of the level's static geometry taken out while playing, without recompiling
+// the level. The renderer culls a static visual by its bounds (CRender::add_Static), so they go far under the level.
+static void hide_static_visual(int index)
+{
+	IRenderVisual* visual = index >= 0 ? ::Render->getVisual(index) : NULL;
+	if (!visual)
+		return;
+	Fvector far_away;
+	far_away.set(0.f, -10000.f, 0.f);
+	vis_data& vis = visual->getVisData();
+	vis.box.set(far_away, far_away);
+	vis.sphere.set(far_away, 0.001f);
+}
+
+// ... and its collision triangles ("first-last,index,..." into level.cform) get materials\fake: passable (physics, the
+// player, the crosshair), shot and heard through
+static void make_static_passable(LPCSTR triangles)
+{
+	CDB::MODEL* model = Level().ObjectSpace.GetStaticModel();
+	CDB::TRI* tris = model->get_tris();
+	u32 count = (u32)model->get_tris_count();
+	u16 fake = GMLib.GetMaterialIdx("materials\\fake");
+	string32 part;
+	for (int i = 0, n = _GetItemCount(triangles); i < n; ++i)
+	{
+		_GetItem(triangles, i, part);
+		u32 first = 0, last = 0;
+		int read = sscanf(part, "%u-%u", &first, &last);
+		if (read < 1)
+			continue;
+		if (read < 2)
+			last = first;
+		for (u32 t = first; t <= last && t < count; ++t)
+			tris[t].material = fake;
+	}
+}
+
 void iterate_nearest(const Fvector& pos, float radius, const ::luabind::functor<bool>& functor)
 {
 	xr_vector<CObject*> m_nearest;
@@ -2830,6 +2869,8 @@ void CLevel::script_register(lua_State* L)
 			def("get_env_rads", &get_env_rads),
 			def("get_texture_size", &get_texture_size),
 			def("iterate_nearest", &iterate_nearest),
+			def("hide_static_visual", &hide_static_visual),
+			def("make_static_passable", &make_static_passable),
 			def("nearest_object", &nearest_object, pure_out_value<3>()),
 			def("nearest_object", &nearest_object_of_class, pure_out_value<4>()),
 			def("pick_material", &PickMaterial),

@@ -76,7 +76,11 @@ public:
 	virtual ~UITaskListWndItem();
 
 	bool init_task(CGameTask* task, UITaskListWnd* parent);
+	// a group of tasks (the script's _G.CGameTask__group: the shelter's "Убежище"): listed together, its title on the
+	// first one, the rest indented under it
+	void set_group(const shared_str& group, u32 group_priority, bool header, CUIXml& xml);
 	IC u32 get_priority_task() const;
+	bool sorts_before(const UITaskListWndItem& other) const;
 
 	virtual void OnFocusReceive();
 	virtual void OnFocusLost();
@@ -99,6 +103,10 @@ private: // m_
 	//	CUICheckButton*	m_bt_view;
 	CUIStatic* m_st_story;
 	CUI3tButton* m_bt_focus;
+
+	shared_str m_group;
+	u32 m_group_priority;
+	bool m_group_header;
 
 	enum
 	{
