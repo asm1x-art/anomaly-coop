@@ -1,0 +1,21 @@
+<w>
+	<!-- the furnishing mode's panel (scripts\shelter_furniture.script): the stash's furniture at the bottom of the screen -->
+	<panel x="112" y="584" width="800" height="176" stretch="1">
+		<texture>ui_icons_PDA_dialog</texture>
+		<title x="16" y="10" width="768" height="24">
+			<text font="letterica18" r="240" g="217" b="182" align="c" vert_align="c"/>
+		</title>
+		<!-- one cell; the script lays out seven -->
+		<cell width="100" height="100" stretch="1">
+			<texture>ui_inGame2_booster_slot</texture>
+			<icon_area x="8" y="8" width="84" height="84"/>
+			<icon x="8" y="8" width="84" height="84" stretch="1"/>
+			<count x="50" y="78" width="46" height="18">
+				<text font="letterica16" r="230" g="230" b="230" align="r" vert_align="c"/>
+			</count>
+		</cell>
+		<hint x="16" y="148" width="768" height="20">
+			<text font="letterica16" r="170" g="170" b="170" align="c" vert_align="c"/>
+		</hint>
+	</panel>
+</w>

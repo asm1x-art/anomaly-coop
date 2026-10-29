@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+   <string id="st_placeable_wall">
+		<text>wooden wall ap.5x3m</text>
+	</string>
+	<string id="st_placeable_wall_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>	
+	
+   <string id="st_placeable_wall_metal">
+		<text>Metal sheets wall ap.5x3m</text>
+	</string>
+	<string id="st_placeable_wall_metal_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>	
+	
+   <string id="st_placeable_wall02">
+		<text>wooden wall ap.2x3m</text>
+	</string>
+	<string id="st_placeable_wall02_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>	
+	
+   <string id="st_placeable_wall02_metal">
+		<text>Metal sheets Wall ap.2x3m</text>
+	</string>
+	<string id="st_placeable_wall02_metal_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>	
+	
+   <string id="st_placeable_wall_doorway">
+		<text>Wooden wall w\doorway ap.5x3m</text>
+	</string>
+	<string id="st_placeable_wall_doorway_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_orange] • %c[ui_gray_2] Compatible door: 100x190cm\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>	
+	
+   <string id="st_placeable_wall_doorway_metal">
+		<text>Metal sheets wall w\doorway ap.5x3m</text>
+	</string>
+	<string id="st_placeable_wall_doorway_metal_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_orange] • %c[ui_gray_2] Compatible door: 100x190cm\n
+		%c[d_blue] • %c[ui_gray_2] structural item; used to establish more rooms in bases.\n</text>
+	</string>		
+	
+</string_table>

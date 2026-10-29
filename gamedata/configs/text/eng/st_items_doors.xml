@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+   <string id="st_placeable_door">
+		<text>Wooden Door 100x190cm</text>
+	</string>
+	<string id="st_placeable_door_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[d_orange] • %c[ui_gray_2] Compatible with the craftable doorways\n
+		%c[0,250,250,0] • %c[0,250,250,0] NOTICE: To remove the door stab it with a melee weapon or use explosive. Shooting it works too but requires a lot of bullets (for the purpose of preventing NPCs from breaking doors easly when shooting).\n</text>
+	</string>
+	
+   <string id="st_placeable_door02">
+		<text>Metal Door 150x250cm</text>
+	</string>
+	<string id="st_placeable_door02_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[0,250,250,0] • %c[0,250,250,0] NOTICE: To remove the door stab it with a melee weapon or use explosive. Shooting it works too but requires a lot of bullets (for the purpose of preventing NPCs from breaking doors easly when shooting).\n</text>
+	</string>
+	
+   <string id="st_placeable_door03">
+		<text>Wooden Door 115x215cm</text>
+	</string>
+	<string id="st_placeable_door03_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[0,250,250,0] • %c[0,250,250,0] NOTICE: To remove the door stab it with a melee weapon or use explosive. Shooting it works too but requires a lot of bullets (for the purpose of preventing NPCs from breaking doors easly when shooting).\n</text>
+	</string>
+	
+   <string id="st_placeable_door04">
+		<text>Wooden Door 145x220cm</text>
+	</string>
+	<string id="st_placeable_door04_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[0,250,250,0] • %c[0,250,250,0] NOTICE: To remove the door stab it with a melee weapon or use explosive. Shooting it works too but requires a lot of bullets (for the purpose of preventing NPCs from breaking doors easly when shooting).\n</text>
+	</string>
+	
+   <string id="st_placeable_door05">
+		<text>Wooden Door 176x300cm</text>
+	</string>
+	<string id="st_placeable_door05_descr">
+		<text>
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_orange] • %c[ui_gray_2] placeable item\n
+		%c[0,250,250,0] • %c[0,250,250,0] NOTICE: To remove the door stab it with a melee weapon or use explosive. Shooting it works too but requires a lot of bullets (for the purpose of preventing NPCs from breaking doors easly when shooting).\n</text>
+	</string>
+</string_table>

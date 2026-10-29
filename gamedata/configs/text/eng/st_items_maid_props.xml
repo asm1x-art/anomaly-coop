@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	
+	<string id="st_use_stove">
+		<text>Use Stove</text>
+	</string>
+	
+	<string id="st_prop_laptop_item">
+		<text>Laptop</text>
+	</string>
+	<string id="st_prop_laptop_item_descr">
+		<text>
+			A very sofisticated and modern laptop. Quite surprising in the Zone. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n				
+		</text>
+	</string>
+
+	<string id="st_prop_bed_1">
+		<text>Rollable bed</text>
+	</string>
+	<string id="st_prop_bed_1_descr">
+		<text>
+			A simple mattress and a blanket, lightweight and portable. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+			%c[d_orange] • %c[ui_gray_2] usable for sleep\n		
+		</text>
+	</string>
+
+	<string id="st_prop_bed_2">
+		<text>Metal bed</text>
+	</string>
+	<string id="st_prop_bed_2_descr">
+		<text>
+			An old rusty metal bed, with a basic mattress and a blanket. Better than sleeping on the ground. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+			%c[d_orange] • %c[ui_gray_2] usable for sleep\n				
+		</text>
+	</string>
+
+	<string id="st_prop_bed_3">
+		<text>Wooden bed</text>
+	</string>
+	<string id="st_prop_bed_3_descr">
+		<text>
+			A sturdy wooden bed. The mattress is soft and comfortable. Comes with a double set of blankets to keep you warm during cold nights. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+			%c[d_orange] • %c[ui_gray_2] usable for sleep\n		
+		</text>
+	</string>
+
+	<string id="st_prop_board_map">
+		<text>Zone map</text>
+	</string>
+	<string id="st_prop_board_map_descr">
+		<text>
+			Topographic map of the Zone. Plan out your next excursion. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+
+	<string id="st_prop_cans_tuna">
+		<text>Canned food crate</text>
+	</string>
+	<string id="st_prop_cans_tuna_descr">
+		<text>
+			A wooden crate commonly used by the merchants to display their vares. Only suitable for canned food. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] item storage\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] high capacity\n
+			%c[d_blue] • %c[d_red] can only store canned food %c[ui_gray_2] \n
+			%c[0,100,255,150] • %c[ui_gray_2] usable as stash\n	
+		</text>
+	</string>
+
+	<string id="st_prop_couch_1">
+		<text>Old sofa</text>
+	</string>
+	<string id="st_prop_couch_1_descr">
+		<text>
+			An old sofa. In a surprisingly good shape and free of radioactive particles. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+
+	<string id="st_prop_counter_1">
+		<text>Wooden counter</text>
+	</string>
+	<string id="st_prop_counter_1_descr">
+		<text>
+			A simple old wooden counter that survived the Zone's harsh enviroment, still in good shape. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+
+	<string id="st_prop_poster_vertical_item">
+		<text>Poster (Vertical)</text>
+	</string>
+	<string id="st_prop_poster_vertical_item_descr">
+		<text>
+			Simple piece of waxed paper with an image on it. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+	
+	<string id="st_prop_table_1">
+		<text>Wooden desk</text>
+	</string>
+	<string id="st_prop_table_1_descr">
+		<text>
+			A sturdy wooden desk, still in good shape. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+
+	<string id="st_prop_table_2">
+		<text>Wooden table</text>
+	</string>
+	<string id="st_prop_table_2_descr">
+		<text>
+			An average wooden table, realiable and sturdy. \n \n
+			%%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n		
+		</text>
+	</string>
+
+	<string id="st_prop_bong">
+		<text>Hookah</text>
+	</string>
+	<string id="st_prop_bong_descr">
+		<text>
+			A hookah also known as a waterpipe or arghile, is a single or multi-stemmed instrument for smoking Shisha Tobacco in which the smoke is cooled by water held in the base. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_case">
+		<text>PC case</text>
+	</string>
+	<string id="st_prop_case_descr">
+		<text>
+			An old PC case, non functional, perhaps repairable. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_chair_descr">
+		<text>Wooden chair</text>
+	</string>
+	<string id="st_prop_chair_descr">
+		<text>
+			Simple and sturdy wooden chair, has a soft seat. Comfortable enough. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_dish1">
+		<text>Ceramic plate</text>
+	</string>
+	<string id="st_prop_dish1_descr">
+		<text>
+			Ceramic plate of non-combat variety. Will serve you well on your mutant eating adventures. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_dish2">
+		<text>Ceramic bowl</text>
+	</string>
+	<string id="st_prop_dish2_descr">
+		<text>
+			Ceramic bowl, will serve you well on your mutant eating adventures. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_fan">
+		<text>Small fan</text>
+	</string>
+	<string id="st_prop_fan_descr">
+		<text>
+			Small fan, functional. Useful for those rare sunny days in the zone. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n
+			%c[d_orange] • %c[ui_gray_2] produces cool breeze when turned on\n			
+		</text>
+	</string>
+
+	<string id="st_prop_fridge">
+		<text>Old fridge</text>
+	</string>
+	<string id="st_prop_fridge_descr">
+		<text>
+			Big and heavy fridge. Helps preserve mutant meat. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] item storage\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] high capacity\n
+			%c[d_orange] • %c[ui_gray_2] mutant meat doesn't rot while in the fridge %c[ui_gray_2] \n
+			%c[0,100,255,150] • %c[ui_gray_2] usable as stash\n
+		</text>
+	</string>
+	
+	<string id="st_prop_keyboard">
+		<text>Keyboard</text>
+	</string>
+	<string id="st_prop_keyboard_descr">
+		<text>
+			An old keyboard. Has a faint yellow tint due to the passage of time. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_mice">
+		<text>Mouse</text>
+	</string>
+	<string id="st_prop_mice_descr">
+		<text>
+			Basic, old PC mouse. Uncomfortable, sluggish and heavy. Welcome back to late 90s. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_mice_pad">
+		<text>Mouse and mouse pad</text>
+	</string>
+	<string id="st_prop_mice_pad_descr">
+		<text>
+			Basic, old PC mouse. Uncomfortable, sluggish and heavy. Comes with a bunch of fabrics sewn together to give the mouse a slightly better surface. Might not be as effective as it is marketed. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_monitor">
+		<text>Monitor</text>
+	</string>
+	<string id="st_prop_monitor_descr">
+		<text>
+			An old monitor, the screen seems to be intact, could potentially work. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_mug">
+		<text>Mug</text>
+	</string>
+	<string id="st_prop_mug_descr">
+		<text>
+			A basic mug of unknown origin. While clean enough, it might give your beverages a peculiar flavor. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_stove1">
+		<text>Small stove</text>
+	</string>
+	<string id="st_prop_stove1_descr">
+		<text>
+			A small stove, functional. Was refitted by stalkers to work with all fuels. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] technological item\n
+			%c[d_blue] • %c[ui_gray_2] valuable\n
+			%c[d_orange] • %c[ui_gray_2] usable for cooking\n
+		</text>
+	</string>
+
+	<string id="st_prop_stove2">
+		<text>Large stove</text>
+	</string>
+	<string id="st_prop_stove2_descr">
+		<text>
+			Large stove, functional. Was refitted by stalkers to work with all fuels. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] technological item\n
+			%c[d_blue] • %c[ui_gray_2] valuable\n
+			%c[d_blue] • %c[ui_gray_2] high capacity (integrated)\n
+			%c[d_orange] • %c[ui_gray_2] usable for cooking\n		
+		</text>
+	</string>
+
+	<string id="st_prop_tv">
+		<text>TV</text>
+	</string>
+	<string id="st_prop_tv_descr">
+		<text>
+			An old TV that tunes in to the same single channel available in the Zone. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_shelf_1">
+		<text>Wooden shelf</text>
+	</string>
+	<string id="st_prop_shelf_1_descr">
+		<text>
+			Simple shelf, made out of wood. Common in the zone. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_shelf_2">
+		<text>Large wooden shelf</text>
+	</string>
+	<string id="st_prop_shelf_2_descr">
+		<text>
+			Sturdy wooden shelf, well preserved. Good way to organize your wares. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_green] • %c[ui_gray_2] furniture item\n			
+		</text>
+	</string>
+
+	<string id="st_prop_prop_clock_1">
+		<text>Digital clock</text>
+	</string>
+	<string id="st_prop_prop_clock_1_descr">
+		<text>
+			Brand new digital clock. A rare sight in the zone.\n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] technological item\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_orange] • %c[ui_gray_2] shows time\n
+		</text>
+	</string>
+
+	<string id="st_prop_med_case_1">
+		<text>Medical case</text>
+	</string>
+	<string id="st_prop_med_case_1_descr">
+		<text>
+			Sturdy plastic made case, with cushioning on the inside. Intended to store medical items. \n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] item storage\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] high capacity\n
+			%c[d_orange] • %c[d_red] can only store medical items %c[ui_gray_2] \n
+			%c[0,100,255,150] • %c[ui_gray_2] usable as stash\n
+		</text>
+	</string>
+
+	<string id="st_prop_lamp1">
+		<text>Small desk lamp</text>
+	</string>
+	<string id="st_prop_lamp1_descr">
+		<text>
+			Brightens your nights. \n \n
+			%c[ui_gray_3]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] technological item\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] low electric power consumption\n
+			%c[d_blue] • %c[ui_gray_2] fuel: batteries\n			
+		</text>
+	</string>
+
+	<string id="st_prop_lamp2">
+		<text>Large desk lamp</text>
+	</string>
+
+	<string id="st_prop_lamp2_descr">
+		<text>
+			Brightens your nights. \n \n
+			%c[ui_gray_3]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] technological item\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] low electric power consumption\n
+			%c[d_blue] • %c[ui_gray_2] fuel: batteries\n		
+		</text>
+	</string>
+
+	<string id="st_placeable_ammo_box">
+		<text>Ammo Box</text>
+	</string>
+	<string id="st_placeable_ammo_box_descr">
+		<text>A spacious wooden box used for storing ammo by the military. It provides a lot of space for ammo, but not suitable for anything else.\n \n
+			%c[ui_gray_1]PROPERTIES:\n
+			%c[d_blue] • %c[ui_gray_2] item storage\n
+			%c[d_blue] • %c[ui_gray_2] placeable item\n
+			%c[d_blue] • %c[ui_gray_2] high capacity\n
+			%c[d_orange] • %c[d_red] can only store ammo %c[ui_gray_2] \n
+			%c[0,100,255,150] • %c[ui_gray_2] usable as stash\n
+		</text>
+	</string>
+	
+</string_table>

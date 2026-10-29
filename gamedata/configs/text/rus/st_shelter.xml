@@ -255,4 +255,25 @@
 	<string id="st_shelter_dig_done">
 		<text>Завал разобран, проход открыт</text>
 	</string>
+	<string id="st_shelter_furniture_stashed">
+		<text>Убрано в тайник</text>
+	</string>
+	<string id="st_shelter_build_hint">
+		<text>Колесо — выбор  |  ЛКМ — поставить  |  ПКМ по мебели — в тайник  |  H — выход</text>
+	</string>
+	<string id="st_shelter_build_empty">
+		<text>В тайнике нет мебели</text>
+	</string>
+	<string id="st_shelter_item_barrel">
+		<text>Бочка</text>
+	</string>
+	<string id="st_shelter_item_barrel_descr">
+		<text>Старая железная бочка из бункера. Можно поставить в убежище.</text>
+	</string>
+	<string id="st_shelter_item_chair">
+		<text>Деревянный стул</text>
+	</string>
+	<string id="st_shelter_item_chair_descr">
+		<text>Простой деревянный стул из бункера. Можно поставить в убежище.</text>
+	</string>
 </string_table>

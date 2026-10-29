@@ -173,3 +173,64 @@ use_condition   = true
 
 ![shovel_mili]
 use_condition   = true
+
+; the bunker's own barrels and chairs as Hideout Furniture's pieces: the furnishing mode (scripts\shelter_furniture.script)
+; puts them into the stash, and they're placed back with their own look; the icons are Hideout Furniture's barrel's
+; and chair's. Its cardboard boxes come back as its own (decor_box_paper)
+[shelter_item_barrel]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\balon\bochka_close_1.ogf
+description             = st_shelter_item_barrel_descr
+inv_name                = st_shelter_item_barrel
+inv_name_short          = st_shelter_item_barrel
+icons_texture           = ui\ui_decor
+inv_grid_x              = 5
+inv_grid_y              = 2
+inv_grid_width          = 1
+inv_grid_height         = 2
+cost                    = 20
+inv_weight              = 8
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_placeable_barrel
+
+[shelter_placeable_barrel]:physic_object
+visual                  = dynamics\balon\bochka_close_1.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_barrel
+ui_texture              = ui_decor_barrel_metal
+bounding_box_size       = 0.741, 0.741, 1.089
+bounding_box_origin     = 0, 0.546, 0
+
+[shelter_item_chair]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\stul\stul_wood_01.ogf
+description             = st_shelter_item_chair_descr
+inv_name                = st_shelter_item_chair
+inv_name_short          = st_shelter_item_chair
+icons_texture           = ui\ui_maid_efp_props
+inv_grid_x              = 8
+inv_grid_y              = 8
+inv_grid_width          = 1
+inv_grid_height         = 2
+cost                    = 20
+inv_weight              = 3
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_placeable_chair
+
+[shelter_placeable_chair]:physic_object
+visual                  = dynamics\stul\stul_wood_01.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_chair
+ui_texture              = ui_efp_prop_chair
+bounding_box_size       = 0.5, 0.539, 1.029
+bounding_box_origin     = 0, 0.514, 0

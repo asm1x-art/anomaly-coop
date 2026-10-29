@@ -4,9 +4,10 @@ scripts and shaders go into this repo's gamedata; meshes, textures, sounds and a
 archives kept outside git (the game loads them from db\mods\).
   build_pack.py manifest                 which mod gives each file, where it goes, what collides with the repo
   build_pack.py code                     copy the code part into gamedata (files the repo has already: tools\gra\merge),
-                                         list it in pack_files.txt, remove what an earlier run put there and is gone
+                                         list it in the pack's file list, remove what an earlier run put there and is gone
   build_pack.py assets <stage> <out>     stage the assets under <stage>, pack them into <out>\gra_*.db
   build_pack.py header <out> [size]      rewrite the header of the archives in <out> (HEADER below), its size kept
+  --pack <name> before the command: which pack (PACKS below), the weapons by default
 """
 import os
 import shutil
@@ -82,6 +83,16 @@ EXTRA = {
 }
 
 
+# the packs: each puts its code into gamedata, listed in its own file list (another pack's files count as the repo's:
+# a file two packs have goes to tools\gra\merge), and its assets into <prefix>_*.db
+PACKS = {
+    "weapons": {"mods": MODS, "extra": EXTRA, "files": "pack_files.txt", "prefix": "gra"},
+    # the shelter's furniture: placing, moving and picking up objects in a hideout
+    "hf": {"mods": ["[Убежище] Hideout Furniture"], "extra": {}, "files": "pack_files_hf.txt", "prefix": "gra_hf"},
+}
+PACK = PACKS["weapons"]  # the one at work, --pack
+
+
 def skipped(rel):
     """files of the taken mods left out"""
     return (rel.startswith("scripts/это что такое/")  # a stray copy of MRAA's scripts; the engine doesn't read subfolders
@@ -108,7 +119,7 @@ def kind(rel):
     top = rel.split("/", 1)[0]
     if top in ("configs", "scripts", "shaders"):
         return "code"
-    if top in ("meshes", "textures", "sounds", "anims"):
+    if top in ("meshes", "textures", "sounds", "anims", "particles"):
         return "asset"
     return "other"
 
@@ -116,7 +127,7 @@ def kind(rel):
 def manifest():
     """{gamedata path (lower case, /): (mod, real path)}, later mods winning"""
     files = {}
-    for mod in MODS:
+    for mod in PACK["mods"]:
         root = os.path.join(MO2, mod, "gamedata")
         assert os.path.isdir(root), root
         for dirpath, _, names in os.walk(root):
@@ -125,24 +136,26 @@ def manifest():
                 rel = os.path.relpath(full, root).replace("\\", "/").lower()
                 if not skipped(rel):
                     files[rel] = (mod, full)
-    for rel, mod in EXTRA.items():
+    for rel, mod in PACK["extra"].items():
         full = os.path.join(MO2, mod, "gamedata", *rel.split("/"))
         assert os.path.isfile(full), full
         files[rel] = (mod, full)
     return files
 
 
-PACK_FILES = os.path.join(HERE, "pack_files.txt")  # the code files `code` put into gamedata (gamedata paths)
+def pack_files_path():
+    """the pack's code files `code` put into gamedata (gamedata paths)"""
+    return os.path.join(HERE, PACK["files"])
 
 
 def pack_files():
-    if not os.path.isfile(PACK_FILES):
+    if not os.path.isfile(pack_files_path()):
         return set()
-    return {line.strip() for line in open(PACK_FILES, encoding="utf-8") if line.strip()}
+    return {line.strip() for line in open(pack_files_path(), encoding="utf-8") if line.strip()}
 
 
 def repo_files():
-    """the repo's own gamedata files: tracked by git (or not yet), less those the pack put there"""
+    """the repo's own gamedata files: tracked by git (or not yet), less those the pack put there (another pack's count)"""
     ours = pack_files()
     out = {}
     for dirpath, _, names in os.walk(REPO_GAMEDATA):
@@ -188,7 +201,7 @@ def cmd_code():
         path = os.path.join(REPO_GAMEDATA, *rel.split("/"))
         if os.path.isfile(path):
             os.remove(path)
-    open(PACK_FILES, "w", encoding="utf-8", newline="\n").write("".join(f"{r}\n" for r in sorted(placed)))
+    open(pack_files_path(), "w", encoding="utf-8", newline="\n").write("".join(f"{r}\n" for r in sorted(placed)))
     print(f"{len(placed)} code files in gamedata, {len(files) - len(placed) - sum(kind(r) != 'code' for r in files)} to merge "
           f"by hand (tools\\gra\\merge), {len(stale)} stale removed")
 
@@ -243,7 +256,7 @@ def cmd_assets(stage, out):
     for top, items, size in groups:
         n = counters.get(top, 0)
         counters[top] = n + 1
-        name = f"gra_{top}_{n:02d}"
+        name = f"{PACK['prefix']}_{top}_{n:02d}"
         folder = os.path.join(stage, name)
         if os.path.isdir(folder):
             shutil.rmtree(folder)
@@ -259,6 +272,9 @@ def cmd_assets(stage, out):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[1] == "--pack":
+        PACK = PACKS[sys.argv[2]]
+        del sys.argv[1:3]
     cmd = sys.argv[1] if len(sys.argv) > 1 else "manifest"
     if cmd == "manifest":
         cmd_manifest()

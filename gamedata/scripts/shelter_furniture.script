@@ -1,0 +1,301 @@
+-- The shelter's furniture (docs/coop/shelter.md): Hideout Furniture (tools\gra, its pack "hf") works with the shelter's
+-- stash instead of the backpack, which can't carry much. A piece lying in the stash is placed right from it: from the
+-- furnishing mode's panel (H in the shelter) or its "Place" in the stash's window. A piece picked up in the shelter
+-- goes into the stash, and so do the bunker's own barrels, cardboard boxes and chairs in the furnishing mode.
+
+local LEVEL = "bunker_a1"
+local KEY = DIK_keys.DIK_H -- the furnishing mode on and off
+local CELLS = 7 -- the panel's cells
+
+-- the bunker's own pieces (the level's physic objects) by visual: the item each goes into the stash as
+local PIECES = {
+	["dynamics\\box\\box_paper"] = "decor_box_paper",
+	["dynamics\\balon\\bochka_close_1"] = "shelter_item_barrel",
+	["dynamics\\stul\\stul_wood_01"] = "shelter_item_chair",
+}
+
+-- the shelter's stash (scripts\shelter.script spawns it), while it exists
+local function stash()
+	local id = load_var(db.actor, "shelter_stash_id", nil)
+	return id and alife_object(id)
+end
+
+local function placeable(obj)
+	return obj and SYS_GetParam(0, obj:section(), "use1_functor") == "placeable_furniture.place_item"
+end
+
+local panel -- the furnishing mode's panel while it's on
+
+-- a message: in the panel's title while it's shown (the usual one would be under it)
+local function msg(id)
+	if panel then
+		panel:Status(game.translate_string(id))
+	else
+		actor_menu.set_msg(1, game.translate_string(id), 3)
+	end
+end
+
+-- ui_inventory offers an item's use1 ("Place" for furniture) in the backpack only; in the stash's window it's offered
+-- for the stash's furniture too
+local function in_stash_window(ui, obj, i)
+	local box = stash()
+	return i == 1 and ui.mode == "loot" and box and ui.npc_id == box.id and placeable(ui:CheckItem(obj, "shelter_furniture"))
+end
+
+local mode_custom = ui_inventory.UIInventory.Mode_Custom
+ui_inventory.UIInventory.Mode_Custom = function(self, obj, bag, temp, i)
+	return mode_custom(self, obj, bag, temp, i) or in_stash_window(self, obj, i)
+end
+
+local cont_custom = ui_inventory.UIInventory.Cont_Custom
+ui_inventory.UIInventory.Cont_Custom = function(self, obj, bag, temp, i)
+	return cont_custom(self, obj, bag, temp, i) or (bag == "npc_bag" and in_stash_window(self, obj, i))
+end
+
+-- picked up in the shelter: the item into the stash (bind_hf_base's pickup otherwise, which gives it to the actor)
+local pickup = bind_hf_base.hf_binder_wrapper.pickup
+bind_hf_base.hf_binder_wrapper.pickup = function(self)
+	local box = level.name() == LEVEL and stash()
+	if not box then
+		return pickup(self)
+	end
+	local item_section = ini_sys:r_string_ex(self.object:section(), "item_section")
+	alife_create_item(item_section, box, { cond = self.fuel })
+	hf_obj_manager.cleanup_data(self.object:id())
+	alife_release(self.object)
+	msg("st_shelter_furniture_stashed")
+	return true
+end
+
+-----------------------------------------------------------------------------------------------------------------------
+-- The furnishing mode: a panel of the stash's furniture at the bottom of the screen. The wheel picks a piece, the left
+-- button places it (Hideout Furniture's placing: F puts it down, Esc cancels), the right button puts the piece of
+-- furniture looked at into the stash; H or Esc leaves the mode.
+
+local mode = false
+local entries = {} -- the stash's furniture by kind, by name: { section, name, ids }
+local selected = 1
+local was_placing = false
+
+local function stash_furniture()
+	local se = stash()
+	local box = se and level.object_by_id(se.id)
+	local by_section, list = {}, {}
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			if placeable(item) then
+				local sec = item:section()
+				local e = by_section[sec]
+				if not e then
+					e = { section = sec, name = game.translate_string(ini_sys:r_string_ex(sec, "inv_name") or sec), ids = {} }
+					by_section[sec] = e
+					list[#list + 1] = e
+				end
+				e.ids[#e.ids + 1] = item:id()
+			end
+		end, box)
+	end
+	table.sort(list, function(a, b) return a.name < b.name end)
+	return list
+end
+
+class "UIShelterBuild" (CUIScriptWnd)
+
+function UIShelterBuild:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_shelter_build.xml")
+	self.panel = xml:InitFrame("panel", self) -- a frame of pieces (ui_icons_PDA_dialog_b, _back, ...)
+	self.title = xml:InitTextWnd("panel:title", self.panel)
+	self.hint = xml:InitTextWnd("panel:hint", self.panel)
+	self.hint:SetText(game.translate_string("st_shelter_build_hint"))
+	self.cells = {}
+	for i = 1, CELLS do
+		local cell = xml:InitStatic("panel:cell", self.panel)
+		self.cells[i] = { cell = cell, area = xml:InitStatic("panel:cell:icon_area", cell),
+			icon = xml:InitStatic("panel:cell:icon", cell), count = xml:InitTextWnd("panel:cell:count", cell) }
+	end
+	self:Refresh()
+end
+
+function UIShelterBuild:Refresh()
+	local first = math.max(1, math.min(selected - math.floor(CELLS / 2), #entries - CELLS + 1))
+	local shown = math.min(#entries, CELLS)
+	local x0 = (self.panel:GetWidth() - shown * 104 + 4) / 2 -- the cells shown, centred
+	for i, c in ipairs(self.cells) do
+		c.cell:SetWndPos(vector2():set(x0 + (i - 1) * 104, 40))
+		local e = entries[first + i - 1]
+		c.cell:Show(e ~= nil)
+		if e then
+			utils_xml.set_icon(e.section, first + i - 1 ~= selected, c.area, c.icon)
+			c.count:SetText(#e.ids > 1 and ("x" .. #e.ids) or "")
+		end
+	end
+	if self.status_until then
+		return -- the message stays for its time
+	end
+	local e = entries[selected]
+	self.title:SetText(e and string.format("%s  x%d", e.name, #e.ids) or game.translate_string("st_shelter_build_empty"))
+end
+
+function UIShelterBuild:Status(text)
+	self.status_until = time_global() + 2000
+	self.title:SetText(text)
+end
+
+function UIShelterBuild:Update()
+	CUIScriptWnd.Update(self)
+	if self.status_until and time_global() > self.status_until then
+		self.status_until = nil
+		self:Refresh()
+	end
+end
+
+local function refresh()
+	entries = stash_furniture()
+	selected = math.max(1, math.min(selected, #entries))
+	if panel then
+		panel:Refresh()
+	end
+end
+
+local function set_mode(on)
+	mode = on
+	if on then
+		db.actor:activate_slot(0)
+		refresh()
+		if not panel then
+			panel = UIShelterBuild()
+			get_hud():AddDialogToRender(panel)
+		end
+	elseif panel then
+		get_hud():RemoveDialogToRender(panel)
+		panel = nil
+	end
+end
+
+local function placing()
+	return placeable_furniture.in_placing_state()
+end
+
+local function place_selected()
+	local e = entries[selected]
+	local item = e and level.object_by_id(e.ids[1])
+	if item then
+		placeable_furniture.func_place_item(item)
+	end
+end
+
+-- the piece looked at into the stash: Hideout Furniture's (its pickup, into the stash in the shelter) or the bunker's own
+local function stash_looked_at()
+	local obj = placeable_furniture.get_obj_at_crosshair()
+	if not obj then
+		return
+	end
+	local binder = obj:binded_object()
+	local wrapper = binder and binder.wrapper
+	if wrapper then
+		if wrapper:is_pickupable() then
+			wrapper:pickup()
+		end
+	else
+		local item = PIECES[string.lower(obj:get_visual_name() or "")]
+		if not item then
+			return
+		end
+		alife_create_item(item, stash())
+		alife_release_id(obj:id())
+		msg("st_shelter_furniture_stashed")
+	end
+	CreateTimeEvent("shelter_furniture", "refresh", 0.2, function()
+		refresh()
+		return true
+	end)
+end
+
+local function on_key_press(dik)
+	if dik ~= KEY then
+		return
+	end
+	if mode then
+		if not placing() then
+			set_mode(false)
+		end
+	elseif level.name() == LEVEL and stash() and not Check_UI() then
+		set_mode(true)
+	end
+end
+
+local function mouse_button(bind)
+	return bind == key_bindings.kWPN_FIRE or bind == key_bindings.kWPN_ZOOM
+end
+
+-- while the mode is on the mouse buttons are its own, placing included (no shooting, aiming, or the weapon drawn by
+-- firing with empty hands, which the button's release does); Esc leaves it
+local function on_before_key_press(dik, bind, dis, flags)
+	if not mode or Check_UI() then
+		return
+	end
+	if mouse_button(bind) then
+		flags.ret_value = false
+		if placing() then
+			return
+		elseif bind == key_bindings.kWPN_FIRE then
+			place_selected()
+		else
+			stash_looked_at()
+		end
+	elseif bind == key_bindings.kQUIT and not placing() then
+		flags.ret_value = false
+		set_mode(false)
+	end
+end
+
+local function on_before_key_other(dik, bind, dis, flags)
+	if mode and mouse_button(bind) then
+		flags.ret_value = false
+	end
+end
+
+-- ... and the wheel picks the piece (no weapon switching)
+local function on_mouse_wheel(dir, flags)
+	if not mode or placing() then
+		return
+	end
+	flags.ret_value = false
+	if #entries > 0 then
+		selected = (selected - 1 + (dir == 1 and -1 or 1)) % #entries + 1
+		panel:Refresh()
+	end
+end
+
+local function actor_on_update()
+	if not mode then
+		return
+	end
+	if level.name() ~= LEVEL then
+		set_mode(false)
+		return
+	end
+	local now = placing()
+	if was_placing and not now then
+		refresh() -- placed or cancelled: the stash changed
+	end
+	was_placing = now
+	if panel then
+		panel:Show(not now) -- Hideout Furniture's own hints while placing
+	end
+	if db.actor:active_slot() ~= 0 then
+		db.actor:activate_slot(0)
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_key_press", on_key_press)
+	RegisterScriptCallback("on_before_key_press", on_before_key_press)
+	RegisterScriptCallback("on_before_key_hold", on_before_key_other)
+	RegisterScriptCallback("on_before_key_release", on_before_key_other)
+	RegisterScriptCallback("on_mouse_wheel", on_mouse_wheel)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end
