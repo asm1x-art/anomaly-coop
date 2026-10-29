@@ -9,6 +9,32 @@ local scopes_on
 -- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (its user.ltx): with the
 -- vanilla 0.45 hands and guns sit in the face. Set once per game the same way.
 local hud_fov_set
+-- A scope with a second sight (an ACOG's, a Razor HD's alternative aim) switches on the engine's wpn_func (V here); GRA
+-- had Alt with the aim button for it, so it's that too: Alt while aiming changes the sight; Alt + the aim button from
+-- the hip takes the other sight and aims through it.
+local function switch_sight()
+	local func = bind_to_dik(key_bindings.kWPN_FUNC)
+	level.press_action(func)
+	level.release_action(func)
+end
+
+local function on_before_key_press(key, bind, dis, flags)
+	local wpn = db.actor:active_item()
+	if not (wpn and IsWeapon(wpn) and actor_menu.is_hud_free()) then
+		return
+	end
+	if key == DIK_keys.DIK_LMENU or key == DIK_keys.DIK_RMENU then
+		if axr_main.weapon_is_zoomed then
+			switch_sight()
+		end
+	elseif bind == key_bindings.kWPN_ZOOM and ui_mcm.get_mod_key(3) then
+		if axr_main.weapon_is_zoomed then
+			flags.ret_value = false -- toggled aiming: Alt has changed the sight already, the aim stays
+		else
+			switch_sight()
+		end
+	end
+end
 
 function actor_on_first_update()
 	if not scopes_on then
@@ -35,4 +61,5 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("save_state", save_state)
 	RegisterScriptCallback("load_state", load_state)
+	RegisterScriptCallback("on_before_key_press", on_before_key_press)
 end

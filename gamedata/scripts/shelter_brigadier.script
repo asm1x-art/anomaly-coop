@@ -14,7 +14,8 @@ local CONDITION = 0.95 -- their gear off their bodies: they kept it in order
 -- as it drops, the rest
 local GEAR = {
 	shelter_zombie_nosorog = { state = "brigadier_gear", outfit = OUTFIT, weapon = "wpn_m4_tac_brigadier",
-		addons = { "acog", "wpn_sil_surfire" }, items = {} }, -- MAS's ACOG, the Surefire silencer
+		addons = { "razorhd", "wpn_sil_surfire" }, items = {} }, -- the Razor HD (1-6x, an alternative sight), the Surefire
+		-- silencer
 	shelter_zombie_seva = { state = "chemist_gear", outfit = "shelter_chemist_outfit", weapon = "wpn_krissvektor_chemist",
 		addons = { "eot", "wpn_sil_45" }, -- an EOTech, the .45 silencer
 		items = { "detector_scientific", "ammo_11.43x23_hydro", "ammo_11.43x23_hydro" } }, -- the Svarog, expansive rounds
