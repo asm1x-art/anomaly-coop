@@ -26,8 +26,9 @@ local LAMPS = {
 -- the first visit's occupants: aggressive to players as their kinds are
 local OCCUPANTS = {
 	{ section = "shelter_zombie_nosorog", pos = vector():set(2.0, 2.95, -10.0), -- the lower hall: the note, the flash drive
-		items = { "shelter_note", "shelter_flash" } },
-	{ section = "shelter_zombie_seva", pos = vector():set(-3.89, 2.95, -1.67) }, -- the passage by the laptop's room
+		items = { "shelter_note", "shelter_flash", "shelter_pda_brigadier" } },
+	{ section = "shelter_zombie_seva", pos = vector():set(-3.89, 2.95, -1.67), -- the passage by the laptop's room
+		items = { "shelter_pda_chemist" } },
 	{ section = "m_controller_normal", pos = vector():set(16.56, 1.32, -10.94) }, -- the water hall, point 5
 }
 local LAPTOP = {
@@ -373,6 +374,46 @@ function UIShelterNote:OnKeyboard(dik, keyboard_action)
 		self:Close()
 	end
 	return res
+end
+
+----------------------------------------------------------------------------------------------------
+-- The occupants' PDAs: broken screens, but their data can be unloaded into the actor's PDA (in its slot): their notes
+-- show in its Base tab (ui_pda_shelter_base.script). The info that gives them is a shelter_ one: in co-op the group's.
+
+local UPLOAD = { seconds = 6, steps = 6 }
+local uploading = false
+
+function pda_menu(obj)
+	local p = obj:parent()
+	return p and p:id() == AC_ID and game.translate_string("st_shelter_pda_upload") or nil
+end
+
+function pda_upload(obj)
+	local info = SYS_GetParam(0, obj:section(), "shelter_notes")
+	if uploading then
+		return
+	elseif has_alife_info(info) then
+		return msg("st_shelter_pda_uploaded_already")
+	elseif not db.actor:item_in_slot(8) then
+		return msg("st_shelter_pda_no_pda")
+	end
+	hide_hud_inventory()
+	uploading = true
+	local step = 0
+	actor_menu.set_msg(1, string.format(game.translate_string("st_shelter_pda_uploading"), 0), 3)
+	CreateTimeEvent("shelter", "pda_upload", UPLOAD.seconds / UPLOAD.steps, function()
+		step = step + 1
+		if step < UPLOAD.steps then
+			actor_menu.set_msg(1, string.format(game.translate_string("st_shelter_pda_uploading"), math.floor(step * 100 / UPLOAD.steps)), 3)
+			ResetTimeEvent("shelter", "pda_upload", UPLOAD.seconds / UPLOAD.steps)
+			return false
+		end
+		uploading = false
+		give_info(info)
+		xr_sound.set_sound_play(AC_ID, "pda_tips")
+		actor_menu.set_msg(1, game.translate_string("st_shelter_pda_uploaded"), 8)
+		return true
+	end)
 end
 
 function note_menu(obj)
@@ -1010,7 +1051,7 @@ local function spawn_desk()
 	end
 end
 
--- the controller and the zombies, the note and the flash drive on the one in the Nosorog suit
+-- the controller and the zombies, the note, the flash drive and their PDAs on them
 local function spawn_occupants()
 	local gvid = db.actor:game_vertex_id()
 	for _, o in ipairs(OCCUPANTS) do
@@ -1025,6 +1066,30 @@ local function spawn_occupants()
 		end
 	end
 	set_state("occupants", true)
+	set_state("pdas", true)
+end
+
+-- a game whose occupants came before their PDAs did: each on its zombie if it's alive, in the stash otherwise
+local function give_pdas()
+	local stash = alife_object(state("stash_id", 65535))
+	for _, o in ipairs(OCCUPANTS) do
+		for _, item in ipairs(o.items or {}) do
+			if string.find(item, "^shelter_pda_") then
+				local owner = stash
+				for id = 1, 65534 do
+					local se = alife():object(id)
+					if se and se:section_name() == o.section and se:alive() then
+						owner = se
+						break
+					end
+				end
+				if owner then
+					alife_create_item(item, owner)
+				end
+			end
+		end
+	end
+	set_state("pdas", true)
 end
 
 -- what the shelter gets on the first visit (each part once for the world), and the cleaned zones' heaps taken out
@@ -1057,6 +1122,8 @@ local function first_update()
 	once("mounds", place_mounds)
 	if not state("occupants", false) then
 		once("occupants", spawn_occupants)
+	elseif not state("pdas", false) and state("stash_id", nil) then
+		once("pdas", give_pdas)
 	end
 	for zone in pairs(CLEAN.zones) do
 		if zone_cleaned(zone) then

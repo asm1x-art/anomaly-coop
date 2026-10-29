@@ -328,7 +328,7 @@
 		<text>The Brigadier's M4 Tactical</text>
 	</string>
 	<string id="st_shelter_brigadier_m4_descr">
-		<text>The M4 Tactical carbine the Brigadier carried. Upgraded to the limit and well kept: it wears down from firing half as fast as an upgraded ordinary one. Any fitting scope goes onto its Picatinny rail; the Surefire silencer comes off.</text>
+		<text>The M4 Tactical carbine the Brigadier carried. Upgraded to the limit and well kept: it wears down from firing half as fast as an upgraded ordinary one, and the Chemist made it a quarter lighter. Any fitting scope goes onto its Picatinny rail; the Surefire silencer comes off.</text>
 	</string>
 	<string id="st_shelter_visor_on">
 		<text>Anomaly visor on</text>
@@ -338,5 +338,38 @@
 	</string>
 	<string id="st_shelter_needs_group">
 		<text>The shelter is a group's: form a group with your friends, then the note gives the tasks.</text>
+	</string>
+	<string id="st_shelter_pda_brigadier_name">
+		<text>The Brigadier's PDA</text>
+	</string>
+	<string id="st_shelter_pda_chemist_name">
+		<text>The Chemist's PDA</text>
+	</string>
+	<string id="st_shelter_pda_broken_descr">
+		<text>A PDA with a broken screen. It won't switch on, but its memory seems intact. In theory its data could be unloaded into your own.</text>
+	</string>
+	<string id="st_shelter_pda_upload">
+		<text>Unload the data</text>
+	</string>
+	<string id="st_shelter_pda_no_pda">
+		<text>Nowhere to unload it: your own PDA must be in its slot.</text>
+	</string>
+	<string id="st_shelter_pda_uploading">
+		<text>Unloading the data into your PDA... %s%%</text>
+	</string>
+	<string id="st_shelter_pda_uploaded">
+		<text>Data unloaded: your PDA has a Base tab now.</text>
+	</string>
+	<string id="st_shelter_pda_uploaded_already">
+		<text>This data is unloaded already.</text>
+	</string>
+	<string id="st_shelter_pda_base">
+		<text>Base</text>
+	</string>
+	<string id="st_shelter_notes_brigadier">
+		<text>The Brigadier's notes</text>
+	</string>
+	<string id="st_shelter_notes_chemist">
+		<text>The Chemist's archive</text>
 	</string>
 </string_table>

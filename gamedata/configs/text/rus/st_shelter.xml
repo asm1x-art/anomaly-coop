@@ -328,7 +328,7 @@
 		<text>M4 Tactical Бригадира</text>
 	</string>
 	<string id="st_shelter_brigadier_m4_descr">
-		<text>Карабин M4 Тактический, с которым ходил Бригадир. Прокачан до предела и ухожен: изнашивается при стрельбе вдвое медленнее прокачанного обычного. На планку Пикатинни встаёт любой подходящий прицел, глушитель Surefire съёмный.</text>
+		<text>Карабин M4 Тактический, с которым ходил Бригадир. Прокачан до предела и ухожен: изнашивается при стрельбе вдвое медленнее прокачанного обычного, а Химик облегчил его на четверть. На планку Пикатинни встаёт любой подходящий прицел, глушитель Surefire съёмный.</text>
 	</string>
 	<string id="st_shelter_visor_on">
 		<text>Визор аномалий включён</text>
@@ -338,5 +338,38 @@
 	</string>
 	<string id="st_shelter_needs_group">
 		<text>Убежище — дело группы: соберите группу с друзьями, тогда записка даст задания.</text>
+	</string>
+	<string id="st_shelter_pda_brigadier_name">
+		<text>ПДА Бригадира</text>
+	</string>
+	<string id="st_shelter_pda_chemist_name">
+		<text>ПДА Химика</text>
+	</string>
+	<string id="st_shelter_pda_broken_descr">
+		<text>ПДА с разбитым экраном. Сам не включается, но память, похоже, цела. В теории можно попробовать выгрузить информацию себе.</text>
+	</string>
+	<string id="st_shelter_pda_upload">
+		<text>Выгрузить информацию</text>
+	</string>
+	<string id="st_shelter_pda_no_pda">
+		<text>Не во что выгружать: нужен свой ПДА в слоте.</text>
+	</string>
+	<string id="st_shelter_pda_uploading">
+		<text>Передача данных в ваш ПДА... %s%%</text>
+	</string>
+	<string id="st_shelter_pda_uploaded">
+		<text>Данные выгружены: в ПДА появился раздел «База».</text>
+	</string>
+	<string id="st_shelter_pda_uploaded_already">
+		<text>Эти данные уже выгружены.</text>
+	</string>
+	<string id="st_shelter_pda_base">
+		<text>База</text>
+	</string>
+	<string id="st_shelter_notes_brigadier">
+		<text>Заметки Бригадира</text>
+	</string>
+	<string id="st_shelter_notes_chemist">
+		<text>Архив Химика</text>
 	</string>
 </string_table>

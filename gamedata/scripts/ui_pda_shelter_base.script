@@ -1,0 +1,157 @@
+-- The PDA's Base tab (pda_dynamic_tabs.script, right after the map's): the notes unloaded from the shelter's
+-- occupants' broken PDAs (shelter.pda_upload), each PDA's under its own heading. The tab is there once any are; its
+-- notes are string tables' (configs\text\*\st_shelter_notes.xml, tools\shelter\notes_to_xml.py).
+
+-- whose notes, the info their unloading gave, and the numbers of the notes
+local SOURCES = {
+	{ key = "brigadier", info = "shelter_notes_brigadier", title = "st_shelter_notes_brigadier", from = 1, to = 10 },
+	{ key = "chemist", info = "shelter_notes_chemist", title = "st_shelter_notes_chemist", from = 0, to = 8 },
+}
+local HEADING_COLOR = { 255, 230, 200, 120 }
+local NOTE_COLOR = { 255, 210, 210, 210 }
+local ROW = { min = 22, pad = 6, left = 4 } -- a row's least height, the room around its title, its title's indent
+local SINGLETON = nil
+
+function get_ui()
+	SINGLETON = SINGLETON or pda_shelter_base_tab()
+	SINGLETON:Reset()
+	return SINGLETON
+end
+
+-- a row of the list as tall as its title, wrapped at the row's width, needs
+class "shelter_base_row" (CUIListBoxItem)
+
+function shelter_base_row:__init(height, width, text, color) super(height)
+	local t = self:GetTextItem()
+	t:SetWndRect(Frect():set(ROW.left, ROW.pad / 2, width - ROW.left, height - ROW.pad / 2))
+	t:SetFont(GetFontLetterica16Russian())
+	t:SetTextComplexMode(true)
+	t:SetText(text)
+	self:SetTextColor(GetARGB(unpack(color)))
+end
+
+local function any_notes()
+	for _, s in ipairs(SOURCES) do
+		if has_alife_info(s.info) then
+			return true
+		end
+	end
+	return false
+end
+
+class "pda_shelter_base_tab" (CUIScriptWnd)
+
+function pda_shelter_base_tab:__init() super()
+	self.rows = {} -- the list's rows: { source = i } for a heading, { id = the note's string id } for a note
+	self.collapsed = {} -- source index -> its notes hidden
+	self:InitControls()
+end
+
+function pda_shelter_base_tab:__finalize()
+end
+
+function pda_shelter_base_tab:InitControls()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("pda_shelter_base.xml")
+	xml:InitFrame("frame", self)
+	xml:InitTextWnd("caption", self)
+	xml:InitFrame("frame_list", self)
+	self.list = xml:InitListBox("list", self)
+	self.list:ShowSelectedItem(true)
+	xml:InitFrame("frame_text", self)
+	self.title = xml:InitTextWnd("title", self)
+	self.scroll = xml:InitScrollView("scroll", self)
+	self.text = xml:InitTextWnd("text", nil)
+	self.text:SetAutoDelete(false)
+	self.measure = xml:InitTextWnd("measure", nil)
+	self.measure:SetAutoDelete(false)
+	self.measure:SetWndSize(vector2():set(self.list:GetWidth() - 2 * ROW.left, 1)) -- a row's title's width
+end
+
+function pda_shelter_base_tab:AddRow(text, color, row)
+	self.measure:SetText(text)
+	self.measure:AdjustHeightToText()
+	local height = math.max(ROW.min, self.measure:GetHeight() + ROW.pad)
+	-- the list makes every row added its item height: this one's for the moment
+	self.list:SetItemHeight(height)
+	self.list:AddExistingItem(shelter_base_row(height, self.list:GetWidth(), text, color))
+	self.list:SetItemHeight(ROW.min)
+	self.rows[#self.rows + 1] = row
+end
+
+-- the list again: each source unloaded, its heading (a click folds its notes away or back) and notes
+function pda_shelter_base_tab:Fill()
+	self.list:RemoveAll()
+	self.rows = {}
+	for i, s in ipairs(SOURCES) do
+		if has_alife_info(s.info) then
+			local sign = self.collapsed[i] and "+ " or "- "
+			self:AddRow(sign .. game.translate_string(s.title), HEADING_COLOR, { source = i })
+			if not self.collapsed[i] then
+				for n = s.from, s.to do
+					local id = "st_shelter_note_" .. s.key .. "_" .. n
+					self:AddRow(game.translate_string(id .. "_title"), NOTE_COLOR, { id = id })
+				end
+			end
+		end
+	end
+	self.picked = self.list:GetSelectedIndex()
+end
+
+-- the list, the first note shown
+function pda_shelter_base_tab:Reset()
+	self:Fill()
+	self:ShowNote(self.rows[2] and self.rows[2].id)
+end
+
+function pda_shelter_base_tab:ShowNote(id)
+	self.shown = id
+	self.title:SetText(id and game.translate_string(id .. "_title") or "")
+	self.text:SetText(id and game.translate_string(id .. "_text") or "")
+	self.text:AdjustHeightToText()
+	self.text:SetWndSize(vector2():set(self.text:GetWidth(), self.text:GetHeight() + 10))
+	self.scroll:Clear()
+	self.scroll:AddWindow(self.text, true)
+	self.text:SetAutoDelete(false)
+	self.scroll:ScrollToBegin()
+end
+
+-- a row clicked: a heading folds or unfolds its source, a note is shown
+function pda_shelter_base_tab:Update()
+	CUIScriptWnd.Update(self)
+	local index = self.list:GetSelectedIndex()
+	if index == self.picked then
+		return
+	end
+	self.picked = index
+	local row = self.rows[index + 1]
+	if row and row.source then
+		self.collapsed[row.source] = not self.collapsed[row.source]
+		self:Fill()
+	elseif row and row.id ~= self.shown then
+		self:ShowNote(row.id)
+	end
+end
+
+local tab = nil -- our tab's id, once registered
+local check_at = 0
+
+-- the tab, once there are notes for it (unloaded here, or by a group's member in co-op)
+local function actor_on_update()
+	local now = time_global()
+	if tab or now < check_at then
+		return
+	end
+	check_at = now + 2000
+	if any_notes() then
+		tab = pda_dynamic_tabs.register("st_shelter_pda_base", get_ui, "eptTasks")
+	end
+end
+
+function on_game_start()
+	if not (pda_dynamic_tabs and CUITabControl and CUITabControl.AddTab) then
+		return -- no PDA tabs of mods
+	end
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end

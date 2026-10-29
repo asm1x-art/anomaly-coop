@@ -1,0 +1,32 @@
+<w>
+	<!-- The PDA's Base tab (ui_pda_shelter_base.script): the notes unloaded from the shelter's occupants' PDAs, in the
+	     content area the other PDA tabs use; the notes on the left, the one chosen on the right -->
+	<frame x="28" y="41" width="764" height="667" stretch="1">
+		<texture>ui_inGame2_pda_buttons_background</texture>
+	</frame>
+	<caption x="28" y="56" width="764" height="27" stretch="1">
+		<text font="letterica18" align="c" r="170" g="170" b="170">st_shelter_pda_base</text>
+	</caption>
+
+	<frame_list x="44" y="92" width="280" height="602" stretch="1">
+		<texture>ui_inGame2_servers_list_frame</texture>
+	</frame_list>
+	<list x="48" y="96" width="272" height="594" item_height="22" can_select="1" stretch="1">
+		<font font="letterica16" r="210" g="210" b="210"/>
+	</list>
+	<!-- not shown: a list row's title laid out at the row's width (set by the script), for the row's height (long titles wrap) -->
+	<measure width="252" height="1">
+		<text font="letterica16" complex_mode="1" align="l" vert_align="t"/>
+	</measure>
+
+	<frame_text x="332" y="92" width="446" height="602" stretch="1">
+		<texture>ui_inGame2_servers_list_frame</texture>
+	</frame_text>
+	<title x="342" y="98" width="426" height="24" stretch="1">
+		<text font="letterica18" align="l" vert_align="c" r="230" g="200" b="120"/>
+	</title>
+	<scroll x="336" y="126" width="438" height="564" right_ident="0" left_ident="0" top_indent="0" bottom_indent="0" vert_interval="0" always_show_scroll="0"/>
+	<text width="418" height="1">
+		<text font="letterica16" complex_mode="1" align="l" vert_align="t" x="6" y="4" r="210" g="210" b="210"/>
+	</text>
+</w>

@@ -70,6 +70,27 @@ inv_weight      = 0.05
 quest_item      = true
 shelter_keep    = true
 
+; The occupants' PDAs, their screens broken: "Unload the data" (shelter.script) puts their notes into the actor's
+; PDA, its Base tab (ui_pda_shelter_base.script); the PDA stays (for a technician to mend, later)
+[shelter_pda_brigadier]:tch_quest
+visual          = dynamics\devices\dev_pda\dev_pda.ogf
+inv_name        = st_shelter_pda_brigadier_name
+inv_name_short  = st_shelter_pda_brigadier_name
+description     = st_shelter_pda_broken_descr
+inv_grid_x      = 4
+inv_grid_y      = 27
+inv_weight      = 0.3
+quest_item      = true
+shelter_keep    = true
+shelter_notes   = shelter_notes_brigadier ; the info its data gives
+use1_functor        = shelter.pda_menu
+use1_action_functor = shelter.pda_upload
+
+[shelter_pda_chemist]:shelter_pda_brigadier
+inv_name        = st_shelter_pda_chemist_name
+inv_name_short  = st_shelter_pda_chemist_name
+shelter_notes   = shelter_notes_chemist
+
 ; Sakharov's samples for Sidorovich
 [shelter_af_container]:tch_quest
 visual          = dynamics\equipments\quest\safe_container.ogf

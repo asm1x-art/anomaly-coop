@@ -13,13 +13,15 @@ shelter_keep              = true ; off a body the cleaning takes, into the stash
 upgrades                  = up_gr_firsta_brigadier, up_gr_secona_brigadier, up_gr_thirda_brigadier, up_gr_fourta_brigadier, up_gr_fiftha_brigadier
 installed_upgrades        = up_firsta_brigadier, up_firstc_brigadier, up_firstd_brigadier, up_firste_brigadier, up_firstf_brigadier, up_secona_brigadier, up_seconc_brigadier, up_second_brigadier, up_secone_brigadier, up_seconf_brigadier, up_thirda_brigadier, up_thirdc_brigadier, up_thirde_brigadier, up_fourta_brigadier, up_fourtc_brigadier, up_fourtd_brigadier, up_fourte_brigadier, up_fourtf_brigadier, up_fiftha_brigadier, up_fifthc_brigadier, up_fifthd_brigadier, up_fifthe_brigadier
 
-; His M4 Tactical: every upgrade installed, half the wear of an upgraded M4's (0.00045 a shot: 0.0008 less the upgrades'
-; 0.00035), MAS's scopes (an ACOG on it as it drops, with the Surefire silencer)
+; His M4 Tactical, a quarter lighter by the Chemist's work: every upgrade installed, half the wear of an upgraded
+; M4's (0.00045 a shot: 0.0008 less the upgrades' 0.00035), MAS's scopes (an ACOG on it as it drops, with the
+; Surefire silencer)
 [wpn_m4_tac_brigadier]:wpn_m4_tac
 parent_section            = wpn_m4_tac_brigadier
 inv_name                  = st_shelter_brigadier_m4_name
 inv_name_short            = st_shelter_brigadier_m4_name
 description               = st_shelter_brigadier_m4_descr
+inv_weight                = 1.61 ; the Chemist's lightening: 4.19 with its upgrades, ACOG and Surefire (5.58 before)
 condition_shot_dec        = 0.000575 ; 0.000225 with its upgrades
 condition_queue_shot_dec  = 0.000575
 shelter_keep              = true
