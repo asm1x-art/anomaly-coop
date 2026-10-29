@@ -1,0 +1,440 @@
+-- The Brigadier's Nosorog and M4 (configs\mod_system_shelter_brigadier.ltx, docs/coop/shelter.md): his body in the
+-- bunker drops them in good repair. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
+-- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
+-- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
+-- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
+-- slot.
+
+local OUTFIT = "shelter_brigadier_outfit"
+local MODULE = "shelter_brigadier_module"
+local HEAT = "device_torch_nv_4" -- z_heatvision's thermal device (its heat_effect)
+local M4 = "wpn_m4_tac_brigadier"
+local M4_ADDONS = { "acog", "wpn_sil_surfire" } -- on it as it drops: MAS's ACOG, the Surefire silencer
+local BRIGADIER = "shelter_zombie_nosorog" -- scripts\shelter.script's occupant
+local CONDITION = 0.95 -- his gear off his body: he kept it in order
+local HOLD = 500 -- ms N is held for the thermal vision
+local CHARGE = 1 / 3600 -- of a full charge per game second from an electric artefact: an hour for a full one
+local VISOR = { radius = 35, step = 500, drain = 0.75 } -- the anomaly visor's reach, and its power loss each step (ms)
+
+-- the anomaly visor's marks: a part of an anomaly's section -> its detector icon
+local ANOMALY_KINDS = {
+	electr = "electro", acid = "acid", studen = "acid", hvatalka = "acid", liana = "acid", gravi = "gravity",
+	therm = "fire", steam = "fire", zharka = "fire",
+	-- Arrival's anomalies
+	umbra = "gravity", ghost = "electro", gold = "acid", flash = "acid", sloth = "acid", mefistotel = "electro",
+	net = "electro", point = "electro", cdf = "gravity", sphere = "gravity", electra = "electro", springboard = "gravity",
+	vortex = "gravity", blast = "gravity", vapour = "fire", seed = "gravity", thorn = "gravity", shatterpoint = "gravity",
+}
+
+local electric -- the electric artefacts' sections (items\settings\artefacts.ltx [af_class_electro])
+
+local function is_electric(sec)
+	if not electric then
+		electric = {}
+		local ini = ini_file("items\\settings\\artefacts.ltx")
+		for i = 0, ini:line_count("af_class_electro") - 1 do
+			local _, id = ini:r_line_ex("af_class_electro", i, "", "")
+			electric[id] = true
+		end
+	end
+	-- one in an applied module (af_*_af_aam and the like) is of its artefact's kind
+	return electric[sec] or electric[(string.gsub(sec, "_af_%a+$", ""))] or false
+end
+
+local function worn()
+	local outfit = db.actor:item_in_slot(7)
+	return outfit and outfit:section() == OUTFIT and outfit or nil
+end
+
+local power, power_at = false, 0
+
+-- an electric artefact on the belt of the outfit (checked once a second)
+local function powered()
+	if not worn() then
+		return false
+	end
+	local now = time_global()
+	if now >= power_at then
+		power_at = now + 1000
+		power = false
+		db.actor:iterate_belt(function(owner, obj)
+			power = power or is_electric(obj:section())
+		end)
+	end
+	return power
+end
+
+local function module()
+	return db.actor:object(MODULE)
+end
+
+local function charge_var(outfit_id)
+	return "shelter_brigadier_charge_" .. outfit_id
+end
+
+local function charged(m)
+	return m and item_device.is_device_charged(m)
+end
+
+-------------------------------------------------------------------------------
+-- the visions
+
+local thermal = false
+
+local function thermal_off()
+	if not thermal then
+		return
+	end
+	thermal = false
+	if item_device.is_nv_active() then
+		z_heatvision.set_heatvision_simple(HEAT, false)
+	else -- the night vision under it went off (no power): its shader with it
+		get_console():execute("r__heatvision 0")
+		z_heatvision.set_nightvision_HUD(false)
+	end
+end
+
+-- N: the Oracle on and off; the thermal vision off
+local function night_vision()
+	if thermal then
+		thermal_off()
+	elseif item_device.is_nv_active() then
+		item_device.set_nightvision(MODULE, false)
+	elseif charged(module()) then
+		item_device.set_nightvision(MODULE, true)
+	end
+end
+
+-- N held: the thermal vision on, or back to the Oracle
+local function thermal_vision()
+	if thermal then
+		thermal_off()
+		item_device.set_nightvision(MODULE, true)
+	elseif charged(module()) then
+		if item_device.is_nv_active() then
+			item_device.set_nightvision(MODULE, false)
+		end
+		z_heatvision.set_heatvision_simple(HEAT, true)
+		thermal = item_device.is_nv_active()
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the anomaly visor: the anomalies around marked on the screen by kind
+
+class "VisorHUD" (CUIScriptWnd)
+
+function VisorHUD:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	local xml = CScriptXmlInit()
+	xml:ParseFile("actor_menu.xml")
+	self.marks, self.found, self.found_at = {}, {}, 0
+	for i = 1, 40 do
+		local mark = xml:InitStatic("helmet_over", self)
+		mark:SetWndSize(vector2():set(20 * 0.75, 20))
+		mark:Show(false)
+		self.marks[i] = mark
+	end
+end
+
+function VisorHUD:Update()
+	CUIScriptWnd.Update(self)
+	local now = time_global()
+	if now >= self.found_at then
+		self.found_at = now + 1000
+		iempty_table(self.found)
+		level.iterate_nearest(db.actor:position(), VISOR.radius, function(obj)
+			if IsAnomaly(obj) then
+				for part, kind in pairs(ANOMALY_KINDS) do
+					if string.find(obj:section(), part) then
+						self.found[#self.found + 1] = { obj:id(), kind }
+						break
+					end
+				end
+			end
+		end)
+	end
+	for i, mark in ipairs(self.marks) do
+		local found = self.found[i]
+		local obj = found and level.object_by_id(found[1])
+		if obj then
+			mark:InitTexture("ui_inGame2_Detector_icon_" .. found[2] .. "_big")
+			mark:SetWndPos(vector2():set(game.world2ui(obj:position())))
+		end
+		mark:Show(obj and true or false)
+	end
+end
+
+local visor, visor_at = nil, 0
+
+local function visor_off()
+	if visor then
+		get_hud():RemoveDialogToRender(visor)
+		visor = nil
+		utils_obj.play_sound("interface\\inv_nv_off")
+	end
+end
+
+-- J: the visor on and off (said: with no anomaly around it shows nothing)
+local function anomaly_visor()
+	if visor then
+		visor_off()
+		actor_menu.set_msg(1, game.translate_string("st_shelter_visor_off"), 2)
+	elseif charged(module()) then
+		visor = VisorHUD()
+		get_hud():AddDialogToRender(visor)
+		utils_obj.play_sound("interface\\inv_nv_start")
+		actor_menu.set_msg(1, game.translate_string("st_shelter_visor_on"), 2)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the module in the headlamp slot while the outfit is worn
+
+local wearing -- the worn outfit's id
+local spawned_at = 0 -- when a module was asked for
+
+local function fit(outfit)
+	local m = module()
+	if not m then
+		if time_global() > spawned_at + 2000 then
+			spawned_at = time_global()
+			alife_create_item(MODULE, db.actor, { cond = load_var(db.actor, charge_var(outfit:id()), 1) })
+		end
+		return -- into the slot on a next update
+	end
+	local torch = db.actor:item_in_slot(10)
+	if torch and torch:id() == m:id() then
+		return
+	end
+	if torch then
+		db.actor:move_to_ruck(torch)
+	end
+	db.actor:move_to_slot(m, 10)
+end
+
+-- the outfit taken off: the module's charge kept for it, the module gone with its light and visions
+local function unfit(outfit_id)
+	local m = module()
+	if not m then
+		return
+	end
+	thermal_off()
+	visor_off()
+	if item_device.is_nv_active() then
+		item_device.set_nightvision(MODULE, false)
+	end
+	if outfit_id then
+		save_var(db.actor, charge_var(outfit_id), m:condition())
+	end
+	alife_release(m)
+end
+
+local update_at, game_time = 0, nil
+
+local function actor_on_update()
+	local now = time_global()
+	if now < update_at then
+		return
+	end
+	update_at = now + 300
+	local outfit = worn()
+	if outfit then
+		wearing = outfit:id()
+		fit(outfit)
+	elseif wearing or module() then
+		unfit(wearing)
+		wearing = nil
+	end
+	local m = module()
+	if thermal and not item_device.is_nv_active() then
+		thermal_off()
+	end
+	if visor and now >= visor_at then
+		visor_at = now + VISOR.step
+		item_device.drain_device(m, MODULE, VISOR.drain)
+		if not charged(m) then
+			visor_off()
+		end
+	end
+	-- an electric artefact charges the accumulator and the PDA in its slot (not in hands)
+	local t = game.get_game_time()
+	local seconds = game_time and t:diffSec(game_time) or 0
+	game_time = t
+	if m and powered() then
+		m:set_condition(math.min(1, m:condition() + seconds * CHARGE))
+		local pda = db.actor:item_in_slot(8)
+		if pda and not item_device.is_pda_active() then
+			pda:set_condition(math.min(1, pda:condition() + seconds * CHARGE))
+		end
+	end
+end
+
+-- a dropped module gone (another comes with the outfit's charge), no spare one about
+local function actor_on_item_drop(obj)
+	if obj:section() == MODULE then
+		if wearing then
+			save_var(db.actor, charge_var(wearing), obj:condition())
+		end
+		alife_release(obj)
+	end
+end
+
+-- a battery dragged onto the outfit charges its accumulator (as item_device does a device's)
+local function on_item_drag_dropped(obj_b, obj_d, slot_from, slot_to)
+	if not (obj_b:section() == item_device.device_battery and obj_d:section() == OUTFIT) then
+		return
+	end
+	local m = obj_d:id() == wearing and module()
+	local con_b = obj_b:condition()
+	local con_d = m and m:condition() or load_var(db.actor, charge_var(obj_d:id()), 1)
+	if con_d > con_b then
+		actor_menu.set_msg(1, game.translate_string("ui_st_battery_more_power"))
+		return
+	end
+	if con_d > item_device.get_power_critical(MODULE) then
+		alife_create_item(item_device.device_battery, db.actor, { cond = con_d })
+	end
+	alife_release(obj_b)
+	if m then
+		m:set_condition(con_b)
+	else
+		save_var(db.actor, charge_var(obj_d:id()), con_b)
+	end
+	actor_effects.play_item_fx(item_device.device_battery)
+	utils_obj.play_sound("interface\\inv_batt")
+end
+
+-------------------------------------------------------------------------------
+-- the keys while the outfit is worn
+
+local pressed, held -- when N went down; its hold used
+
+local function on_before_key_press(dik, bind, dis, flags)
+	if bind == key_bindings.kNIGHT_VISION and worn() and not Check_UI() then
+		flags.ret_value = false
+		pressed, held = time_global(), false
+	end
+end
+
+local function on_before_key_hold(dik, bind, dis, flags)
+	if bind == key_bindings.kNIGHT_VISION and pressed then
+		flags.ret_value = false
+		if not held and time_global() - pressed >= HOLD then
+			held = true
+			thermal_vision()
+		end
+	end
+end
+
+local function on_before_key_release(dik, bind, dis, flags)
+	if bind == key_bindings.kNIGHT_VISION and pressed then
+		flags.ret_value = false
+		if not held then
+			night_vision()
+		end
+		pressed = nil
+	end
+end
+
+local function on_key_release(key)
+	if key == DIK_keys.DIK_J and worn() and not Check_UI() then
+		anomaly_visor()
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the gear off the Brigadier's body
+
+local fitting = {} -- an M4's id -> its addons' ids, attached once they're all online
+
+-- the outfit and the M4 with its addons to an owner (a game or server object)
+local function give_gear(owner)
+	save_var(db.actor, "shelter_brigadier_gear", true)
+	local outfit = alife_create_item(OUTFIT, owner, { cond = CONDITION })
+	local m4 = alife_create_item(M4, owner, { cond = CONDITION })
+	if m4 then
+		local addons = {}
+		for _, sec in ipairs(M4_ADDONS) do
+			local se = alife_create_item(sec, owner)
+			addons[#addons + 1] = se and se.id
+		end
+		fitting[m4.id] = addons
+	end
+	return outfit and outfit.id
+end
+
+local function fit_addons()
+	for id, addons in pairs(fitting) do
+		local m4 = level.object_by_id(id)
+		local objs = {}
+		for _, addon in ipairs(addons) do
+			objs[#objs + 1] = level.object_by_id(addon)
+		end
+		if m4 and #objs == #addons then
+			for _, obj in ipairs(objs) do
+				m4:weapon_addon_attach(obj)
+			end
+			fitting[id] = nil
+		end
+	end
+end
+
+-- a game whose Brigadier is gone already (killed before the gear was his): it waits in the shelter's stash
+local function catch_up()
+	if level.name() ~= "bunker_a1" or load_var(db.actor, "shelter_brigadier_gear", false)
+		or not load_var(db.actor, "shelter_occupants", false) then
+		return
+	end
+	for id = 1, 65534 do
+		local se = alife():object(id)
+		if se and se:section_name() == BRIGADIER and se:alive() then
+			return -- his body will drop it
+		end
+	end
+	local stash = alife_object(load_var(db.actor, "shelter_stash_id", 65535))
+	if stash then
+		give_gear(stash)
+	end
+end
+
+local function actor_on_net_destroy()
+	visor_off()
+end
+
+function on_game_start()
+	-- no power drawn from the accumulator while an electric artefact powers the module
+	local drain_device, drain_device_on_event = item_device.drain_device, item_device.drain_device_on_event
+	function item_device.drain_device(obj, sec, ...)
+		if (sec or obj and obj:section()) == MODULE and powered() then
+			return true
+		end
+		return drain_device(obj, sec, ...)
+	end
+	function item_device.drain_device_on_event(obj, sec, ...)
+		if (sec or obj and obj:section()) == MODULE and powered() then
+			return true
+		end
+		return drain_device_on_event(obj, sec, ...)
+	end
+	-- his body drops his gear instead of the outfit its looks would give
+	local spawn_cosmetics = death_manager.spawn_cosmetics
+	function death_manager.spawn_cosmetics(npc, ...)
+		if npc:section() == BRIGADIER then
+			return give_gear(npc)
+		end
+		return spawn_cosmetics(npc, ...)
+	end
+	RegisterScriptCallback("actor_on_first_update", catch_up)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_update", fit_addons)
+	RegisterScriptCallback("actor_on_item_drop", actor_on_item_drop)
+	RegisterScriptCallback("ActorMenu_on_item_drag_drop", on_item_drag_dropped)
+	RegisterScriptCallback("on_before_key_press", on_before_key_press)
+	RegisterScriptCallback("on_before_key_hold", on_before_key_hold)
+	RegisterScriptCallback("on_before_key_release", on_before_key_release)
+	RegisterScriptCallback("on_key_release", on_key_release)
+	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
+	RegisterScriptCallback("actor_on_before_death", actor_on_net_destroy)
+end

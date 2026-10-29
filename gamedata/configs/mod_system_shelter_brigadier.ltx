@@ -1,0 +1,189 @@
+; The Brigadier's Nosorog (scripts\shelter_brigadier.script): the mercenaries' Nosorog, every upgrade installed, five
+; artefact containers that let none of their radiation through (the engine's artefact_radiation_shield), a helmet
+; module with a light, Oracle night vision, thermal vision and an anomaly visor. Drops off the Brigadier's body with
+; his M4 (below).
+[shelter_brigadier_outfit]:merc_nosorog_outfit
+inv_name                  = st_shelter_brigadier_outfit_name
+inv_name_short            = st_shelter_brigadier_outfit_name
+description               = st_shelter_brigadier_outfit_descr
+inv_weight                = 9.55 ; 18 with its upgrades
+artefact_count            = 3 ; 5 with its upgrades
+artefact_radiation_shield = true
+upgrades                  = up_gr_firsta_brigadier, up_gr_secona_brigadier, up_gr_thirda_brigadier, up_gr_fourta_brigadier, up_gr_fiftha_brigadier
+installed_upgrades        = up_firsta_brigadier, up_firstc_brigadier, up_firstd_brigadier, up_firste_brigadier, up_firstf_brigadier, up_secona_brigadier, up_seconc_brigadier, up_second_brigadier, up_secone_brigadier, up_seconf_brigadier, up_thirda_brigadier, up_thirdc_brigadier, up_thirde_brigadier, up_fourta_brigadier, up_fourtc_brigadier, up_fourtd_brigadier, up_fourte_brigadier, up_fourtf_brigadier, up_fiftha_brigadier, up_fifthc_brigadier, up_fifthd_brigadier, up_fifthe_brigadier
+
+; His M4 Tactical: every upgrade installed, half the wear of an upgraded M4's (0.00045 a shot: 0.0008 less the upgrades'
+; 0.00035), MAS's scopes (an ACOG on it as it drops, with the Surefire silencer)
+[wpn_m4_tac_brigadier]:wpn_m4_tac
+parent_section            = wpn_m4_tac_brigadier
+inv_name                  = st_shelter_brigadier_m4_name
+inv_name_short            = st_shelter_brigadier_m4_name
+description               = st_shelter_brigadier_m4_descr
+condition_shot_dec        = 0.000575 ; 0.000225 with its upgrades
+condition_queue_shot_dec  = 0.000575
+scopes                    =
+modular_attachments       = true
+modular_scope_group       = scope_group_picatinny
+scope_status              = 2
+upgrades                  = up_gr_firsta_m4_brigadier, up_gr_secona_m4_brigadier, up_gr_thirda_m4_brigadier, up_gr_fourta_m4_brigadier
+installed_upgrades        = up_firsta_m4_brigadier, up_firstc_m4_brigadier, up_firste_m4_brigadier, up_firstf_m4_brigadier, up_secona_m4_brigadier, up_seconc_m4_brigadier, up_second_m4_brigadier, up_secone_m4_brigadier, up_thirda_m4_brigadier, up_thirdc_m4_brigadier, up_thirde_m4_brigadier, up_thirdf_m4_brigadier, up_fourta_m4_brigadier, up_fourtc_m4_brigadier, up_fourte_m4_brigadier, up_fourtf_m4_brigadier
+
+; the helmet module: in the headlamp slot while the outfit is worn, its charge is the outfit's accumulator
+[shelter_brigadier_module]:device_torch_nv_3
+inv_name                  = st_shelter_brigadier_module_name
+inv_name_short            = st_shelter_brigadier_module_name
+description               = st_shelter_brigadier_module_descr
+inv_weight                = 0
+cost                      = 0
+quest_item                = true
+
+; The Nosorog's upgrade tree (up_exolight_1.ltx) with each upgrade in a group of its own: the engine refuses a second
+; upgrade of a group, so the vanilla tree can't have both of a pair. Same upgrades, same places in the scheme.
+[up_firsta_brigadier]:up_firsta_exolight_1
+effects = up_gr_firstc_brigadier, up_gr_firstd_brigadier
+[up_firstc_brigadier]:up_firstc_exolight_1
+effects = up_gr_firste_brigadier, up_gr_firstf_brigadier
+[up_firstd_brigadier]:up_firstd_exolight_1
+effects = up_gr_firste_brigadier, up_gr_firstf_brigadier
+[up_firste_brigadier]:up_firste_exolight_1
+[up_firstf_brigadier]:up_firstf_exolight_1
+
+[up_secona_brigadier]:up_secona_exolight_1
+effects = up_gr_seconc_brigadier, up_gr_second_brigadier
+[up_seconc_brigadier]:up_seconc_exolight_1
+effects = up_gr_secone_brigadier, up_gr_seconf_brigadier
+[up_second_brigadier]:up_second_exolight_1
+effects = up_gr_secone_brigadier, up_gr_seconf_brigadier
+[up_secone_brigadier]:up_secone_exolight_1
+[up_seconf_brigadier]:up_seconf_exolight_1
+
+[up_thirda_brigadier]:up_thirda_exolight_1
+effects = up_gr_thirdc_brigadier
+[up_thirdc_brigadier]:up_thirdc_exolight_1
+effects = up_gr_thirde_brigadier
+[up_thirde_brigadier]:up_thirde_exolight_1
+
+[up_fourta_brigadier]:up_fourta_exolight_1
+effects = up_gr_fourtc_brigadier, up_gr_fourtd_brigadier
+[up_fourtc_brigadier]:up_fourtc_exolight_1
+effects = up_gr_fourte_brigadier, up_gr_fourtf_brigadier
+[up_fourtd_brigadier]:up_fourtd_exolight_1
+effects = up_gr_fourte_brigadier, up_gr_fourtf_brigadier
+[up_fourte_brigadier]:up_fourte_exolight_1
+[up_fourtf_brigadier]:up_fourtf_exolight_1
+
+[up_fiftha_brigadier]:up_fiftha_nosorog_1
+effects = up_gr_fifthc_brigadier, up_gr_fifthd_brigadier
+[up_fifthc_brigadier]:up_fifthc_nosorog_1
+effects = up_gr_fifthe_brigadier
+[up_fifthd_brigadier]:up_fifthd_nosorog_1
+effects = up_gr_fifthe_brigadier
+[up_fifthe_brigadier]:up_fifthe_nosorog_1
+
+[up_gr_firsta_brigadier]
+elements = up_firsta_brigadier
+[up_gr_firstc_brigadier]
+elements = up_firstc_brigadier
+[up_gr_firstd_brigadier]
+elements = up_firstd_brigadier
+[up_gr_firste_brigadier]
+elements = up_firste_brigadier
+[up_gr_firstf_brigadier]
+elements = up_firstf_brigadier
+[up_gr_secona_brigadier]
+elements = up_secona_brigadier
+[up_gr_seconc_brigadier]
+elements = up_seconc_brigadier
+[up_gr_second_brigadier]
+elements = up_second_brigadier
+[up_gr_secone_brigadier]
+elements = up_secone_brigadier
+[up_gr_seconf_brigadier]
+elements = up_seconf_brigadier
+[up_gr_thirda_brigadier]
+elements = up_thirda_brigadier
+[up_gr_thirdc_brigadier]
+elements = up_thirdc_brigadier
+[up_gr_thirde_brigadier]
+elements = up_thirde_brigadier
+[up_gr_fourta_brigadier]
+elements = up_fourta_brigadier
+[up_gr_fourtc_brigadier]
+elements = up_fourtc_brigadier
+[up_gr_fourtd_brigadier]
+elements = up_fourtd_brigadier
+[up_gr_fourte_brigadier]
+elements = up_fourte_brigadier
+[up_gr_fourtf_brigadier]
+elements = up_fourtf_brigadier
+[up_gr_fiftha_brigadier]
+elements = up_fiftha_brigadier
+[up_gr_fifthc_brigadier]
+elements = up_fifthc_brigadier
+[up_gr_fifthd_brigadier]
+elements = up_fifthd_brigadier
+[up_gr_fifthe_brigadier]
+elements = up_fifthe_brigadier
+
+; The M4's tree (w_g36_up.ltx) the same way
+[up_firsta_m4_brigadier]:up_firsta_g36
+effects = up_gr_firstc_m4_brigadier
+[up_firstc_m4_brigadier]:up_firstc_g36
+effects = up_gr_firste_m4_brigadier, up_gr_firstf_m4_brigadier
+[up_firste_m4_brigadier]:up_firste_g36
+[up_firstf_m4_brigadier]:up_firstf_g36
+
+[up_secona_m4_brigadier]:up_secona_g36
+effects = up_gr_seconc_m4_brigadier, up_gr_second_m4_brigadier
+[up_seconc_m4_brigadier]:up_seconc_g36
+effects = up_gr_secone_m4_brigadier
+[up_second_m4_brigadier]:up_second_g36
+effects = up_gr_secone_m4_brigadier
+[up_secone_m4_brigadier]:up_secone_g36
+
+[up_thirda_m4_brigadier]:up_thirda_g36
+effects = up_gr_thirdc_m4_brigadier
+[up_thirdc_m4_brigadier]:up_thirdc_g36
+effects = up_gr_thirde_m4_brigadier, up_gr_thirdf_m4_brigadier
+[up_thirde_m4_brigadier]:up_thirde_g36
+[up_thirdf_m4_brigadier]:up_thirdf_g36
+
+[up_fourta_m4_brigadier]:up_fourta_g36
+effects = up_gr_fourtc_m4_brigadier
+[up_fourtc_m4_brigadier]:up_fourtc_g36
+effects = up_gr_fourte_m4_brigadier, up_gr_fourtf_m4_brigadier
+[up_fourte_m4_brigadier]:up_fourte_g36
+[up_fourtf_m4_brigadier]:up_fourtf_g36
+
+[up_gr_firsta_m4_brigadier]
+elements = up_firsta_m4_brigadier
+[up_gr_firstc_m4_brigadier]
+elements = up_firstc_m4_brigadier
+[up_gr_firste_m4_brigadier]
+elements = up_firste_m4_brigadier
+[up_gr_firstf_m4_brigadier]
+elements = up_firstf_m4_brigadier
+[up_gr_secona_m4_brigadier]
+elements = up_secona_m4_brigadier
+[up_gr_seconc_m4_brigadier]
+elements = up_seconc_m4_brigadier
+[up_gr_second_m4_brigadier]
+elements = up_second_m4_brigadier
+[up_gr_secone_m4_brigadier]
+elements = up_secone_m4_brigadier
+[up_gr_thirda_m4_brigadier]
+elements = up_thirda_m4_brigadier
+[up_gr_thirdc_m4_brigadier]
+elements = up_thirdc_m4_brigadier
+[up_gr_thirde_m4_brigadier]
+elements = up_thirde_m4_brigadier
+[up_gr_thirdf_m4_brigadier]
+elements = up_thirdf_m4_brigadier
+[up_gr_fourta_m4_brigadier]
+elements = up_fourta_m4_brigadier
+[up_gr_fourtc_m4_brigadier]
+elements = up_fourtc_m4_brigadier
+[up_gr_fourte_m4_brigadier]
+elements = up_fourte_m4_brigadier
+[up_gr_fourtf_m4_brigadier]
+elements = up_fourtf_m4_brigadier
