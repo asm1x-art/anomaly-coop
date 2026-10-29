@@ -208,9 +208,14 @@ void CALifeSpawnRegistry::load(IReader& file_stream, xrGUID* save_guid)
 	chunk->close();
 
 	xrGUID guid{};
-	overlays.spawn_guid(header().guid(), guid);
+	const xrGUID raw_guid = header().guid();
+	overlays.spawn_guid(raw_guid, guid);
 	m_header.set_guid(guid);
 	const bool legacy = save_guid && !(*save_guid == header().guid()) && overlays.take_legacy(m_legacy_vertices, m_legacy_spawn_ids);
+	if (save_guid && !(*save_guid == header().guid()))
+		Msg("! [spawn_overlays] the save's spawn %016llx%016llx, ours %016llx%016llx (%s.spawn %016llx%016llx)%s",
+		    save_guid->g[0], save_guid->g[1], guid.g[0], guid.g[1], *m_spawn_name, raw_guid.g[0], raw_guid.g[1],
+		    legacy ? ", translated" : "");
 	R_ASSERT2(!save_guid || (*save_guid == header().guid()) || legacy || ignore_save_incompatibility(),
 	          "Saved game doesn't correspond to the spawn : DELETE SAVED GAME!");
 
