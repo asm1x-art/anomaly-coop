@@ -1,0 +1,19 @@
+-- Fixes to the Grim Raid Addon weapon pack's UI files as they are read (the repo's own, like gra_fixes.script)
+
+-- The main menu (Anomaly-MCM's, from GRA) highlights the button under the cursor with ui\ui_mm_slider, a texture of
+-- GRA's UI Rework, which the pack hasn't: a black bar. Vanilla's slider instead.
+local SLIDER = { file = [[ui\ui_actor_main_menu]], x = 5, y = 773, width = 274, height = 61 } -- ui_inGame2_slider
+
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		if xml_file_name ~= [[ui\ui_mm_main.xml]] and xml_file_name ~= [[ui\ui_mm_main_16.xml]] then
+			return
+		end
+		for _, el in ipairs(xml_obj:query("shniaga > texture")) do
+			if xml_obj:getText(el) == [[ui\ui_mm_slider]] then
+				xml_obj:setText(el, SLIDER.file)
+				xml_obj:setElementAttr(el, { x = SLIDER.x, y = SLIDER.y, width = SLIDER.width, height = SLIDER.height })
+			end
+		end
+	end)
+end
