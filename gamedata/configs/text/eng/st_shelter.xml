@@ -406,7 +406,7 @@
 		<text>Take Professor Herman a capsule of each nature.</text>
 	</string>
 	<string id="st_shelter_goal_synthesis_4">
-		<text>Put the capsules into the chambers by the shelter's entrance.</text>
+		<text>Put the capsules into the synthesis chambers by the shelter's entrance: %d of %d.</text>
 	</string>
 	<string id="st_shelter_capsule_name">
 		<text>Capsule for anomalous matter</text>
@@ -491,5 +491,38 @@
 	</string>
 	<string id="st_shelter_capsule_full_descr">
 		<text>Professor Herman's capsule, filled with anomalous matter. Take it in hand only in an SSP from Topaz up or in the Chemist's SEVA: in another suit its discharge kills on the spot.</text>
+	</string>
+	<string id="st_shelter_chamber_gravi">
+		<text>Synthesis chamber (gravitational)</text>
+	</string>
+	<string id="st_shelter_chamber_thermo">
+		<text>Synthesis chamber (thermal)</text>
+	</string>
+	<string id="st_shelter_chamber_chem">
+		<text>Synthesis chamber (chemical)</text>
+	</string>
+	<string id="st_shelter_chamber_electro">
+		<text>Synthesis chamber (electrical)</text>
+	</string>
+	<string id="st_shelter_chamber_tip_empty">
+		<text>%s: needs a capsule of its matter</text>
+	</string>
+	<string id="st_shelter_chamber_tip_install">
+		<text>%s: install the capsule</text>
+	</string>
+	<string id="st_shelter_chamber_tip_ready">
+		<text>%s: the capsule is in</text>
+	</string>
+	<string id="st_shelter_chamber_need_capsule">
+		<text>It needs a filled capsule of its nature.</text>
+	</string>
+	<string id="st_shelter_chamber_installed">
+		<text>The capsule is in. %s is ready.</text>
+	</string>
+	<string id="st_shelter_chamber_ready">
+		<text>%s is ready. Transmutations need recipes.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_5">
+		<text>The synthesis chambers are ready. Recipes next.</text>
 	</string>
 </string_table>

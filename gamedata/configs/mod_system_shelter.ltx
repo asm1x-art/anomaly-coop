@@ -159,6 +159,27 @@ shelter_full    = true
 [shelter_capsule_filling]:physic_object
 visual          = dynamics\equipments\aa\aam
 
+; a capsule in its chamber, behind the cell's window
+[shelter_capsule_installed]:shelter_capsule_filling
+
+; the synthesis chambers' panels by the entrance (shelter_synthesis.script): an unseen box over each cell's panel
+; (tools\shelter\chamber_panel.py), the chamber of a nature
+[shelter_chamber_panel]:physic_object
+visual          = dynamics\shelter\chamber_panel.ogf
+script_binding  = shelter_synthesis.init_panel
+
+[shelter_chamber_panel_gravi]:shelter_chamber_panel
+shelter_nature  = gravi
+
+[shelter_chamber_panel_thermo]:shelter_chamber_panel
+shelter_nature  = thermo
+
+[shelter_chamber_panel_chem]:shelter_chamber_panel
+shelter_nature  = chem
+
+[shelter_chamber_panel_electro]:shelter_chamber_panel
+shelter_nature  = electro
+
 ; the work with the capsules and the chambers (shelter_synthesis.script): the suits it allows, how long a capsule
 ; takes to fill (s), how near an anomaly takes the actor's capsule (m)
 [shelter_synthesis]

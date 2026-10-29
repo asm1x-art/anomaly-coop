@@ -406,7 +406,7 @@
 		<text>Отнести профессору Герману по капсуле каждой природы.</text>
 	</string>
 	<string id="st_shelter_goal_synthesis_4">
-		<text>Установить капсулы в камеры у входа в убежище.</text>
+		<text>Установить капсулы в камеры синтеза у входа в убежище: %d из %d.</text>
 	</string>
 	<string id="st_shelter_capsule_name">
 		<text>Капсула для аномальной среды</text>
@@ -491,5 +491,38 @@
 	</string>
 	<string id="st_shelter_capsule_full_descr">
 		<text>Капсула профессора Германа, наполненная аномальной средой. Брать в руки только в ССП не ниже «Топаза» или в «Севе» Химика: в другом костюме разряд убивает на месте.</text>
+	</string>
+	<string id="st_shelter_chamber_gravi">
+		<text>Камера синтеза (гравитационная)</text>
+	</string>
+	<string id="st_shelter_chamber_thermo">
+		<text>Камера синтеза (термическая)</text>
+	</string>
+	<string id="st_shelter_chamber_chem">
+		<text>Камера синтеза (химическая)</text>
+	</string>
+	<string id="st_shelter_chamber_electro">
+		<text>Камера синтеза (электрическая)</text>
+	</string>
+	<string id="st_shelter_chamber_tip_empty">
+		<text>%s: нужна капсула с её средой</text>
+	</string>
+	<string id="st_shelter_chamber_tip_install">
+		<text>%s: установить капсулу</text>
+	</string>
+	<string id="st_shelter_chamber_tip_ready">
+		<text>%s: капсула установлена</text>
+	</string>
+	<string id="st_shelter_chamber_need_capsule">
+		<text>Нужна наполненная капсула этой природы.</text>
+	</string>
+	<string id="st_shelter_chamber_installed">
+		<text>Капсула установлена. %s готова.</text>
+	</string>
+	<string id="st_shelter_chamber_ready">
+		<text>%s готова. Для трансмутаций нужны рецепты.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_5">
+		<text>Камеры синтеза готовы. Дальше — рецепты.</text>
 	</string>
 </string_table>

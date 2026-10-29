@@ -3,6 +3,7 @@
 -- there full, and the anomaly is burnt out till the next emission. All of it only in a suit the work allows
 -- ([shelter_synthesis] suits): in any other the capsule's discharge kills, and nothing's done. The capsules being
 -- filled and the anomalies burnt out are the world's (shelter.state), the filled ones count for the shelter's tasks.
+-- Then a capsule of each nature into its chamber by the shelter's entrance, the same way only in such a suit.
 
 local SETTINGS = "shelter_synthesis"
 local FILLING = "shelter_capsule_filling" -- the capsule in the anomaly while it fills
@@ -231,6 +232,199 @@ local function on_interaction(kind, obj, what)
 	end
 end
 
+-------------------------------------------------------------------------------
+-- the chambers: the cells along the entrance corridor's north wall (on the left from the door in), one for each
+-- nature from the door. Over each cell's panel by its window a box (shelter_chamber_panel_<nature>) to look at and
+-- use: it takes a full capsule of the nature, which is then seen in the cell, and the cell shows its anomaly at work:
+-- the anomaly's own idle particles and sound (zones\*.ltx), a glow; no anomaly's there to hurt (and none can be
+-- spawned from a script). The panels come on the first visit.
+
+local LEVEL = "bunker_a1"
+local CHAMBERS = { -- from the door: the x of the cell's panel and of its window
+	{ nature = "gravi", panel = -7.44, window = -6.41 },
+	{ nature = "thermo", panel = -4.47, window = -3.44 },
+	{ nature = "chem", panel = -1.53, window = -0.50 },
+	{ nature = "electro", panel = 1.49, window = 2.51 },
+}
+-- the wall (the panels' face) and the panels' middle height, the cells' floor and depth, the corridor's floor
+local WALL = { z = -25.45, panel_y = 4.59, cell_floor = 3.42, cell_z = -24.2, corridor_y = 3.3, corridor_z = -27.1 }
+-- an installed chamber's cell: its anomaly's idle particles and sound, a glow (a colour or a light animation)
+local CELL_FX = {
+	gravi = { particles = "zones_mine\\zone_gravity_mine_idle", sound = "anomaly\\gravi_rumble1", color = { 0.5, 0.4, 0.3 } },
+	thermo = { particles = "static\\buble_distort", sound = "anomaly\\fire_idle", color = { 1.0, 0.45, 0.1 } },
+	chem = { particles = "zones_mine\\zone_acidic_mine_idle", sound = "anomaly\\buzz_idle", lanim = "light_green_02" },
+	electro = { particles = "zones_mine\\zone_electric_mine_idle", sound = "anomaly\\electra_idle1", lanim = "koster_01_electra" },
+}
+local CELL_GLOW = { range = 3, height = 1, brightness = 0.006 } -- m, m over the floor; a light animation's 0..255 to 0..1.5
+local CELL_VOLUME = 0.5
+
+local function full(nature)
+	return "shelter_capsule_" .. nature .. "_full"
+end
+
+local function installed(nature)
+	return shelter.state("chamber_" .. nature, nil) ~= nil
+end
+
+function chambers_installed()
+	local n = 0
+	for _, c in ipairs(CHAMBERS) do
+		n = n + (installed(c.nature) and 1 or 0)
+	end
+	return n
+end
+
+-- the task's mark: the first chamber still empty
+function chamber_target()
+	for _, c in ipairs(CHAMBERS) do
+		if not installed(c.nature) then
+			return shelter.state("chamber_panel_" .. c.nature, nil)
+		end
+	end
+end
+
+local function chamber(nature)
+	for _, c in ipairs(CHAMBERS) do
+		if c.nature == nature then
+			return c
+		end
+	end
+end
+
+local function ai_vertex(x)
+	local lv = level.vertex_id(vector():set(x, WALL.corridor_y, WALL.corridor_z))
+	return lv < 4294967295 and lv or db.actor:level_vertex_id()
+end
+
+local function spawn_panels()
+	for _, c in ipairs(CHAMBERS) do
+		local se = alife_create("shelter_chamber_panel_" .. c.nature, vector():set(c.panel, WALL.panel_y, WALL.z),
+			ai_vertex(c.panel), db.actor:game_vertex_id())
+		if se then -- the model's +z into the wall: here north
+			shelter.set_state("chamber_panel_" .. c.nature, se.id)
+		end
+	end
+end
+
+local function chamber_name(nature)
+	return game.translate_string("st_shelter_chamber_" .. nature)
+end
+
+local function panel_tip(nature)
+	local id = installed(nature) and "st_shelter_chamber_tip_ready"
+		or db.actor:object(full(nature)) and "st_shelter_chamber_tip_install" or "st_shelter_chamber_tip_empty"
+	return string.format(game.translate_string(id), chamber_name(nature))
+end
+
+local function panel_use(nature)
+	if installed(nature) then
+		return msg("st_shelter_chamber_ready", chamber_name(nature))
+	end
+	local capsule = db.actor:object(full(nature))
+	if not capsule then
+		return msg("st_shelter_chamber_need_capsule")
+	elseif not suited() then
+		return kill(nature)
+	end
+	local c = chamber(nature)
+	shelter.everyones(function()
+		alife_release(capsule)
+		local se = alife_create("shelter_capsule_installed", vector():set(c.window, WALL.cell_floor + 0.05, WALL.cell_z),
+			ai_vertex(c.window), db.actor:game_vertex_id())
+		shelter.set_state("chamber_" .. nature, se and se.id or 65535)
+	end)
+	msg("st_shelter_chamber_installed", chamber_name(nature))
+end
+
+-- the cell's anomaly at work: on while the chamber has its capsule and its panel's online here
+local function cell_fx_start(nature, panel)
+	local c, fx = chamber(nature), CELL_FX[nature]
+	local pos = vector():set(c.window, WALL.cell_floor, WALL.cell_z)
+	local t = { pos = pos, particles = particles_object(fx.particles), sound = sound_object(fx.sound), light = script_light() }
+	t.particles:play_at_pos(pos)
+	t.sound:play_at_pos(panel, pos, 0, sound_object.s3d + sound_object.looped)
+	t.sound.volume = CELL_VOLUME
+	t.light.range = CELL_GLOW.range
+	if fx.lanim then
+		t.light.lanim = fx.lanim
+		t.light.lanim_brightness = CELL_GLOW.brightness
+	else
+		t.light.color = fcolor():set(fx.color[1], fx.color[2], fx.color[3], 1)
+	end
+	t.light:set_position(vector():set(pos.x, pos.y + CELL_GLOW.height, pos.z))
+	t.light.enabled = true
+	t.light:update()
+	return t
+end
+
+local function cell_fx_stop(t)
+	if t.particles:playing() then
+		t.particles:stop()
+	end
+	if t.sound:playing() then
+		t.sound:stop()
+	end
+	t.light.enabled = false
+end
+
+class "panel_binder" (object_binder)
+function panel_binder:__init(obj) super(obj)
+	self.nature = SYS_GetParam(0, obj:section(), "shelter_nature")
+	self.ready = false
+	self.tip = nil
+	self.next = 0
+	self.fx = nil
+end
+function panel_binder:update(delta)
+	object_binder.update(self, delta)
+	if not self.ready then -- frozen on the wall
+		local shell = self.object:get_physics_shell()
+		if not shell then
+			return
+		end
+		shell:freeze()
+		self.ready = true
+		self.object:set_callback(callback.use_object, panel_binder.use, self)
+	end
+	if self.fx then
+		self.fx.light:update() -- its animation
+	end
+	local now = time_global()
+	if now < self.next or not db.actor then
+		return
+	end
+	self.next = now + 500
+	local on = installed(self.nature)
+	if on and not self.fx then
+		self.fx = cell_fx_start(self.nature, self.object)
+	elseif not on and self.fx then
+		cell_fx_stop(self.fx)
+		self.fx = nil
+	elseif self.fx and not self.fx.particles:playing() then -- not a looped one
+		self.fx.particles:play_at_pos(self.fx.pos)
+	end
+	local tip = panel_tip(self.nature)
+	if tip ~= self.tip then
+		self.tip = tip
+		self.object:set_tip_text(tip)
+	end
+end
+function panel_binder:use()
+	panel_use(self.nature)
+	self.next = 0
+end
+function panel_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	if self.fx then
+		cell_fx_stop(self.fx)
+		self.fx = nil
+	end
+	object_binder.net_destroy(self)
+end
+function init_panel(obj)
+	obj:bind_object(panel_binder(obj))
+end
+
 local last_update = nil
 
 local function actor_on_update()
@@ -249,6 +443,9 @@ local takes_from = nil -- time_global() from which the actor's takes are pickups
 
 local function actor_on_first_update()
 	takes_from = time_global() + 3000
+	if level.name() == LEVEL and not shelter.state("chamber_panel_" .. CHAMBERS[1].nature, nil) then
+		shelter.once("chamber_panels", spawn_panels)
+	end
 end
 
 -- a full capsule picked up in a suit that can't take it: its discharge, and it falls back

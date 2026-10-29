@@ -483,7 +483,7 @@ end
 
 local function goal_stage(goal)
 	if goal == "synthesis" then -- talk to Herman, fill his capsules, his half back, ours into the chambers
-		return state("chambers_ready", false) and 5 or has_alife_info("shelter_capsules_paid") and 4
+		return shelter_synthesis.chambers_installed() >= #NATURES and 5 or has_alife_info("shelter_capsules_paid") and 4
 			or filled_all() >= CAPSULES and 3 or has_alife_info("shelter_capsules_got") and 2 or 1
 	elseif string.find(goal, "^synthesis_") then -- a nature's capsules: being filled, filled
 		return filled(string.sub(goal, 11)) >= CAPSULES_EACH and 2 or 1
@@ -499,7 +499,7 @@ end
 local function goal_target(goal, stage)
 	if goal == "synthesis" then
 		return (stage == 1 or stage == 3) and get_story_object_id("jup_b6_scientist_nuclear_physicist")
-			or stage == 4 and state("stash_id", nil) or nil
+			or stage == 4 and shelter_synthesis.chamber_target() or nil
 	elseif string.find(goal, "^synthesis_") then
 		return nil
 	elseif goal == "laptop" then
@@ -539,6 +539,9 @@ local function task_functor_shelter(task_id, field, p, tsk)
 	elseif field == "descr" then
 		if goal == "synthesis" and stage == 2 then
 			return string.format(game.translate_string("st_shelter_goal_synthesis_2"), filled_all(), CAPSULES)
+		elseif goal == "synthesis" and stage == 4 then
+			return string.format(game.translate_string("st_shelter_goal_synthesis_4"), shelter_synthesis.chambers_installed(),
+				#NATURES)
 		elseif string.find(goal, "^synthesis_") and stage == 1 then
 			return string.format(game.translate_string("st_shelter_goal_" .. goal .. "_1"), filled(string.sub(goal, 11)),
 				CAPSULES_EACH)
