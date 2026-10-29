@@ -101,7 +101,7 @@ local function anomaly_for(nature)
 		if IsAnomaly(obj) then
 			local d = obj:position():distance_to(db.actor:position())
 			local n = nature_of(obj)
-			if d <= reach and n then
+			if d <= reach and n and not is_chamber_anomaly(obj:id()) then
 				if n == nature and not burnt(obj:id()) then
 					if not best_d or d < best_d then
 						best, best_d = obj, d
@@ -235,28 +235,29 @@ end
 -------------------------------------------------------------------------------
 -- the chambers: the cells along the entrance corridor's north wall (on the left from the door in), one for each
 -- nature from the door. Over each cell's panel by its window a box (shelter_chamber_panel_<nature>) to look at and
--- use: it takes a full capsule of the nature, which is then seen in the cell, and the cell shows its anomaly at work:
--- the anomaly's own idle particles and sound (zones\*.ltx), a glow; no anomaly's there to hurt (and none can be
--- spawned from a script). The panels come on the first visit.
+-- use: it takes a full capsule of the nature, which is then seen in the cell with a real anomaly of the nature round it
+-- (the visor and the detectors see it; the transmutations need it), small enough to stay behind the window, and a
+-- glow. The panels come on the first visit.
 
 local LEVEL = "bunker_a1"
-local CHAMBERS = { -- from the door: the x of the cell's panel and of its window
-	{ nature = "gravi", panel = -7.44, window = -6.41 },
-	{ nature = "thermo", panel = -4.47, window = -3.44 },
-	{ nature = "chem", panel = -1.53, window = -0.50 },
-	{ nature = "electro", panel = 1.49, window = 2.51 },
+local CHAMBERS = { -- from the door: the x of the cell's panel and of its window, the cell's anomaly
+	{ nature = "gravi", panel = -7.44, window = -6.41, anomaly = "zone_mine_gravitational_weak" },
+	{ nature = "thermo", panel = -4.47, window = -3.44, anomaly = "zone_mine_thermal_weak" },
+	{ nature = "chem", panel = -1.53, window = -0.50, anomaly = "zone_mine_acidic_weak" },
+	{ nature = "electro", panel = 1.49, window = 2.51, anomaly = "zone_mine_electric_weak" },
 }
 -- the wall (the panels' face) and the panels' middle height, the cells' floor and depth, the corridor's floor
 local WALL = { z = -25.45, panel_y = 4.59, cell_floor = 3.42, cell_z = -24.2, corridor_y = 3.3, corridor_z = -27.1 }
--- an installed chamber's cell: its anomaly's idle particles and sound, a glow (a colour or a light animation)
+-- an installed chamber's cell: the anomaly's sphere (m) round the cell's middle, short of the window; the glow (a colour
+-- or a light animation)
+local CELL_RADIUS = 0.9
 local CELL_FX = {
-	gravi = { particles = "zones_mine\\zone_gravity_mine_idle", sound = "anomaly\\gravi_rumble1", color = { 0.5, 0.4, 0.3 } },
-	thermo = { particles = "static\\buble_distort", sound = "anomaly\\fire_idle", color = { 1.0, 0.45, 0.1 } },
-	chem = { particles = "zones_mine\\zone_acidic_mine_idle", sound = "anomaly\\buzz_idle", lanim = "light_green_02" },
-	electro = { particles = "zones_mine\\zone_electric_mine_idle", sound = "anomaly\\electra_idle1", lanim = "koster_01_electra" },
+	gravi = { color = { 0.5, 0.4, 0.3 } },
+	thermo = { color = { 1.0, 0.45, 0.1 } },
+	chem = { lanim = "light_green_02" },
+	electro = { lanim = "koster_01_electra" },
 }
 local CELL_GLOW = { range = 3, height = 1, brightness = 0.006 } -- m, m over the floor; a light animation's 0..255 to 0..1.5
-local CELL_VOLUME = 0.5
 
 local function full(nature)
 	return "shelter_capsule_" .. nature .. "_full"
@@ -294,6 +295,41 @@ end
 local function ai_vertex(x)
 	local lv = level.vertex_id(vector():set(x, WALL.corridor_y, WALL.corridor_z))
 	return lv < 4294967295 and lv or db.actor:level_vertex_id()
+end
+
+-- a chamber's anomaly, each game's own (its id kept on the actor): co-op shares a spawn the moment it's made, before
+-- its shape could be set, and an anomaly with no shape crashes the game
+local function anomaly_var(nature)
+	return "shelter_chamber_anomaly_" .. nature
+end
+
+local function cell_anomaly(c)
+	local id = load_var(db.actor, anomaly_var(c.nature), nil)
+	local se = id and alife_object(id)
+	return se and se:section_name() == c.anomaly and id or nil
+end
+
+function is_chamber_anomaly(id)
+	for _, c in ipairs(CHAMBERS) do
+		if load_var(db.actor, anomaly_var(c.nature), nil) == id then
+			return true
+		end
+	end
+	return false
+end
+
+-- as Anomaly's dynamic anomalies are made (bind_anomaly_field.dyn_anomalies_spawn): the shape set before it's online
+local function spawn_cell_anomaly(c)
+	local se = alife_create(c.anomaly, vector():set(c.window, WALL.cell_floor, WALL.cell_z), ai_vertex(c.window),
+		db.actor:game_vertex_id())
+	local data = se and utils_stpk.get_anom_zone_data(se)
+	if not data then
+		printf("! [shelter] no anomaly for the %s chamber", c.nature)
+		return
+	end
+	data.shapes[1] = { shtype = 0, offset = vector():set(0, 0, 0), center = vector():set(0, 0, 0), radius = CELL_RADIUS }
+	utils_stpk.set_anom_zone_data(data, se)
+	save_var(db.actor, anomaly_var(c.nature), se.id)
 end
 
 local function spawn_panels()
@@ -336,14 +372,10 @@ local function panel_use(nature)
 	msg("st_shelter_chamber_installed", chamber_name(nature))
 end
 
--- the cell's anomaly at work: on while the chamber has its capsule and its panel's online here
-local function cell_fx_start(nature, panel)
+-- the cell's glow: on while the chamber has its capsule and its panel's online here
+local function cell_fx_start(nature)
 	local c, fx = chamber(nature), CELL_FX[nature]
-	local pos = vector():set(c.window, WALL.cell_floor, WALL.cell_z)
-	local t = { pos = pos, particles = particles_object(fx.particles), sound = sound_object(fx.sound), light = script_light() }
-	t.particles:play_at_pos(pos)
-	t.sound:play_at_pos(panel, pos, 0, sound_object.s3d + sound_object.looped)
-	t.sound.volume = CELL_VOLUME
+	local t = { light = script_light() }
 	t.light.range = CELL_GLOW.range
 	if fx.lanim then
 		t.light.lanim = fx.lanim
@@ -351,19 +383,13 @@ local function cell_fx_start(nature, panel)
 	else
 		t.light.color = fcolor():set(fx.color[1], fx.color[2], fx.color[3], 1)
 	end
-	t.light:set_position(vector():set(pos.x, pos.y + CELL_GLOW.height, pos.z))
+	t.light:set_position(vector():set(c.window, WALL.cell_floor + CELL_GLOW.height, WALL.cell_z))
 	t.light.enabled = true
 	t.light:update()
 	return t
 end
 
 local function cell_fx_stop(t)
-	if t.particles:playing() then
-		t.particles:stop()
-	end
-	if t.sound:playing() then
-		t.sound:stop()
-	end
 	t.light.enabled = false
 end
 
@@ -395,13 +421,14 @@ function panel_binder:update(delta)
 	end
 	self.next = now + 500
 	local on = installed(self.nature)
+	if on and not cell_anomaly(chamber(self.nature)) then
+		spawn_cell_anomaly(chamber(self.nature))
+	end
 	if on and not self.fx then
-		self.fx = cell_fx_start(self.nature, self.object)
+		self.fx = cell_fx_start(self.nature)
 	elseif not on and self.fx then
 		cell_fx_stop(self.fx)
 		self.fx = nil
-	elseif self.fx and not self.fx.particles:playing() then -- not a looped one
-		self.fx.particles:play_at_pos(self.fx.pos)
 	end
 	local tip = panel_tip(self.nature)
 	if tip ~= self.tip then
