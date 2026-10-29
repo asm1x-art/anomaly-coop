@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	WEAPONS ATTACHMENTS
+-->
+
+<string_table>
+
+	<string id="st_addon_scope">
+		<text>ПСО-1</text>
+	</string>
+	<string id="st_addon_scope_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]НПЗ(Новосибирский приборостроительный завод)\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n	
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_1p29">
+		<text>1П29 "Тюльпан"</text>
+	</string>
+	<string id="st_addon_scope_1p29_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]СССР\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_acog">
+		<text>ACOG</text>
+	</string>
+	<string id="st_addon_scope_acog_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Trijicon\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_pso-1m2-01">
+		<text>ПСО-1М2-1</text>
+	</string>
+	<string id="st_addon_scope_pso-1m2-01_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]НПЗ(Новосибирский приборостроительный завод)\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_specterDR">
+		<text>ELCAN SpecterDR</text>
+	</string>
+	<string id="st_addon_scope_specterDR_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Raytheon ELCAN\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x или 4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n		
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_pso2">
+		<text>ПСО-1М</text>
+	</string>
+	<string id="st_addon_scope_pso2_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]НПЗ(Новосибирский приборостроительный завод)\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>
+		
+	<string id="st_addon_scope_1p59">
+		<text>1П59 "Гиперон"</text>
+	</string>
+	<string id="st_addon_scope_1p59_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Разные производители\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x - 10.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>	
+	
+	<string id="st_addon_scope_1pn93">
+		<text>1ПН93-4 ночной прицел</text>
+	</string>
+	<string id="st_addon_scope_1pn93_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]НПЗ(Новосибирский приборостроительный завод)\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение ночного видения\n \n				
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_leupold">
+		<text>Leupold Mark 8</text>
+	</string>
+	<string id="st_addon_scope_leupold_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Leupold\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 8.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_pn23">
+		<text>PN-23 ночной прицел</text>
+	</string>
+	<string id="st_addon_scope_pn23_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]KULA\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]6x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение ночного видения\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_marchf">
+		<text>March Tactical 3-24x42 FFP</text>
+	</string>
+	<string id="st_addon_scope_marchf_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Япония\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]DEON Optical Design\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x - 24.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_pgo7gs">
+		<text>ПГО-7</text>
+	</string>
+	<string id="st_addon_scope_pgo7gs_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]СССР\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение подсветки\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_susat">
+		<text>SUSAT</text>
+	</string>
+	<string id="st_addon_scope_susat_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Великобритания\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Avimo\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_gauss_sight">
+		<text>Trijicon REAP-IR тепловизионная оптика</text>
+	</string>
+	<string id="st_addon_scope_gauss_sight_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Trijicon\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x - 8.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение тепловизора\n \n			
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_1p78gs">
+		<text>1П78 "Каштан"</text>
+	</string>
+	<string id="st_addon_scope_1p78gs_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]НПЗ(Новосибирский приборостроительный завод)\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]2.8x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_1pn93n2_1gs">
+		<text>1ПН93-1 ночной прицел</text>
+	</string>
+	<string id="st_addon_scope_1pn93n2_1gs_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		%c[d_cyan] • %c[0,255,255,255] %c[ui_gray_2]Включение/выключение ночного видения\n \n\n \n			
+		</text>
+	</string>
+
+	<string id="st_addon_scope_usp1">
+		<text>1П29 "Тюльпан"</text>
+	</string>
+	<string id="st_addon_scope_usp1_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_trijicon_rmr">
+		<text>ACOG + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_trijicon_rmr_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] Trijicon ACOG BAC 5.56 BDC прицел\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>
+	</string>	
+	
+	<string id="st_addon_scope_mark8_rmr">
+		<text>Mark 8 + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_mark8_rmr_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] Leupold Mark 8 CQBSS прицел\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_spec_alt">
+		<text>SpecterDR + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_spec_alt_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] Elcan SpecterDR DFOV14-C2 прицел\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_kashtan_rmr">
+		<text>Каштан + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_kashtan_rmr_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] Прицел "Каштан" 1P78\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_psicho_rmr">
+		<text>ПСО + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_psicho_rmr_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] Прицел BelOMO ПСО-1М2-1\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_susatov">
+		<text>SUSAT 4.0x прицел</text>
+	</string>
+	<string id="st_addon_scope_susatov_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Великобритания\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Royal Armament Research Development\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_march_f_shorty">
+		<text>March F Shorty 1x-8x24mm LPVO</text>
+	</string>
+	<string id="st_addon_scope_march_f_shorty_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Япония\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]DEON Optical Design\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 8.0x\n \n
+		</text>		
+	</string>	
+
+	<string id="st_addon_scope_march_f_shorty_alt">
+		<text>March F Shorty + красная точка (наклонный кронштейн)</text>
+	</string>
+	<string id="st_addon_scope_march_f_shorty_alt_descr">
+		<text>%c[0,255,255,255]В КОМПЛЕКТЕ:\n
+		%c[d_cyan] • %c[ui_gray_2] March F Shorty 1x-8x24mm LPVO\n
+		%c[d_cyan] • %c[ui_gray_2] Наклонный коллиматорный прицел\n \n
+		</text>		
+	</string>
+	
+	<string id="st_addon_scope_lco1">
+		<text>LCO Leupold Carbine Optic</text>
+	</string>
+	<string id="st_addon_scope_lco1_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Leupold\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_e0t2_mag">
+		<text>Eotech XPS3 + увеличитель Eotech G33 3x</text>
+	</string>
+	<string id="st_addon_scope_e0t2_mag_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]EOTech\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x\n \n
+		</text>
+	</string>
+	
+	
+	<string id="st_addon_scope_razor_mag">
+		<text>Vortex Optics Razor AMG UH-1 + увеличитель Eotech G33 3x</text>
+	</string>
+	<string id="st_addon_scope_razor_mag_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]EOTech & Vortex\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_exps3_mag">
+		<text>Eotech EXPS3 + увеличитель Eotech G33 3x</text>
+	</string>
+	<string id="st_addon_scope_exps3_mag_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]EOTech\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_addon_scope_razor">
+		<text>Vortex Optics Razor AMG UH-1 Gen. II</text>
+	</string>
+	<string id="st_addon_scope_razor_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Vortex\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_exps3">
+		<text>Eotech EXPS3</text>
+	</string>
+	<string id="st_addon_scope_exps3_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]EOTech\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+	</string>
+  
+	<string id="st_addon_scope_he510">
+		<text>Holosun HE510C</text>
+	</string>
+	<string id="st_addon_scope_he510_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Holosun\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+	</string>
+  
+	<string id="st_addon_scope_bravo4">
+		<text>SIG Sauer BRAVO4</text>
+	</string>
+	<string id="st_addon_scope_bravo4_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Германия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]SIG Sauer\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+  
+	<string id="st_addon_scope_hamr">
+		<text>Leupold Mark 4 HAMR</text>
+	</string>
+	<string id="st_addon_scope_hamr_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Leupold\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+  
+	<string id="st_addon_scope_razorhd">
+		<text>Vortex Optics Razor HD Gen II</text>
+	</string>
+	<string id="st_addon_scope_razorhd_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Vortex\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 6.0x\n \n
+		</text>
+	</string>	
+
+	<string id="st_addon_scope_devo">
+		<text>Leupold D-EVO (смещённый) + LCO красная точка</text>
+	</string>
+	<string id="st_addon_scope_devo_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Leupold\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]6.0x\n \n		
+		</text>
+	</string>	
+
+	<string id="st_addon_scope_side">
+		<text>Winchester боковой прицел</text>
+	</string>
+	<string id="st_addon_scope_side_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Winchester\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_romeo">
+		<text>SIG Sauer ROMEO4 красная точка</text>
+	</string>
+	<string id="st_addon_scope_romeo_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Германия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]SIG Sauer\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+	</string>	
+
+	<string id="st_cortex_scope">
+		<text>Cortex Optic LPVO</text>
+	</string>
+	<string id="st_cortex_scope_desc">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Разные\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 12.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_cmore">
+        <text>C-MORE тактический прицел</text>
+    </string>
+    <string id="st_addon_scope_cmore_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]C-More Systems\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n
+		</text>
+    </string>
+
+	<string id="st_addon_scope_zf4">
+		<text>ZF-4 прицел</text>
+	</string>
+	<string id="st_addon_scope_zf4_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Германия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Германия\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]4.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_kp_sr2">
+		<text>КП-СР2 коллиматорный прицел</text>
+	</string>
+	<string id="st_addon_scope_kp_sr2_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Россия\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n
+		%c[0,255,255,255]СОВМЕСТИМОСТЬ:\n
+		%c[d_cyan] • %c[ui_gray_2] СР-2М "Вереск"\n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_gee36">
+		<text>G36 штатный прицел</text>
+	</string>
+	<string id="st_addon_scope_gee36_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Германия\n\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]H&K\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_gee36_dove">
+		<text>G36 штатный прицел (планка "ласточкин хвост")</text>
+	</string>
+	<string id="st_addon_scope_gee36_dove_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]Ад\n\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Сатана\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_vudu_scope">
+		<text>EOTech Vudu 1-6x24 30мм винтовочный прицел</text>
+	</string>
+	<string id="st_vudu_scope_desc">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]EOTech\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 6.0x\n \n
+		</text>
+	</string>
+	
+	<string id="st_tango6_scope">
+		<text>SIG Sauer TANGO6T 1-6x24 30мм винтовочный прицел</text>
+	</string>
+	<string id="st_tango6_scope_desc">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]SIG Sauer\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x - 6.0x\n \n
+		</text>
+	</string>
+
+	<string id="st_addon_scope_deltapoint_high">
+		<text>Deltapoint PRO на высокой планке</text>
+	</string>
+	<string id="st_addon_scope_deltapoint_high_descr">
+		<text>DeltaPoint Pro, установленный на высокой прицельной планке.</text>
+	</string>
+
+	
+	<string id="st_addon_scope_rmr_high">
+		<text>Trijicon RMR красная точка на высокой планке</text>
+	</string>
+	<string id="st_addon_scope_rmr_high_descr">
+		<text>Trijicon RMR, установленный на высокой прицельной планке.</text>
+	</string>
+
+	<string id="st_addon_scope_c79">
+		<text>ELCAN Specter C79 оптический прицел</text>
+	</string>
+	<string id="st_addon_scope_c79_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_cyan] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_cyan] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Raytheon ELCAN Optical Technologies\n
+		%c[d_cyan] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]3.4x\n \n			
+		</text>
+	</string>
+
+	<string id="st_scope_dev">
+		<text>MAS инструмент разработчика</text>
+	</string>
+	<string id="st_scope_dev_desc">
+		<text>Инструмент разработчика. Немедленно выбросьте.
+		</text>
+	</string>
+	
+</string_table>

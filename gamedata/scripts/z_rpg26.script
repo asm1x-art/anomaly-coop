@@ -1,0 +1,65 @@
+--[[
+	=====================================================================
+	Addon      : RPG26 2.2
+	Link       : https://www.moddb.com/mods/stalker-anomaly/addons/rpg26-2-21
+	Author     : Tosox
+	Date       : 15.04.2024
+	Last Edit  : 15.04.2024
+	=====================================================================
+--]]
+
+-- Monkey patch unload function in inventory
+ui_inventory_UIInventory_Cond_Unload = ui_inventory.UIInventory.Cond_Unload
+ui_inventory.UIInventory.Cond_Unload = function(self, obj, bag)
+	obj = self:CheckItem(obj, "Cond_Unload")
+	
+	local sec = obj:section()
+	if sec == "wpn_rpg26" then
+		return false
+	end
+	
+	return ui_inventory_UIInventory_Cond_Unload(self, obj, bag)
+end
+
+-- Monkey patch unload all weapons
+item_weapon_unload_all_weapons = item_weapon.unload_all_weapons
+item_weapon.unload_all_weapons = function()
+	if mags_patches then
+		-- Use modified Mags Redux unload all function
+		mags_patches_unload_all_patch()
+	else
+		-- Use modified Vanilla unload all function
+		vanilla_unload_all_patch()
+	end
+end
+
+-- Monkey patch UnloadAll from Nitpickers Modpack
+ish_proper_unload_validate = nil
+if ish_proper_unload then
+	ish_proper_unload_validate = ish_proper_unload.validate
+	ish_proper_unload.validate = function(obj)
+		if not IsWeapon(obj) or IsItem("fake_ammo_wpn", obj:section()) or obj:section() == "wpn_rpg26" then
+			return true
+		end
+	end
+end
+
+function mags_patches_unload_all_patch()
+	db.actor:iterate_ruck(function(temp, obj)	
+		if IsWeapon(obj) and (not IsItem("fake_ammo_wpn", obj:section())) and (obj:section() ~= "wpn_rpg26") then
+			if mags_patches.is_supported_weapon(obj) then
+				mags_patches.eject(obj)
+			else
+				obj:force_unload_magazine(true)
+			end
+		end
+	end)
+end
+
+function vanilla_unload_all_patch()
+	db.actor:iterate_ruck(function(temp, obj)	
+		if IsWeapon(obj) and (not IsItem("fake_ammo_wpn",obj:section())) and (obj:section() ~= "wpn_rpg26") then
+			obj:force_unload_magazine(true)
+		end
+	end)
+end

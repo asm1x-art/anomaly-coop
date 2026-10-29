@@ -72,7 +72,7 @@ function attach_scope(item, weapon)
 	
 	-- An addon has already been attached or none can be used.
 	local parent_section = ini_sys:r_string_ex(weapon:section(),"parent_section")
-	if (not parent_section or weapon:section() ~= parent_section) then return end
+	if (not parent_section or weapon:section() ~= parent_section or utils_item.has_attached_scope(weapon)) then return end
 	
 	-- Modified weapon does not exist and as such can't be used.
 	local child_section = (parent_section .. "_" .. item:section())

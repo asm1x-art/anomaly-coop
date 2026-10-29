@@ -1,0 +1,258 @@
+;	average	       	 0.3		 0.5		 0.8		1.1			1.3			1.5		2.0		2.5    3.0		3.5
+;burn_protection 	-77% 		-61%		-50%   	   -33%		   -22%		   -11%
+;shock_protection	-89%		-82%		-75%	   -68%		   -61%		   -55%	    -50%   -38%    -26%	    -14%
+;chemical_burn		-66%		-42%		-35%	   -28%		   -22%		   -16%	
+
+;	strong	       	 0.3		 0.5		 0.8		1.1			1.3			1.5		2.0		2.5    3.0		3.5
+;burn_protection 	-77% 		-61%		-50%   	   -33%		   -22%		   -11%
+;shock_protection	-89%		-82%		-75%	   -68%		   -61%		   -55%	    -50%   -38%    -26%	    -14%
+;chemical_burn		-66%		-42%		-35%	   -28%		   -22%		   -16%	
+
+
+![ecolog_outfit_orange] 
+;ССП первого поколения, повышенный огонь
+bones_koeff_protection        = actor_armor_ssp
+immunities_sect               = sect_ecolog_immunities
+!community
+
+burn_protection               = 1.2
+shock_protection              = 1.35
+chemical_burn_protection      = 0.85
+strike_protection             = 0.3
+explosion_protection          = 0.30
+wound_protection              = 0.3
+radiation_protection          = 0.044
+
+cost                          = 24500
+inv_weight                    = 2.5
+
+additional_inventory_weight    = 20
+additional_inventory_weight2   = 20
+
+
+![ecolog_outfit_green]
+;ССП первого поколения, повышенный хим
+bones_koeff_protection        = actor_armor_ssp
+immunities_sect               = sect_ecolog_immunities
+!community
+
+burn_protection               = 0.6
+shock_protection              = 1.35
+chemical_burn_protection      = 1.2
+strike_protection             = 0.3
+explosion_protection          = 0.30
+wound_protection              = 0.3
+radiation_protection          = 0.044
+
+cost                          = 24980
+inv_weight                    = 2.72
+
+additional_inventory_weight    = 20
+additional_inventory_weight2   = 20
+
+
+![ecolog_outfit_blue]
+;ССП первого поколения, повышенный электро и пси
+bones_koeff_protection        = actor_armor_ssp
+immunities_sect               = sect_ecolog_immunities
+!community
+
+burn_protection               = 0.6
+shock_protection              = 2.4
+chemical_burn_protection      = 0.85
+strike_protection             = 0.3
+explosion_protection          = 0.30
+wound_protection              = 0.3
+radiation_protection          = 0.044
+
+telepatic_protection          = 0.28
+
+cost                          = 24730
+inv_weight                    = 2.85
+
+additional_inventory_weight    = 20
+additional_inventory_weight2   = 20
+
+; ССП "второго поколения" (sabbat) 
+;==============================================
+
+![ecolog_outfit_yello]
+;ССП второго поколения, лучший огонь и хима
+bones_koeff_protection        = actor_armor_ssp_up
+immunities_sect               = sect_ecolog_immunities_up
+
+burn_protection               = 1.5
+shock_protection              = 2.1
+chemical_burn_protection      = 1.5
+strike_protection             = 0.3
+explosion_protection          = 0.32
+wound_protection              = 0.3
+radiation_protection          = 0.054
+fire_wound_protection         = 0.4
+
+artefact_count                = 3
+cost                          = 51400
+inv_weight                    = 6.63
+
+additional_inventory_weight    = 28
+additional_inventory_weight2   = 28
+
+![ecolog_outfit_red]
+;ССП второго поколения, лучший огонь хима и электра + от мутантов неплохо, но тяжелый
+bones_koeff_protection        = actor_armor_ssp_up
+immunities_sect               = sect_ecolog_immunities_up
+
+burn_protection               = 1.6
+shock_protection              = 3.0
+chemical_burn_protection      = 1.7
+strike_protection             = 0.6
+explosion_protection          = 0.4
+wound_protection              = 0.6
+radiation_protection          = 0.054
+fire_wound_protection         = 0.25
+
+telepatic_protection          = 0.26
+
+artefact_count                = 3
+cost                          = 63160
+inv_weight                    = 9.57
+
+additional_inventory_weight    = 28
+additional_inventory_weight2   = 28
+
+
+![ecolog_outfit_white]
+;ССП второго поколения, повышенный огонь хима и электра + пулестой
+bones_koeff_protection        = actor_armor_ssp_upb
+immunities_sect               = sect_ecolog_immunities_up
+
+burn_protection               = 1.6
+shock_protection              = 3.5
+chemical_burn_protection      = 1.7
+strike_protection             = 0.5
+explosion_protection          = 0.45
+wound_protection              = 0.5
+radiation_protection          = 0.054
+fire_wound_protection         = 0.35
+
+telepatic_protection          = 0.26
+
+artefact_count                = 3
+cost                          = 82400
+inv_weight                    = 7.63
+
+additional_inventory_weight    = 28
+additional_inventory_weight2   = 28
+
+
+; Прочность(изменено sabbat) 
+;==============================================
+[sect_ecolog_immunities]
+burn_immunity                 = 0.01
+chemical_burn_immunity        = 0.006
+explosion_immunity            = 0.2
+fire_wound_immunity           = 0.055
+radiation_immunity            = 0.0
+shock_immunity                = 0.0
+strike_immunity               = 0.13
+telepatic_immunity            = 0.0
+wound_immunity                = 0.12
+;==============================================
+
+; Прочность для бронированных версий (изменено sabbat) 
+;==============================================
+[sect_ecolog_immunities_up]
+burn_immunity                 = 0.01
+chemical_burn_immunity        = 0.006
+explosion_immunity            = 0.2
+fire_wound_immunity           = 0.034
+radiation_immunity            = 0.0
+shock_immunity                = 0.0
+telepatic_immunity            = 0.0
+strike_immunity               = 0.082
+wound_immunity                = 0.082
+;==============================================
+
+[actor_armor_ssp]:body_damage_ssp, head_damage_ssp10
+ap_scale						= 0.8
+
+[body_damage_ssp]
+bip01_pelvis 				= 1, 0.12
+bip01_spine 		 		= 1, 0.12
+bip01_spine1 		 		= 1, 0.12
+bip01_spine2 		 		= 1, 0.12
+
+bip01_l_clavicle	 		= 1, 0.12
+bip01_l_upperarm	 		= 1, 0.12
+bip01_l_forearm	 	 		= 1, 0.12
+
+bip01_r_clavicle	 		= 1, 0.12
+bip01_r_upperarm	 		= 1, 0.12
+bip01_r_forearm	 	 		= 1, 0.12
+
+bip01_l_thigh	 	 		= 1, 0.12
+bip01_l_calf	 	 		= 1, 0.12
+bip01_r_thigh	 	 		= 1, 0.12
+bip01_r_calf	 	 		= 1, 0.12
+
+bip01_l_hand	 	 		= 1, 0.12
+bip01_r_hand	 	 		= 1, 0.12
+bip01_r_foot	 	 		= 1, 0.12
+bip01_l_foot	 	 		= 1, 0.12
+
+[actor_armor_ssp_up]:body_damage_ssp_up, head_damage_ssp12_up
+ap_scale						= 0.8
+
+[body_damage_ssp_up]
+bip01_pelvis 				= 1, 0.34
+bip01_spine 		 		= 1, 0.34
+bip01_spine1 		 		= 1, 0.34
+bip01_spine2 		 		= 1, 0.34
+
+bip01_l_clavicle	 		= 1, 0.34
+bip01_l_upperarm	 		= 1, 0.34
+bip01_l_forearm	 	 		= 1, 0.34
+
+bip01_r_clavicle	 		= 1, 0.34
+bip01_r_upperarm	 		= 1, 0.34
+bip01_r_forearm	 	 		= 1, 0.34
+
+bip01_l_thigh	 	 		= 1, 0.34
+bip01_l_calf	 	 		= 1, 0.34
+bip01_r_thigh	 	 		= 1, 0.34
+bip01_r_calf	 	 		= 1, 0.34
+
+bip01_l_hand	 	 		= 1, 0.24
+bip01_r_hand	 	 		= 1, 0.24
+bip01_r_foot	 	 		= 1, 0.24
+bip01_l_foot	 	 		= 1, 0.24
+
+
+[actor_armor_ssp_upb]:body_damage_ssp_upb, head_damage_ssp12_upb
+ap_scale						= 0.8
+
+[body_damage_ssp_upb]
+bip01_pelvis 				= 1, 0.42
+bip01_spine 		 		= 1, 0.42
+bip01_spine1 		 		= 1, 0.42
+bip01_spine2 		 		= 1, 0.42
+
+bip01_l_clavicle	 		= 1, 0.42
+bip01_l_upperarm	 		= 1, 0.42
+bip01_l_forearm	 	 		= 1, 0.42
+
+bip01_r_clavicle	 		= 1, 0.42
+bip01_r_upperarm	 		= 1, 0.42
+bip01_r_forearm	 	 		= 1, 0.42
+
+bip01_l_thigh	 	 		= 1, 0.42
+bip01_l_calf	 	 		= 1, 0.42
+bip01_r_thigh	 	 		= 1, 0.42
+bip01_r_calf	 	 		= 1, 0.42
+bip01_r_calf	 	 		= 1, 0.42
+
+bip01_l_hand	 	 		= 1, 0.28
+bip01_r_hand	 	 		= 1, 0.28
+bip01_r_foot	 	 		= 1, 0.28
+bip01_l_foot	 	 		= 1, 0.28
+

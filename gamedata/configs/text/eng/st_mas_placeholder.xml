@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	MAS Placeholder
+-->
+
+<string_table>
+	
+	<string id="st_addon_scope_placeholder">
+		<text>Anomalous scope</text>
+	</string>
+	<string id="st_addon_scope_placeholder_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2] all weapons with a scope mount\n \n%c[ui_gray_1]An anomalous scope looks like a plain old PU scope, scratched glass and all, with nothing strange about it at first glance. The anomaly only shows itself when it locks flawlessly onto any scope mount, no adapters, no complaints. Veterans don't question how or why it works - they just know it shouldn't.\n</text>
+	</string>
+	
+</string_table>

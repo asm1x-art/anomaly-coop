@@ -1,0 +1,224 @@
+;
+; PU
+;
+
+![wpn_addon_scope_pu]
+	animation_slot                   = 2
+	inv_offset_x                     = 29
+	inv_offset_y                     = 35
+	use_alt_aim_hud					 = true
+	hud                              = wpn_addon_scope_pu_hud
+
+[wpn_addon_scope_pu_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\pu
+    aim_hud_offset_pos               = -0.014878, -0.058734, 0.200544
+    aim_hud_offset_pos_16x9          = -0.014878, -0.058734, 0.200544
+
+![scope_group_pu]
+    >scopes                          = wpn_addon_scope_pu
+
+;
+; PO
+;
+
+![wpn_addon_scope_po4x34]
+	animation_slot                   = 2
+	inv_offset_x                     = 51
+	inv_offset_y                     = 38
+	use_alt_aim_hud					 = true
+	hud                              = wpn_addon_scope_po4x34_hud
+
+[wpn_addon_scope_po4x34_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\po
+    aim_hud_offset_pos               = 5.3e-05, -0.034103, 0.217008
+    aim_hud_offset_pos_16x9          = 5.3e-05, -0.034103, 0.217008
+    aim_hud_offset_alt_pos           = -0.039947, 0.000559, 0.252801
+    aim_hud_offset_alt_pos_16x9      = -0.039947, 0.000559, 0.252801
+    aim_hud_offset_alt_rot           = 0, 0, -0.501842
+    aim_hud_offset_alt_rot_16x9      = 0, 0, -0.501842
+
+![scope_group_groza]
+    >scopes                          = wpn_addon_scope_po4x34
+
+;
+; ZF4
+;
+
+![wpn_addon_scope_zf4]
+	animation_slot                   = 2
+	inv_offset_x                     = 41
+	inv_offset_y                     = 32
+	use_alt_aim_hud					 = true
+	hud                              = wpn_addon_scope_zf4_hud
+
+[wpn_addon_scope_zf4_hud]:scope_hud_base,picatinny_alt_positions
+	item_visual                      = attachments\scopes\zf4
+    aim_hud_offset_pos               = -5.3e-05, -0.031676, 0.221656
+    aim_hud_offset_pos_16x9          = -5.3e-05, -0.031676, 0.221656
+
+![scope_group_zf4]
+    >scopes                          = wpn_addon_scope_zf4
+
+;
+; GALIL SCOPE (BUSHNELL BANNER)
+;
+
+![wpn_addon_scope_galil]
+	animation_slot                   = 2
+	inv_offset_x                     = 43
+	inv_offset_y                     = 29
+	use_alt_aim_hud					 = true
+	hud                              = wpn_addon_scope_galil_hud
+
+[wpn_addon_scope_galil_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\bushnell_banner
+    aim_hud_offset_pos               = -0.020679, -0.114087, 0.261925
+    aim_hud_offset_pos_16x9          = -0.020679, -0.114087, 0.261925
+    aim_hud_offset_alt_pos           = -0.058666, -0.103523, 0.288076
+    aim_hud_offset_alt_pos_16x9      = -0.058666, -0.103523, 0.288076
+    aim_hud_offset_alt_rot           = 0, 0, -0.501842
+    aim_hud_offset_alt_rot_16x9      = 0, 0, -0.501842
+
+![scope_group_galil]
+    >scopes                          = wpn_addon_scope_galil
+
+;
+; EOT
+;
+
+![eot]:scope_base
+	inv_offset_x                     = 10
+	inv_offset_y                     = 32
+	hud                              = eot_hud
+
+[eot_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\eot
+    aim_hud_offset_pos               = -0.000153, -0.033292, 0.173797
+    aim_hud_offset_pos_16x9          = -0.000153, -0.033292, 0.173797
+
+;
+; AC10632
+;
+
+![ac10632]:scope_base
+	inv_offset_x                     = 21
+	inv_offset_y                     = 38
+	hud                              = ac10632_hud
+
+[ac10632_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\ac10632	
+    aim_hud_offset_pos               = 0.000101, -0.026465, 0.173797
+    aim_hud_offset_pos_16x9          = 0.000101, -0.026465, 0.173797
+
+;
+; AC11090
+;
+
+![ac11090]:scope_base
+	inv_offset_x                     = 11
+	inv_offset_y                     = 36
+	hud                              = ac11090_hud
+
+[ac11090_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\ac11090
+    aim_hud_offset_pos               = -0.000265, -0.020714, 0.173797
+    aim_hud_offset_pos_16x9          = -0.000265, -0.020714, 0.173797
+
+;
+; C-MORE
+;
+
+![c-more]:scope_base
+	inv_offset_x                     = 7
+	inv_offset_y                     = 34
+	hud                              = c-more_hud
+
+[c-more_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\c-more
+    aim_hud_offset_pos               = -0.000318, -0.024619, 0.147559
+    aim_hud_offset_pos_16x9          = -0.000318, -0.024619, 0.147559
+
+;
+; ACOG
+;
+
+![acog]:scope_base
+	inv_offset_x                     = 23
+	inv_offset_y                     = 37
+	scope_zoom_factor                = 20
+	use_alt_aim_hud					 = true
+	hud                              = acog_hud
+
+[acog_hud]:scope_hud_base,picatinny_alt_positions
+	item_visual                      = attachments\scopes\acog
+    aim_hud_offset_pos               = -5.3e-05, -0.026181, 0.105927
+    aim_hud_offset_pos_16x9          = -5.3e-05, -0.026181, 0.105927
+
+;
+; PSO-1
+;
+
+![ps01]:scope_base
+	inv_offset_x                     = 45
+	inv_offset_y                     = 27
+    scope_texture                    =
+    scope_zoom_factor                = 15
+	use_alt_aim_hud					 = true
+	hud                              = ps01_hud
+
+[ps01_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\pso1
+    aim_hud_offset_pos               = -0.010281, -0.069329, 0.147434
+    aim_hud_offset_pos_16x9          = -0.010281, -0.069329, 0.147434
+
+;
+; PSO-1M2-01
+;
+
+![pso1m21]:scope_base
+	inv_offset_x                     = 45
+	inv_offset_y                     = 27
+	scope_dynamic_zoom               = on
+    scope_texture                    =
+    scope_zoom_factor                = 15
+	use_alt_aim_hud					 = true
+	hud                              = pso1m21_hud
+
+[pso1m21_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\pso1m21
+    aim_hud_offset_pos               = -0.010281, -0.069329, 0.147434
+    aim_hud_offset_pos_16x9          = -0.010281, -0.069329, 0.147434
+
+;
+; 1P29
+;
+
+![1p29]:scope_base
+	inv_offset_x                     = 20
+	inv_offset_y                     = 29
+    scope_texture                    =
+    scope_zoom_factor                = 15
+	use_alt_aim_hud					 = true
+	hud                              = 1p29_hud
+
+[1p29_hud]:scope_hud_base,dovetail_alt_positions
+	item_visual                      = attachments\scopes\1p29
+    aim_hud_offset_pos               = -0.019336, -0.077991, 0.102182
+    aim_hud_offset_pos_16x9          = -0.019336, -0.077991, 0.102182
+
+;
+; KOBRA
+;
+
+![kobra]:scope_base
+	inv_offset_x                     = 18
+	inv_offset_y                     = 26
+	hud                              = kobra_hud
+
+[kobra_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\kobra
+aim_hud_offset_pos               = -0.018245, -0.079744, 0.143872
+aim_hud_offset_pos_16x9          = -0.018245, -0.079744, 0.143872
+
+![scope_group_dovetail]
+    >scopes                          = kobra

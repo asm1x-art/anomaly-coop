@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	Weapons Attachments
+-->
+
+<string_table>
+
+	<string id="st_addon_scope_t12">
+		<text>Torrey Pines Logic T12W 30Гц тепловизионный коллиматорный прицел</text>
+	</string>
+	<string id="st_addon_scope_t12_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_green] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_green] • %c[0,255,255,255] Производитель: %c[ui_gray_2]Torrey Pines Logic\n
+		%c[d_green] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1.0x\n \n			
+		</text>
+	</string>	
+
+	<string id="st_addon_scope_echo1">
+		<text>SIG Sauer ECHO1 1-2x30мм 30Гц тепловизионный коллиматорный прицел</text>
+	</string>
+	<string id="st_addon_scope_echo1_descr">
+		<text>%c[0,255,255,255]ХАРАКТЕРИСТИКИ:\n
+		%c[d_green] • %c[0,255,255,255] Страна: %c[ui_gray_2]США\n
+		%c[d_green] • %c[0,255,255,255] Производитель: %c[ui_gray_2]SIG SAUER\n
+		%c[d_green] • %c[0,255,255,255] Увеличение: %c[ui_gray_2]1-2x\n \n			
+		</text>
+	</string>	
+
+
+</string_table>

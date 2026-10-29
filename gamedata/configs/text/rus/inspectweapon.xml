@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_menu_inspectWeapon">
+		<text>Осмотр оружия</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_keybind">
+		<text>Осмотреть оружие</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_keyInputMode">
+		<text>Режим ввода с клавиатуры</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_inspectDoF">
+		<text>Глубина резкости (DOF) при осмотре</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_inspectRemoveUI">
+		<text>Убирать интерфейс при осмотре оружия</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_disableIdleAnimation">
+		<text>Отключить анимацию бездействия оружия</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_disableIdleAnimation_desc">
+		<text>При включении этой опции игра не будет автоматически запускать анимацию бездействия оружия, если игрок долго ничего не делает.</text>
+	</string>
+</string_table>

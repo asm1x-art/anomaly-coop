@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	MAS Extra Scopes
+-->
+
+<string_table>
+	
+	<string id="st_addon_scope_1p59">
+		<text>1P59 "Hyperon" scope</text>
+	</string>
+	<string id="st_addon_scope_1p59_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2] all Warsaw Pact rifles\n \n%c[ui_gray_1]Giperon is a series of Russian variable-magnification pancratic sights designed for reconnaissance of targets and aimed shooting from sniper rifles. In 2001, it was adopted for service. It is distinguished by high light intensity, which ensures image clarity in low-light conditions. The 1P59 sight is designed for the SVD. It has variable magnification and an improved ballistic reticle, which makes it effective for use at long range.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]3.0-10.0x\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good\n
+		%c[d_purple] • %c[ui_gray_2] Reticule pattern: %c[ui_gray_1]1P59</text>
+	</string>
+	
+	<string id="st_addon_scope_1pn93">
+		<text>1PN93 "Malysh" scope</text>
+	</string>
+	<string id="st_addon_scope_1pn93_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2] all Warsaw Pact rifles\n \n%c[ui_gray_1]1PN93 night scope is designed for battlefield observing and conducting aimed fire in poor visibility conditions. The sight was developed in the 1990s at the Tochpribor Central Design Bureau, manufactured by Novosibirsk Instrument-Making Plant. The scope features modular design, which made it possible to deploy the production of various types of sights for a wide range of small arms with minimal costs.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]4.0x\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]good\n
+		%c[d_purple] • %c[ui_gray_2] Reticule pattern: %c[ui_gray_1]1PN93</text>
+	</string>
+	
+	<string id="st_addon_scope_pk-a">
+		<text>PK-A scope</text>
+	</string>
+	<string id="st_addon_scope_pk-a_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2] all Warsaw Pact rifles\n \n%c[ui_gray_1]PK-A is a Belarusian collimator sight for light small arms, developed by specialists of the Minsk enterprise "BelOMO". Compared to standard sighting devices, it allows to reduce the time for aiming by more than three times while increasing the accuracy of aiming by more than two times. The design of the optical system of the sight allows its use in low light conditions and at night in combination with a night vision device.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]none (collimator)\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good</text>
+	</string>
+	
+	<string id="st_addon_scope_docter">
+		<text>Docter Sight scope</text>
+	</string>
+	<string id="st_addon_scope_docter_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2]all NATO rifles\n \n%c[ui_gray_1]Docter is a collimator sight developed by Docter Optics to improve the effectiveness of shooting at medium distances. The sight was created to provide fast targeting and simplify the aiming process. Among its features are compactness, lightness and high targeting accuracy.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]none (collimator)\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good</text>
+	</string>
+	
+	<string id="st_addon_scope_aimpoint">
+		<text>Aimpoint scope</text>
+	</string>
+	<string id="st_addon_scope_aimpoint_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2]all NATO rifles\n \n%c[ui_gray_1]A collimator sight manufactured by Aimpoint, designed for use in small arms. Designed to meet the needs of military and law enforcement agencies, it provides fast and accurate aiming in various conditions. The main features of the model are shock resistance, waterproofness and long battery life.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]none (collimator)\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good</text>
+	</string>
+
+	<string id="st_addon_scope_mark4">
+		<text>Leupold Mark 4 scope</text>
+	</string>
+	<string id="st_addon_scope_mark4_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2]all NATO rifles\n \n%c[ui_gray_1]The Leupold Mark 4 riflescope is designed by Leupold Stevens, a company known for its high-quality optics. This scope is designed for precision shooting at long ranges and is popular among hunters and target shooters. Distinguishing features of the Mark 4 include high impact resistance, clear image quality, and the ability to adapt to various shooting conditions thanks to the adjustments of the reticle and illumination.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]6.5-20.0x\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good\n
+		%c[d_purple] • %c[ui_gray_2] Reticule pattern: %c[ui_gray_1]Mark 4</text>
+	</string>
+
+	<string id="st_addon_scope_pks07">
+		<text>PKS-07 scope</text>
+	</string>
+	<string id="st_addon_scope_pks07_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2]all NATO rifles\n \n%c[ui_gray_1]The PKS-07 optical sight was developed by specialists from the Leningrad Optical and Mechanical Association (LOMO). It was manufactured in 1997-1998 by NPO Pusk (Saint Petersburg) by order of the FSB of the Russian Federation. The PKS-07 features include high magnification and robust construction, which makes it a reliable tool for military purposes compared to its analogues.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]7.0x\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good\n
+		%c[d_purple] • %c[ui_gray_2] Reticule pattern: %c[ui_gray_1]PKS-07</text>
+	</string>
+
+	<string id="st_addon_scope_ts12x">
+		<text>US Optics TS-12X scope</text>
+	</string>
+	<string id="st_addon_scope_ts12x_descr">
+		<text>\n \n%c[ui_gray_2]COMPATIBILITY:\n \n%c[d_cyan] • %c[ui_gray_2]all NATO rifles\n \n%c[ui_gray_1]TS-12X scope was developed by the American company US Optics, which specializes in creating high-quality optical devices for shooters and hunters. This sight offers variable magnification from 3 to 12x, making it a versatile choice for close and medium ranges. The TS-12X features a robust design, anodized coating, and a high-precision ballistic reticle, providing clear aiming and maximum shooting accuracy in a variety of conditions.\n \n
+		%c[d_purple] • %c[ui_gray_2] Magnification: %c[ui_gray_1]3.0-12.0x\n
+		%c[d_purple] • %c[ui_gray_2] Condition: %c[ui_gray_1]very good\n
+		%c[d_purple] • %c[ui_gray_2] Reticule pattern: %c[ui_gray_1]MHR</text>
+	</string>
+	
+</string_table>

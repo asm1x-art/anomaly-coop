@@ -1,0 +1,1007 @@
+local ini_parts   = itms_manager.ini_parts
+parts_list = a_wpo_parts.parts_list
+get_config = a_arti_jamming_mcm.get_config
+gc = game.translate_string
+math_random = math.random
+math_floor = math.floor
+local jammin = sound_object("wpo\\jammin")
+
+-- Enum for different types of jams
+JamType = {
+	OK = 0,
+	Misfire = 1, -- No discharge
+	FailureToEject = 2, -- Discharge
+	DoubleFeed = 3, -- Discharge, Need to remove magazine
+	Classic = 2, -- Just reload
+}
+
+-- associate jammed guns to type of jam
+local jammed_guns 	= {}
+--[[
+	properties:
+	id: id of current weapon, if applicable
+	has_parts: if weapon has parts or not, determines if rest is filled in
+	parts: map of part_name -> condition, same as item_parts, minus barrel
+	part_names: list of part names, these are the mechanism parts only. we will take the other parts as needed
+	barrel_name: name of barrel in weapon, for barrel specific calculation
+	barrel_con: cond of barrel in weapon
+	trigger_name: name of trigger
+]]
+local cgd = {}
+
+local ini_weapon = ini_file("wpo\\weapons\\importer.ltx")
+
+local guarantee_not_jam = 0
+-- use to block inputs while animations / unjam logic fires
+local unjam_in_progress = false
+
+
+-------------------
+-- SECTION utils --
+-------------------
+
+function print_dbg(txt, ...)
+	local enable_debug = get_config("debug") or false
+	if enable_debug then
+		printf("arti_jamming | %s | " .. txt, time_global(), ...)
+	end
+end
+
+function send_msg(msg)
+	if get_config("verbosity") then
+		actor_menu.set_msg(1, gc(msg),3)
+	end
+end
+
+-- export functions
+function get_jam_status(id)
+	return jammed_guns[id]
+end
+
+function set_jam_status(id, status)
+	print_dbg("Id %s set to %s", id, status)
+	jammed_guns[id] = status
+end
+
+function get_jammed(id)
+	return jammed_guns[id] and jammed_guns[id] > 0
+end
+
+local can_swear = true
+
+--gun jam play swearing sound
+function jam_swearing()
+	local timeout = get_config("profanity_timeout")
+	if timeout and not can_swear then return end
+	if get_config("profanity") and math_random(1,100) > 50 then
+		local lang = get_config("profanity_language") or "rus"
+		utils_obj.play_sound("cutscenes\\"..lang.."\\gun_jam_"..math_random(1,7), 1 )
+		if timeout then
+			can_swear = false
+			CreateTimeEvent("wpo", "reset_swear", 2, reset_swear)
+		end
+    end
+end
+
+function reset_swear()
+	can_swear = true
+	return true
+end
+
+function start_jammin(chance)
+	local fun_level = get_config("fun")
+	fun_level = tonumber(fun_level)
+	print_dbg("fun level: %s", fun_level)
+	if fun_level == 0 then 
+		return 
+	end
+	if fun_level == 2 then 
+		chance = chance * 2 
+	end
+	if not jammin:playing() and math.random(100) <= chance then
+		jammin.volume = 1
+		jammin:play(db.actor, 0, sound_object.s2d)
+	end
+end
+
+function stop_jammin()
+	if jammin:playing() then
+		jammin:stop()
+	end
+end
+
+function is_part(part)
+	return parts_list[part]
+end
+
+function is_barrel(part)
+	return is_part(part) and string.find(part, "barrel")
+end
+function is_trigger(part)
+	return is_part(part) and string.find(part, "trigger")
+end
+
+local function parent_section(sec)
+	return SYS_GetParam(0, sec,"parent_section") or sec
+end
+
+function get_parts_list(wpn)
+    local parts = se_load_var(wpn:id(), wpn:name(), "parts")
+    if wpn and IsWeapon(wpn) and (not IsMelee(wpn)) and parts then
+        for k,v in pairs(parts) do
+            if (string.find(k, "_o_")) then
+                alife_release(wpn)
+                return nil
+            end
+        end
+    end
+	if wpn and IsWeapon(wpn) and (not IsMelee(wpn)) and not IsItem("fake_ammo_wpn",sec) then
+		local sec = parent_section(wpn:section())
+		return ini_parts:r_string_ex("con_parts_list", sec)
+	else 
+		return nil
+	end
+end
+
+-- true if item is a firearm with parts
+function has_parts(wpn)
+	return get_parts_list(wpn) ~= nil
+end
+ 
+function sec_has_parts(sec)
+	sec = parent_section(sec)
+	if sec then
+		return string.find(sec, "wpn_") and ini_parts:r_string_ex("con_parts_list", sec)
+	else return false
+	end
+end
+
+function missing_parts(wpn, check_broken)
+	local comp = check_broken and -1 or 0
+	if wpn:id() == cgd.id then
+		if not cgd.has_parts then return false end
+		if cgd.barrel_con < comp then return true end
+		for k,v in pairs(cgd.parts) do
+			if v < comp then return true end
+		end
+	else
+		local parts = item_parts.get_parts_con(wpn, nil, true)
+		
+		-- Прежде чем в скрипты лезть - научись кодить, животное
+		if not parts then 
+			cgd.has_parts = false
+			return 
+		end
+		
+		if not parts or is_empty(parts) then return false end
+		for k,v in pairs(parts) do
+			if is_part(k) and v < comp then return true end
+		end
+	end
+	return false
+end
+
+
+function play_anim(weapon, anim, sound)
+	local length = weapon:play_hud_motion(anim, true, 0, 1, 0)
+	print_dbg("playing animation %s for %s time", anim, length)
+	if sound then
+		utils_obj.play_sound(sound)
+	end				
+	return length
+end
+
+
+function persist_current_weapon()
+	if cgd.id and cgd.has_parts then
+		local saved_parts = se_load_var(cgd.id, nil, "parts")
+		local copy_parts = {}
+		copy_table(saved_parts, copy_parts)
+		for k,v in pairs(cgd.parts) do
+			copy_parts[k] = v
+		end
+		copy_parts[cgd.barrel_name] = cgd.barrel_con
+		item_parts.set_parts_con(cgd.id, copy_parts)
+		print_dbg("Persisted parts for weapon %s", cgd.id)
+	end
+end
+
+-- current weapon access/update
+
+function update_part(part, cond)
+	if cgd.barrel_name == part then
+		cgd.barrel_con = cond
+	elseif cgd.parts[part] then
+		cgd.parts[part] = cond
+	end
+	persist_current_weapon()
+end
+
+function remove_part(part)
+	update_part(part, -1)
+end
+
+function get_parts()
+	local parts = {}
+	copy_table(cgd.parts, parts)
+	parts[cgd.barrel_name] = cgd.barrel_con
+	return parts
+end
+
+function current_id()
+	return cgd.id
+end
+
+function reset_cgd()
+	clear_cgd()
+	update_current()
+end
+----------------------------
+-- SECTION main functions --
+----------------------------
+function actor_on_first_update()
+	update_current()
+end
+
+function clear_cgd()
+	empty_table(cgd.parts)
+	empty_table(cgd.data)
+	empty_table(cgd)
+	cgd.id = 0
+	cgd.has_parts = false
+end
+
+-- update current gun to be gun in hand
+function update_current()
+	
+	local wpn = db.actor:active_item()
+	if not wpn then return end
+	local id = wpn:id()
+	if id == cgd.id then return end
+
+	local sec = wpn:section()
+	if not has_parts(wpn) then
+		clear_cgd()
+		cgd.id = id
+		print_dbg("Current wpn (no parts) changed to %s (%s)", cgd.id, sec)
+	else
+		cgd.id = id
+		cgd.has_parts = true
+		print_dbg("Current wpn changed to %s (%s)", cgd.id, sec)
+		cgd.current_wpn_shot_dec = wpn and SYS_GetParam(2, sec,"condition_shot_dec") or 0.0005
+		
+		-- consider upgrades
+		local upgrades = utils_item.get_upgrades_installed(obj)
+		for _, upgrade in pairs(upgrades) do
+			local section = ini_sys:r_string_ex(upgrade, "section")
+			local shot_dec = ini_sys:r_string_ex(section,"condition_shot_dec")
+			if shot_dec then
+				local op = string.sub(shot_dec, 1, 1)
+				local val = tonumber(string.sub(shot_dec, 2))
+				cgd.current_wpn_shot_dec = op == "+" and cgd.current_wpn_shot_dec + val or cgd.current_wpn_shot_dec - val
+			end
+		end
+
+		-- ingest parts
+		cgd.parts = {}
+		local saved_parts = item_parts.get_parts_con(wpn, nil, true)
+		-- fix mistakes - if weapon should have parts but were deleted, delete and restore
+		for k, v in pairs(saved_parts) do
+			print_dbg("Part: %s, condition of part: %s", k, v)
+			if is_trigger(k) then
+				cgd.trigger_name = k
+				cgd.parts[k] = v
+			elseif is_barrel(k) then
+				cgd.barrel_name = k
+				cgd.barrel_con = v
+			elseif is_part(k) then
+				cgd.parts[k] = v
+			end
+		end
+		-- manage family data
+		cgd.data = {}
+		local parent = parent_section(sec)
+		if not ini_weapon:section_exist(parent) then parent = "base" end
+		cgd.data.jam_chance = larp.str_explode_num(ini_weapon:r_string_ex(parent, "jam_chance") or "0.001, 0.03, 0.09, 0.27, 0.81", ",")
+		cgd.data.max_jam_chance = ini_weapon:r_float_ex(parent, "max_jam_chance") or 1
+		cgd.data.misfire_chance = larp.str_explode_num(ini_weapon:r_string_ex(parent, "misfire_chance"), ",")
+		cgd.data.superjam_mult = ini_weapon:r_float_ex(parent, "superjam_mult") or 1
+		cgd.data.damage_chance_mult = ini_weapon:r_float_ex(parent, "damage_chance_mult") or 1
+		cgd.data.barrel_wear = ini_weapon:r_float_ex(parent, "barrel_wear") or 1
+		cgd.ammo_data = utils_item.get_ammo(nil, wpn:id())
+	end
+end
+
+function get_ammo_impair(wpn)
+	if wpn:id() ~= cgd.id or not get_config("oldammo") then return 1 end
+	local ammo = cgd.ammo_data[wpn:get_ammo_type()+1]
+	return ammo and SYS_GetParam(2, ammo, "impair") or 1
+end
+
+-- returns true if using ammo with impair > 1
+function using_old_ammo(wpn)
+	return get_ammo_impair(wpn) > 1
+end
+
+-- individually calculate jam based on weapon parts, and jam the weapon if applicable
+-- Average jam chance based on damage level of each component.
+local function calculate_jam(wpn)
+	if guarantee_not_jam > 0 then
+		return
+	end
+	
+	jam_chance = calculate_jam_chance(wpn)
+
+	print_dbg("Final jam chance: %s", jam_chance)
+
+	if (math_random() < jam_chance) then
+		if wpn:get_ammo_in_magazine() > 0 and get_config("superjam") and (math_random() < (cgd.data.superjam_mult * jam_chance/2)) then
+			set_jam_status(wpn:id(), JamType.DoubleFeed)
+			print_dbg("Severe jam")
+		else
+			set_jam_status(wpn:id(), JamType.FailureToEject)
+			print_dbg("Normal jam")
+		end
+		start_jammin(2)
+		CreateTimeEvent("arti_jamming", "jamsound", 0.1, 
+		function(sec, key)
+			play_sound(nil, 1, sec, key)
+			return true
+		end
+		, wpn:section(), "jam_sound")
+		send_msg("ui_st_jam")
+	end
+end
+
+-- assumes weapon being used is current
+function calculate_jam_chance(wpn, extra)
+	-- compute base chance from quality of weapon parts
+	local without_jammin = true
+	local count = 0
+	local mechanism_cond = #cgd.parts
+	for k, v in pairs(cgd.parts) do -- skip barrel
+		local severity = 5 - clamp(math_floor(v / 20), 0, 4)
+		mechanism_cond = mechanism_cond + cgd.data.jam_chance[severity]
+		count = count + 1
+		if v < 95 then without_jammin = nil end
+	end
+	jam_chance = mechanism_cond/count
+	
+	local cond = wpn:condition()	
+	if cond and cond < 0.90 then without_jammin = nil end
+	if without_jammin == true then jam_chance = 0.0 end
+	
+	if not extra then return jam_chance end
+	
+	
+	-- apply ammo, mcm and condition enhancements
+	local ammo_impair = get_ammo_impair(wpn)
+	if ammo_impair > 0 then
+		if jam_chance == 0 then jam_chance = clamp(0.1 * (ammo_impair - 1), 0, 0.05)
+		else
+			jam_chance = jam_chance * ammo_impair
+		end
+	end
+	-- enhancing jam chance
+	jam_chance = jam_chance * get_config("jamchance")
+	-- condition can increase jam chance by up to 3x
+	local cond = wpn:condition()
+	local ratio = cond < 0.9 and 1 + (0.9-cond)/0.45 or 1
+	jam_chance = jam_chance * ratio
+
+	jam_chance = clamp(jam_chance, 0, cgd.data.max_jam_chance)
+
+	return jam_chance
+end
+
+-- Randomly damage 1 part of the weapon by DAMAGE, skipping barrels
+-- wear reduces damage and happens more frequently
+local function damage_part(wpn, wear)
+	local to_damage = random_key_table(cgd.parts)
+	local part_con = cgd.parts[to_damage]
+	local amt = wear and 1 or math_random(5, 12)
+	cgd.parts[to_damage] = clamp(part_con - amt, 0, 99)
+
+	print_dbg("%s damaged %s amt to %s condition", to_damage, amt, cgd.parts[to_damage])
+	if get_config("verbosity") then
+		--news_manager.send_tip(db.actor, gc("ui_st_parts_damage"), nil, "swiss_knife", 6000)
+	end
+	if not wear then
+		CreateTimeEvent("arti_jamming", "damsound", 0.1, 
+		function()
+			play_sound(nil, 0.5, wpn:section(), "damage_sound")
+			return true
+		end)
+	 end
+end
+
+-- Calculate chance to damage based on weapon condition
+local function calculate_damage(wpn)
+	local cond = wpn and wpn:condition() or 1
+	local damaged = false
+	local roll = math_random()
+	local damage_chance = calculate_damage_chance(wpn)
+
+
+	if (roll < damage_chance) then
+		damage_part(wpn)
+		damaged = true
+	else
+		-- wear is mostly an omnipresent threat
+		wear_chance = clamp(damage_chance * 1.5, 0, 1)
+		if math_random() < wear_chance then
+		damage_part(wpn, true)
+		damaged = true
+		end
+	end
+
+	-- calculate random condition damage
+	if wpn:condition() > 0.2 then
+		local chance = 2 * calculate_jam_chance(wpn)
+		if math_random() < chance then
+			local degrade = math_random(3)/100
+			wpn:set_condition(wpn:condition() - degrade, 0, 1)
+			damaged = true
+		end
+	end
+
+	local barrel_wear = calculate_barrel_wear(wpn, old_ammo)
+
+	print_dbg("Calculating damage: Old ammo %s, barrel wear %s, Final: %s", old_ammo, barrel_wear, damage_chance)
+
+	if (roll < barrel_wear) then
+		print_dbg("Damaged barrel")
+		cgd.barrel_con = cgd.barrel_con > 0 and cgd.barrel_con - 1 or 0
+		damaged = true
+	end
+	
+	if damaged then
+		persist_current_weapon()
+	end
+end
+
+-- damage chance is 0-1
+function calculate_damage_chance(wpn)
+	local cond = wpn and wpn:condition() or 1
+	local threshold = (get_config("threshold") or 85)/100
+	local damage_chance = 0
+	old_ammo = get_ammo_impair(wpn)
+	if (cond < threshold) then
+		-- 200 x (threshold - condition) * per shot decrease, should result in pretty small chances
+		damage_chance = (threshold - cond) * cgd.current_wpn_shot_dec * 200 * (cgd.data.damage_chance_mult or 1)
+		if old_ammo > 1 then
+			damage_chance = damage_chance * old_ammo
+		end
+	else
+		if old_ammo > 1 then damage_chance = clamp(0.1 * (old_ammo - 1), 0, 0.05) end
+	end
+	return damage_chance
+end
+
+function calculate_barrel_wear(wpn)
+	old_ammo = using_old_ammo(wpn) and 2 or 1
+	return old_ammo * cgd.data.barrel_wear
+end
+
+-- calculate misfire change of held weapon
+function calculate_misfire()
+	local trigger_con = cgd.parts[cgd.trigger_name] or 99
+	local severity = 5 - clamp(math_floor(trigger_con / 20), 0, 4)
+	local misfire_chance = cgd.data.misfire_chance[severity]
+	misfire_chance = misfire_chance * get_config("jamchance")
+	return misfire_chance
+end
+
+local last_wpn_snd_empty = {nil, "$no_sound", 1}
+local tg_snd_empty = 0
+local delay_snd_empty = 300 -- ms
+-- before fire - misfire, block shot if jammed with same clicky sound for zeroed weapons
+function actor_on_weapon_before_fire(flags)
+
+	local wpn = db.actor:active_item()
+	local id = wpn and wpn:id() or 0
+
+	if wpn and id ~= cgd.id then
+		-- populate current gun
+		update_current()
+	end
+
+	if not wpn or id ~= cgd.id or wpn:get_ammo_in_magazine() == 0 or not cgd.has_parts or wpn:weapon_in_grenade_mode() then return end
+
+	-- if missing parts do not roll for misfire
+	if missing_parts(wpn) then
+		send_msg("ui_st_missing")
+		flags.ret_value = false
+		return
+	end
+	-- if guarantee not jam, don't even calculate this
+	if guarantee_not_jam > 0 then
+		return
+	end
+
+	-- misfire the weapon
+	local misfire_chance = calculate_misfire()
+	print_dbg("Misfire chance: "..misfire_chance)
+	-- soft misfire
+	-- if math_random() < clamp(misfire_chance * 3, 0, 1) then
+	-- 	flags.ret_value = false
+	-- 	return
+	-- end
+	-- FTE/Double feed
+	if not get_jammed(id) then
+		calculate_jam(wpn)
+		if get_jammed(id) then
+			return
+		end
+	end
+	-- hard misfire
+	if not get_jammed(id) and math_random() < misfire_chance then
+		set_jam_status(id, JamType.Misfire)
+	end
+	
+	local str = ""
+	-- check for malfunction
+	if get_jammed(id) then
+		local sec = wpn:section()
+		-- Cache
+		if (sec ~= last_wpn_snd_empty[1]) then
+			-- Reset
+			last_wpn_snd_empty[1] = sec
+			last_wpn_snd_empty[2] = "$no_sound"
+			last_wpn_snd_empty[3] = 1
+			
+			-- Get empty sound
+			local snd = ini_sys:r_string_ex(sec,"snd_empty")
+			if snd and (snd ~= "") then
+				snd = str_explode(snd,",")
+				last_wpn_snd_empty[2] = snd[1]
+				last_wpn_snd_empty[3] = snd[2] or 1
+			end
+		end
+		-- Play empty clip sound
+		local tg = time_global()
+		if (last_wpn_snd_empty[2] ~= "$no_sound") and (tg > tg_snd_empty) then
+			utils_obj.play_sound( last_wpn_snd_empty[2], last_wpn_snd_empty[3] or 1 )
+			tg_snd_empty = tg + delay_snd_empty
+		end
+		--ADDED jam_swearing()
+		jam_swearing()			
+		start_jammin(2)
+		if (get_jam_status(id) == JamType.DoubleFeed) then
+			str = "ui_st_superjam"
+		else
+			str = "ui_st_jam"
+		end
+		-- Don't shoot
+		flags.ret_value = false
+		send_msg(str)
+	end
+end
+
+-- after fire - chance of FTE, double feed
+-- if shoot success, calculate damage
+function actor_on_weapon_fired(obj, wpn, ammo_elapsed, grenade_elapsed, ammo_type, grenade_type)
+	if (obj:id() ~= AC_ID) then
+		return
+	end
+	local id = wpn:id()
+	if id ~= cgd.id or not cgd.has_parts or wpn:get_ammo_in_magazine() == 0 or missing_parts(wpn) or wpn:weapon_in_grenade_mode() then
+		return 
+	end
+
+	-- calc and apply jam
+	wpn = utils_item.item_is_fa(wpn) and wpn
+	if not wpn then return end
+	
+	if get_jammed(id) then
+		level.release_action(bind_to_dik(key_bindings.kWPN_FIRE))
+	end
+	if not cgd.parts or is_empty(cgd.parts) then return
+	elseif (not get_jammed(id) 
+	or get_jam_status(id) == JamType.FailureToEject 
+	or get_jam_status(id) == JamType.DoubleFeed) then
+		calculate_damage(wpn)
+	end
+
+	if guarantee_not_jam > 0 then
+		guarantee_not_jam = guarantee_not_jam - 1
+	end
+
+	-- calc and apply extra degradation in rain
+	local degradation_factor = 1
+	if level.rain_factor() > 0.3 and not GetEvent("current_safe_cover") then
+		degradation_factor = degradation_factor * (get_config("degradation") or 1.5)
+	end
+
+	if degradation_factor > 1 then
+		degradation_factor = degradation_factor - 1
+		local degradation = degradation_factor * cgd.current_wpn_shot_dec
+		print_dbg("Degrading by additional %s", degradation)
+		wpn:set_condition(clamp(wpn:condition() - degradation, 0, 0.999))
+	end
+end
+
+function check_unjam(wpn)
+	return get_jammed(wpn:id())
+end
+
+function string_unjam()
+	return gc("st_unjam")
+end
+
+function get_sound(sec, key)
+	print_dbg("Get sound %s %s", sec, key)
+	key = key or "unjam_sound"
+	sec = sec and parent_section(sec) or "base"
+	sec = ini_weapon:section_exist(sec) and sec or "base"
+	return "wpo\\"..ini_weapon:r_string_ex(sec, key)
+end
+
+function play_sound(snd, vol, sec, key)
+	print_dbg("Play sound %s %s %s %s", snd, vol, sec, key)
+	if not snd then
+		snd = get_sound(sec, key)
+	end
+	print_dbg("Playing %s", snd)
+	utils_obj.play_sound(snd, vol)
+end
+
+function toggle_slot(slot)
+	db.actor:activate_slot(slot)
+	return true
+end
+
+-- do an unjam, optionally playing sounds and such
+function apply_unjam(id, sound, message)
+	if not unjam_in_progress then 
+		print_dbg("Unjam interrupted for %s", id)
+		return true
+	end
+	unjam_in_progress = false
+	if sound and sound ~= "" then
+		play_sound(sound)
+	end
+	if message then
+		send_msg(message)
+	end
+	if id and id ~= 0 then
+		set_jam_status(id, nil)
+		guarantee_not_jam = 1
+	end
+	return true
+end
+
+function check_simple(weapon)
+	local str = gc("ui_st_functional")
+	send_msg(str)
+	guarantee_not_jam = 1
+end
+
+function check_anim(weapon)
+	check_simple(weapon)
+	local sec = weapon:section()
+	local idle_section = utils_item.addon_attached(weapon ,"gl") and (weapon:weapon_in_grenade_mode() and "anm_bore_g" or "anm_bore_w_gl") or "anm_bore"
+	local hud = ini_sys:r_string_ex(sec, "hud")
+	print_dbg("searching for "..idle_section.. " for weapon section "..hud)
+
+	local bored_anim = hud and ini_sys:r_string_ex(hud, idle_section)
+	if bored_anim then
+		weapon:switch_state(4)
+		guarantee_not_jam = 1
+	end
+end
+
+-- put down and bring back up
+function unjam_simple(weapon)
+	stop_jammin()
+	local str = gc("ui_st_unjam")
+	local id = weapon:id()
+	local sec = parent_section(weapon:section())
+	local sound = get_sound(sec)
+	local active_slot = db.actor:active_slot()
+	toggle_slot(0)
+
+	unjam_in_progress = true
+	CreateTimeEvent("arti_jamming", "unjam"..id, 0.1, 
+	unjam_simple_timed,
+	active_slot, id, sound, str)
+end
+
+function unjam_simple_timed(slot, id, sound, message)
+	if not unjam_in_progress then
+		print_dbg("unjam_replace_simple interrupted")
+		toggle_slot(slot)
+		return true
+	end
+	local current_weapon = db.actor:active_item()
+	if current_weapon then return false end
+	
+	toggle_slot(slot)
+	-- premature interrupt
+	apply_unjam(id, sound, message)
+
+	return true
+end
+-- unjam held weapon with animation
+function unjam_anim(weapon)
+	-- don't unjam if weapon is still in Fire state
+	if weapon:get_state() == 5 then
+		return
+	end
+	stop_jammin()
+	local str = gc("ui_st_unjam")
+	local id = weapon:id()
+	local sec = weapon:section()
+	-- blindside compat, check for unjaminations and cache anim name and sound
+	local unjam_anims = get_unjam_animation(weapon)
+	if unjam_anims ~= nil then
+		unjam_in_progress = true
+		local to_search = utils_item.addon_attached(weapon ,"gl") and "anm_reload_misfire_w_gl" or "anm_reload_misfire"
+		local unjam_sound = ini_sys:r_string_ex(sec, "snd_reload_misfire") or ini_sys:r_string_ex(sec, "snd_reload_1") or "$no_sound"
+		-- shorten time so that jam is cleared before the next animation plays
+		local length = play_anim(weapon, to_search, unjam_sound) - 10
+		CreateTimeEvent("arti_jamming", "restore", length/1000, apply_unjam, id)
+	end
+
+end
+
+function unjam_super_simple(weapon)
+	if weapon:get_ammo_in_magazine() > 1 then
+		start_jammin(50)
+		jam_swearing()
+		send_msg(gc("ui_st_unjam_fail"))
+		weapon:switch_state(2)
+	else
+		unjam_simple(weapon)
+	end
+end
+
+function unjam_super_anim(weapon)
+	if weapon:get_ammo_in_magazine() > 1 then
+		start_jammin(50)
+		jam_swearing()
+		send_msg(gc("ui_st_unjam_fail"))
+		weapon:switch_state(2)
+	else
+		unjam_anim(weapon)
+	end
+end
+
+
+function determine_slot(weapon)
+	for i=1,5 do 
+		local item = db.actor:item_in_slot(i)
+		local item_id = item and item:id() or 0
+		if weapon:id() == item_id then return i end
+	end
+end
+
+-- clear the entry, no qs asked
+function inv_unjam(weapon)
+	if get_jam_status(weapon:id()) > 1 then return end
+	unjam_in_progress = true
+	apply_unjam(weapon:id(), get_sound(weapon:section()))
+end
+
+-- hide, clone, move
+function unjam_replace_simple(weapon)
+	weapon:switch_state(7)
+	unjam_in_progress = true
+	apply_unjam(weapon:id())
+	return true
+end
+
+-- just change the state to reloading and check when reloading is done
+function unjam_replace_anim(weapon)
+	weapon:switch_state(7)
+	unjam_in_progress = true
+	apply_unjam(weapon:id())
+end
+
+function inv_unjam_replace(weapon)
+	unjam_in_progress = true
+	apply_unjam(weapon:id(), get_sound(weapon:section()))
+	local slot = determine_slot(weapon)
+	return true
+end
+
+-- conditions:
+-- unjam type? ok (0), misfire/feed (just 1), failure to eject(2), doublefeed(3), classic (4)
+-- currently held?
+-- has animation?
+-- these functions will be completely responsible for what happens
+local unjam_router = {
+	-- held or not
+	held = {
+		[JamType.OK] = {
+--			anim = check_anim,
+--			no_anim = check_simple
+		},
+		[JamType.Misfire] = {
+			anim = unjam_anim,
+			no_anim = unjam_simple
+		},
+		[JamType.FailureToEject] = {
+			anim = unjam_anim,
+			no_anim = unjam_simple
+		},
+		[JamType.DoubleFeed] = {
+			anim = unjam_super_anim,
+			no_anim = unjam_super_simple
+		},
+		[JamType.Classic] = {
+			anim = unjam_replace_anim,
+			no_anim = unjam_replace_simple
+		}
+	},
+	inventory = {
+		[JamType.Misfire] = {
+			anim = inv_unjam,
+			no_anim = inv_unjam
+		},
+		[JamType.FailureToEject] = {
+			anim = inv_unjam,
+			no_anim = inv_unjam
+		},
+		[JamType.DoubleFeed] = {
+			anim = inv_unjam,
+			no_anim = inv_unjam
+		},
+		[JamType.Classic] = {
+			anim = inv_unjam_replace,
+			no_anim = inv_unjam_replace
+		}
+	}
+}
+-- Unjam works by clearing weapon ID from the jam table, if conditions are met.
+function unjam(wpn)
+	local weapon = wpn or db.actor:active_item()
+	if not weapon then return end
+	if unjam_in_progress then
+		print_dbg("weapon already being unjammed")
+		return
+	end
+	local id = weapon:id()
+	local active_id = db.actor:active_item() and db.actor:active_item():id() or 0 
+	local sec = weapon:section()
+
+	if not weapon then
+		return
+	end
+
+	if missing_parts(weapon) then
+		send_msg("ui_st_missing")
+		return
+	end
+
+	local is_current = id == active_id and "held" or "inventory"
+
+	local jam_level = get_jam_status(id) or 0
+
+	local has_anim = get_unjam_animation(weapon) and "anim" or "no_anim"
+
+	print_dbg("unjam current: %s jam level: %s has_anims: %s. has function? %s", is_current, jam_level, has_anim, unjam_router[is_current][jam_level][has_anim] ~= nil)
+
+	if unjam_router[is_current][jam_level][has_anim] then
+		unjam_router[is_current][jam_level][has_anim](weapon)
+	end
+end
+
+
+function get_unjam_animation(weapon)					
+	local sec = weapon:section()
+	local to_search = utils_item.addon_attached(weapon ,"gl") and "anm_reload_misfire_w_gl" or "anm_reload_misfire"
+	local hud = ini_sys:r_string_ex(sec, "hud")
+	print_dbg("searching for "..to_search.. " for weapon section "..hud)
+	local unjam_anims = hud and ini_sys:r_string_ex(hud,to_search)
+	return unjam_anims
+end
+
+-- SECTION callbacks --
+
+
+local disallowed = {
+	[key_bindings.kINVENTORY] = true,
+	[key_bindings.kWPN_RELOAD] = true,
+	[key_bindings.kNIGHT_VISION] = true,
+	[key_bindings.kWPN_NEXT] = true,
+	[key_bindings.kWPN_1] = true,
+	[key_bindings.kWPN_2] = true,
+	[key_bindings.kWPN_3] = true,
+	[key_bindings.kWPN_4] = true,
+	[key_bindings.kWPN_5] = true,
+	[key_bindings.kWPN_6] = true,
+
+}
+function on_key_press(key)
+	-- certain actions interrupt any unjams in progress
+	local bind = dik_to_bind(key)
+	if unjam_in_progress and disallowed[bind] then
+		print_dbg("unjam interrupted by action")
+		unjam_in_progress = false
+	end
+end
+
+
+function actor_on_weapon_jammed(actor)
+	local wpn = db.actor:active_item()
+	if not get_jammed(wpn:id()) then
+		if not pcall(function(wpn)
+			set_jam_status(wpn:id(), JamType.FailureToEject)
+		end, wpn) then
+			set_jam_status(wpn:id(), JamType.Classic)
+		end
+	end
+	wpn:cast_Weapon():SetMisfire(false)
+	jam_swearing()
+	play_sound(nil, 2, wpn:section(), "jam_sound")
+end
+
+function actor_on_weapon_reload(wpn)
+	local id = wpn:id()
+	local jam_lv = get_jam_status(id)
+	if jam_lv then
+		if magazines and magazines.do_interrupt_reload then magazines.do_interrupt_reload() end
+		-- drop mag if simplejam enabled and superjammed
+		if get_config("simplejam") and jam_lv == JamType.DoubleFeed then
+			-- on simplejam, unload the magazine
+			mag_support.eject_mag(wpn)
+		end
+		CreateTimeEvent("arti_jamming", "cancel_reload", 0.1, 
+			function(wpn)		
+				wpn:switch_state(2)
+				return true
+			end
+		, wpn)
+	end
+end
+
+-- Reduces player outgoing damage based on barrel quality, up to 50% -- 
+local function reduce_damage(npc, shit, bone_id, flags)
+	-- skip if it wasnt a hit by the player
+	if not (shit.draftsman and shit.draftsman:id() == 0) then 
+		return 
+	end
+
+	-- skip if player has no weapon out, or weapon has no parts
+	local weapon = db.actor:active_item()
+	if not weapon or barrel_con == nil then
+		return 
+	end
+
+	if barrel_con > 80 then
+		return 
+	else
+		local ratio = (80 - barrel_con)/80
+		shit.power = shit.power * (1 - (0.5 * ratio))
+	end
+end
+
+function npc_on_before_hit(npc,shit,bone_id, flags)
+	--reduce_damage(npc, shit, bone_id, flags)
+end
+function monster_on_before_hit(monster,shit,bone_id, flags)
+--	reduce_damage(monster, shit, bone_id, flags)
+end
+
+-- Clear jam mid animation with motion marks
+function actor_on_hud_animation_mark(state, mark)
+	if mark == "clear_jam" then
+		ResetTimeEvent("arti_jamming", "restore", 0)
+	end
+end
+
+function on_game_start()
+
+	-- add custom functors
+	custom_functor_autoinject.add_functor("arti_unjam", check_unjam, string_unjam, nil, unjam, false)
+	RegisterScriptCallback("on_key_press",on_key_press)
+	RegisterScriptCallback("actor_on_weapon_jammed",actor_on_weapon_jammed)
+	RegisterScriptCallback("actor_on_weapon_before_fire",actor_on_weapon_before_fire)
+	RegisterScriptCallback("actor_on_weapon_fired",actor_on_weapon_fired)
+	RegisterScriptCallback("actor_on_weapon_reload",actor_on_weapon_reload)
+	RegisterScriptCallback("actor_on_first_update",actor_on_first_update)
+--	RegisterScriptCallback("npc_on_before_hit",npc_on_before_hit)
+--	RegisterScriptCallback("monster_on_before_hit",monster_on_before_hit)
+	RegisterScriptCallback("actor_on_hud_animation_mark",actor_on_hud_animation_mark)
+end

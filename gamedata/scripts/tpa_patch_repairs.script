@@ -1,0 +1,46 @@
+if not zzzz_arti_jamming_repairs then
+    return
+end
+
+local remove_name
+local can_remove
+local act_fieldstrip
+
+function on_game_start()
+    patch_methods()
+end
+
+function patch_methods()
+    remove_name = zzzz_arti_jamming_repairs.remove_name
+    can_remove = zzzz_arti_jamming_repairs.can_remove
+    act_fieldstrip = zzzz_arti_jamming_repairs.act_fieldstrip
+
+    zzzz_arti_jamming_repairs.init_fieldstrip_menu = patched_init
+end
+
+local fs_gui
+function patched_init(obj)
+    local context_str = {}
+    local context_action = {}
+    local context_params = {}
+
+    local parts = item_parts.get_parts_con(obj)
+    local num = 0
+    for k, v in pairs(parts) do
+        if can_remove(k) and v > 0 then
+            table.insert(context_str, remove_name(k) .. " (" .. v .. "%)")
+            table.insert(context_action, "remove_part")
+            table.insert(context_params, { obj:id(), k, v })
+            num = num + 1
+        end
+    end
+    -- remove all
+    if num > 1 then
+        table.insert(context_str, remove_name(nil))
+        table.insert(context_action, "remove_part")
+        table.insert(context_params, { obj:id(), k, v })
+    end
+    if not fs_gui then fs_gui = utils_ui_custom.UICellPropertiesCustom(act_fieldstrip) end
+    fs_gui:Reset(GetCursorPosition(), context_action, context_str, context_params)
+    ui_inventory.GUI:PlaySND(sound_object([[interface\inv_properties_2]]))
+end

@@ -1,0 +1,135 @@
+local wct = weapon_cover_tilt
+
+if MODDED_EXES_VERSION >= 20240412 then
+	wct.parameters["attach_base_hud_offset_pos"]      = { name = "Attach Base Position",     typ = 2, def = {0,0,0}, indx = 24,  min = -180,   max = 180, step = 0.0001, idxa = 0, idxb = 6,  hud = true }
+	wct.parameters["attach_base_hud_offset_rot"]      = { name = "Attach Base Orientation",  typ = 2, def = {0,0,0}, indx = 25,  min = -180,   max = 180, step = 0.0001, idxa = 1, idxb = 6,  hud = true }
+	wct.parameters["attach_mount_hud_offset_pos"]     = { name = "Attach Mount Position",    typ = 2, def = {0,0,0}, indx = 26,  min = -180,   max = 180, step = 0.0001, idxa = 0, idxb = 7,  hud = true }
+	wct.parameters["attach_mount_hud_offset_rot"]     = { name = "Attach Mount Orientation", typ = 2, def = {0,0,0}, indx = 27,  min = -180,   max = 180, step = 0.0001, idxa = 1, idxb = 7,  hud = true }
+	wct.parameters["attach_scale"]                    = { name = "Attach Scale",             typ = 1, def = 1,       indx = 28,  min = 0.1,    max = 10,  step = 0.0001, hud = true }
+else
+	wct.parameters["attach_base_hud_offset_pos"]      = { name = "Attach Base Position",     typ = 2, def = {0,0,0}, indx = 22,  min = -180,   max = 180, step = 0.0001, idxa = 0, idxb = 6,  hud = true }
+	wct.parameters["attach_base_hud_offset_rot"]      = { name = "Attach Base Orientation",  typ = 2, def = {0,0,0}, indx = 23,  min = -180,   max = 180, step = 0.0001, idxa = 1, idxb = 6,  hud = true }
+	wct.parameters["attach_mount_hud_offset_pos"]     = { name = "Attach Mount Position",    typ = 2, def = {0,0,0}, indx = 24,  min = -180,   max = 180, step = 0.0001, idxa = 0, idxb = 7,  hud = true }
+	wct.parameters["attach_mount_hud_offset_rot"]     = { name = "Attach Mount Orientation", typ = 2, def = {0,0,0}, indx = 25,  min = -180,   max = 180, step = 0.0001, idxa = 1, idxb = 7,  hud = true }
+	wct.parameters["attach_scale"]                    = { name = "Attach Scale",             typ = 1, def = 1,       indx = 36,  min = 0.1,    max = 10,  step = 0.0001, hud = true }
+end
+
+--- ----------------------------------------------------------------
+--- monkey patches
+--- ----------------------------------------------------------------
+
+wct.reset_wpn_hud = function(sec)
+	local hud_sec = SYS_GetParam(0, sec, "hud")
+	if not hud_sec then return end
+
+	hud_adjust.enabled(true)
+	for k, v in pairs(wct.parameters) do
+		if v.typ == 1 then
+			local p = SYS_GetParam(2, hud_sec, k, v.def)
+			if p then
+				hud_adjust.set_value(k, p)
+			end
+		elseif v.typ == 2 then
+			local function res(str)
+				local str = str or ""
+				local p = SYS_GetParam(0, hud_sec, v.no_16x9 and k or (k .. str))
+
+				if not p then
+					p = table.concat(v.def, ",")
+				end
+
+				if p then
+					p = str_explode(p, ",")
+					for i, d in ipairs(v.def) do
+						p[i] = p[i] and tonumber(p[i]) or d
+					end
+					hud_adjust.set_vector(v.idxa, v.idxb, p[1] or 0, p[2] or 0, p[3] or 0)
+				end
+			end
+			res(utils_xml.is_widescreen() and "_16x9")
+		end
+	end
+	-- bruteforce by copypaste, will do fancy loop code when it's working 
+	local weapon = db.actor:active_item():cast_Weapon()
+	if weapon and weapon['IsScopeAttached'](weapon) then
+		local scope = weapon['GetScopeName'](weapon)
+		if scope then
+			local hud_section = ini_sys:r_string_ex(scope, "hud")
+			if hud_section then
+				local pos = ini_sys:r_string_ex(hud_section, 'aim_hud_offset_pos')
+				if pos then
+					pos = str_explode(pos, ",")
+					pos[1] = tonumber(pos[1])
+					pos[2] = tonumber(pos[2])
+					pos[3] = tonumber(pos[3])
+					hud_adjust.set_vector(0, 8, pos[1], pos[2], pos[3])
+				end
+				local rot = ini_sys:r_string_ex(hud_section, 'aim_hud_offset_rot')
+				if rot then
+					rot = str_explode(rot, ",")
+					rot[1] = tonumber(rot[1])
+					rot[2] = tonumber(rot[2])
+					rot[3] = tonumber(rot[3])
+					hud_adjust.set_vector(1, 8, rot[1], rot[2], rot[3])
+				end
+				local altpos = ini_sys:r_string_ex(hud_section, 'aim_hud_offset_alt_pos')
+				if altpos then
+					altpos = str_explode(altpos, ",")
+					altpos[1] = tonumber(altpos[1])
+					altpos[2] = tonumber(altpos[2])
+					altpos[3] = tonumber(altpos[3])
+					hud_adjust.set_vector(0, 9, altpos[1], altpos[2], altpos[3])
+				end
+				local altrot = ini_sys:r_string_ex(hud_section, 'aim_hud_offset_alt_rot')
+				if altrot then
+					altrot = str_explode(altrot, ",")
+					altrot[1] = tonumber(altrot[1])
+					altrot[2] = tonumber(altrot[2])
+					altrot[3] = tonumber(altrot[3])
+					hud_adjust.set_vector(1, 9, altrot[1], altrot[2], altrot[3])
+				end
+			end
+		end
+	end
+	hud_adjust.enabled(false)
+end
+
+
+wct.isScopedWeapon = function(wpn)
+	if not wpn then return false end
+
+	local has_scopes_sect = SYS_GetParam(0, wpn:section(), "scopes_sect", "") ~= ""
+	local has_texture = SYS_GetParam(0, wpn:section(), "scope_texture", "") ~= ""
+
+	local cobj = wpn:cast_Weapon()
+
+	-- If old scopes system
+	if has_scopes_sect then
+		if cobj and cobj:IsScopeAttached() or wpn:weapon_is_scope() then
+			return true
+		end
+	else
+		-- If there is fixed scope or no scope defined, but also if there is a scope texture, it will use the texture for zoomin and considered a scoped weapon
+		if  (wpn:weapon_scope_status() == 1 or wpn:weapon_scope_status() == 0) and has_texture then
+			return true
+		end
+
+		-- Usual check
+		if  (cobj and cobj:IsScopeAttached() or wpn:weapon_is_scope()) and has_texture then
+			return true
+		end
+
+		--MAS check
+		if cobj then
+			local scope = cobj['GetScopeName'](cobj)
+			if scope then
+				has_texture = ini_sys:r_string_ex(scope, "scope_texture")
+				if has_texture then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
+end

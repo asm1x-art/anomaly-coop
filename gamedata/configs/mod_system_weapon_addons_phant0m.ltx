@@ -1,0 +1,266 @@
+![addons_table]
+uh2                                                 = scope
+uh1_magd                                            = scope
+e0t2_magd                                           = scope
+lco1                                                = scope
+march_f_shorty                                      = scope
+march_f_shorty_alt                                  = scope
+e0t2_magd_flipped                                   = scope
+uh1_magd_flipped                                    = scope
+
+[uh2]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_razor_uh1.ogf
+cost                		                        = 18950
+inv_name        		                            = st_addon_scope_razor
+inv_name_short  		                            = st_addon_scope_razor
+description    			                            = st_addon_scope_razor_descr
+inv_weight        		                            = 0.470
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 0
+repair_type                                         = scope
+!ms_count = 0
+hud = uh2_hud
+
+[uh2_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\uh2
+        aim_hud_offset_pos               = 0.000106, -0.028736, 0.120192
+        aim_hud_offset_pos_16x9          = 0.000106, -0.028736, 0.120192
+
+![scope_group_picatinny_2inch]
+    >scopes                          = uh2
+;--------------------------------------------------------------------------------------------------------------
+[uh1_magd]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_razor_uh1_mag.ogf
+cost                		                        = 25280
+inv_name        		                            = st_addon_scope_razor_mag
+inv_name_short  		                            = st_addon_scope_razor_mag
+description    			                            = st_addon_scope_razor_mag_descr
+inv_weight        		                            = 0.630
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 4
+repair_type                                         = scope
+scope_zoom_factor = 30
+scope_dynamic_zoom = off
+!ms_count = 0
+flippable = true
+flip_to = uh1_magd_flipped
+use_alt_aim_hud = true
+hud = uh1_magd_hud
+
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.235
+	s3ds_exit_pupil = 0.34
+	s3ds_reticle_type = 7
+	s3ds_dirt_intensity = 0.3
+	scope_objective_lens_offset = 0, 0, 6.5, 0.85
+
+[uh1_magd_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\uh1_magd
+        aim_hud_offset_pos               = 0.000106, -0.028224, 0.086208
+        aim_hud_offset_pos_16x9          = 0.000106, -0.028224, 0.086208
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = uh1_magd
+;--------------------------------------------------------------------------------------------------------------
+[uh1_magd_flipped]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_razor_uh1_mag.ogf
+cost                		                        = 25280
+inv_name        		                            = st_addon_scope_razor_mag
+inv_name_short  		                            = st_addon_scope_razor_mag
+description    			                            = st_addon_scope_razor_mag_descr
+inv_weight        		                            = 0.630
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 4
+repair_type                                         = scope
+scope_zoom_factor = 0
+scope_dynamic_zoom = off
+use_alt_aim_hud = true
+flippable = true
+flip_to = uh1_magd
+hud = uh1_magd_flipped_hud
+!ms_count = 0
+
+	s3ds_reticle_type = 1
+
+[uh1_magd_flipped_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\uh1_magd_flipped
+        aim_hud_offset_pos               = 0.000106, -0.028224, 0.086208
+        aim_hud_offset_pos_16x9          = 0.000106, -0.028224, 0.086208
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = uh1_magd_flipped
+;--------------------------------------------------------------------------------------------------------------
+[e0t2_magd]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_e0t2_mag.ogf
+cost                		                        = 23280
+inv_name        		                            = st_addon_scope_e0t2_mag
+inv_name_short  		                            = st_addon_scope_e0t2_mag
+description    			                            = st_addon_scope_e0t2_mag_descr
+inv_weight        		                            = 0.5800
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 3
+repair_type                                         = scope
+scope_zoom_factor = 30
+scope_dynamic_zoom = off
+flippable = true
+flip_to = e0t2_magd_flipped
+use_alt_aim_hud = true
+ms_count = 6
+hud = e0t2_magd_hud
+
+	s3ds_reticle_size = 4
+	s3ds_eye_relief = 2.235
+	s3ds_exit_pupil = 0.34
+	s3ds_reticle_type = 10
+	s3ds_dirt_intensity = 0.3
+	scope_objective_lens_offset = 0, 0, 6.5, 0.85
+
+[e0t2_magd_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\e0t2_magd
+        aim_hud_offset_pos               = 0.000106, -0.028224, 0.086208
+        aim_hud_offset_pos_16x9          = 0.000106, -0.028224, 0.086208
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = e0t2_magd
+;--------------------------------------------------------------------------------------------------------------
+[e0t2_magd_flipped]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_e0t2_mag.ogf
+cost                		                        = 23280
+inv_name        		                            = st_addon_scope_e0t2_mag
+inv_name_short  		                            = st_addon_scope_e0t2_mag
+description    			                            = st_addon_scope_e0t2_mag_descr
+inv_weight        		                            = 0.5800
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 3
+repair_type                                         = scope
+scope_zoom_factor = 0
+scope_dynamic_zoom = off
+use_alt_aim_hud = true
+flippable = true
+flip_to = e0t2_magd
+ms_count = 6
+
+	s3ds_reticle_type = 1
+
+hud = e0t2_magd_flipped_hud
+
+[e0t2_magd_flipped_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\e0t2_magd_flipped
+        aim_hud_offset_pos               = 0.000153, -0.02656, 0.115072
+        aim_hud_offset_pos_16x9          = 0.000153, -0.02656, 0.115072
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = e0t2_magd_flipped
+;--------------------------------------------------------------------------------------------------------------
+[lco1]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_leupold_lco1.ogf
+cost                		                        = 16950
+inv_name        		                            = st_addon_scope_lco1
+inv_name_short  		                            = st_addon_scope_lco1
+description    			                            = st_addon_scope_lco1_descr
+inv_weight        		                            = 0.385
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 1
+repair_type                                         = scope
+!ms_count = 0
+hud = lco1_hud
+
+[lco1_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\lco1	
+        aim_hud_offset_pos               = 0.000155, -0.0304, 0.124288
+        aim_hud_offset_pos_16x9          = 0.000155, -0.0304, 0.124288
+
+![scope_group_picatinny_2inch]
+    >scopes                          = lco1
+;--------------------------------------------------------------------------------------------------------------
+[march_f_shorty]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 27280
+inv_name        		                            = st_addon_scope_march_f_shorty
+inv_name_short  		                            = st_addon_scope_march_f_shorty
+description    			                            = st_addon_scope_march_f_shorty_descr
+inv_weight        		                            = 0.5800
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 2
+repair_type                                         = scope
+scope_zoom_factor = 12
+scope_dynamic_zoom = on
+
+hud = march_f_shorty_hud
+
+	s3ds_reticle_size 	= 4.2
+	s3ds_eye_relief = 4.25
+	s3ds_exit_pupil = 0.275
+	s3ds_exit_pupil		= 0.5	
+	s3ds_chroma_power	= 0		
+	s3ds_min_zoom_1x = 1
+	magnification = 8
+	scope_objective_lens_offset = 0, 0, 12.2, .8
+
+[march_f_shorty_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\march_f_shorty	
+        aim_hud_offset_pos               = -0.000157, -0.034112, 0.12576
+        aim_hud_offset_pos_16x9          = -0.000157, -0.034112, 0.12576
+
+![scope_group_picatinny_tiny]
+    >scopes                          = march_f_shorty
+;--------------------------------------------------------------------------------------------------------------
+[march_f_shorty_alt]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 64280
+inv_name        		                            = st_addon_scope_march_f_shorty_alt
+inv_name_short  		                            = st_addon_scope_march_f_shorty_alt
+description    			                            = st_addon_scope_march_f_shorty_alt_descr
+inv_weight        		                            = 0.6100
+icons_texture                                       = ui\ui_icon_phant0m_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 2
+inv_grid_y         = 0
+repair_type                                         = scope
+scope_zoom_factor = 12
+scope_dynamic_zoom = on
+use_alt_aim_hud	= true
+hud = march_f_shorty_alt_hud
+
+	s3ds_reticle_size 	= 4.2
+	s3ds_eye_relief = 4.25
+	s3ds_exit_pupil = 0.275
+	s3ds_exit_pupil		= 0.5	
+	s3ds_chroma_power	= 0		
+	s3ds_min_zoom_1x = 1
+	magnification = 8
+	scope_objective_lens_offset = 0, 0, 12.2, .8
+
+[march_f_shorty_alt_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\march_f_shorty_alt
+        aim_hud_offset_pos               = -0.000157, -0.034112, 0.12576
+        aim_hud_offset_pos_16x9          = -0.000157, -0.034112, 0.12576
+        aim_hud_offset_alt_pos           = -0.026666, -0.015936, 0.12384
+        aim_hud_offset_alt_pos_16x9      = -0.026666, -0.015936, 0.12384
+        aim_hud_offset_alt_rot           = 0, 0, -0.45
+        aim_hud_offset_alt_rot_16x9      = 0, 0, -0.45
+
+![scope_group_picatinny_short]
+    >scopes                          = march_f_shorty_alt

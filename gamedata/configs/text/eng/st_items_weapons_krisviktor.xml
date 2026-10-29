@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	RIP the TCO pack man --- YukiZ
+-->
+
+<string_table>
+	
+	<string id="st_wpn_kriss_cust">
+		<text>KRISS Vector Custom</text>
+	</string>	
+	<string id="st_wpn_kriss_cust_descr">
+		<text>KRISS Vector is a family of modern submachine guns developed by the American company KRISS USA. They use an unconventional delayed blowback system combined with in-line design to reduce felt recoil and muzzle climb of the weapon. The Vector shoots with incredibly high cyclic rate of 1200 rounds per minute, but the recoil reducing mechanism makes it easy to control. In The Zone it is used by mercenary groups and loners who need a compact and light weapon for use as PDW, but due to it's extremely high rate of fire it is also used as weapon for mutant hunting - even short burst can send lots of bullets down range, increasing the chance of critical hits. This model includes a vertical grip and LAM Module, making it better in CQB.\n \n
+		%c[ui_gray_2]ATTACHMENTS: \n
+        %c[d_purple] • %c[ui_gray_2] RVG Vertical Grip  \n
+        %c[d_purple] • %c[ui_gray_2] L3Harris LA-5B/PEQ tactical device	 \n
+		%c[d_purple] • %c[ui_gray_2] SilencerCo Omega .45 caliber suppressor</text>
+	</string>
+	
+</string_table>

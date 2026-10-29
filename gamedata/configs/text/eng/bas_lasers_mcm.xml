@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_menu_bas_lasers">
+		<text>BaS Lasers</text>
+	</string>
+	<string id="ui_mcm_bas_lasers_keybind">
+		<text>Laser keybind</text>
+	</string>
+	<string id="ui_mcm_menu_torch_anim_toggle">
+		<text>Torch Anim Toggle</text>
+	</string>
+	<string id="ui_mcm_torch_anim_toggle_torch_anim">
+		<text>Animation toggle</text>
+	</string>
+</string_table>

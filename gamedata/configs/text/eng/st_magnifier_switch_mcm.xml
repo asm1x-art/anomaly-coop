@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+  <!-- Main menu -->
+  <string id="ui_mcm_menu_magnifier_switch">
+    <text>Sight Magnifier Switch</text>
+  </string>
+
+  <!-- Options -->
+  <string id="ui_mcm_magnifier_switch_use_mousewheel">
+    <text>Use mouse wheel</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_use_mousewheel_hint">
+    <text>Allow switching sights using mouse wheel</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_mwheel_switch_ads_only">
+    <text>Only while aiming</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_mwheel_switch_ads_only_hint">
+    <text>Mouse wheel switches sights only in aiming mode</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_mwheel_weapon_swap">
+    <text>Mouse wheel weapon switch</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_mwheel_weapon_swap_hint">
+    <text>Enable mouse wheel weapon switching (default game function)</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_switch_bind">
+    <text>Switch keybind</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_switch_bind_hint">
+    <text>Primary key for toggling sight mode</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_keep_aim_toggle">
+    <text>Maintain aim</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_keep_aim_toggle_hint">
+    <text>Don't reset aiming state when switching sights</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_switch_sound">
+    <text>Switch sound</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_switch_sound_hint">
+    <text>Play sound when changing sight mode</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_debug">
+    <text>Debug mode</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_debug_hint">
+    <text>Enable debug messages in log</text>
+  </string>
+
+  <!-- Common MCM strings -->
+  <string id="mcm_kb_modifier">
+    <text>Key modifier</text>
+  </string>
+  <string id="mcm_kb_mode">
+    <text>Press type</text>
+  </string>
+
+  <string id="mcm_kb_mod_none">
+    <text>None</text>
+  </string>
+  <string id="mcm_kb_mod_shift">
+    <text>Shift</text>
+  </string>
+  <string id="mcm_kb_mod_ctrl">
+    <text>Ctrl</text>
+  </string>
+  <string id="mcm_kb_mod_alt">
+    <text>Alt</text>
+  </string>
+
+  <string id="mcm_kb_mode_press">
+    <text>Single</text>
+  </string>
+  <string id="mcm_kb_mode_dtap">
+    <text>Double</text>
+  </string>
+  <string id="mcm_kb_mode_hold">
+    <text>Hold</text>
+  </string>
+</string_table>

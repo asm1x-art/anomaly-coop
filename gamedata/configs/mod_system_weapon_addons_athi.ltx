@@ -1,0 +1,227 @@
+![addons_table]
+devo                                                						= scope
+side												= scope
+gee36												= scope
+pn23f												= scope
+vulcan												= scope
+bossxe												= scope
+c79												= scope
+
+;--------------------------------------------------------------------------------------
+[c79]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 14300
+inv_name        		                            = st_addon_scope_c79
+inv_name_short  		                            = st_addon_scope_c79
+description    			                            = st_addon_scope_c79_descr
+inv_weight        		                            = 0.35
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 3
+inv_grid_y         = 0
+repair_type                                         = scope		
+scope_zoom_factor = 24
+use_alt_aim_hud = true
+hud = c79_hud
+
+	s3ds_reticle_size 	= 4
+	s3ds_eye_relief 	= 2.5
+	s3ds_exit_pupil		= 0.303
+	magnifications 		= 3.4
+
+[c79_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\c79
+        aim_hud_offset_pos               = -5.5e-05, -0.028608, 0.088192
+        aim_hud_offset_pos_16x9          = -5.5e-05, -0.028608, 0.088192
+        aim_hud_offset_alt_pos           = -0.00032, -0.050048, 0.097152
+        aim_hud_offset_alt_pos_16x9      = -0.00032, -0.050048, 0.097152
+        aim_hud_offset_alt_rot           = 0, 0.003328, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0.003328, 0
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = c79
+;--------------------------------------------------------------------------------------
+[bossxe]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_willcox_boss.ogf
+cost                		                        = 30950
+inv_name        		                            = st_addon_scope_bossxe
+inv_name_short  		                            = st_addon_scope_bossxe
+description    			                            = st_addon_scope_bossxe_descr
+inv_weight        		                            = 0.25
+icons_texture                                       = ui\ui_icon_bossxe
+inv_grid_width     = 1
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 0
+repair_type                                         = scope
+laser_status = true
+use_alt_aim_hud = true
+ms_count = 3
+
+hud = bossxe_hud
+
+[bossxe_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\bossxe
+        aim_hud_offset_pos               = -0.000267, -0.036096, 0.126592
+        aim_hud_offset_pos_16x9          = -0.000267, -0.036096, 0.126592
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = bossxe
+;--------------------------------------------------------------------------------------
+[devo]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 44950
+inv_name        		                            = st_addon_scope_devo
+inv_name_short  		                            = st_addon_scope_devo
+description    			                            = st_addon_scope_devo_descr
+inv_weight        		                            = 0.470
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 0
+repair_type                                         = scope	
+hud = devo_hud
+scope_zoom_factor = 15
+scope_dynamic_zoom = off
+use_alt_aim_hud	= true
+
+	s3ds_reticle_size = 3
+	s3ds_eye_relief = 4.32
+	s3ds_exit_pupil = 0.17
+	s3ds_dirt_intensity = 0.3
+	scope_objective_lens_offset = 2.31, -0.5, 6, 0.75
+
+[devo_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\devo
+        aim_hud_offset_alt_pos           = 5.4e-05, -0.030528, 0.119488
+        aim_hud_offset_alt_pos_16x9      = 5.4e-05, -0.030528, 0.119488
+        aim_hud_offset_pos               = -0.000213, -0.018496, 0.115968
+        aim_hud_offset_pos_16x9          = -0.000213, -0.018496, 0.115968
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny_short_phys]
+    >scopes                          = devo
+;--------------------------------------------------------------------------------------
+[side]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 4950
+inv_name        		                            = st_addon_scope_side
+inv_name_short  		                            = st_addon_scope_side
+description    			                            = st_addon_scope_side_descr
+inv_weight        		                            = 0.350
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 1
+repair_type                                         = scope	
+hud = side_hud
+scope_zoom_factor = 25
+scope_dynamic_zoom = off
+
+[side_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\side
+
+;- no scope group yet, GAMMA only -
+
+;--------------------------------------------------------------------------------------
+[gee36]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_case_weapon_small_world.ogf
+cost                		                        = 5230
+inv_name        		                            = st_addon_scope_gee36
+inv_name_short  		                            = st_addon_scope_gee36
+description    			                            = st_addon_scope_gee36_descr
+inv_weight        		                            = 0.650
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 2
+repair_type                                         = scope	
+hud = gee36_hud
+scope_zoom_factor = 25
+scope_dynamic_zoom = off
+
+	s3ds_reticle_size = 4.1
+	s3ds_eye_relief = 1.82
+	s3ds_exit_pupil = 0.57	
+	magnification = 3
+	s3ds_dirt_intensity = 0.5
+	s3ds_reflection_hue = 0.55
+	scope_objective_lens_offset = 0, 0, 16.3, .6
+
+[gee36_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\gee36
+        aim_hud_offset_alt_pos           = 5.4e-05, -0.050688, 0.073792
+        aim_hud_offset_alt_pos_16x9      = 5.4e-05, -0.050688, 0.073792
+        aim_hud_offset_pos               = 0.000106, -0.034496, 0.046272
+        aim_hud_offset_pos_16x9          = 0.000106, -0.034496, 0.046272
+        aim_hud_offset_alt_rot           = 0, 0, 0
+        aim_hud_offset_alt_rot_16x9      = 0, 0, 0
+
+![scope_group_picatinny]
+    >scopes                          = gee36
+;--------------------------------------------------------------------------------------
+[vulcan]:scope_base
+visual				                                = dynamics\weapons\wpn_addon_world_models\wpn_scope_vulcan.ogf
+cost                		                        = 20250
+inv_name        		                            = st_addon_scope_vulcan
+inv_name_short  		                            = st_addon_scope_vulcan
+description    			                            = st_addon_scope_vulcan_descr
+inv_weight        		                            = 0.4
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_width     = 2
+inv_grid_height    = 1
+inv_grid_x         = 0
+inv_grid_y         = 4
+repair_type                                         = scope	
+hud = vulcan_hud
+scope_zoom_factor = 25
+scope_dynamic_zoom = off
+
+	s3ds_reticle_size = 3.2
+	s3ds_eye_relief = 3.65
+	s3ds_exit_pupil = 0.17	
+	s3ds_chroma_power	= 0.05	
+	s3ds_image_type 	= 1
+	s3ds_reticle_type	= 7
+	ms_count 			= 2
+	magnification = 3.5
+	scope_objective_lens_offset = -0.03, 0.01, 11.25, 1.61
+
+[vulcan_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\vulcan
+        aim_hud_offset_pos               = -0.000475, -0.034048, 0.12032
+        aim_hud_offset_pos_16x9          = -0.000475, -0.034048, 0.12032
+
+![scope_group_picatinny_short]
+    >scopes                          = vulcan
+;--------------------------------------------------------------------------------------
+![cortex]:scope_base
+icons_texture                                       = ui\ui_icon_athi_scopes
+inv_grid_x         = 0
+inv_grid_y         = 3
+hud = cortex_hud
+scope_zoom_factor = 15
+scope_dynamic_zoom = on
+
+	s3ds_reticle_size = 4.9
+	s3ds_eye_relief = 4.24
+	s3ds_exit_pupil = 0.5	
+	magnification = 6
+	min_magnification = 1
+	s3ds_ffp = 0
+	s3ds_min_zoom_1x = 1
+	s3ds_dirt_intensity = 0.2
+	s3ds_lens_color = lens_new_bright
+
+[cortex_hud]:scope_hud_base
+	item_visual                      = attachments\scopes\cortex
+        aim_hud_offset_pos               = -0.000428, -0.036288, 0.125696
+        aim_hud_offset_pos_16x9          = -0.000428, -0.036288, 0.125696
+
+![scope_group_picatinny_short]
+    >scopes                          = cortex

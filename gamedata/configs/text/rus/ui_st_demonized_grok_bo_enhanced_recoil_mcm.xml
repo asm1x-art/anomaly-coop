@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_title">
+		<text>GBOOBS Усиленная отдача оружия</text>
+	</string>
+	<string id="ui_mcm_menu_demonized_grok_bo_enhanced_recoil">
+		<text>GBOOBS отдача</text>
+	</string>
+
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_enabled">
+		<text>Включить</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_effect_power">
+		<text>Сила отдачи</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_gun_effect_power">
+		<text>Сила движения оружия</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_pp_power">
+		<text>Сила пост-процесс эффектов</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_upgrades_power">
+		<text>Влияние апгрейдов</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_upgrades_power_desc">
+		<text>Апгрейды на удобность и отдачу могут уменьшить эффект усиленной отдачи. Данный параметр отвечает за влияние апгрейдов на уменьшение</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_condition_power">
+		<text>Влияние состояния оружия</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_condition_power_desc">
+		<text>Плохое состояние увеличит отдачу, идеальное - уменьшит</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcAnyMove_power">
+		<text>Увеличение отдачи при движении</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcSprint_power">
+		<text>Увеличение отдачи при спринте</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcProne_power">
+		<text>Уменьшение отдачи в положении лежа</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcCrouch_power">
+		<text>Уменьшение отдачи при приседании</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcJump_power">
+		<text>Увеличение отдачи при прыжке</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcZoom_power">
+		<text>Уменьшение отдачи при зумировании</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_fov_changer">
+		<text>FOV эффект</text>
+	</string>
+		
+</string_table>

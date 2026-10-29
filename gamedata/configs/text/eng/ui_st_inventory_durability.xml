@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_inv_outfit_durability_physical">
+		<text>Phys. durability</text>
+	</string>
+	<string id="ui_inv_outfit_durability_anomaly">
+		<text>Anom. durability</text>
+	</string>
+	<string id="ui_inv_outfit_fire_wound_protection_helmet">
+		<text>Phys. dur. helmet</text>
+	</string>		
+</string_table>

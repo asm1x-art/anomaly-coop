@@ -1,0 +1,40 @@
+--[[
+
+NOTE: KEEP THIS TEXT FOR OTHERS AND TO CREDIT THE ORIGINAL AUTHOR.
+This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+	RavenAscendant
+	2025/1/16
+	
+	This script is made to hide bones through a script.
+	Can be useful to hide a muzzle when a silencer is used, to hide a shorter barrel when a longer one is used, to hide the foregrip when the Grenade Launcher is used...And so on.
+	
+	INSTRUCTIONS:
+	1. Make sure you have a "script_binding" parameter in your Weapon LTX config, it can be added anywhere in the item section of the weapon's config.
+	For example, at the end of "wpn_X", add "script_binding = hidebone_shak12_silencer.bind" without the quotation marks.
+	2. Name your script however you want, it's recommended you use the same as you would with the .bind though, for example, "hidebone_shak12_silencer.script"
+	3. In the script, use what is provided, and...
+		* Change the binder, which is on top named class "CHANGER111", for example, "hidebone_shak12_silencer". MAKE SURE TO CHANGE ALL OTHER "CHANGER111" TO THE NEW ONE TOO.
+		* Make sure to change the bone you want the script to remove. For example, if you have a muzzle called "wpn_muzzle", change it to that.
+		X If you are hiding the Grenade Launcher instead, change "silencer_state" to "gl_state".
+	
+
+--]]
+
+class "hidebone_shak12_silencer" ( object_binder )
+function hidebone_shak12_silencer:__init(obj) super(obj)
+end
+
+function bind(obj)
+    obj:bind_object(hidebone_shak12_silencer(obj))
+end
+
+function hidebone_shak12_silencer:update(delta)
+    object_binder.update(self, delta)
+    local silencer_state = (self.object:weapon_silencer_status() == 2) and self.object:weapon_is_silencer()
+    if silencer_state ~= self.silencer_state then
+        self.silencer_state = silencer_state
+        self.object:set_bone_visible("muzzle_bone", not silencer_state, true, true)
+        self.object:set_bone_visible("muzzle_bone", not silencer_state, true, false)
+    end
+end

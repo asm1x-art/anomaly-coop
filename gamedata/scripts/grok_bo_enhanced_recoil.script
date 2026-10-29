@@ -1,0 +1,420 @@
+-- Linear inter/extrapolation
+local function lerp(a, b, f)
+    if a and b and f then
+        return a + f * (b - a)
+    else
+        return a or b or 0
+    end
+end
+
+local ini_eff = ini_file("plugins\\grok_bo_enhanced_recoil.ltx")
+local ini_eff_og = ini_file("plugins\\actor_effects.ltx")
+
+local wpn_fx = {}
+local function parse_anims(curr_ini_eff, sec, add_default)
+	if not curr_ini_eff then
+		return
+	end
+
+	if wpn_fx[sec] then
+		return
+	end
+
+	local sec_p = ini_sys:r_string_ex(sec,"parent_section") or sec
+	
+	if wpn_fx[sec_p] and (sec ~= sec_p) then
+		wpn_fx[sec] = wpn_fx[sec_p]
+		
+	elseif curr_ini_eff:section_exist(sec_p) then
+		if not (
+			curr_ini_eff:r_string_ex(sec_p,"s")
+		-- and curr_ini_eff:r_string_ex(sec_p,"r")
+		and curr_ini_eff:r_string_ex(sec_p,"e")
+		)
+		then
+			return
+		end
+
+		local tbl = {}
+		
+		-- parse strength
+		tbl.s = {}
+		local s = curr_ini_eff:r_string_ex(sec_p,"s")
+		local _s = str_explode(s,",")
+		for i=1,#_s do
+			tbl.s[#tbl.s + 1] = tonumber(_s[i])
+		end
+		
+		-- parse strength randomizer
+		tbl.r = curr_ini_eff:r_float_ex(sec_p,"r")
+		
+		-- parse anm
+		tbl.e = {}
+		local e = curr_ini_eff:r_string_ex(sec_p,"e")
+		local _e = str_explode(e,",")
+		for i=1,#_e do
+			local __e = str_explode(_e[i],":")
+			for j=1,#__e do
+				if not ((i == 1 or i == 4) and j >= 2) then
+					__e[j] = tonumber(__e[j])
+				end
+			end
+			tbl.e[#tbl.e + 1] = __e
+		end
+		
+		-- parse ppe
+		tbl.p = {}
+		local p = curr_ini_eff:r_string_ex(sec_p,"p")
+		if p and p ~= "" then
+			for k,v in string.gmatch(p, "([%w_%-%s%.]+)=([%w_%-%s%.]+)") do
+				tbl.p[k] = tonumber(v)
+			end
+		end
+		
+		if (not wpn_fx[sec_p]) and (sec ~= sec_p) then
+			wpn_fx[sec_p] = tbl
+		end
+		
+		wpn_fx[sec] = tbl
+		--utils_data.print_table(wpn_fx[sec])
+		
+	else
+		wpn_fx[sec] = add_default and wpn_fx["wpn_aug"] or true
+		--printf("not recoil effect for [%s]", sec)
+	end
+end
+
+-- Recoil modifier table
+-- Contains functions that return modifier coefficients (see example)
+modifier_table = {
+	[1] = function(effect_power, wpn, wpn_fx)
+		return 1
+	end,
+}
+
+function modifier(effect_power, wpn)
+	if is_empty(modifier_table) then
+		return effect_power
+	end
+	for i, v in ipairs(modifier_table) do
+		effect_power = effect_power * (v(effect_power, wpn, wpn_fx[wpn:section()]) or 1)
+	end
+	return effect_power
+end
+
+-- Add modifier, modifier_func is function as in modifier_table, pos is position to add (optional)
+function add_modifier(modifier_func, pos)
+	pos = pos and clamp(pos, 1, #modifier_table + 1) or (#modifier_table + 1)
+	table.insert(modifier_table, pos, modifier_func)
+end
+
+function remove_modifier(modifier_func)
+	for i = #modifier_table, 1, -1 do
+		local v = modifier_table[i]
+		if modifier_func == v then
+			table.remove(modifier_table, i)
+		end
+	end
+end
+
+function clamp_effect_power(effect_power)
+	return math.max(0.15, effect_power)
+end
+
+local effect_min_id = 5000
+local effect_max_id = 30000
+local effect_id = effect_min_id
+function next_effect_id()
+	effect_id = effect_id + 1
+	if effect_id > effect_max_id then
+		effect_id = effect_min_id
+	end
+end
+
+function add_cam_effector(filename, anim_id, cyclic, callback_str, cam_fov, hud, effect_power)
+	local current_id = effect_id
+	level.add_cam_effector(filename, effect_id, cyclic, callback_str, cam_fov, hud, effect_power)
+	next_effect_id()
+	return current_id
+end
+
+function add_pp_effector(filename, anim_id, cyclic)
+	local current_id = effect_id
+	level.add_pp_effector(filename, effect_id, cyclic)
+	next_effect_id()
+	return current_id
+end
+
+local shotc = 1
+local shott = 0
+local fov_r = 1
+abakan_state = 0
+function shoot_effect(sect)
+	--printf("-SHOOT")
+
+	if shott and (shott < time_global()) then
+		shotc = 1
+		shott = nil
+	end
+
+	local anims = {}
+	local s = wpn_fx[sect].s
+	local sc = #s
+
+	if sc > 1 then
+		if wpn_fx[sect].r == 1 then
+			s = s[math.random(#s)]
+		elseif wpn_fx[sect].r == 2 then
+			if shotc == 1 then
+				s = s[1]
+			else
+				s = s[math.random(2,#s)]
+			end
+		else
+			sc = shotc <= sc and shotc or (sc > 2 and math.random(sc-1,sc)) or sc
+			s = s[sc]
+		end
+	else
+		s = s[1]
+	end
+--	local cnt, r = math.modf(s*fov_r)
+--	if r ~=0 then
+--		s = math.max(1, cnt - 1)
+--	end
+	for i,v in ipairs(wpn_fx[sect].e) do
+		local cnt,r = math.modf(v[1]*fov_r)
+		if r ~= 0 and cnt > 4 then --fmb
+			cnt = cnt-cnt*math.random(0,r*100)/100 --fmb
+			cnt,r = math.modf(cnt)
+		end
+
+		if r ~= 0 and math.random() < r then
+			cnt = cnt+1
+		end
+
+		if cnt > 0 then
+			table.insert(anims,{e = i,d = v[2] or math.random(0,1),c = cnt})
+		end
+	end
+
+	-- Get weapon upgrades and reduce effect based on them
+	local effect_power = settings.effect_power
+	local wpn = db.actor:active_item()
+	-- printf("base effect_power %s", effect_power)
+	wpn:iterate_installed_upgrades( function(upgr_sec)
+		-- printf("installed upgrade %s", upgr_sec)
+		local section = SYS_GetParam(0, upgr_sec, "section")
+		if not section then return end
+
+		local upgrades_power = settings.upgrades_power or 1
+
+		-- Upgrades reduces values, so effect power must be with "+"
+		local cam_dispersion = SYS_GetParam(0, section, "cam_dispersion")
+		cam_dispersion = cam_dispersion and tonumber(cam_dispersion) or 0
+		effect_power = effect_power + cam_dispersion * upgrades_power
+
+		local PDM_disp_base = SYS_GetParam(0, section, "PDM_disp_base")
+		PDM_disp_base = PDM_disp_base and tonumber(PDM_disp_base) or 0
+		effect_power = effect_power + PDM_disp_base * upgrades_power
+
+		effect_power = clamp_effect_power(effect_power)
+	end)
+
+	-- Get actor state and increase/reduce effect
+	-- Reduce recoil by 50% when proning
+	if IsMoveState('mcCrouch') and IsMoveState('mcAccel') then
+		effect_power = clamp_effect_power(effect_power * (1 - 0.5 * (settings.mcProne_power or 1)))
+	-- Reduce recoil by 15% when crouching
+	elseif IsMoveState('mcCrouch') then
+		effect_power = clamp_effect_power(effect_power * (1 - 0.15 * (settings.mcCrouch_power or 1)))
+	end
+
+	-- Increase recoil by 20% when moving
+	if IsMoveState('mcAnyMove') then
+		effect_power = clamp_effect_power(effect_power * (1 + 0.2 * (settings.mcAnyMove_power or 1)))
+	end
+
+	-- Increase recoil by 25% when sprinting
+	if IsMoveState('mcSprint') then
+		effect_power = clamp_effect_power(effect_power * (1 + 0.25 * (settings.mcSprint_power or 1)))
+	end
+
+	-- Increase recoil by 25% when jumping and landing
+	if IsMoveState('mcJump') 
+	or IsMoveState('mcFall')
+	or IsMoveState('mcLanding')
+	or IsMoveState('mcLanding2') then
+		effect_power = clamp_effect_power(effect_power * (1 + 0.25 * (settings.mcJump_power or 1)))
+	end
+
+	-- Reduce recoil by 5% when zooming
+	if axr_main.weapon_is_zoomed then
+		effect_power = clamp_effect_power(effect_power * (1 - 0.05 * (settings.mcZoom_power or 1)))
+	end
+
+	-- Clamp result
+	effect_power = clamp_effect_power(effect_power)
+
+	-- Condition modifier
+	if settings.condition_power > 0 then
+		local c = wpn:condition()
+		local c_threshold = 0.93
+		local m
+		if c >= c_threshold then
+			m = lerp(0, -0.12, normalize(c, c_threshold, 1)) * settings.condition_power
+		else
+			m = lerp(0.85, 0, normalize(c, 0, c_threshold)) * settings.condition_power
+		end
+		effect_power = clamp_effect_power(effect_power * (1 + m))
+	end
+
+	-- External modifiers for recoil
+	effect_power = clamp_effect_power(modifier(effect_power, wpn))
+
+	-- Abakan delayed effect
+	if ( -- If weapon is Abakan
+		wpn:section():find("abakan")
+		or wpn:section():find("an_94")
+		or wpn:section():find("an94")
+	)
+	-- If Abakan has > 1 ammo or is in second shot state
+	and (wpn:cast_Weapon():GetAmmoElapsed() > 1 or abakan_state == 1)
+	-- If Abakan fire mode is not single shot 
+	and wpn:cast_Weapon():GetFireMode() ~= 1
+	-- Check for 2 shot burst fire mode if "cycle_down" is false (vanilla behaviour, BAN's Abakan replacer works correctly to IRL)
+	and (SYS_GetParam(1, wpn:section(), "cycle_down") or wpn:cast_Weapon():GetFireMode() == 2)
+	then
+		-- First shot - 0 recoil
+		if abakan_state == 0 then
+			effect_power = 0.0000001
+			abakan_state = 1
+		-- Second shot - double recoil power
+		elseif abakan_state == 1 then
+			effect_power = effect_power * 2
+			abakan_state = 2
+		-- Consecutive shots - single recoil power
+		elseif abakan_state == 2 then
+			-- effect_power = effect_power
+			-- abakan_state = 2
+		end
+
+		-- Reset state after some time
+		-- Add small epsilon to timer for better behaviour on full auto consecutive shots
+		local state = "abakan_state_reset"
+		local state_id = "abakan_state_reset"
+		local timer = 1 / (SYS_GetParam(2, wpn:section(), "rpm") / 60) + 0.001
+		ResetTimeEvent(state, state_id, timer)
+		CreateTimeEvent(state, state_id, timer, function()
+			abakan_state = 0
+			return true
+		end)
+	end
+
+	-- printf("new effect_power %s", effect_power)
+
+	for i,a in ipairs(anims) do
+		local n = string.format([[shoot\s%s_e%s_%s.anm]],s,a.e,a.d)
+		for ii=1,a.c do
+			local anim_id = 0
+			add_cam_effector(n,anim_id,false,"", 0, true, effect_power)
+			if settings.gun_effect_power > 0 then
+				add_cam_effector(n,anim_id + 1,false,"", 0, false, effect_power * 0.17 * settings.gun_effect_power)
+			end
+		end
+	end
+	for k,v in pairs(wpn_fx[sect].p) do
+		local eid = 0
+		eid = add_pp_effector(string.format([[shoot\%s_s%s.ppe]],k,s), eid, false)
+		v = math.max(0.0000001, v * settings.pp_power)
+		level.set_pp_effector_factor(eid, v)
+	end
+	shotc = shotc+1
+	shott = time_global()+100
+	
+	if settings.fov_changer then
+		local fov_before = get_console_cmd(2, "fov")
+		local weapon_shake_factor = s * 0.1 + 1
+		exec_console_cmd("fov " .. clamp(math.atan(math.tan(fov_before * (0.5 * math.pi / 180)) * (axr_main.weapon_is_zoomed and 1.1 or 1.05 * weapon_shake_factor ) * settings.fov_power) / (0.5 * math.pi / 180), 5, 120))
+		
+		local function reset_fov_to_normal(fov_val)
+			exec_console_cmd("fov " .. fov_val)
+			return true
+		end
+		
+		CreateTimeEvent(0, "reset_fov_to_normal", 0.075, reset_fov_to_normal, fov_before)
+	end
+end
+
+
+function Update_Shooting(obj, wpn, ammo_elapsed, grenade_elapsed, ammo_type, grenade_type)
+	if (obj:id() ~= AC_ID) then
+		return
+	end
+
+	local wpn_obj = utils_item.item_is_fa(wpn) and wpn
+	if wpn_obj then
+		local sec = wpn_obj:section()
+		
+		if (not wpn_fx[sec]) then
+			parse_anims(ini_eff, sec, true)
+			parse_anims(ini_eff_og, sec, true)
+		end
+		
+		if (wpn_fx[sec] == true) then
+			return
+		end
+		
+		shoot_effect(sec)
+		
+		--printf("Shooting effect played for [%s]", sec)
+	end
+end
+
+-- MCM
+function load_defaults()
+	local t = {}
+	local op = grok_bo_enhanced_recoil_mcm.op
+	for i, v in ipairs(op.gr) do
+		if v.def ~= nil then
+			t[v.id] = v.def
+		end
+	end
+	return t
+end
+
+settings = load_defaults()
+
+function load_settings()
+	settings = load_defaults()
+	if ui_mcm then
+		for k, v in pairs(settings) do
+			settings[k] = ui_mcm.get(grok_bo_enhanced_recoil_mcm.op_id .. "/" .. k)
+		end
+	end
+	return settings
+end
+
+function on_option_change()
+	load_settings()
+	if settings.enabled then
+		RegisterScriptCallback("actor_on_weapon_fired", Update_Shooting)
+	else
+		UnregisterScriptCallback("actor_on_weapon_fired", Update_Shooting)
+	end
+end
+
+function actor_on_first_update()
+	on_option_change()
+	ini_eff:section_for_each(function(sec)
+		parse_anims(ini_eff, sec)
+	end)
+	ini_eff_og:section_for_each(function(sec)
+		parse_anims(ini_eff_og, sec)
+	end)
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_option_change", on_option_change)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_weapon_fired", Update_Shooting)
+end

@@ -1,0 +1,370 @@
+-- --------------------------------------------------------------------------
+-- By Minotaur
+-- Credit to Sneakydud for his work on Adjustable Scopes
+-- Credit to Ravenascendant for his work on MCM
+-- Credit to SlowVibe for introducing the concept for this mod
+-- --------------------------------------------------------------------------
+
+-- Focus Zoom default values (change these if you don't use MCM)
+local KEY = DIK_keys.DIK_F 					-- key to focus while aiming -- Default is DIK_F
+local drain_stamina_mcm = false				-- true means stamina drain is on when Focusing -- Default is true
+local stamina_drain_mult_mcm = 0.75 		-- used as direct multiplier for stamina drain while Focusing -- Default is 0.75
+local holstered_fov_mcm = 0.9				-- used to calculate fov multiplier when holstered and Focused -- Default is 0.9
+local aiming_hud_fov_mcm = 1.35				-- used to calculate hud_fov multiplier when aimed and Focused -- Default is 1.35
+local aiming_fov_mcm = 0.65					-- used to calculate fov multiplier when aimed and Focused -- Default is 0.65
+local receiver = "detector_radio"
+
+-- Sneaky's Adjustable Scopes default hud_fov values (change these if you don't use Sneaky's Adjustable Scopes or if you don't use MCM)
+local zoom_in_iron = 0.40					-- hud_fov for basic ironsights -- Default is 0.40
+local zoom_in_scope = 0.35					-- hud_fov for basic non-overlay scopes -- Default is 0.35
+local zoom_bad_scope = 0.2					-- hud_fov for fake 3d scopes like the vanilla SUSAT, ACOG, and AUG Scope -- Default is 0.2
+local gl_fov = 0.45							-- hud_fov for grenade launchers -- Default is 0.45
+
+-- --------------------------------------------------------------------------
+--  DO NOT CHANGE ANYTHING BELOW THIS LINE UNLESS YOU KNOW WHAT YOU'RE DOING
+-- --------------------------------------------------------------------------
+
+-- Focused Zoom Calculated values
+local holstered_focus_fov = 70				-- fov value to be set when holstered and focused
+local aiming_focus_hud_fov = 0.6			-- hud_fov value to be set when aimed and focused
+local aiming_focus_fov = 70					-- fov value to be set when aimed and focused
+
+local mcm_keybinds = ui_mcm
+ini_fov = ini_file_ex("items\\weapon_fov_values.ltx")
+
+local defaults = {
+	["drain_stamina_mcm"] = false,
+	["stamina_drain_mult_mcm"] = 0.75,
+	["holstered_fov_mcm"] = 0.9,
+	["aiming_hud_fov_mcm"] = 1.35,
+	["aiming_fov_mcm"] = 0.65
+}
+
+-- Values when weapon is aimed and Focused Zoom is not on
+local default_aim_hud_fov = 0.6				-- hud_fov as set by Adjustable Scopes configs
+local default_zoom_factor = 0				-- scope_zoom_factor as set by weapon configs
+
+-- Game Setting fov and hud_fov values
+local default_hud_fov = ui_options.get("video/basic/hud_fov")
+local default_fov = ui_options.get("video/basic/fov")
+local original_aim_hud_fov = 0.6			-- hud_fov set by normal game settings without Adjustable Scopes modification
+
+-- Useful flags
+local is_mcm_open = false					-- self-explanatory, to check if variables need updating
+local weapon_aimed = false					-- true means weapon is being aimed
+local focused_zoom = false					-- true means holstered Focus Zoom is on
+local scope_focused_zoom = false			-- true means aimed Focus Zoom is on
+local focus_is_draining_stamina = false		-- true means stamina currently drained by Focus
+local enough_stamina_for_focus = true		-- true means there's enough stamina to Focus
+local is_scope_bad = false					-- true means scope is fake vanilla 3d scope
+
+-- Useful debug messages similar to Raven's
+function print_dbg( text , ...)
+	if true then
+		printf( "Zoom: | %s |  "..text ,time_global(), ...)
+	end
+end
+-- print_dbg("This is example of debug message")
+
+function on_mcm_load()
+    local options = {
+        id = "focused",
+        sh = true,
+        gr = {
+            {id = "focused", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_menu_focused", size = {512, 50}, spacing = 20},
+			{id = "keybind", type = "key_bind", val = 2, def= KEY},
+			{ id= "desc_mcm"    	 	,type= "desc"     ,text= "ui_mcm_focused_update_mcm"			 ,clr= {255,175,0,0}, precondition = {function() return not mcm_keybinds end}	},
+			{id = "drain_stamina_mcm", type = "check", val = 1, def = false},
+			{id = "stamina_drain_mult_mcm", type = "track", val = 2, min=0.01,max=2.0,step=0.01, def = 0.75},
+			{id = "holstered_fov_mcm", type = "track", val = 2, min=0.51,max=1.49,step=0.01, def = 0.9},
+            {id = "aiming_hud_fov_mcm", type = "track", val = 2, min=0.5,max=1.5,step=0.01, def = 1.35},
+			{id = "aiming_fov_mcm", type = "track", val = 2, min=0.51,max=1.49,step=0.01, def = 0.65},
+        }
+    }
+    return options
+end
+
+function get_on_start()
+	default_fov = ui_options.get("video/basic/fov")
+	default_hud_fov = ui_options.get("video/basic/hud_fov")
+	zoom_in_iron = ui_mcm.get("scop/iron_fov") or zoom_in_iron
+	zoom_in_scope = ui_mcm.get("scop/scope_fov") or zoom_in_scope
+	zoom_bad_scope = ui_mcm.get("scop/bad_scope_fov") or zoom_bad_scope
+	gl_fov = ui_mcm.get("scop/grenade_fov") or gl_fov
+	drain_stamina_mcm = ui_mcm.get("focused/drain_stamina_mcm")
+	stamina_drain_mult_mcm = ui_mcm.get("focused/stamina_drain_mult_mcm")
+	holstered_fov_mcm = ui_mcm.get("focused/holstered_fov_mcm")
+	aiming_hud_fov_mcm = ui_mcm.get("focused/aiming_hud_fov_mcm")
+	aiming_fov_mcm = ui_mcm.get("focused/aiming_fov_mcm")
+end
+
+function on_option_change(mcm)
+	default_fov = ui_options.get("video/basic/fov")
+	default_hud_fov = ui_options.get("video/basic/hud_fov")
+	if mcm then
+		KEY = ui_mcm.get("focused/keybind") or KEY
+		zoom_in_iron = ui_mcm.get("scop/iron_fov") or zoom_in_iron
+		zoom_in_scope = ui_mcm.get("scop/scope_fov") or zoom_in_scope
+		zoom_bad_scope = ui_mcm.get("scop/bad_scope_fov") or zoom_bad_scope
+		gl_fov = ui_mcm.get("scop/grenade_fov") or gl_fov
+		drain_stamina_mcm = ui_mcm.get("focused/drain_stamina_mcm")
+		stamina_drain_mult_mcm = ui_mcm.get("focused/stamina_drain_mult_mcm")
+		holstered_fov_mcm = ui_mcm.get("focused/holstered_fov_mcm")
+		aiming_hud_fov_mcm = ui_mcm.get("focused/aiming_hud_fov_mcm")
+		aiming_fov_mcm = ui_mcm.get("focused/aiming_fov_mcm")
+	end
+end
+
+-- --------------------------------------------------------------------------
+
+-- Drains stamina while focusing for both aiming focus and holstered focus
+function focus_stamina_drain()
+	drain_stamina_mcm = ui_mcm.get("focused/drain_stamina_mcm")
+	if not drain_stamina_mcm then return end
+	local player_stamina = db.actor.power
+	if player_stamina > 0.1 then
+		enough_stamina_for_focus = true
+	else
+		enough_stamina_for_focus = false
+		if focused_zoom then focused_zoom_out() end
+		if scope_focused_zoom then scope_focused_zoom_out() end
+	end
+	if focus_is_draining_stamina and enough_stamina_for_focus then
+		local stamina_drain_amount = 0.05 * stamina_drain_mult_mcm * -1.0
+		local new_player_stamina = player_stamina - (stamina_drain_amount)
+		if new_player_stamina > 0.1 then
+			db.actor:change_power(stamina_drain_amount)
+		else
+			enough_stamina_for_focus = false
+			if focused_zoom then focused_zoom_out() end
+			if scope_focused_zoom then scope_focused_zoom_out() end
+		end
+	end
+end
+
+-- Returns scope_zoom_factor written in weapon configs
+function get_zoom_factor()
+	local weapon = db.actor:active_item()
+	local scope_zoom_factor = 0
+	if weapon then
+		scope_zoom_factor = ini_sys:r_float_ex(weapon:section(),"scope_zoom_factor") or 0
+	end
+	return scope_zoom_factor
+end
+
+-- Returns a weapon's default hud_fov when aiming without focusing. Based on Sneakydud's Adjustable Scopes script
+function get_aim_hud_fov()
+	local weapon = db.actor:active_item()
+	local scope = utils_item.get_attached_scope(weapon)
+	local parent = ini_sys:r_string_ex(weapon:section(),"parent_section") or weapon:section()
+	local not_pistol = not IsPistol(weapon)
+	local two_dim = weapon and ini_sys:r_float_ex(weapon:section(),"scope_status") == 1
+	local sec_exist = ini_fov:section_exist(parent)
+	if weapon and weapon:weapon_in_grenade_mode() then
+		is_scope_bad = false
+		return gl_fov
+	end
+	local iron_fov = ini_fov:r_float_ex(parent, "iron")
+	if sec_exist and scope then
+		local custom_fov = ini_fov:r_float_ex(parent, scope)
+		if scope and custom_fov then
+			is_scope_bad = false
+			return custom_fov
+		end
+	end
+	if sec_exist and (not scope) and iron_fov then
+		is_scope_bad = true
+		return iron_fov
+	end
+	if scope and not_pistol then
+		local scope_bad = ini_fov:r_bool_ex("bad_scopes", scope)
+		if scope_bad and (not two_dim) then
+			is_scope_bad = true
+			return zoom_bad_scope
+		else
+			is_scope_bad = false
+			return zoom_in_scope
+		end
+	end
+	if (not scope) or IsPistol(weapon) then
+		is_scope_bad = false
+		return zoom_in_iron
+	end
+end
+
+-- Turns off aimed Focused Zoom
+function scope_focused_zoom_out()
+	local weapon = db.actor:active_item()
+	local two_dim = weapon and ini_sys:r_float_ex(weapon:section(),"scope_status") == 1
+	if weapon and not two_dim then
+		if not weapon_aimed then
+			exec_console_cmd("hud_fov " .. default_hud_fov)
+			exec_console_cmd("fov " .. default_fov)
+		else
+			default_zoom_factor = get_zoom_factor()
+			exec_console_cmd("hud_fov " .. original_aim_hud_fov)
+			if default_zoom_factor == 0 then
+				exec_console_cmd("fov " .. default_fov)
+			else
+				exec_console_cmd("fov " .. default_zoom_factor * 0.75)
+			end
+		end
+	end
+	focused_zoom = false
+	scope_focused_zoom = false
+	focus_is_draining_stamina = false
+end
+
+-- Turns on aimed Focused Zoom
+function scope_focused_zoom_in()
+	focused_zoom = false
+	scope_focused_zoom = false
+	focus_is_draining_stamina = false
+	drain_stamina_mcm = ui_mcm.get("focused/drain_stamina_mcm")
+	local player_stamina = db.actor.power
+		if player_stamina > 0.1 then enough_stamina_for_focus = true
+		else enough_stamina_for_focus = false end
+	local weapon = db.actor:active_item()
+	local two_dim = weapon and ini_sys:r_float_ex(weapon:section(),"scope_status") == 1
+	if weapon and not two_dim then
+		original_aim_hud_fov = get_console():get_float("hud_fov")
+		default_aim_hud_fov = get_aim_hud_fov()
+		if not weapon_aimed then
+			exec_console_cmd("hud_fov " .. default_hud_fov)
+			exec_console_cmd("fov " .. default_fov)
+			return
+		elseif not drain_stamina_mcm or enough_stamina_for_focus then
+			default_aim_hud_fov = get_aim_hud_fov()
+			default_zoom_factor = get_zoom_factor()
+			local focused_zoom_factor = (1.5 - aiming_fov_mcm) * default_zoom_factor
+			aiming_focus_hud_fov = (aiming_hud_fov_mcm - 0.49) * default_aim_hud_fov
+			if aiming_focus_hud_fov > 1.0 then aiming_focus_hud_fov = 1.0 end
+			if aiming_focus_hud_fov < 0.1 then aiming_focus_hud_fov = 0.1 end
+			if not is_scope_bad then exec_console_cmd("hud_fov " .. aiming_focus_hud_fov) end
+			-- exec_console_cmd("hud_fov " .. aiming_focus_hud_fov)
+			if default_zoom_factor == 0 then
+				aiming_focus_fov = (1.5 - aiming_fov_mcm) * default_fov
+				if aiming_focus_fov > 180 then aiming_focus_fov = 180 end
+				if aiming_focus_fov < 5 then aiming_focus_fov = 5 end
+				if not is_scope_bad then exec_console_cmd("fov " .. aiming_focus_fov) end
+				-- exec_console_cmd("fov " .. aiming_focus_fov)
+			else
+				aiming_focus_fov = focused_zoom_factor * 0.75
+				if aiming_focus_fov > 180 then aiming_focus_fov = 180 end
+				if aiming_focus_fov < 5 then aiming_focus_fov = 5 end
+				if not is_scope_bad then exec_console_cmd("fov " .. aiming_focus_fov) end
+				-- exec_console_cmd("fov " .. aiming_focus_fov)
+			end
+			scope_focused_zoom = true
+			if drain_stamina_mcm and not is_scope_bad then focus_is_draining_stamina = true end
+		end
+	end
+end
+
+-- Turns off holstered Focused Zoom
+function focused_zoom_out()
+	local weapon = db.actor:active_item()
+	if not weapon then
+		exec_console_cmd("hud_fov " .. default_hud_fov)
+		exec_console_cmd("fov " .. default_fov)
+		focused_zoom = false
+		scope_focused_zoom = false
+		focus_is_draining_stamina = false
+	end
+end
+
+-- Turns on holstered Focused Zoom
+function focused_zoom_in()
+	local weapon = db.actor:active_item()
+	if not weapon then
+		drain_stamina_mcm = ui_mcm.get("focused/drain_stamina_mcm")
+		local player_stamina = db.actor.power
+			if player_stamina > 0.1 then enough_stamina_for_focus = true
+			else enough_stamina_for_focus = false end
+		if not drain_stamina_mcm or enough_stamina_for_focus then
+			holstered_focus_fov = (1.5 - holstered_fov_mcm) * default_fov
+			if holstered_focus_fov > 180 then holstered_focus_fov = 180 end
+			if holstered_focus_fov < 5 then holstered_focus_fov = 5 end
+			exec_console_cmd("fov " .. holstered_focus_fov)
+			focused_zoom = true
+			if drain_stamina_mcm then focus_is_draining_stamina = true end
+		else
+			focused_zoom = false
+			scope_focused_zoom = false
+			focus_is_draining_stamina = false
+		end
+	end
+end
+
+-- --------------------------------------------------------------------------
+
+function actor_on_weapon_zoom_out(wpn)
+	weapon_aimed = false
+	scope_focused_zoom_out()
+end
+
+function actor_on_weapon_zoom_in(wpn)
+    weapon_aimed = true
+	focused_zoom_out()
+end
+
+function on_key_press(key)
+	local bind = dik_to_bind(key)
+	if (key == KEY) then
+		if weapon_aimed and not scope_focused_zoom then
+			scope_focused_zoom_in()
+			return
+		end
+	end
+	if (bind == key_bindings.kWPN_ZOOM) then
+		if not actor_menu.is_hud_free() or device():is_paused() then 
+			return 
+		end
+		local device = db.actor:active_detector()
+		if device and device:section() == receiver then
+			return
+		end
+		if not weapon_aimed and not scope_focused_zoom and not focused_zoom then
+			focused_zoom_in()
+			return
+		end
+	end
+end
+
+function on_key_release(key)
+	local bind = dik_to_bind(key)
+	if (key == KEY) then
+		if weapon_aimed and scope_focused_zoom then
+			scope_focused_zoom_out()
+			return
+		end
+	end
+	if (bind == key_bindings.kWPN_ZOOM) then
+		if not weapon_aimed and not scope_focused_zoom and focused_zoom then
+			focused_zoom_out()
+			return
+		end
+	end
+end
+
+local tg_act = 0
+local tg_act_delay = 250
+function actor_on_update()
+	local tg = time_global()
+	if tg > tg_act then
+		if focus_is_draining_stamina then
+			focus_stamina_drain()
+		end
+		tg_act = tg + tg_act_delay
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_weapon_zoom_in", actor_on_weapon_zoom_in)
+	RegisterScriptCallback("actor_on_weapon_zoom_out", actor_on_weapon_zoom_out)
+	RegisterScriptCallback("on_option_change", on_option_change)
+    RegisterScriptCallback("on_key_press", on_key_press)
+    RegisterScriptCallback("on_key_release", on_key_release)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	on_option_change(mcm_keybinds)
+end

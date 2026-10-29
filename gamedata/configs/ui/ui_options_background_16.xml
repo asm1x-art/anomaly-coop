@@ -1,0 +1,5 @@
+<auto_static x="0" y="0" width="1024" height="768" stretch="1">	
+	<!--статик-->
+	<!--<texture x="0" y="0" width="1280" height="768">ui\ui_actor_main_menu_one</texture>-->
+	<texture x="0" y="0" width="1920" height="1080">ui\grim_raid</texture>
+</auto_static>

@@ -1,0 +1,79 @@
+-- Dummy implementation is for the intemediate period before game start
+function utils_xml_get_color_con_orig (condition, to_code)
+  return utils_xml.get_color_con (condition, to_code)
+end
+
+in_UIItemSheet_Reset = 0
+in_UIWorkshopRepair_ListPartScheme = 0
+in_UIWorkshopRepair_ReplacePart = 0
+in_UIInfoItem_Update = 0
+in_part_condition_bar_override = 0
+
+function ui_workshop_UIWorkshopRepair_ListPartScheme_orig (self) end
+
+function ui_workshop_UIWorkshopRepair_ListPartScheme_tracker (self)
+  in_UIWorkshopRepair_ListPartScheme = in_UIWorkshopRepair_ListPartScheme + 1
+  ui_workshop_UIWorkshopRepair_ListPartScheme_orig (self)
+  in_UIWorkshopRepair_ListPartScheme = in_UIWorkshopRepair_ListPartScheme - 1
+end
+
+function ui_workshop_UIWorkshopRepair_ReplacePart_orig (self) end
+
+function ui_workshop_UIWorkshopRepair_ReplacePart_tracker (self)
+  in_UIWorkshopRepair_ReplacePart = in_UIWorkshopRepair_ReplacePart + 1
+  ui_workshop_UIWorkshopRepair_ReplacePart_orig (self)
+  in_UIWorkshopRepair_ReplacePart = in_UIWorkshopRepair_ReplacePart - 1
+end
+
+function ui_itm_details_UIItemSheet_Reset_orig (self, obj) end
+
+function ui_itm_details_UIItemSheet_Reset_tracker (self, obj)
+  in_UIItemSheet_Reset = in_UIItemSheet_Reset + 1
+  ui_itm_details_UIItemSheet_Reset_orig (self, obj)
+  in_UIItemSheet_Reset = in_UIItemSheet_Reset - 1
+end
+
+
+-- Need to override Parts in Tooltips, the script has to be loaded before it.
+utils_ui_UIInfoItem_Update_orig = utils_ui.UIInfoItem.Update
+
+function utils_ui_UIInfoItem_Update_tracker (self, obj, sec, flags)
+  in_UIInfoItem_Update = in_UIInfoItem_Update + 1
+  utils_ui_UIInfoItem_Update_orig (self, obj, sec, flags)
+  in_UIInfoItem_Update = in_UIInfoItem_Update - 1
+end
+
+utils_ui.UIInfoItem.Update = utils_ui_UIInfoItem_Update_tracker
+
+function utils_xml_get_color_con_WPO (condition, to_code)
+  if in_UIItemSheet_Reset == 0 and in_UIWorkshopRepair_ListPartScheme == 0 and in_UIWorkshopRepair_ReplacePart == 0 and in_part_condition_bar_override == 0 and in_UIInfoItem_Update == 0 then return utils_xml_get_color_con_orig (condition, to_code) end
+
+  if condition
+  then
+    if condition < 0
+    then
+      return utils_xml.get_color ("black", to_code)
+    elseif condition < 60
+    then
+      return utils_xml.get_color ("d_red", to_code)
+    else
+      local threshold = a_arti_jamming_mcm.get_config ("threshold") or 85
+      if condition < threshold
+      then
+        return utils_xml.get_color ("yellow", to_code)
+      end
+    end
+  end
+  return utils_xml.get_color ("d_green", to_code)
+end
+
+function on_game_start ()
+  utils_xml_get_color_con_orig = utils_xml.get_color_con
+  utils_xml.get_color_con = utils_xml_get_color_con_WPO
+  ui_itm_details_UIItemSheet_Reset_orig = ui_itm_details.UIItemSheet.Reset
+  ui_itm_details.UIItemSheet.Reset = ui_itm_details_UIItemSheet_Reset_tracker
+  ui_workshop_UIWorkshopRepair_ListPartScheme_orig = ui_workshop.UIWorkshopRepair.ListPartScheme
+  ui_workshop.UIWorkshopRepair.ListPartScheme = ui_workshop_UIWorkshopRepair_ListPartScheme_tracker
+  ui_workshop_UIWorkshopRepair_ReplacePart_orig = ui_workshop.UIWorkshopRepair.ReplacePart
+  ui_workshop.UIWorkshopRepair.ReplacePart = ui_workshop_UIWorkshopRepair_ReplacePart_tracker
+end

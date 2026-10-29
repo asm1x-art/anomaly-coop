@@ -1,0 +1,6 @@
+; Fixes to the Grim Raid Addon weapon pack (tools\gra\build_pack.py brings it in; this file is the repo's own)
+
+; Boomsticks' Archangel has "_v.ogf" after its world model's path (with spaces between, which the engine drops), a
+; model that doesn't exist: the game crashed on the first Monolith stalker carrying it
+![wpn_remington700_bas_archangel]
+visual = dynamics\weapons\wpn_remington700_bas\wpn_remington700_bas_archangel_world.ogf

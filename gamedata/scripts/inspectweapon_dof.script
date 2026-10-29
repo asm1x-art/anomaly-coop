@@ -1,0 +1,30 @@
+local inspect_utils = inspectWeapon_utils
+local console = get_console()
+
+local inspect_dof_blur = { from = 0.0, to = 0.0 }
+
+local function inspect_change_ssfx_dof()
+	local smoothed_dof = inspect_utils.smooth_value(inspect_dof_blur)
+
+	inspect_set_ssfx_dof(0.15, 0.25, smoothed_dof, 1)
+	if smoothed_dof == inspect_dof_blur.to then
+		UnregisterScriptCallback("actor_on_update", inspect_change_ssfx_dof)
+	end
+end
+
+function inspect_remove_ssfx_dof()
+	RemoveTimeEvent(0, "inspect_remove_ssfx_dof")
+	inspect_set_ssfx_dof_blur(0)
+end
+
+function inspect_set_ssfx_dof(fade_start, fade_length, blur, intensity)
+	console:execute("ssfx_wpn_dof_1 (" .. fade_start .. "," .. fade_length .. "," .. blur .. "," .. intensity .. ")")
+end
+
+function inspect_set_ssfx_dof_blur(value)
+	if inspect_dof_blur.to ~= value then 
+		UnregisterScriptCallback("actor_on_update", inspect_change_ssfx_dof)
+		inspect_dof_blur.to = value
+		RegisterScriptCallback("actor_on_update", inspect_change_ssfx_dof)
+	end
+end

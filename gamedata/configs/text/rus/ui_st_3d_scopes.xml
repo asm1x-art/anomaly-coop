@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+
+	<string id="ui_mcm_menu_3d_scopes">
+		<text>3D прицелы</text>
+	</string>
+	
+	<string id="ui_mcm_3d_scopes_title">
+		<text>Шейдерные 3D прицелы</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_zoom_factor">
+		<text>Коэффициент приближения</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_lens_brightness">
+		<text>Яркость бликов на линзах</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_nvg_blur">
+		<text>Размытие прицела в ПНВ от Beef</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_parallax_shadow">
+		<text>Отображать тени параллакса</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_see_through">
+		<text>Сетка и выходной зрачок всегда видны</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_thermal_pixelation">
+		<text>Пикселизация тепловизионных прицелов при зуме</text>
+	</string>
+
+	<string id="ui_mcm_3d_scopes_chromatism">
+		<text>Хроматические аберрации на прицелах</text>
+	</string>
+
+</string_table>

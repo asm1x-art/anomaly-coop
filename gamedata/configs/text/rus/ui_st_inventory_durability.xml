@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_inv_outfit_durability_physical">
+		<text>Физ. прочность</text>
+	</string>
+	<string id="ui_inv_outfit_durability_anomaly">
+		<text>Аном. прочность</text>
+	</string>	
+	<string id="ui_inv_outfit_fire_wound_protection_helmet">
+		<text>Балл. защ. Шлема</text>
+	</string>	
+</string_table>

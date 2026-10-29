@@ -1,0 +1,249 @@
+![helm_bandana]
+cost                          = 320
+
+![helm_cloth_mask]
+cost                          = 630
+
+![helm_rp_bala]
+cost                          = 770
+
+![helm_resp]
+cost                          = 5910
+
+![helm_respirator]
+cost                          = 8570
+
+![helm_respirator_old]
+cost                          = 9970
+
+![helm_respirator_gp5]
+cost                          = 14170
+
+![helm_m40]
+cost                          = 22290
+
+![helm_ppm88]
+cost                          = 25900
+
+![helm_protective]
+cost                          = 24800
+
+![helm_m50]
+cost                          = 28980
+
+![helm_ranger]
+cost                          = 34020
+
+![helm_hardhat]
+cost                          = 14900
+
+![helm_hardhat_snag]
+cost                          = 22150
+
+![helm_ach7]
+cost                          = 19180
+
+![helm_ach7ex]
+cost                          = 24500
+
+![helm_battle]
+cost                          = 38530
+
+![helm_exo]
+cost                          = 42730
+
+![helm_metro]
+cost                          = 46820
+
+![helm_spartan]
+cost                          = 51800
+
+![helm_tactic]
+cost                          = 31420
+
+
+; Раздел встроенных шлемов
+
+![head_damage_gas13]
+bip01_neck 			 		= 1, 0.04
+bip01_head 			 		= 1, 0.04
+eyelid_1 			 		= 1, 0.04
+eye_left 			 		= 1, 0.04
+eye_right 			 		= 1, 0.04
+jaw_1 		 		 		= 1, 0.04
+
+![head_damage_gas14]
+bip01_neck 			 		= 1, 0.24
+bip01_head 			 		= 1, 0.25
+eyelid_1 			 		= 1, 0.24
+eye_left 			 		= 1, 0.24
+eye_right 			 		= 1, 0.24
+jaw_1 		 		 		= 1, 0.25
+
+![head_damage_ssp10]
+bip01_neck 			 		= 1, 0.12
+bip01_head 			 		= 1, 0.12
+eyelid_1 			 		= 1, 0.12
+eye_left 			 		= 1, 0.12
+eye_right 			 		= 1, 0.12
+jaw_1 		 		 		= 1, 0.12
+
+![head_damage_ssp12]
+bip01_neck 			 		= 1, 0.18
+bip01_head 			 		= 1, 0.18
+eyelid_1 			 		= 1, 0.18
+eye_left 			 		= 1, 0.18
+eye_right 			 		= 1, 0.18
+jaw_1 		 		 		= 1, 0.18
+
+![head_damage_ssp12_up]
+bip01_neck 			 		= 1, 0.23
+bip01_head 			 		= 1, 0.23
+eyelid_1 			 		= 1, 0.23
+eye_left 			 		= 1, 0.23
+eye_right 			 		= 1, 0.23
+jaw_1 		 		 		= 1, 0.23
+
+![head_damage_ssp12_upb]
+bip01_neck 			 		= 1, 0.30
+bip01_head 			 		= 1, 0.30
+eyelid_1 			 		= 1, 0.30
+eye_left 			 		= 1, 0.30
+eye_right 			 		= 1, 0.30
+jaw_1 		 		 		= 1, 0.30
+
+
+![head_damage_exolight24]
+bip01_neck 			 		= 1, 0.41
+bip01_head 			 		= 1, 0.41
+eyelid_1 			 		= 1, 0.41
+eye_left 			 		= 1, 0.41
+eye_right 			 		= 1, 0.41
+jaw_1 		 		 		= 1, 0.41
+
+![head_damage_exo25]
+bip01_neck 			 		= 1, 0.41
+bip01_head 			 		= 1, 0.41
+eyelid_1 			 		= 1, 0.41
+eye_left 			 		= 1, 0.41
+eye_right 			 		= 1, 0.41
+jaw_1 		 		 		= 1, 0.41
+
+![head_damage_nosorog28]
+bip01_neck 			 		= 1, 0.47
+bip01_head 			 		= 1, 0.47
+eyelid_1 			 		= 1, 0.47
+eye_left 			 		= 1, 0.47
+eye_right 			 		= 1, 0.47
+jaw_1 		 		 		= 1, 0.47
+
+
+
+; Раздел ребаланса шлемов, в оригинале некоторые наборы статов соответствовали всего 1му шлему
+; пишется как bones_koeff_protection        = имя из квадратных скобок в шкаргалке внизу
+;[actor_helm_absent]:body_damage_absent, head_damage_00
+;[actor_helm_respirator]:body_damage_absent, head_damage_0011
+;[actor_helm_m40]:body_damage_absent, head_damage_0011
+;[actor_helm_screen]:body_damage_absent, head_damage_015
+;[actor_helm_hardhat]:body_damage_absent, head_damage_hardhat
+;[actor_helm_tactic]:body_damage_absent, head_damage_030
+;[actor_helm_battle]:body_damage_absent, head_damage_035
+;[actor_helm_exo]:body_damage_absent, head_damage_040
+;[actor_helm_spartan]:body_damage_absent, head_damage_045
+
+
+; Раздел раздельных шлемов
+
+![head_damage_00]; NO PROTECTION ; название в конфиге helm_rp_bala, helm_bandana, helm_cloth_mask
+bip01_neck 			 		= 1, 0.0
+bip01_head 			 		= 1, 0.0
+eyelid_1 			 		= 1, 0.0
+eye_left 			 		= 1, 0.0
+eye_right 			 		= 1, 0.0
+jaw_1 		 		 		= 1, 0.0
+
+![head_damage_0011]; respirator ;название в конфиге actor_helm_m40
+; было helm_m40, helm_m50, helm_ppm88, helm_ranger, helm_resp, helm_respirator, helm_respirator_gp5, helm_respirator_old
+; стало helm_m40, helm_ppm88, helm_resp, helm_respirator, helm_respirator_gp5, helm_respirator_old
+bip01_neck 			 		= 1, 0.04
+bip01_head 			 		= 1, 0.04
+eyelid_1 			 		= 1, 0.04
+eye_left 			 		= 1, 0.04
+eye_right 			 		= 1, 0.04
+jaw_1 		 		 		= 1, 0.04
+
+
+![helm_m50]:tch_helmet
+bones_koeff_protection        = actor_helm_screen
+![helm_ranger]:tch_helmet
+bones_koeff_protection        = actor_helm_screen
+
+![head_damage_015]; scientific CLASS II ;название в конфиге actor_helm_screen
+; было helm_protective
+; стало helm_protective, helm_m50, helm_ranger
+bip01_neck 			 		= 1, 0.18
+bip01_head 			 		= 1, 0.18
+eyelid_1 			 		= 1, 0.18
+eye_left 			 		= 1, 0.18
+eye_right 			 		= 1, 0.18
+jaw_1 		 		 		= 1, 0.18
+
+![head_damage_hardhat]; CLASS IIIA ;название в конфиге actor_helm_hardhat
+; было helm_ach7, helm_ach7ex, helm_hardhat, helm_hardhat_snag
+; стало 
+bip01_neck 			 		= 1, 0.26
+bip01_head 			 		= 1, 0.26
+eyelid_1 			 		= 1, 0.26
+eye_left 			 		= 1, 0.12
+eye_right 			 		= 1, 0.12
+jaw_1 		 		 		= 1, 0.26
+
+
+![helm_battle]:tch_helmet
+bones_koeff_protection        = actor_helm_tactic
+
+![head_damage_030]; CLASS III ;название в конфиге actor_helm_tactic
+; было helm_tactic
+; стало helm_tactic helm_battle
+bip01_neck 			 		= 1, 0.32
+bip01_head 			 		= 1, 0.32
+eyelid_1 			 		= 1, 0.32
+eye_left 			 		= 1, 0.32
+eye_right 			 		= 1, 0.32
+jaw_1 		 		 		= 1, 0.32
+
+
+![helm_exo]:tch_helmet
+bones_koeff_protection        = 	actor_helm_battle
+
+![head_damage_035]; CLASS III ;название в конфиге actor_helm_battle
+; было helm_battle 
+; стало helm_exo
+bip01_neck 			 		= 1, 0.41
+bip01_head 			 		= 1, 0.41
+eyelid_1 			 		= 1, 0.41
+eye_left 			 		= 1, 0.41
+eye_right 			 		= 1, 0.41
+jaw_1 		 		 		= 1, 0.41
+
+![head_damage_040]; exo ; CLASS III + ;название в конфиге actor_helm_exo
+; было helm_metro, helm_exo
+; стало helm_metro
+bip01_neck 			 		= 1, 0.44
+bip01_head 			 		= 1, 0.44
+eyelid_1 			 		= 1, 0.44
+eye_left 			 		= 1, 0.44
+eye_right 			 		= 1, 0.44
+jaw_1 		 		 		= 1, 0.44
+
+![head_damage_045]; CLASS III ;название в конфиге actor_helm_spartan
+; было helm_spartan
+; стало helm_spartan
+bip01_neck 			 		= 1, 0.47
+bip01_head 			 		= 1, 0.47
+eyelid_1 			 		= 1, 0.47
+eye_left 			 		= 1, 0.47
+eye_right 			 		= 1, 0.47
+jaw_1 		 		 		= 1, 0.47
+
+

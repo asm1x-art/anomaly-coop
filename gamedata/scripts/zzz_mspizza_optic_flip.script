@@ -1,0 +1,105 @@
+--[[
+
+Modular Attachment System Optic Flip Script
+
+Made by: MsPizza727
+Last Edit: 12/30/25 - MsPizza727
+
+--]]
+
+local SOUND
+
+function init()
+    SOUND = sound_object('interface\\mark_adjust')
+end
+
+function make_scope(wpn, old_scope, scope_section)
+local se_obj = alife_create_item(scope_section, db.actor)
+
+  CreateTimeEvent("attach", "attach_time", 0.01, function()
+    local scope = level.object_by_id(se_obj.id)
+    if scope then
+      process_scope_change(wpn, old_scope, scope)
+      return true
+    end
+    return false
+  end)
+end
+
+
+function process_scope_change(wpn, old_scope, new_scope)
+	SOUND:play(db.actor, 0, sound_object.s2d)
+    	game.play_hud_anm("script\\mark_adjust.anm", 2, 2, 1, false, false)
+	wpn:weapon_addon_detach(old_scope, false)
+	wpn:weapon_addon_attach(new_scope)
+end
+
+function get_flipped(wpn, scope)
+
+		local c_wpn = wpn:cast_Weapon()
+
+		if not c_wpn then
+			printf("No cweapon")
+			return
+		end 
+		if c_wpn['IsScopeAttached'](c_wpn) then
+			scope = c_wpn['GetScopeName'](c_wpn)
+		end
+
+    -- Get equipped weapon
+    local wpn_se = wpn and alife_object(wpn:id())
+    if not wpn_se then
+	printf("no wpn se")
+        return
+    end
+
+	if not scope then
+		printf("No scope found")
+		return
+	end
+
+    -- Check if the weapon uses the flip script
+    local uses_switcher = ini_sys:r_bool_ex(scope, "flippable", false)
+    if not uses_switcher then
+        return
+    end
+
+    -- Get the next scope
+    local new_section = ini_sys:r_string_ex(scope, "flip_to", nil)
+    if not new_section then
+        printf("No new section")
+        return
+    end
+
+	make_scope(wpn, scope, new_section)
+
+end
+
+
+function start_flip(wpn)
+	if not (db.actor and db.actor:alive()) then
+		return
+	end
+	
+	if not wpn then
+		return
+	end
+	
+	local scope
+	local modular_attachments = ini_sys:r_bool_ex(wpn:section(), "modular_attachments", false)
+	if modular_attachments then
+		local c_wpn = wpn:cast_Weapon()
+
+		if not c_wpn then
+			printf("No cweapon")
+		end 
+		if c_wpn['IsScopeAttached'](c_wpn) then
+			scope = c_wpn['GetScopeName'](c_wpn)
+			get_flipped(wpn, scope)
+		end
+	end
+end
+
+function on_game_start()
+	init()
+end

@@ -1,0 +1,208 @@
+local inspect_utils = inspectWeapon_utils
+local inspect_dof = inspectWeapon_dof
+local inspect_ui = inspectWeapon_ui
+
+local inspect_options = 
+{
+	keybind,
+	key_input_mode,
+	enable_dof,
+	remove_ui,
+	disable_idle_animation
+}
+
+local inspect_animations = 
+{
+	idle = { name = nil, exists = false },
+	ammo_check = { name = "anm_ammo_check", exists = false }
+}
+
+local is_inspecting = false
+
+local function inspect_unset_state()
+	RemoveTimeEvent(0, "inspect_unset_state")
+	is_inspecting = false
+end
+
+local function inspect_check_interruption(weapon)
+	if not is_inspecting then
+		RemoveTimeEvent(0, "inspect_check_interruption")
+		return
+	end
+
+	if weapon ~= nil and weapon:get_state() ~= 0 then 
+		inspect_dof.inspect_remove_ssfx_dof()
+		inspect_ui.inspect_show_ui()
+		inspect_unset_state()
+	end
+end
+
+function inspect_select_animation(weapon_section, has_grenade_launcher)
+	-- Check idle animations.
+	if not has_grenade_launcher then
+		inspect_animations.idle.name = "anm_bore"
+		inspect_animations.idle.exists = inspect_utils.has_animation(weapon_section, inspect_animations.idle.name)
+	else
+		-- Weapons with grenade launchers have different idle animations.
+		inspect_animations.idle.exists = false
+		possible_gl_animations = {"anm_bore_g", "anm_bore_w_gl", "anm_bore_empty_w_gl"}
+		-- Some weapons, for example the ones in BaS, might miss some of the grenade launcher animations, so we need to check them one by one.
+		for i = 1, 3 do 
+			if inspect_utils.has_animation(weapon_section, possible_gl_animations[i]) then 
+				inspect_animations.idle.name = possible_gl_animations[i]
+				inspect_animations.idle.exists = true
+				break
+			end
+		end
+	end
+
+	-- Check ammo check animation.
+	inspect_animations.ammo_check.exists = inspect_utils.has_animation(weapon_section, inspect_animations.ammo_check.name)
+
+	-- Decide which animation to use.
+	if not inspect_animations.idle.exists and not inspect_animations.ammo_check.exists then
+		return nil
+	elseif inspect_animations.idle.exists and not inspect_animations.ammo_check.exists then
+		return inspect_animations.idle.name
+	elseif inspect_animations.ammo_check.exists and not inspect_animations.idle.exists then
+		return inspect_animations.ammo_check.name
+	else
+		-- Ammo check animation has 33% chance to trigger.
+		return math.random(100) <= 33 and inspect_animations.ammo_check.name or inspect_animations.idle.name
+	end
+end
+
+function inspect_weapon()
+	if is_inspecting then
+		return
+	end
+
+	local weapon = inspectWeapon_utils.get_current_weapon()
+	if weapon == nil or weapon:get_state() ~= 0 then -- Only allow inspection when weapon is idle.
+		return
+	end
+
+	local weapon_section = weapon:section()
+	local has_grenade_launcher = utils_item.addon_attached(weapon ,"gl")
+	local inspect_animation = inspect_select_animation(weapon_section, has_grenade_launcher)
+
+	if not inspect_utils.string_is_nil_or_empty(inspect_animation) then
+		is_inspecting = true
+		local inspect_duration = weapon:play_hud_motion(inspect_animation, true, 0, 1, 0) -- Animation duration in milliseconds.
+		utils_obj.play_sound(inspect_utils.get_sound(weapon_section, "snd_bore"))
+
+		CreateTimeEvent(0, "inspect_check_interruption", 0.001, inspect_check_interruption, weapon)
+		CreateTimeEvent(0, "inspect_unset_state", inspect_duration * 0.001 + 0.2, inspect_unset_state)
+
+		-- In case selected inspect animation is too short, don't adjust DOF as it might nauseate the user.
+		if inspect_duration > 100 then
+			if inspect_options.enable_dof then 
+				inspect_dof.inspect_set_ssfx_dof_blur(1)
+				local inspect_remove_ssfx_dof_delay = inspect_duration * 0.0008
+				CreateTimeEvent(0, "inspect_remove_ssfx_dof", inspect_remove_ssfx_dof_delay, inspect_dof.inspect_remove_ssfx_dof)
+			end
+
+			if inspect_options.remove_ui then
+				inspect_ui.inspect_hide_ui()
+				local inspect_show_ui_delay = inspect_duration * 0.00095
+				CreateTimeEvent(0, "inspect_show_ui", inspect_show_ui_delay, inspect_ui.inspect_show_ui)
+			end
+		end
+	end
+end
+
+--region Event handlers
+function on_mcm_load()
+	local options = 
+	{
+		id = "inspectWeapon", sh = true,
+		gr = 
+		{
+			{ id = "inspectWeapon", type = "slide", link = "ui_options_slider_disguise", text = "ui_mcm_menu_inspectWeapon", size = {512,50}, spacing = 20 },
+			{ id = "keybind", type = "key_bind", val = 2, def = DIK_keys.DIK_R },
+			{ id = "keyInputMode", type = ui_mcm.kb_mod_radio, val = 2, def = 2, text = "ui_mcm_inspectWeapon_keyInputMode", 
+				content = {{0, "mcm_kb_mode_press"}, {1, "mcm_kb_mode_dtap"}, {2, "mcm_kb_mode_hold"}}
+			},
+			{ id = "inspectDoF", type = "check", val = 1, def = true, text = "ui_mcm_inspectWeapon_inspectDoF" },
+			{ id = "inspectRemoveUI", type = "check", val = 1, def = true, text = "ui_mcm_inspectWeapon_inspectRemoveUI" },
+			{ id = "disableIdleAnimation", type = "check", val = 1, def = true, text = "ui_mcm_inspectWeapon_disableIdleAnimation" }
+		}
+	}
+	return options
+end
+
+function on_option_change(mcm)
+	if mcm then
+		inspect_options.keybind = ui_mcm.get("inspectWeapon/keybind")
+		inspect_options.key_input_mode = ui_mcm.get("inspectWeapon/keyInputMode")
+		inspect_options.enable_dof = ui_mcm.get("inspectWeapon/inspectDoF")
+		inspect_options.remove_ui = ui_mcm.get("inspectWeapon/inspectRemoveUI")
+		inspect_options.disable_idle_animation = ui_mcm.get("inspectWeapon/disableIdleAnimation")
+    end
+end
+
+local function on_key_press(key)
+	if key ~= inspect_options.keybind then 
+		return 
+	end
+
+	if inspect_options.key_input_mode == 0 then
+		ui_mcm.simple_press("inspectWeapon", key, inspect_weapon)
+		return
+	end
+
+	if inspect_options.key_input_mode == 1 and ui_mcm.double_tap("inspectWeapon", key) then
+		inspect_weapon()
+	end
+end
+
+local function on_key_hold(key)
+	if key ~= inspect_options.keybind then 
+		return 
+	end
+
+	if inspect_options.key_input_mode == 2 and ui_mcm.key_hold("inspectWeapon", key) then
+		inspect_weapon()
+	end
+end
+
+local function on_console_execute(command)
+	if inspect_utils.string_is_nil_or_empty(command) then
+		return
+	end
+
+	--[[
+		When user quits/closes game or loads last save, restore original UI state.
+		No need to handle new game starts because if user choose to start a new game when a save is loaded already,
+		game will disconnect first, thus restoring the UI state.
+	--]]
+	if command == "quit" or command == "disconnect" or command == "load_last_save" then
+		inspect_ui.inspect_show_ui()
+	end
+end
+
+local function on_hud_animation_play(animation_table, object)
+	if not inspect_options.disable_idle_animation then
+		return
+	end
+	if object == nil or not IsWeapon(object) then
+		return
+	end
+
+	local animation_name = animation_table["anm_name"]
+	if inspect_utils.string_starts_with(animation_name, "anm_bore") and not is_inspecting then
+		animation_table["anm_name"] = "$cancel"
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_option_change", on_option_change)
+	RegisterScriptCallback("on_key_press", on_key_press)
+	RegisterScriptCallback("on_key_hold", on_key_hold)
+	RegisterScriptCallback("on_console_execute", on_console_execute)
+
+	RegisterScriptCallback("actor_on_hud_animation_play", on_hud_animation_play)
+
+	on_option_change(ui_mcm)
+end
+--endregion

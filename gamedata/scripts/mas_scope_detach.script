@@ -1,0 +1,98 @@
+--[[
+
+Modular Attachment System Optic Detachment Script
+
+Made by: MsPizza727
+Last Edit: 1/23/26 - MsPizza727
+
+--]]
+
+local scopes_table = utils_data.collect_sections(ini_sys, {"addons_table"})
+
+local function move(npc_id, obj, mode, bag_from)
+
+	if mode ~= "loot" then return end
+
+	local modular_attachments = ini_sys:r_bool_ex(obj:section(), "modular_attachments", false)
+	if not modular_attachments then return end
+
+	if not detach(obj) then
+
+		if (bag_from ~= EDDListType.iActorBag) and (bag_from ~= 1) then return end
+
+		local c_wpn = obj:cast_Weapon()
+
+		if c_wpn['IsScopeAttached'](c_wpn) then
+			scope = c_wpn['GetScopeName'](c_wpn)
+			obj:weapon_addon_detach(scope, true)
+		end
+	end
+
+end
+
+local function drag_drop(scope, wpn, slot_from, slot_to)
+
+	local c_wpn = wpn:cast_Weapon()
+	local old_scope
+
+	if not (wpn and c_wpn) then return end
+
+	if c_wpn['IsScopeAttached'](c_wpn) then
+		old_scope = c_wpn['GetScopeName'](c_wpn)
+	end
+
+	if not old_scope then return end
+
+	local add_sec = scope:section()
+
+	local modular_attachments = ini_sys:r_bool_ex(wpn:section(), "modular_attachments", false)
+	if modular_attachments then 
+		local modular_scope_group = ini_sys:r_string_ex(wpn:section(), "modular_scope_group")
+		if modular_scope_group then
+			local scopes = parse_list(ini_sys, modular_scope_group, "scopes")
+			for i=1, #scopes do
+				if scopes[i] == add_sec then
+					wpn:weapon_addon_detach(old_scope, true)
+					wpn:weapon_addon_attach(scope)
+				end
+			end
+		end
+	end
+end
+
+
+function detach(obj)
+
+	-- An addon has not been attached or none can be detached.
+	local parent_section = ini_sys:r_string_ex(obj:section(),"parent_section")
+	if (not parent_section or obj:section() == parent_section) then return end
+
+	-- Get weapon owner
+	local old_weapon = alife_object(obj:id())
+	local owner = old_weapon and old_weapon.parent_id and get_object_by_id(old_weapon.parent_id)
+	if (not owner) then
+		printf("~ item_weapon.detach_scope | weapon owner not found")
+		return
+	end
+	
+	local scope_obj
+	
+	-- Determine which addon is attached to the weapon.
+	-- Create the item in the inventory when found.
+	for k, v in pairs(scopes_table) do
+		if (string.find(obj:section(), k)) then
+			--give_object_to_actor(k)
+			scope_obj = alife_create_item(k, owner)
+			break
+		end
+	end	
+	
+	local new_weapon = old_weapon and alife_clone_weapon(old_weapon, parent_section)
+
+	return true
+end
+
+function on_game_start()
+	RegisterScriptCallback("ActorMenu_on_item_drag_drop",drag_drop)
+	RegisterScriptCallback("ActorMenu_on_item_after_move", move)
+end

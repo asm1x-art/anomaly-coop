@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_title">
+		<text>GBOOBS Enhanced Recoil Revised</text>
+	</string>
+	<string id="ui_mcm_menu_demonized_grok_bo_enhanced_recoil">
+		<text>GBOOBS Recoil</text>
+	</string>
+
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_enabled">
+		<text>Enable</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_effect_power">
+		<text>Recoil Power</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_gun_effect_power">
+		<text>Gun movement Power</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_pp_power">
+		<text>Postprocess FX Power</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_upgrades_power">
+		<text>Influence by upgrades</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_upgrades_power_desc">
+		<text>Handling and recoil upgrades can reduce enhanced recoil. This parameter tells how much upgrades can influence enhanced recoil</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_condition_power">
+		<text>Influence by condition</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_condition_power_desc">
+		<text>Lower condition will increase recoil. Ideal condition will reduce it.</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcAnyMove_power">
+		<text>Increase recoil while moving</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcSprint_power">
+		<text>Increase recoil while sprinting</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcProne_power">
+		<text>Decrease recoil while prone</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcCrouch_power">
+		<text>Decrease recoil while crouching</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcJump_power">
+		<text>Increase recoil while jumping</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_mcZoom_power">
+		<text>Decrease recoil while zooming</text>
+	</string>
+	<string id="ui_mcm_demonized_grok_bo_enhanced_recoil_fov_changer">
+		<text>FOV Effect</text>
+	</string>
+		
+</string_table>

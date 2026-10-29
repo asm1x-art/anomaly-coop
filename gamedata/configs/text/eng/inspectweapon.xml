@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="ui_mcm_menu_inspectWeapon">
+		<text>Inspect Weapon Expanded</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_keybind">
+		<text>Perform Weapon Inspection</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_keyInputMode">
+		<text>Key Input Mode</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_inspectDoF">
+		<text>DOF During Weapon Inspection</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_inspectRemoveUI">
+		<text>Remove UI During Weapon Inspection</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_disableIdleAnimation">
+		<text>Disable Weapon Idle Animation</text>
+	</string>
+	<string id="ui_mcm_inspectWeapon_disableIdleAnimation_desc">
+		<text>When this option is checked, game won't automatically start weapon idle animation when player is idling for too long.</text>
+	</string>
+</string_table>

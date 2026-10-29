@@ -1,0 +1,246 @@
+local enable_debug = false
+function print_dbg(txt, ...)
+    if enable_debug then 
+        printf(txt, ...)
+    end
+end
+
+function on_belt(camelbak)
+    local found = false
+    db.actor:iterate_belt(
+            function (owner, obj)
+                -- printf("checking object id %s, section %s", obj:id(), obj:section())
+                if obj:id() == camelbak:id() then
+                    -- printf("found it")
+                    found =  true
+				end
+			end
+        )
+    return found
+end
+
+local water_table = {
+    ["mineral_water"] = 30,
+    ["flask"] = 20
+}
+local MIN = 0.0001
+local MAX = 0.999
+
+-- Шабаш: переписана функция глотка, чисти вилкой чисти чисти
+function sip(camelbak, large)
+    local section = large and "camelbak_chug" or "camelbak_sip"
+    local id = camelbak:id()
+    local camelbak_drain = SYS_GetParam(2, section, "cap_drain") or 0 -- 
+    
+    local cond = clamp((camelbak_cond[id] or 100) - camelbak_drain, 0, 100) -- 
+    camelbak_cond[id] = cond
+    
+    if cond <= 0 and camelbak:condition() > MIN then
+        camelbak:set_condition(MIN) -- 
+    elseif cond > 0 and camelbak:condition() < MAX then
+        camelbak:set_condition(MAX) -- 
+    end
+
+    -- Читаем параметры из конфига
+    local thirst_restore = SYS_GetParam(2, section, "eat_thirstiness") or 0
+    local power_restore = SYS_GetParam(2, section, "boost_power_restore") or 0
+    
+    -- 1. Связываем с actor_status_thirst
+    if actor_status_thirst and actor_status_thirst.add_thirst then
+        -- Умножаем на 1000, так как в твоем скрипте жажды стоит eat_thirstiness_mul = 1000 
+        actor_status_thirst.add_thirst(thirst_restore * 1000)
+    end
+    
+    -- 2. Восстанавливаем выносливость корректным движковым методом
+    if power_restore ~= 0 then
+        db.actor:change_power(power_restore)
+    end
+
+    -- Звук проигрывается только при ручном питье (large = true). 
+    if large then
+        local snd = sound_object("interface\\inv_drink_flask_2")
+        if snd then
+            snd:play(db.actor, 0, sound_object.s2d)
+        end
+    end
+
+    camelbak_last_sip = game.get_game_time() -- 
+end
+
+
+function try_drink(obj)
+    local id = obj:id()
+    if (camelbak_cond[id] and camelbak_cond[id] > 0) then
+        return game.translate_string("st_camelbak_trydrink")
+    end
+end
+
+function drink(obj)
+    sip(obj, true)
+end
+
+function on_item_drag_dropped(obj_1, obj_2, slot_from, slot_to)
+    
+	local water = obj_1
+    local camelbak = obj_2
+    local id = camelbak:id()
+    
+    local water_sec = obj_1:section()
+    if water_table[water_sec] == nil or not string.find(camelbak:section(), "af_camelbak") then
+        return
+    end
+
+    if not camelbak_cond[id] or camelbak_cond[id] < 100 then
+        local current_capacity = camelbak_cond[id] and camelbak_cond[id] or 0
+        camelbak_cond[id] = clamp(current_capacity + water_table[water_sec], 0, 100)
+        utils_item.discharge(water)
+        if camelbak:condition() < MAX then
+            camelbak:set_condition(MAX)
+        end
+        news_manager.send_tip(db.actor, game.translate_string("st_camelbak_fill"), nil, "swiss_knife", 6000)
+    else
+        news_manager.send_tip(db.actor, game.translate_string("st_camelbak_full"), nil, "swiss_knife", 6000)
+    end
+
+end
+
+-- monkey patch descriptor
+BuildHeader = ui_item.build_desc_header  -- obj needed
+function ui_item.build_desc_header(obj, sec, str)
+	str = str or gc(ini_sys:r_string_ex(sec,"description"))
+	if (not str) then return "" end
+	
+	local _str = ""
+    if string.find(obj:section(), "af_camelbak") then
+        local con = camelbak_cond[obj:id()] and math.floor(camelbak_cond[obj:id()]) or 0
+        local clr = utils_xml.get_color_con(con)
+        _str = clr .. " � " .. utils_xml.get_color("ui_gray_1") .. game.translate_string("st_camelbak_capacity") .. ": " .. clr .. tostring(con)  .. "%" .. "\\n \\n" .. utils_xml.get_color("ui_gray_1")   
+        return _str .. str
+    else
+        return BuildHeader(obj, sec, str)
+    end
+end
+
+camelbak_cond = {}
+-- class
+function bind(obj)
+    -- printf("bound object "..obj:section())
+    obj:bind_object(camelbak_binder(obj))
+end
+
+
+local drink_chk = 25 -- 60  работает слишком редко
+local camelbak_last_sip
+
+class "camelbak_binder" (object_binder)
+
+function camelbak_binder:__init(obj) super(obj)
+	self.first_update = nil
+end
+
+-- Шабаш: старая версия скрипта удалена, исправил
+function camelbak_binder:update(delta)
+    object_binder.update(self, delta)
+	local obj = self.object
+	local id = obj:id()
+    local curr_time = game.get_game_time()
+
+    if not self.first_update then
+        self.first_update = true
+        camelbak_last_sip = curr_time
+        if not camelbak_cond[id] then
+            -- Инициализация
+            camelbak_cond[id] = 100
+        elseif camelbak_cond[id] <= 0 then
+            obj:set_condition(MIN)
+        else
+            obj:set_condition(MAX)
+		end
+    end
+    
+    --if (get_console_cmd(1,"g_god")) or not on_belt(obj) then
+	if not on_belt(obj) then
+		return
+    end
+
+    -- Проверяем, прошла ли 1 игровая минута с последней проверки
+    if (camelbak_last_sip and curr_time:diffSec(camelbak_last_sip) < drink_chk) then
+		return 
+    end
+    
+    -- Обновляем таймер проверки
+    camelbak_last_sip = curr_time
+
+	if camelbak_cond[id] > 0 then
+        -- Получаем порог из MCM (как желаемый уровень гидратации)
+        local threshold_pct = arti_slot_control_mcm.get_config("camelbakThreshold") or 60
+        
+        -- Инвертируем: если мы хотим держать гидратацию не ниже 80%, 
+        -- значит мы пьем, когда жажда поднимается выше 20% (2000)
+        local threshold_val = ((100 - threshold_pct) / 100) * 10000 
+
+        -- Получаем текущий уровень жажды актора
+        local current_thirst = 0
+        if actor_status_thirst and actor_status_thirst.get_thirst_level then
+            current_thirst = actor_status_thirst.get_thirst_level()
+        end
+
+        -- Если текущая жажда превышает допустимый порог — делаем глоток
+        if current_thirst >= threshold_val then
+            print_dbg("Camelbak sip triggered. Thirst: %s, Threshold: %s", current_thirst, threshold_val)
+            sip(obj, false)
+        end
+    end
+    return
+end
+
+function camelbak_binder:reload(section)
+    object_binder.reload(self, section)
+end
+
+function camelbak_binder:reinit()
+    object_binder.reinit(self)
+end
+
+function camelbak_binder:net_spawn(se_abstract)
+    if not(object_binder.net_spawn(self, se_abstract)) then
+        return false
+    end
+    return true
+end
+
+function camelbak_binder:net_destroy()
+	--print_dbg("[%s] destroyed: %s", self.object:name())
+	object_binder.net_destroy(self)
+end
+
+function camelbak_binder:save(stpk)
+end
+
+function camelbak_binder:load(stpk)
+end
+
+local function save_state(mdata) 
+	mdata.camelbak_cond = camelbak_cond
+end
+
+local function load_state(mdata) 
+	camelbak_cond = mdata.camelbak_cond or {}
+end
+
+local function se_device_on_unregister(se_obj, typ)
+	--local sec = se_obj:section_name()
+	--if ini_sys:r_string_ex(sec,"script_binding") == "item_device.bind" then
+		local id = se_obj.id
+		camelbak_cond[id] = nil
+	--end
+end
+
+function on_game_start()
+	if (USE_MARSHAL) then 
+		RegisterScriptCallback("save_state",save_state)
+		RegisterScriptCallback("load_state",load_state)
+	end
+    RegisterScriptCallback("ActorMenu_on_item_drag_drop",on_item_drag_dropped)
+	RegisterScriptCallback("server_entity_on_unregister",se_device_on_unregister)
+end

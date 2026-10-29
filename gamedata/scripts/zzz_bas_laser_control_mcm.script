@@ -1,0 +1,204 @@
+--[[
+
+Controls for laser shader in BaS
+Author: HarukaSai
+
+Credits: LVutner, Sneaky
+Last edit: 11-02-2022
+]]
+
+local updated = 0
+local interval = 500
+local saved_lasers = {}
+local snd_laser = sound_object("interface\\inv_torch")
+local mcm_id = "bas_lasers"
+local inputs = nil
+local string_format = string.format
+
+CloneWep = _G.alife_clone_weapon
+function _G.alife_clone_weapon(se_obj, section, parent_id)
+	local old_id = se_obj.id
+	local new_wep = CloneWep(se_obj, section, parent_id)
+	local new_id = new_wep and new_wep.id
+	if saved_lasers and saved_lasers[old_id] and new_id then
+		saved_lasers[new_id] = saved_lasers[old_id]
+		saved_lasers[old_id] = nil
+	end
+	return new_wep
+end
+
+function on_mcm_load()
+    local options = {
+        id = mcm_id, sh = true,
+        gr = {
+            { id = mcm_id, type = "slide", link = "ui_options_slider_player", text = "ui_mcm_menu_" .. mcm_id, size = {512, 50}, spacing = 20},
+            { id = "keybind", type = "key_bind", val = 2, def = DIK_keys.DIK_V },
+            { id = "modifier", type = ui_mcm.kb_mod_radio , val = 2, def = 2, hint = "mcm_kb_mode",
+                content = {
+                    {0, "mcm_kb_mode_press"},
+                    {1, "mcm_kb_mode_dtap"},
+                    {2, "mcm_kb_mode_hold"} 
+                }
+            },
+	        { id = "second_key", type = ui_mcm.kb_mod_radio , val = 2, def = 0, hint = "mcm_kb_modifier",
+                content = { 
+                    {0,"mcm_kb_mod_none"} , 
+                    {1,"mcm_kb_mod_shift"} , 
+                    {2,"mcm_kb_mod_ctrl"},
+                    {3,"mcm_kb_mod_alt"}
+                }
+            }
+        }
+    }
+    return options
+end
+
+function actor_on_update()
+    if time_global() < updated then return end
+    updated = time_global() + interval
+    local wpn = db.actor:active_item()
+    local section = wpn and wpn:section()
+	local wpn_id = wpn and wpn:id()
+    if not (section and has_laser(wpn, section)) then return end
+    if wpn_id and saved_lasers[wpn_id] ~= nil then
+        set_laser(saved_lasers[wpn_id] and 1 or 0)
+    else
+        saved_lasers[wpn_id] = false
+        set_laser(0)
+    end
+end
+
+function key_function()
+    if not actor_menu.is_hud_free() or device():is_paused() then return end
+    local wpn = db.actor:active_item()
+    local section = wpn and wpn:section()
+	local w_id = wpn and wpn:id()
+    if not section then return end
+    if not w_id then return end
+    if not has_laser(wpn, section) then return end
+    local state = wpn:get_state()
+    if state ~= 0 then return end
+    toggle_laser(w_id)
+end
+
+function has_laser(wpn, section)
+
+    if ini_sys:r_bool_ex(section, "laser_status", false) then
+        return true
+    end
+
+	local modular_attachments = ini_sys:r_bool_ex(section, "modular_attachments", false)
+	if modular_attachments then
+		local c_wpn = wpn:cast_Weapon()
+		if c_wpn['IsScopeAttached'](c_wpn) then
+			local scope_section = c_wpn['GetScopeName'](c_wpn)
+			if scope_section then
+				return ini_sys:r_bool_ex(scope_section, "laser_status", false)
+			end
+		end
+	end
+	return false
+
+end
+
+function toggle_laser(id)
+    level.add_cam_effector("camera_effects\\weapon\\ak74_switch_off.anm", 9342, false, '')
+
+    CreateTimeEvent("haruka_laser", "haruka_laser", 0.2, function()
+        if saved_lasers[id] ~= nil then
+            saved_lasers[id] = not saved_lasers[id]
+        else
+            saved_lasers[id] = true
+        end
+
+        snd_laser:play(db.actor, 0, sound_object.s2d)
+        snd_laser.frequency = saved_lasers[id] and 1.15 or 0.85
+        set_laser(saved_lasers[id] and 1 or 0)
+
+        return true
+    end)
+end
+
+function set_laser(arg)
+    exec_console_cmd(string.format("shader_param_5 %s, 0, 0, 0", arg))
+end
+
+function save_state(m_data)
+    m_data.saved_lasers_id = saved_lasers
+end
+
+function load_state(m_data)
+    saved_lasers = m_data.saved_lasers_id or {}
+end
+
+function on_option_change()
+    if inputs then
+        inputs:destroy()
+    end
+
+    inputs = InputManager("", key_function, {
+            keybind = ui_mcm.get(string_format("%s/keybind", mcm_id, category)),
+            modifier = ui_mcm.get(string_format("%s/modifier", mcm_id, category)),
+            second_key = ui_mcm.get(string_format("%s/second_key", mcm_id, category))
+        }
+    )
+end
+
+class "InputManager"
+
+function InputManager:__init(id, functor, settings)
+    self.settings = settings
+    self.modes = {
+        [0] = { 
+            call = "on_key_press", 
+            action = function(key) 
+                ui_mcm.simple_press(mcm_id .. id, key, function() 
+                    functor(id) 
+                end) 
+            end 
+        },
+        [1] = { 
+            call = "on_key_press", 
+            action = function(key) 
+                if ui_mcm.double_tap(mcm_id .. id, key) then 
+                    functor(id) 
+                end 
+            end 
+        },
+        [2] = { 
+            call = "on_key_hold", 
+            action = function(key) 
+                if ui_mcm.key_hold(mcm_id .. id, key) then 
+                    functor(id) 
+                end 
+            end 
+        }
+    }
+    RegisterScriptCallback(self.modes[self.settings.modifier].call, self)
+end
+
+function InputManager:on_key_press(key)
+    if key ~= self.settings.keybind then return end
+    if ui_mcm.get_mod_key(self.settings.second_key) then
+        self.modes[self.settings.modifier].action(key)
+    end
+end
+
+function InputManager:on_key_hold(key)
+    if key ~= self.settings.keybind then return end
+    if ui_mcm.get_mod_key(self.settings.second_key) then
+        self.modes[self.settings.modifier].action(key)
+    end
+end
+
+function InputManager:destroy()
+    UnregisterScriptCallback(self.modes[self.settings.modifier].call, self)
+end
+
+function on_game_start()
+    RegisterScriptCallback("save_state", save_state)
+    RegisterScriptCallback("load_state", load_state)
+    RegisterScriptCallback("actor_on_update", actor_on_update)
+    RegisterScriptCallback("on_option_change", on_option_change)
+    on_option_change()
+end

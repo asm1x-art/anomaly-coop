@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<!--
+	Weapons
+-->
+
+<string_table>
+
+	<string id="st_wpn_rpg26">
+		<text>RPG-26 "Aglen"</text>
+	</string>
+	<string id="st_wpn_rpg26_descr">
+		<text>RPG-26 "Aglen" is a Soviet disposable anti-tank rocket launcher developed by NPO Basalt to replace the RPG-22 "Net", to increase the combat capabilities of motorized rifle, airborne and other units. In the RPG-26, unlike its predecessors, the possibility of a reverse transfer from a combat position to a marching position was implemented.\n \n
+		%c[d_purple]ONE-TIME USE!\n \n</text>
+	</string>
+
+</string_table>

@@ -1,0 +1,10 @@
+function normal   (shader, t_base, t_second, t_detail)
+	shader:begin	("model_env_lq","model_env_lq")
+      : fog			(true)
+      : zb			(true,false)
+      : blend		(true,blend.one,blend.zero)
+      : aref		(true,0)
+      : sorting		(2,true)
+      : distort		(true)
+	shader:sampler  ("s_base")		:texture	("wpn\\wpn_addon_scope_wa2000_lens")
+end

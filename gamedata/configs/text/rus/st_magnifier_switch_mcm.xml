@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+  <!-- Основное меню -->
+  <string id="ui_mcm_menu_magnifier_switch">
+    <text>Переключатель прицелов</text>
+  </string>
+
+  <!-- Опции -->
+  <string id="ui_mcm_magnifier_switch_use_mousewheel">
+    <text>Использовать колесо мыши</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_use_mousewheel_hint">
+    <text>Позволяет переключать прицел с помощью колеса мыши</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_mwheel_switch_ads_only">
+    <text>Только в прицеливании</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_mwheel_switch_ads_only_hint">
+    <text>Колесо мыши переключает прицел только в режиме прицеливания</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_mwheel_weapon_swap">
+    <text>Смена оружия колесом</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_mwheel_weapon_swap_hint">
+    <text>Включить смену оружия колесом мыши (стандартная функция игры)</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_switch_bind">
+    <text>Клавиша переключения</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_switch_bind_hint">
+    <text>Основная клавиша для переключения режима прицела</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_keep_aim_toggle">
+    <text>Сохранять прицеливание</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_keep_aim_toggle_hint">
+    <text>Не сбрасывать состояние прицеливания при переключении</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_switch_sound">
+    <text>Звук переключения</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_switch_sound_hint">
+    <text>Воспроизводить звук при смене режима прицела</text>
+  </string>
+
+  <string id="ui_mcm_magnifier_switch_debug">
+    <text>Режим отладки</text>
+  </string>
+  <string id="ui_mcm_magnifier_switch_debug_hint">
+    <text>Включить отладочные сообщения в лог</text>
+  </string>
+
+  <!-- Общие для MCM (если еще не переведены) -->
+  <string id="mcm_kb_modifier">
+    <text>Модификатор клавиши</text>
+  </string>
+  <string id="mcm_kb_mode">
+    <text>Тип нажатия</text>
+  </string>
+
+  <string id="mcm_kb_mod_none">
+    <text>Нет</text>
+  </string>
+  <string id="mcm_kb_mod_shift">
+    <text>Shift</text>
+  </string>
+  <string id="mcm_kb_mod_ctrl">
+    <text>Ctrl</text>
+  </string>
+  <string id="mcm_kb_mod_alt">
+    <text>Alt</text>
+  </string>
+
+  <string id="mcm_kb_mode_press">
+    <text>Однократное</text>
+  </string>
+  <string id="mcm_kb_mode_dtap">
+    <text>Двойное</text>
+  </string>
+  <string id="mcm_kb_mode_hold">
+    <text>Удержание</text>
+  </string>
+</string_table>

@@ -1,0 +1,225 @@
+;==============================================
+![stalker_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_sunrise_up
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.202
+shock_protection              = 0.94
+chemical_burn_protection      = 0.092
+radiation_protection          = 0.0035
+
+wound_protection              = 0.80
+strike_protection             = 0.73
+explosion_protection          = 0.57
+
+artefact_count                = 3
+cost                          = 72950
+inv_weight                    = 14.2
+
+additional_inventory_weight    = 85
+additional_inventory_weight2   = 85
+
+;==============================================
+![cs_stalker_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_sunrise
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.48
+shock_protection              = 1.6
+chemical_burn_protection      = 0.170
+radiation_protection          = 0.009
+
+wound_protection              = 0.76
+strike_protection             = 0.68
+explosion_protection          = 0.48
+
+artefact_count                = 3
+cost                          = 73550
+inv_weight                    = 13.55
+
+additional_inventory_weight    = 85
+additional_inventory_weight2   = 85
+
+;==============================================
+![dolg_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_imedium_mid
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.26
+shock_protection              = 1.4
+chemical_burn_protection      = 0.140
+radiation_protection          = 0.007
+
+wound_protection              = 0.90
+strike_protection             = 0.86
+explosion_protection          = 0.66
+
+artefact_count                = 3
+cost                          = 84600
+inv_weight                    = 15.24
+
+additional_inventory_weight    = 88
+additional_inventory_weight2   = 88
+
+;==============================================
+![ecolog_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_imedium_high
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.52
+shock_protection              = 3.2
+chemical_burn_protection      = 0.220
+radiation_protection          = 0.011
+
+wound_protection              = 0.78
+strike_protection             = 0.74
+explosion_protection          = 0.56
+
+artefact_count                = 3
+cost                          = 88200
+inv_weight                    = 15.64
+
+additional_inventory_weight    = 88
+additional_inventory_weight2   = 88
+
+;==============================================
+![isg_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_iimedium_mid
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.34
+shock_protection              = 1.7
+chemical_burn_protection      = 0.180
+radiation_protection          = 0.009
+
+wound_protection              = 0.86
+strike_protection             = 0.76
+explosion_protection          = 0.62
+
+artefact_count                = 2
+cost                          = 94920
+inv_weight                    = 13.80
+
+additional_inventory_weight    = 96
+additional_inventory_weight2   = 96
+
+;==============================================
+![monolith_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_skat_down
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.52
+shock_protection              = 2.3
+chemical_burn_protection      = 0.28
+radiation_protection          = 0.010
+
+wound_protection              = 0.90
+strike_protection             = 0.82
+explosion_protection          = 0.72
+
+artefact_count                = 2
+cost                          = 105830
+inv_weight                    = 19.12
+
+additional_inventory_weight    = 90
+additional_inventory_weight2   = 90
+
+;==============================================
+![svoboda_light_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_imedium_mid
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.22
+shock_protection              = 1.4
+chemical_burn_protection      = 0.140
+radiation_protection          = 0.007
+
+wound_protection              = 0.78
+strike_protection             = 0.76
+explosion_protection          = 0.56
+
+artefact_count                = 2
+cost                          = 87500
+inv_weight                    = 13.44
+
+additional_inventory_weight    = 90
+additional_inventory_weight2   = 90
+
+;==============================================
+![dolg_heavy_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_skat_high
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.60
+shock_protection              = 2.0
+chemical_burn_protection      = 0.36
+radiation_protection          = 0.013
+
+wound_protection              = 1.04
+strike_protection             = 1.02
+explosion_protection          = 0.96
+
+artefact_count                = 2
+cost                          = 105350
+inv_weight                    = 20.32
+
+additional_inventory_weight    = 94
+additional_inventory_weight2   = 94
+
+;============================================== 
+![military_proto_exo_outfit]
+bones_koeff_protection        = actor_armor_military_proto
+immunities_sect               = sect_heavy_immunities_ex
+
+burn_protection               = 0.50
+shock_protection              = 2.0
+chemical_burn_protection      = 0.30
+radiation_protection          = 0.013
+
+wound_protection              = 0.98
+strike_protection             = 0.92
+explosion_protection          = 0.96
+
+artefact_count                = 2
+cost                          = 101350
+inv_weight                    = 18.29
+
+additional_inventory_weight    = 94
+additional_inventory_weight2   = 94
+
+; Прочность протоэкзы
+;==============================================
+[sect_heavy_immunities_prex]
+burn_immunity                 = 0.06
+chemical_burn_immunity        = 0.037
+shock_immunity                = 0.031
+explosion_immunity            = 0.085
+fire_wound_immunity           = 0.0102
+wound_immunity                = 0.0825 ;0.0145 
+strike_immunity               = 0.0825
+telepatic_immunity            = 0
+radiation_immunity            = 0
+
+; Пулестойкость для тяжелых прото-костюмов берется из соответствующей секции костюма, но на +1 категорию (небольшой бонус за счет экзоскелета), например mid => high
+;==============================================
+[actor_armor_military_proto]:body_damage_military_proto, head_damage_00
+ap_scale						= 0.75
+
+[body_damage_military_proto]
+bip01_pelvis 				= 1, 0.74
+bip01_spine 		 		= 1, 0.74
+bip01_spine1 		 		= 1, 0.74
+bip01_spine2 		 		= 1, 0.74
+
+bip01_l_clavicle	 		= 1, 0.74
+bip01_l_upperarm	 		= 1, 0.74
+bip01_l_forearm	 	 		= 1, 0.74
+
+bip01_r_clavicle	 		= 1, 0.74
+bip01_r_upperarm	 		= 1, 0.74
+bip01_r_forearm	 	 		= 1, 0.74
+
+bip01_l_thigh	 	 		= 1, 0.74
+bip01_l_calf	 	 		= 1, 0.74
+bip01_r_thigh	 	 		= 1, 0.74
+bip01_r_calf	 	 		= 1, 0.74
