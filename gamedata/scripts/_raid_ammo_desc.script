@@ -68,30 +68,30 @@ end
 
 local kinds_weapons = {["w_pistol"] = true, ["w_shotgun"] = true, ["w_smg"] = true, ["w_rifle"] = true, ["w_sniper"] = true}
 local weapons_for_ammo = {}
+local weapons_filled = false
+-- This project: the weapons from all base weapon sections, once. GRA's stash managers export
+-- treasure_manager.item_list for this; vanilla's keeps it local (an ammo's description crashed the game). Filled
+-- again for every ammo no weapon takes, it scanned on each tooltip update and counted the weapons twice.
 function fill_list_weapons_for_ammo()
-	if is_empty(treasure_manager.item_list) then
-		treasure_manager.init_settings()
-	end		
-	
-	for kind,_ in pairs(treasure_manager.item_list) do
-		if kinds_weapons[kind] then
-			for tier,list_weapons in pairs(treasure_manager.item_list[kind]) do
-				for _,sec_weapon in pairs(list_weapons) do
-					local ammo_list = utils_item.get_ammo(sec_weapon)
-					local hit_power = utils_item.get_wpn_param(nil, sec_weapon, "hit_power", 0)			
-					for ind,ammo in pairs(ammo_list) do
-						if ammo and hit_power then
-							local ammo = ammo
-							if not weapons_for_ammo[ammo] then weapons_for_ammo[ammo] = {average = 0, number  = 0} end
-							local weap = weapons_for_ammo[ammo]
-							weapons_for_ammo[ammo].number = weap.number + 1
-							weapons_for_ammo[ammo].average = weap.average + ((hit_power - weap.average) / weap.number)
-						end
-					end
+	if weapons_filled then return end
+	weapons_filled = true
+
+	ini_sys:section_for_each(function(sec_weapon)
+		local parent = ini_sys:r_string_ex(sec_weapon, "parent_section")
+		if kinds_weapons[ini_sys:r_string_ex(sec_weapon, "kind") or ""] and (not parent or parent == sec_weapon) then
+			local ammo_list = utils_item.get_ammo(sec_weapon)
+			local hit_power = utils_item.get_wpn_param(nil, sec_weapon, "hit_power", 0)
+			for ind,ammo in pairs(ammo_list) do
+				if ammo and hit_power then
+					local ammo = ammo
+					if not weapons_for_ammo[ammo] then weapons_for_ammo[ammo] = {average = 0, number  = 0} end
+					local weap = weapons_for_ammo[ammo]
+					weapons_for_ammo[ammo].number = weap.number + 1
+					weapons_for_ammo[ammo].average = weap.average + ((hit_power - weap.average) / weap.number)
 				end
 			end
 		end
-	end
+	end)
 end
 
 function get_damage(obj,sec)

@@ -31,6 +31,8 @@
 
 - `scripts/item_weapon.script` — версия Monolith + строка MAS (снятие прицелов).
 - `shaders/r3/effects_sun.ps` — солнце Monolith + выход тепла для тепловизоров HeatVision.
+- `scripts/_raid_ammo_desc.script` (Grok's Ballistics, урон и пробитие в описании патронов) — список стволов
+  собирается из конфигов: в GRA его отдавал менеджер тайников, у ванильного он локальный, описание патронов роняло игру.
 - `configs/mod_system_gra_fixes.ltx` — исправления конфигов пака (путь мировой модели Archangel).
 - `scripts/gra_fixes.script` — включает 3D-прицелы (`r__3Dfakescope 1`) один раз за игру: без этого у ACOG и других
   3D-прицелов пустая труба без сетки. В GRA это делал его графический пресет.

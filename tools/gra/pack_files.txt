@@ -792,7 +792,6 @@ configs/wpo/weapons/weapon_pistols.ltx
 configs/wpo/weapons/weapon_rifles.ltx
 configs/wpo/weapons/weapon_shotgun.ltx
 configs/wpo/weapons/weapon_sniper.ltx
-scripts/_raid_ammo_desc.script
 scripts/a_arti_jamming_mcm.script
 scripts/a_repair_override.script
 scripts/a_wpo_parts.script
