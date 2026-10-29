@@ -1,5 +1,6 @@
--- The Brigadier's Nosorog and M4 (configs\mod_system_shelter_brigadier.ltx, docs/coop/shelter.md): his body in the
--- bunker drops them in good repair. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
+-- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
+-- docs/coop/shelter.md): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
+-- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
 -- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
 -- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
 -- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
@@ -8,10 +9,16 @@
 local OUTFIT = "shelter_brigadier_outfit"
 local MODULE = "shelter_brigadier_module"
 local HEAT = "device_torch_nv_4" -- z_heatvision's thermal device (its heat_effect)
-local M4 = "wpn_m4_tac_brigadier"
-local M4_ADDONS = { "acog", "wpn_sil_surfire" } -- on it as it drops: MAS's ACOG, the Surefire silencer
-local BRIGADIER = "shelter_zombie_nosorog" -- scripts\shelter.script's occupant
-local CONDITION = 0.95 -- his gear off his body: he kept it in order
+local CONDITION = 0.95 -- their gear off their bodies: they kept it in order
+-- the occupants' gear (scripts\shelter.script's zombies): its world state, the outfit, the weapon with the addons on it
+-- as it drops, the rest
+local GEAR = {
+	shelter_zombie_nosorog = { state = "brigadier_gear", outfit = OUTFIT, weapon = "wpn_m4_tac_brigadier",
+		addons = { "acog", "wpn_sil_surfire" }, items = {} }, -- MAS's ACOG, the Surefire silencer
+	shelter_zombie_seva = { state = "chemist_gear", outfit = "shelter_chemist_outfit", weapon = "wpn_krissvektor_chemist",
+		addons = { "eot", "wpn_sil_45" }, -- an EOTech, the .45 silencer
+		items = { "detector_scientific", "ammo_11.43x23_hydro", "ammo_11.43x23_hydro" } }, -- the Svarog, expansive rounds
+}
 local HOLD = 500 -- ms N is held for the thermal vision
 local CHARGE = 1 / 3600 -- of a full charge per game second from an electric artefact: an hour for a full one
 local VISOR = { radius = 35, step = 500, drain = 0.75 } -- the anomaly visor's reach, and its power loss each step (ms)
@@ -345,59 +352,66 @@ local function on_key_release(key)
 end
 
 -------------------------------------------------------------------------------
--- the gear off the Brigadier's body
+-- the gear off the occupants' bodies
 
-local fitting = {} -- an M4's id -> its addons' ids, attached once they're all online
+local fitting = {} -- a weapon's id -> its addons' ids, attached once they're all online
 
--- the outfit and the M4 with its addons to an owner (a game or server object)
-local function give_gear(owner)
-	shelter.set_state("brigadier_gear", true)
-	local outfit = alife_create_item(OUTFIT, owner, { cond = CONDITION })
-	local m4 = alife_create_item(M4, owner, { cond = CONDITION })
-	if m4 then
+-- an occupant's gear to an owner (a game or server object)
+local function give_gear(gear, owner)
+	shelter.set_state(gear.state, true)
+	local outfit = alife_create_item(gear.outfit, owner, { cond = CONDITION })
+	local weapon = alife_create_item(gear.weapon, owner, { cond = CONDITION })
+	if weapon then
 		local addons = {}
-		for _, sec in ipairs(M4_ADDONS) do
+		for _, sec in ipairs(gear.addons) do
 			local se = alife_create_item(sec, owner)
 			addons[#addons + 1] = se and se.id
 		end
-		fitting[m4.id] = addons
+		fitting[weapon.id] = addons
+	end
+	for _, sec in ipairs(gear.items) do
+		alife_create_item(sec, owner)
 	end
 	return outfit and outfit.id
 end
 
 local function fit_addons()
 	for id, addons in pairs(fitting) do
-		local m4 = level.object_by_id(id)
+		local weapon = level.object_by_id(id)
 		local objs = {}
 		for _, addon in ipairs(addons) do
 			objs[#objs + 1] = level.object_by_id(addon)
 		end
-		if m4 and #objs == #addons then
+		if weapon and #objs == #addons then
 			for _, obj in ipairs(objs) do
-				m4:weapon_addon_attach(obj)
+				weapon:weapon_addon_attach(obj)
 			end
 			fitting[id] = nil
 		end
 	end
 end
 
--- a game whose Brigadier is gone already (killed before the gear was his) or whose cleaning took his body unsearched:
--- it waits in the shelter's stash
+-- a game whose occupant is gone already (killed before the gear was theirs) or whose cleaning took their body
+-- unsearched: their gear waits in the shelter's stash
 function catch_up()
-	if level.name() ~= "bunker_a1" or shelter.state("brigadier_gear", false) or not shelter.state("occupants", false) then
+	if level.name() ~= "bunker_a1" or not shelter.state("occupants", false) then
 		return
 	end
-	for id = 1, 65534 do
-		local se = alife():object(id)
-		if se and se:section_name() == BRIGADIER and se:alive() then
-			return -- his body will drop it
-		end
-	end
 	local stash = alife_object(shelter.state("stash_id", 65535))
-	if stash then
-		shelter.once("brigadier_gear", function()
-			give_gear(stash)
-		end)
+	for section, gear in pairs(GEAR) do
+		local alive = false
+		for id = 1, 65534 do
+			local se = alife():object(id)
+			if se and se:section_name() == section and se:alive() then
+				alive = true -- their body will drop it
+				break
+			end
+		end
+		if stash and not alive and not shelter.state(gear.state, false) then
+			shelter.once(gear.state, function()
+				give_gear(gear, stash)
+			end)
+		end
 	end
 end
 
@@ -431,14 +445,15 @@ function on_game_start()
 		end
 		return drain_device_on_event(obj, sec, ...)
 	end
-	-- his body drops his gear instead of the outfit its looks would give
+	-- an occupant's body drops their gear instead of the outfit its looks would give
 	local spawn_cosmetics = death_manager.spawn_cosmetics
 	function death_manager.spawn_cosmetics(npc, ...)
-		if npc:section() == BRIGADIER then
-			if shelter.state("brigadier_gear", false) then
+		local gear = GEAR[npc:section()]
+		if gear then
+			if shelter.state(gear.state, false) then
 				return -- in the stash already
 			end
-			return give_gear(npc)
+			return give_gear(gear, npc)
 		end
 		return spawn_cosmetics(npc, ...)
 	end

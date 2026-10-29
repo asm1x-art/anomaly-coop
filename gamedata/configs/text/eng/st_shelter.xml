@@ -372,4 +372,16 @@
 	<string id="st_shelter_notes_chemist">
 		<text>The Chemist's archive</text>
 	</string>
+	<string id="st_shelter_chemist_outfit_name">
+		<text>The Chemist's SEVA</text>
+	</string>
+	<string id="st_shelter_chemist_outfit_descr">
+		<text>The SEVA scientific suit the Chemist reworked for himself: plates of an alloy baked with Vyvert dust make it a third lighter than an ordinary one, and it is upgraded to the limit.</text>
+	</string>
+	<string id="st_shelter_chemist_vector_name">
+		<text>The Chemist's Vector</text>
+	</string>
+	<string id="st_shelter_chemist_vector_descr">
+		<text>The .45 ACP Kriss Vector the Chemist carried. Upgraded to the limit, it wears down half as fast as an upgraded ordinary one and is a quarter lighter. A silencer and a red dot; another sight fits its Picatinny rail too. The Chemist loaded it with expansive Hydra-Shok.</text>
+	</string>
 </string_table>

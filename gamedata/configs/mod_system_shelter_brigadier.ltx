@@ -1,7 +1,7 @@
 ; The Brigadier's Nosorog (scripts\shelter_brigadier.script): the mercenaries' Nosorog, every upgrade installed, five
 ; artefact containers that let none of their radiation through (the engine's artefact_radiation_shield), a helmet
 ; module with a light, Oracle night vision, thermal vision and an anomaly visor. Drops off the Brigadier's body with
-; his M4 (below).
+; his M4 (below); the Chemist's SEVA and Vector further below.
 [shelter_brigadier_outfit]:merc_nosorog_outfit
 inv_name                  = st_shelter_brigadier_outfit_name
 inv_name_short            = st_shelter_brigadier_outfit_name
@@ -191,3 +191,154 @@ elements = up_fourtc_m4_brigadier
 elements = up_fourte_m4_brigadier
 [up_gr_fourtf_m4_brigadier]
 elements = up_fourtf_m4_brigadier
+
+; The Chemist's SEVA: every upgrade installed, a third lighter by his alloy (8.29 kg upgraded -> 5.53)
+[shelter_chemist_outfit]:scientific_outfit
+inv_name                  = st_shelter_chemist_outfit_name
+inv_name_short            = st_shelter_chemist_outfit_name
+description               = st_shelter_chemist_outfit_descr
+inv_weight                = 3.98 ; 5.53 with its upgrades
+shelter_keep              = true
+upgrades                  = up_gr_firsta_seva_1_chemist, up_gr_secona_seva_1_chemist, up_gr_thirda_seva_1_chemist, up_gr_fourta_seva_1_chemist
+installed_upgrades        = up_firsta_seva_1_chemist, up_secona_seva_1_chemist, up_thirda_seva_1_chemist, up_fourta_seva_1_chemist, up_firstc_seva_1_chemist, up_firstd_seva_1_chemist, up_seconc_seva_1_chemist, up_second_seva_1_chemist, up_thirdc_seva_1_chemist, up_thirdd_seva_1_chemist, up_fourtc_seva_1_chemist, up_firste_seva_1_chemist, up_firstf_seva_1_chemist, up_secone_seva_1_chemist, up_seconf_seva_1_chemist, up_thirde_seva_1_chemist, up_fourte_seva_1_chemist
+
+; His Kriss Vector (.45 ACP, the expansive Hydra-Shok in his pockets): as the Brigadier's M4, every upgrade installed,
+; half the wear of an upgraded Vector's (0.00058 a shot: 0.0012 less the upgrades' 0.00062), a quarter lighter, MAS's
+; scopes; an EOTech and the .45 silencer on it as it drops
+[wpn_krissvektor_chemist]:wpn_krissvektor
+parent_section            = wpn_krissvektor_chemist
+inv_name                  = st_shelter_chemist_vector_name
+inv_name_short            = st_shelter_chemist_vector_name
+description               = st_shelter_chemist_vector_descr
+inv_weight                = 1.6 ; 3.31 with its upgrades, EOTech and silencer (an ordinary one 4.41)
+condition_shot_dec        = 0.00091 ; 0.00029 with its upgrades
+condition_queue_shot_dec  = 0.00091
+shelter_keep              = true
+scopes                    =
+modular_attachments       = true
+modular_scope_group       = scope_group_picatinny_short_phys
+scope_status              = 2
+upgrades                  = up_gr_firsta_kiparis_chemist, up_gr_secona_kiparis_chemist, up_gr_thirda_kiparis_chemist, up_gr_fourta_kiparis_chemist, up_gr_fiftha_kiparis_chemist, up_gr_fifthc_kiparis_chemist
+installed_upgrades        = up_firsta_kiparis_chemist, up_secona_kiparis_chemist, up_thirda_kiparis_chemist, up_fourta_kiparis_chemist, up_fiftha_kiparis_chemist, up_fifthc_kiparis_chemist, up_firstc_kiparis_chemist, up_firstd_kiparis_chemist, up_seconc_kiparis_chemist, up_second_kiparis_chemist, up_thirdc_kiparis_chemist, up_thirdd_kiparis_chemist, up_fourtc_kiparis_chemist, up_firste_kiparis_chemist, up_secone_kiparis_chemist
+
+; scientific_outfit's upgrade tree with each upgrade in a group of its own (tools\shelter\upgrade_tree.py)
+[up_firsta_seva_1_chemist]:up_firsta_seva_1
+effects = up_gr_firstc_seva_1_chemist, up_gr_firstd_seva_1_chemist
+[up_secona_seva_1_chemist]:up_secona_seva_1
+effects = up_gr_seconc_seva_1_chemist, up_gr_second_seva_1_chemist
+[up_thirda_seva_1_chemist]:up_thirda_seva_1
+effects = up_gr_thirdc_seva_1_chemist, up_gr_thirdd_seva_1_chemist
+[up_fourta_seva_1_chemist]:up_fourta_seva_1
+effects = up_gr_fourtc_seva_1_chemist
+[up_firstc_seva_1_chemist]:up_firstc_seva_1
+effects = up_gr_firste_seva_1_chemist, up_gr_firstf_seva_1_chemist
+[up_firstd_seva_1_chemist]:up_firstd_seva_1
+effects = up_gr_firste_seva_1_chemist, up_gr_firstf_seva_1_chemist
+[up_seconc_seva_1_chemist]:up_seconc_seva_1
+effects = up_gr_secone_seva_1_chemist, up_gr_seconf_seva_1_chemist
+[up_second_seva_1_chemist]:up_second_seva_1
+effects = up_gr_secone_seva_1_chemist, up_gr_seconf_seva_1_chemist
+[up_thirdc_seva_1_chemist]:up_thirdc_seva_1
+effects = up_gr_thirde_seva_1_chemist
+[up_thirdd_seva_1_chemist]:up_thirdd_seva_1
+effects = up_gr_thirde_seva_1_chemist
+[up_fourtc_seva_1_chemist]:up_fourtc_seva_1
+effects = up_gr_fourte_seva_1_chemist
+[up_firste_seva_1_chemist]:up_firste_seva_1
+[up_firstf_seva_1_chemist]:up_firstf_seva_1
+[up_secone_seva_1_chemist]:up_secone_seva_1
+[up_seconf_seva_1_chemist]:up_seconf_seva_1
+[up_thirde_seva_1_chemist]:up_thirde_seva_1
+[up_fourte_seva_1_chemist]:up_fourte_seva_1
+
+[up_gr_firsta_seva_1_chemist]
+elements = up_firsta_seva_1_chemist
+[up_gr_secona_seva_1_chemist]
+elements = up_secona_seva_1_chemist
+[up_gr_thirda_seva_1_chemist]
+elements = up_thirda_seva_1_chemist
+[up_gr_fourta_seva_1_chemist]
+elements = up_fourta_seva_1_chemist
+[up_gr_firstc_seva_1_chemist]
+elements = up_firstc_seva_1_chemist
+[up_gr_firstd_seva_1_chemist]
+elements = up_firstd_seva_1_chemist
+[up_gr_seconc_seva_1_chemist]
+elements = up_seconc_seva_1_chemist
+[up_gr_second_seva_1_chemist]
+elements = up_second_seva_1_chemist
+[up_gr_thirdc_seva_1_chemist]
+elements = up_thirdc_seva_1_chemist
+[up_gr_thirdd_seva_1_chemist]
+elements = up_thirdd_seva_1_chemist
+[up_gr_fourtc_seva_1_chemist]
+elements = up_fourtc_seva_1_chemist
+[up_gr_firste_seva_1_chemist]
+elements = up_firste_seva_1_chemist
+[up_gr_firstf_seva_1_chemist]
+elements = up_firstf_seva_1_chemist
+[up_gr_secone_seva_1_chemist]
+elements = up_secone_seva_1_chemist
+[up_gr_seconf_seva_1_chemist]
+elements = up_seconf_seva_1_chemist
+[up_gr_thirde_seva_1_chemist]
+elements = up_thirde_seva_1_chemist
+[up_gr_fourte_seva_1_chemist]
+elements = up_fourte_seva_1_chemist
+
+; wpn_krissvektor's upgrade tree with each upgrade in a group of its own (tools\shelter\upgrade_tree.py)
+[up_firsta_kiparis_chemist]:up_firsta_kiparis
+effects = up_gr_firstc_kiparis_chemist, up_gr_firstd_kiparis_chemist
+[up_secona_kiparis_chemist]:up_secona_kiparis
+effects = up_gr_seconc_kiparis_chemist, up_gr_second_kiparis_chemist
+[up_thirda_kiparis_chemist]:up_thirda_kiparis
+effects = up_gr_thirdc_kiparis_chemist, up_gr_thirdd_kiparis_chemist
+[up_fourta_kiparis_chemist]:up_fourta_kiparis
+effects = up_gr_fourtc_kiparis_chemist
+[up_fiftha_kiparis_chemist]:up_fiftha_kiparis
+effects = up_gr_fifthc_kiparis_chemist
+[up_fifthc_kiparis_chemist]:up_fifthc_kiparis
+[up_firstc_kiparis_chemist]:up_firstc_kiparis
+effects = up_gr_firste_kiparis_chemist
+[up_firstd_kiparis_chemist]:up_firstd_kiparis
+effects = up_gr_firste_kiparis_chemist
+[up_seconc_kiparis_chemist]:up_seconc_kiparis
+effects = up_gr_secone_kiparis_chemist
+[up_second_kiparis_chemist]:up_second_kiparis
+effects = up_gr_secone_kiparis_chemist
+[up_thirdc_kiparis_chemist]:up_thirdc_kiparis
+[up_thirdd_kiparis_chemist]:up_thirdd_kiparis
+[up_fourtc_kiparis_chemist]:up_fourtc_kiparis
+[up_firste_kiparis_chemist]:up_firste_kiparis
+[up_secone_kiparis_chemist]:up_secone_kiparis
+
+[up_gr_firsta_kiparis_chemist]
+elements = up_firsta_kiparis_chemist
+[up_gr_secona_kiparis_chemist]
+elements = up_secona_kiparis_chemist
+[up_gr_thirda_kiparis_chemist]
+elements = up_thirda_kiparis_chemist
+[up_gr_fourta_kiparis_chemist]
+elements = up_fourta_kiparis_chemist
+[up_gr_fiftha_kiparis_chemist]
+elements = up_fiftha_kiparis_chemist
+[up_gr_fifthc_kiparis_chemist]
+elements = up_fifthc_kiparis_chemist
+[up_gr_firstc_kiparis_chemist]
+elements = up_firstc_kiparis_chemist
+[up_gr_firstd_kiparis_chemist]
+elements = up_firstd_kiparis_chemist
+[up_gr_seconc_kiparis_chemist]
+elements = up_seconc_kiparis_chemist
+[up_gr_second_kiparis_chemist]
+elements = up_second_kiparis_chemist
+[up_gr_thirdc_kiparis_chemist]
+elements = up_thirdc_kiparis_chemist
+[up_gr_thirdd_kiparis_chemist]
+elements = up_thirdd_kiparis_chemist
+[up_gr_fourtc_kiparis_chemist]
+elements = up_fourtc_kiparis_chemist
+[up_gr_firste_kiparis_chemist]
+elements = up_firste_kiparis_chemist
+[up_gr_secone_kiparis_chemist]
+elements = up_secone_kiparis_chemist
