@@ -523,4 +523,7 @@
 	<string id="st_coop_pda_story_turned_off">
 		<text>Общий сюжет выключен.</text>
 	</string>
+	<string id="ui_mm_coop_status_joining">
+		<text>Персонаж создан. Мастер сохраняет мир для вас, затем он скачается и загрузится сам (до 30 с). Не нажимайте «Войти».</text>
+	</string>
 </string_table>

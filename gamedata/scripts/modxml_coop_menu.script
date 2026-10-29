@@ -152,8 +152,11 @@ local function join(dlg)
 	local position = vector():set(start_locations:r_float_ex(map, "x"), start_locations:r_float_ex(map, "y"),
 		start_locations:r_float_ex(map, "z"))
 	printf("[coop] joining the world as %s at %s", dlg.selected_faction, map)
-	dlg:OnQuit() -- back to the menu while the world downloads
+	dlg:OnQuit()
 	coop.join_world(gvid, start_locations:r_float_ex(map, "lvid"), position)
+	if main_menu then -- the co-op window says the world is on its way, as when entering with a character
+		ui_coop_profiles.show_loading(main_menu, "ui_mm_coop_status_joining")
+	end
 end
 
 function on_xml_read()

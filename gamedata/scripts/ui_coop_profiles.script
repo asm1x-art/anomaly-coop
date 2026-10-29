@@ -141,6 +141,18 @@ function UICoopProfiles:Open()
 	self.owner:Show(false)
 end
 
+-- the world on its way for a character just made (modxml_coop_menu.script): this window says so, as after Enter,
+-- till the world loads
+function show_loading(menu, status)
+	if not menu.coop_profiles then
+		menu.coop_profiles = UICoopProfiles(menu)
+	end
+	local wnd = menu.coop_profiles
+	wnd:Open()
+	wnd.loading = true
+	wnd:SetStatus(status)
+end
+
 function UICoopProfiles:Close()
 	shown = false
 	self.connect_started = nil
