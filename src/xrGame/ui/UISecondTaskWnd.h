@@ -77,8 +77,9 @@ public:
 
 	bool init_task(CGameTask* task, UITaskListWnd* parent);
 	// a group of tasks (the script's _G.CGameTask__group: the shelter's "Убежище"): listed together, its title on the
-	// first one, the rest indented under it
-	void set_group(const shared_str& group, u32 group_priority, bool header, CUIXml& xml);
+	// first one, the rest indented under it; folded, the title is all there is of it (a click on the title folds it
+	// or unfolds it)
+	void set_group(const shared_str& group, u32 group_priority, bool header, bool folded, CUIXml& xml);
 	IC u32 get_priority_task() const;
 	bool sorts_before(const UITaskListWndItem& other) const;
 
@@ -107,6 +108,7 @@ private: // m_
 	shared_str m_group;
 	u32 m_group_priority;
 	bool m_group_header;
+	float m_group_title_h; // the group's title's height on the item that carries it
 
 	enum
 	{

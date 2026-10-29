@@ -19,6 +19,13 @@
 #include "UICheckButton.h"
 #include "UIFrameLineWnd.h"
 #include "UIFixedScrollBar.h"
+#include "string_table.h"
+
+namespace
+{
+	xr_set<shared_str> g_folded_groups; // the task list's groups folded away (this run's)
+	bool g_list_stale = false; // a group's title clicked: the list is made again on the next update
+}
 #include "UIHint.h"
 #include "UITaskWnd.h"
 
@@ -110,6 +117,11 @@ void UITaskListWnd::OnFocusLost()
 void UITaskListWnd::Update()
 {
 	inherited::Update();
+	if (g_list_stale)
+	{
+		g_list_stale = false;
+		UpdateList();
+	}
 	//	UpdateCounter();
 }
 
@@ -167,14 +179,17 @@ void UITaskListWnd::UpdateList()
 	xml.Load(CONFIG_PATH, UI_PATH, PDA_TASK_XML);
 	for (u32 i = 0; i < listed.size(); ++i)
 	{
+		const shared_str& group = listed[i].second;
+		const bool folded = group.size() && g_folded_groups.count(group);
+		if (folded && group_first[group] != listed[i].first)
+			continue; // a folded group shows its title only
 		UITaskListWndItem* item = xr_new<UITaskListWndItem>();
 		if (!item->init_task(listed[i].first, this))
 			continue;
-		const shared_str& group = listed[i].second;
 		if (group.size())
 		{
 			CGameTask* first = group_first[group];
-			item->set_group(group, first->m_priority, first == listed[i].first, xml);
+			item->set_group(group, first->m_priority, first == listed[i].first, folded, xml);
 		}
 		m_list->AddWindow(item, true);
 	}
@@ -208,6 +223,7 @@ UITaskListWndItem::UITaskListWndItem()
 	m_task = NULL;
 	m_group_priority = 0;
 	m_group_header = false;
+	m_group_title_h = 0.0f;
 
 	m_color_states[0] = (u32)(-1);
 	m_color_states[1] = (u32)(-1);
@@ -238,7 +254,7 @@ bool UITaskListWndItem::sorts_before(const UITaskListWndItem& other) const
 	return get_priority_task() > other.get_priority_task();
 }
 
-void UITaskListWndItem::set_group(const shared_str& group, u32 group_priority, bool header, CUIXml& xml)
+void UITaskListWndItem::set_group(const shared_str& group, u32 group_priority, bool header, bool folded, CUIXml& xml)
 {
 	m_group = group;
 	m_group_priority = group_priority;
@@ -251,11 +267,21 @@ void UITaskListWndItem::set_group(const shared_str& group, u32 group_priority, b
 		CUITextWnd* title = UIHelper::CreateTextWnd(xml, "second_task_wnd:task_item:name", this);
 		title->SetWndPos(Fvector2().set(0.0f, 0.0f));
 		title->SetHeight(22.0f);
-		title->SetTextST(group.c_str());
+		string512 text;
+		xr_sprintf(text, "%s %s", folded ? "+" : "-", *CStringTable().translate(group));
+		title->SetText(text);
 		title->SetTextColor(m_color_states[stt_activ]);
 		shift = title->GetHeight();
+		m_group_title_h = shift;
 	}
 	CUIWindow* row[] = {m_st_story, m_name, m_bt_focus};
+	if (folded)
+	{
+		for (CUIWindow* w : row)
+			w->Show(false);
+		SetHeight(shift);
+		return;
+	}
 	for (CUIWindow* w : row)
 	{
 		Fvector2 pos = w->GetWndPos();
@@ -404,6 +430,16 @@ bool UITaskListWndItem::OnMouseAction(float x, float y, EUIMessages mouse_action
 	switch (mouse_action)
 	{
 	case WINDOW_LBUTTON_DOWN:
+		if (m_group_header && y < m_group_title_h)
+		{
+			// the group's title: folded away or back, the list made again once this click is done with
+			if (g_folded_groups.count(m_group))
+				g_folded_groups.erase(m_group);
+			else
+				g_folded_groups.insert(m_group);
+			g_list_stale = true;
+		}
+		// fallthrough
 	case WINDOW_RBUTTON_DOWN:
 	case BUTTON_DOWN:
 		{
