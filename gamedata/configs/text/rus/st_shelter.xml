@@ -336,4 +336,7 @@
 	<string id="st_shelter_visor_off">
 		<text>¬изор аномалий выключен</text>
 	</string>
+	<string id="st_shelter_needs_group">
+		<text>”бежище Ч дело группы: соберите группу с друзь€ми, тогда записка даст задани€.</text>
+	</string>
 </string_table>

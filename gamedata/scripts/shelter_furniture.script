@@ -16,7 +16,7 @@ local PIECES = {
 
 -- the shelter's stash (scripts\shelter.script spawns it), while it exists
 local function stash()
-	local id = load_var(db.actor, "shelter_stash_id", nil)
+	local id = shelter.state("stash_id", nil)
 	return id and alife_object(id)
 end
 
@@ -307,7 +307,7 @@ local FIRST_ROOM = { [501] = true, [504] = true, [502] = true, [503] = true, [45
 
 local function cleaned_before(visuals)
 	for zone, ids in pairs(CLEANED_BEFORE) do
-		if load_var(db.actor, "shelter_clean_" .. zone, false) then
+		if shelter.state("clean_" .. zone, false) then
 			for _, v in ipairs(ids) do
 				if visuals[v] then
 					return true
@@ -318,15 +318,9 @@ local function cleaned_before(visuals)
 	return false
 end
 
-local function place_props()
+-- the props, once for the world (in co-op the prop keys below are only the game's that spawned them)
+local function spawn_props()
 	local ini = ini_file(PROPS)
-	for _, v in ipairs(str_explode(ini:r_string_ex("replaced", "visuals") or "", ",")) do
-		local index = tonumber(v)
-		if index then
-			level.hide_static_visual(index)
-		end
-	end
-	level.make_static_passable(ini:r_string_ex("replaced", "triangles") or "")
 	-- the first prop room's games (one flag for all its props): those are out already
 	local first_room = load_var(db.actor, "shelter_props_placed", false)
 	for i = 0, ini:line_count("places") - 1 do
@@ -352,13 +346,38 @@ local function place_props()
 	end
 end
 
+-- the level's visuals the props replace: out of every game on every load
+local function place_props()
+	local ini = ini_file(PROPS)
+	for _, v in ipairs(str_explode(ini:r_string_ex("replaced", "visuals") or "", ",")) do
+		local index = tonumber(v)
+		if index then
+			level.hide_static_visual(index)
+		end
+	end
+	level.make_static_passable(ini:r_string_ex("replaced", "triangles") or "")
+	shelter.once("props", spawn_props)
+end
+
 local function actor_on_first_update()
-	if level.name() == LEVEL and level.hide_static_visual then
+	if not (level.name() == LEVEL and level.hide_static_visual) then
+		return
+	elseif coop and coop.connected() then -- shelter.once's claim counts only after coop_facts' first update
+		CreateTimeEvent("shelter_furniture", "props", 1, function()
+			place_props()
+			return true
+		end)
+	else
 		place_props()
 	end
 end
 
 function on_game_start()
+	-- in co-op the furniture a player places is everyone's
+	local create_object = placeable_furniture.create_object
+	function placeable_furniture.create_object(...)
+		return shelter.everyones(create_object, ...)
+	end
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_key_press", on_key_press)
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)

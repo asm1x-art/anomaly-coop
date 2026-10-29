@@ -351,7 +351,7 @@ local fitting = {} -- an M4's id -> its addons' ids, attached once they're all o
 
 -- the outfit and the M4 with its addons to an owner (a game or server object)
 local function give_gear(owner)
-	save_var(db.actor, "shelter_brigadier_gear", true)
+	shelter.set_state("brigadier_gear", true)
 	local outfit = alife_create_item(OUTFIT, owner, { cond = CONDITION })
 	local m4 = alife_create_item(M4, owner, { cond = CONDITION })
 	if m4 then
@@ -381,10 +381,10 @@ local function fit_addons()
 	end
 end
 
--- a game whose Brigadier is gone already (killed before the gear was his): it waits in the shelter's stash
-local function catch_up()
-	if level.name() ~= "bunker_a1" or load_var(db.actor, "shelter_brigadier_gear", false)
-		or not load_var(db.actor, "shelter_occupants", false) then
+-- a game whose Brigadier is gone already (killed before the gear was his) or whose cleaning took his body unsearched:
+-- it waits in the shelter's stash
+function catch_up()
+	if level.name() ~= "bunker_a1" or shelter.state("brigadier_gear", false) or not shelter.state("occupants", false) then
 		return
 	end
 	for id = 1, 65534 do
@@ -393,9 +393,22 @@ local function catch_up()
 			return -- his body will drop it
 		end
 	end
-	local stash = alife_object(load_var(db.actor, "shelter_stash_id", 65535))
+	local stash = alife_object(shelter.state("stash_id", 65535))
 	if stash then
-		give_gear(stash)
+		shelter.once("brigadier_gear", function()
+			give_gear(stash)
+		end)
+	end
+end
+
+local function actor_on_first_update()
+	if coop and coop.connected() then -- shelter.once's claim counts only after coop_facts' first update
+		CreateTimeEvent("shelter_brigadier", "catch_up", 1, function()
+			catch_up()
+			return true
+		end)
+	else
+		catch_up()
 	end
 end
 
@@ -422,11 +435,14 @@ function on_game_start()
 	local spawn_cosmetics = death_manager.spawn_cosmetics
 	function death_manager.spawn_cosmetics(npc, ...)
 		if npc:section() == BRIGADIER then
+			if shelter.state("brigadier_gear", false) then
+				return -- in the stash already
+			end
 			return give_gear(npc)
 		end
 		return spawn_cosmetics(npc, ...)
 	end
-	RegisterScriptCallback("actor_on_first_update", catch_up)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 	RegisterScriptCallback("actor_on_update", fit_addons)
 	RegisterScriptCallback("actor_on_item_drop", actor_on_item_drop)

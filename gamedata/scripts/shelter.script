@@ -88,6 +88,67 @@ local function msg(id)
 	actor_menu.set_msg(1, game.translate_string(id), 6)
 end
 
+----------------------------------------------------------------------------------------------------
+-- The shelter's state is the world's (docs/coop/shelter.md, "Кооп"): in co-op the server's facts "shelter:<name>",
+-- which every game has whoever saved the world; the actor's variables "shelter_<name>" otherwise. What the shelter
+-- spawns is the world's too: in co-op everyone's, the first visit's things once for the world.
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+function state(name, default)
+	if not in_coop() then
+		return load_var(db.actor, "shelter_" .. name, default)
+	end
+	local v = coop.fact("shelter:" .. name)
+	if v == "" then
+		return default
+	end
+	return v == "true" or v ~= "false" and (tonumber(v) or v)
+end
+
+function set_state(name, value)
+	if in_coop() then
+		coop.report_fact("shelter:" .. name, value == nil and "" or tostring(value))
+	else
+		save_var(db.actor, "shelter_" .. name, value)
+	end
+end
+
+local sharing = 0 -- > 0 while f of everyones runs
+
+-- f(...) with what it spawns shared with the other games
+function everyones(f, ...)
+	if not in_coop() or sharing > 0 then
+		return f(...)
+	end
+	sharing = sharing + 1
+	coop.begin_shared()
+	local res = { pcall(f, ...) }
+	coop.end_shared()
+	sharing = sharing - 1
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+-- spawn() once for the world: in co-op in the first game to get there (the server says which), for everyone. The
+-- server's word comes as a fact, while the engine takes no facts of ours: spawn() runs on the next update.
+function once(name, spawn)
+	if in_coop() then
+		coop_story.once("shelter:" .. name, function()
+			CreateTimeEvent("shelter_once", name, 0, function()
+				everyones(spawn)
+				return true
+			end)
+		end)
+	else
+		spawn()
+	end
+end
+
 local function is_electric(section)
 	if not electric then
 		electric = {}
@@ -103,11 +164,11 @@ local function is_electric(section)
 end
 
 local function repaired()
-	return load_var(db.actor, "shelter_generator_repaired", false)
+	return state("generator_repaired", false)
 end
 
 local function generator_box()
-	local id = load_var(db.actor, "shelter_generator_box_id", nil)
+	local id = state("generator_box_id", nil)
 	return id and level.object_by_id(id)
 end
 
@@ -200,7 +261,7 @@ local function spawn_corridor_lamps()
 			utils_stpk.set_lamp_data(d, se)
 		end
 	end
-	save_var(db.actor, "shelter_corridor_lamps", true)
+	set_state("corridor_lamps", true)
 end
 
 local function set_sound(gen, on)
@@ -250,7 +311,7 @@ function generator_binder:update(delta)
 		dark = not on
 		power = on
 		if on then
-			save_var(db.actor, "shelter_generator_powered", true) -- the task's done, whatever comes after
+			set_state("generator_powered", true) -- the task's done, whatever comes after
 		end
 		gen:play_cycle(on and "work" or "idle", true)
 		set_lamps(on)
@@ -270,7 +331,7 @@ function generator_binder:use()
 	local tools = db.actor:object(TOOLS)
 	if tools then
 		alife_release(tools)
-		save_var(db.actor, "shelter_generator_repaired", true)
+		set_state("generator_repaired", true)
 		self.next = 0
 		msg("st_shelter_generator_repaired")
 	end
@@ -319,11 +380,18 @@ function note_menu(obj)
 	return p and p:id() == AC_ID and game.translate_string("st_shelter_read") or nil
 end
 
+-- in co-op the shelter is a group's (docs/coop/shelter.md): with no group the note gives no questline
+local function no_group()
+	return coop and coop.connected and coop.connected() and #coop.group() < 2
+end
+
 function note_read(obj)
 	hide_hud_inventory()
 	GUI = UIShelterNote()
 	GUI:ShowDialog(true)
-	if not has_alife_info("shelter_note_read") then
+	if no_group() then
+		actor_menu.set_msg(1, game.translate_string("st_shelter_needs_group"), 6)
+	elseif not has_alife_info("shelter_note_read") then
 		give_info("shelter_note_read")
 		local tm = task_manager.get_task_manager()
 		tm:give_task("shelter_laptop")
@@ -345,7 +413,7 @@ local function goal_stage(goal)
 			or has_alife_info("shelter_laptop_got") and 4 or db.actor:object(CONTAINER) and 3
 			or has_alife_info("shelter_laptop_asked") and 2 or 1
 	end
-	return load_var(db.actor, "shelter_generator_powered", false) and 5 or repaired() and 4
+	return state("generator_powered", false) and 5 or repaired() and 4
 		or db.actor:object(TOOLS) and 3 or has_alife_info("shelter_tools_asked") and 2 or 1
 end
 
@@ -356,23 +424,23 @@ local function goal_target(goal, stage)
 		elseif stage == 2 then
 			return get_story_object_id("yan_stalker_sakharov")
 		elseif stage == 4 then
-			return load_var(db.actor, "shelter_desk_id", nil) or load_var(db.actor, "shelter_generator_id", nil)
+			return state("desk_id", nil) or state("generator_id", nil)
 		elseif stage == 5 then
-			return load_var(db.actor, "shelter_laptop_id", nil)
+			return state("laptop_id", nil)
 		end
 		return nil
 	end
 	if stage == 1 then
 		return get_story_object_id("zat_a2_stalker_mechanic")
 	elseif stage == 2 then
-		local lom = load_var(db.actor, "shelter_lom_id", nil)
+		local lom = state("lom_id", nil)
 		if lom and alife_object(lom) then
 			return lom
 		end
 		local smart = SIMBOARD.smarts_by_names[LOM.smart]
 		return smart and smart.id
 	elseif stage < 5 then
-		return load_var(db.actor, "shelter_generator_id", nil)
+		return state("generator_id", nil)
 	end
 end
 
@@ -460,7 +528,7 @@ local function spawn_lom()
 	alife_create_item(TOOLS, se)
 	alife_create_item(PDA, se)
 	se:kill()
-	save_var(db.actor, "shelter_lom_id", se.id)
+	set_state("lom_id", se.id)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -503,15 +571,17 @@ local function set_laptop()
 		return
 	end
 	alife_release(item)
-	local desk = load_var(db.actor, "shelter_desk_id", nil)
+	local desk = state("desk_id", nil)
 	if desk and alife_object(desk) then
 		alife_release_id(desk)
 	end
-	local se = alife_create("shelter_laptop", LAPTOP.pos, level.vertex_id(LAPTOP.ai), db.actor:game_vertex_id())
-	if se then
-		se.angle = vector():set(0, LAPTOP.look:getH(), 0)
-		save_var(db.actor, "shelter_laptop_id", se.id)
-	end
+	everyones(function()
+		local se = alife_create("shelter_laptop", LAPTOP.pos, level.vertex_id(LAPTOP.ai), db.actor:game_vertex_id())
+		if se then
+			se.angle = vector():set(0, LAPTOP.look:getH(), 0)
+			set_state("laptop_id", se.id)
+		end
+	end)
 	give_info("shelter_laptop_installed")
 	msg("st_shelter_laptop_installed")
 end
@@ -612,19 +682,19 @@ end
 
 -- dug out: kept by name (point 3's also by the test copy's var from before)
 local function mound_dug(section)
-	return load_var(db.actor, "shelter_dug_" .. section, false)
-		or section == "shelter_mound_3" and load_var(db.actor, "shelter_point3_open", false)
+	return state("dug_" .. section, false)
+		or section == "shelter_mound_3" and state("point3_open", false)
 end
 
 -- the mound's strokes done (its var; mound 3's is the test copy's one) and needed
 local function mound_dig(section)
 	local shovels = ini_sys:r_float_ex(section, "shelter_dig") or 1
-	return "shelter_dig_" .. (string.match(section, "%d+$") or section), math.max(math.floor(shovels / DIG.wear + 0.5), 1)
+	return "dig_" .. (string.match(section, "%d+$") or section), math.max(math.floor(shovels / DIG.wear + 0.5), 1)
 end
 
 local function dig_percent(section)
 	local var, strokes = mound_dig(section)
-	return math.floor(load_var(db.actor, var, 0) * 100 / strokes)
+	return math.floor(state(var, 0) * 100 / strokes)
 end
 
 local function dig_msg(id, section)
@@ -674,15 +744,15 @@ local function dig_stroke()
 	level.add_cam_effector("camera_effects\\switch\\low" .. math.random(1, 4) .. ".anm", 23240, false, "")
 	shovel:set_condition(math.max(shovel:condition() - DIG.wear, 0))
 	local var, strokes = mound_dig(digging.section)
-	local done = load_var(db.actor, var, 0) + 1
-	save_var(db.actor, var, done)
+	local done = state(var, 0) + 1
+	set_state(var, done)
 	local broke = shovel:condition() < 0.001
 	if broke then
 		alife_release(shovel)
 	end
 	if done >= strokes then
-		save_var(db.actor, "shelter_dug_" .. digging.section, true)
-		save_var(db.actor, "shelter_open_" .. mound_zone(mound), true) -- its rooms count for the cleaning
+		set_state("dug_" .. digging.section, true)
+		set_state("open_" .. mound_zone(mound), true) -- its rooms count for the cleaning
 		alife_release(mound)
 		return dig_stop("st_shelter_dig_done")
 	end
@@ -754,12 +824,12 @@ end
 
 -- the mounds, each once and none dug out
 local function place_mounds()
-	local early = load_var(db.actor, "shelter_test_blocks", false)
+	local early = state("test_blocks", false)
 	local gvid = db.actor:game_vertex_id()
 	for _, m in ipairs(MOUNDS) do
 		local section, x, y, z, fx, fz = unpack(m)
-		local var = "shelter_placed_" .. section
-		if not (load_var(db.actor, var, false) or mound_dug(section) or early and EARLY_MOUNDS[section]) then
+		local var = "placed_" .. section
+		if not (state(var, false) or mound_dug(section) or early and EARLY_MOUNDS[section]) then
 			local pos = vector():set(x, y, z)
 			local lvid = level.vertex_id(pos)
 			if not lvid or lvid >= 4294967295 then
@@ -769,7 +839,7 @@ local function place_mounds()
 			if se then
 				se.angle = vector():set(0, vector():set(fx, 0, fz):getH(), 0)
 			end
-			save_var(db.actor, var, true)
+			set_state(var, true)
 		end
 	end
 end
@@ -778,12 +848,12 @@ end
 -- The cleaning: the open rooms' heaps (once, kept in the save and put again on every load) and bodies
 
 local function zone_open(name)
-	return name == "start" or load_var(db.actor, "shelter_open_" .. name, false)
-		or name == "corridor" and load_var(db.actor, "shelter_point3_open", false) -- dug out by the test copy's script
+	return name == "start" or state("open_" .. name, false)
+		or name == "corridor" and state("point3_open", false) -- dug out by the test copy's script
 end
 
 local function zone_cleaned(name)
-	return load_var(db.actor, "shelter_clean_" .. name, false)
+	return state("clean_" .. name, false)
 end
 
 local function zone_of(p)
@@ -819,7 +889,7 @@ end
 -- Furniture's (left out where those sections are missing)
 local function stash_items(name)
 	local ini = ini_file(CLEAN.ini)
-	local id = load_var(db.actor, "shelter_stash_id", nil)
+	local id = state("stash_id", nil)
 	local stash = id and alife_object(id)
 	if not (stash and ini:section_exist(name)) then
 		return
@@ -865,16 +935,45 @@ function clean()
 	level.add_pp_effector("sleep_fade.ppe", 11, false)
 	level.change_game_time(0, CLEAN.hours, 0)
 	for _, name in ipairs(zones) do
-		save_var(db.actor, "shelter_clean_" .. name, true)
+		set_state("clean_" .. name, true)
 		take_heaps(name)
-		stash_items(name)
+		everyones(stash_items, name)
 	end
+	-- what the questline or the Brigadier's gear needs (shelter_keep) goes from the bodies into the stash first, through
+	-- the actor (co-op mirrors a body's or a box's things moving to and from a player, not between the two); the bodies
+	-- a moment later, the moves done
+	local kept = {}
 	for _, id in ipairs(dead) do
-		local se = alife_object(id)
-		if se and not alife_release(se) then -- it leaves an NPC with no squad (ours are made one by one) where it lies
-			alife():release(se, true)
+		local body = level.object_by_id(id)
+		if body then
+			body:iterate_inventory(function(_, item)
+				if SYS_GetParam(1, item:section(), "shelter_keep", false) then
+					kept[#kept + 1] = item:id()
+					body:transfer_item(item, db.actor)
+				end
+			end, body)
 		end
 	end
+	CreateTimeEvent("shelter", "clean_bodies", 1, function()
+		local stash = level.object_by_id(state("stash_id", 65535))
+		for _, id in ipairs(kept) do
+			local item = level.object_by_id(id)
+			local holder = item and item:parent()
+			if stash and holder and holder:id() == AC_ID then
+				db.actor:transfer_item(item, stash)
+			end
+		end
+		for _, id in ipairs(dead) do
+			local se = alife_object(id)
+			if se and not alife_release(se) then -- it leaves an NPC with no squad (ours are made one by one) where it lies
+				alife():release(se, true)
+			end
+		end
+		if shelter_brigadier then -- his gear, if his body never had it, into the stash
+			shelter_brigadier.catch_up()
+		end
+		return true
+	end)
 	db.actor:change_satiety(-0.4)
 	db.actor.power = 0.2
 	msg("st_shelter_clean_done")
@@ -889,8 +988,8 @@ local function spawn_generator()
 	local box = alife_create(GENERATOR.box, vector():set(GENERATOR.pos):add(vector():set(0, 0.3, 0)), lvid, gvid)
 	if se and box then
 		se.angle = vector():set(0, GENERATOR.look:getH(), 0)
-		save_var(db.actor, "shelter_generator_id", se.id)
-		save_var(db.actor, "shelter_generator_box_id", box.id)
+		set_state("generator_id", se.id)
+		set_state("generator_box_id", box.id)
 	end
 end
 
@@ -899,7 +998,7 @@ local function spawn_stash()
 	local se = alife_create(STASH.section, STASH.pos, level.vertex_id(STASH.ai), db.actor:game_vertex_id())
 	if se then
 		se.angle = vector():set(0, STASH.yaw, 0)
-		save_var(db.actor, "shelter_stash_id", se.id)
+		set_state("stash_id", se.id)
 	end
 end
 
@@ -907,7 +1006,7 @@ end
 local function spawn_desk()
 	local se = alife_create(LAPTOP.mark, LAPTOP.pos, level.vertex_id(LAPTOP.ai), db.actor:game_vertex_id())
 	if se then
-		save_var(db.actor, "shelter_desk_id", se.id)
+		set_state("desk_id", se.id)
 	end
 end
 
@@ -925,16 +1024,17 @@ local function spawn_occupants()
 			printf("! [shelter] no AI vertex for %s at %s", o.section, vec_to_str(o.pos))
 		end
 	end
-	save_var(db.actor, "shelter_occupants", true)
+	set_state("occupants", true)
 end
 
--- what the shelter gets on the first visit (each part once), and the cleaned zones' heaps taken out again
-local function on_first_update()
+-- what the shelter gets on the first visit (each part once for the world), and the cleaned zones' heaps taken out
+-- again
+local function first_update()
 	local name = level.name()
 	if name == LOM.level and has_alife_info("shelter_tools_asked") then
-		local lom = load_var(db.actor, "shelter_lom_id", nil)
+		local lom = state("lom_id", nil)
 		if not lom then
-			spawn_lom()
+			once("lom", spawn_lom)
 		elseif alife_object(lom) then
 			name_lom(alife_object(lom))
 		end
@@ -942,26 +1042,45 @@ local function on_first_update()
 	if name ~= LEVEL then
 		return
 	end
-	if not load_var(db.actor, "shelter_generator_id", nil) then
-		spawn_generator()
+	if not state("generator_id", nil) then
+		once("generator", spawn_generator)
 	end
-	if not load_var(db.actor, "shelter_corridor_lamps", false) then
-		spawn_corridor_lamps()
+	if not state("corridor_lamps", false) then
+		once("corridor_lamps", spawn_corridor_lamps)
 	end
-	if not load_var(db.actor, "shelter_desk_id", nil) and not has_alife_info("shelter_laptop_installed") then
-		spawn_desk()
+	if not state("desk_id", nil) and not has_alife_info("shelter_laptop_installed") then
+		once("desk", spawn_desk)
 	end
-	if not load_var(db.actor, "shelter_stash_id", nil) then
-		spawn_stash()
+	if not state("stash_id", nil) then
+		once("stash", spawn_stash)
 	end
-	place_mounds()
-	if not load_var(db.actor, "shelter_occupants", false) then
-		spawn_occupants()
+	once("mounds", place_mounds)
+	if not state("occupants", false) then
+		once("occupants", spawn_occupants)
 	end
 	for zone in pairs(CLEAN.zones) do
 		if zone_cleaned(zone) then
 			take_heaps(zone)
 		end
+	end
+end
+
+local function on_first_update()
+	if in_coop() then -- our facts count only after coop_facts' first update
+		CreateTimeEvent("shelter", "first_update", 1, function()
+			first_update()
+			return true
+		end)
+	else
+		first_update()
+	end
+end
+
+-- in co-op a zone another player cleaned is taken out here at once
+local function on_fact(fact, value)
+	local zone = string.match(fact, "^shelter:clean_(.+)$")
+	if zone and value == "true" and level.present() and level.name() == LEVEL then
+		take_heaps(zone)
 	end
 end
 
@@ -978,6 +1097,9 @@ end
 
 function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", on_first_update)
+	if coop_facts and coop_facts.on_fact then
+		coop_facts.on_fact("shelter:", on_fact)
+	end
 	RegisterScriptCallback("actor_on_first_update", migrate_task)
 	RegisterScriptCallback("actor_on_update", on_update)
 	RegisterScriptCallback("actor_on_update", dig_update)

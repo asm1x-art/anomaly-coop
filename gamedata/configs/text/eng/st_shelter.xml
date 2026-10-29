@@ -336,4 +336,7 @@
 	<string id="st_shelter_visor_off">
 		<text>Anomaly visor off</text>
 	</string>
+	<string id="st_shelter_needs_group">
+		<text>The shelter is a group's: form a group with your friends, then the note gives the tasks.</text>
+	</string>
 </string_table>

@@ -96,6 +96,12 @@ local function storyline(task_id)
 	return type(task_id) == "string" and ini:section_exist(task_id) and ini:r_bool_ex(task_id, "storyline", false)
 end
 
+-- the shelter's questline (scripts\shelter.script, docs/coop/shelter.md): the group's always, whether or not it shares
+-- its story; a step's reward is only the one's who did it
+local function shelters(id)
+	return type(id) == "string" and string.sub(id, 1, 8) == "shelter_"
+end
+
 -- a step of the world's story (not DRX): once for the world
 local function worlds_step(task_id)
 	return storyline(task_id) and not is_drx(task_id)
@@ -155,6 +161,12 @@ local function on_claim(key, whose)
 	if not ok then
 		printf("! [coop] %s: %s", key, tostring(err))
 	end
+end
+
+-- for the other co-op scripts (the shelter's spawns): run() once for the world, in the first game to get there; what
+-- it spawns is the caller's to share
+function once(key, run)
+	claim("once:" .. key, run)
 end
 
 local function object_of(obj)
@@ -536,6 +548,10 @@ end
 local function sharing()
 	return coop.connected() and coop.group_story() and #coop.group() > 1
 end
+-- a task or info of the story or the shelter that goes to the group now
+local function shared(id)
+	return (storyline(id) or is_story_info(id)) and sharing() or shelters(id) and coop.connected() and #coop.group() > 1
+end
 
 local function in_our_group(name)
 	for _, member in ipairs(coop.group()) do
@@ -574,7 +590,7 @@ end
 
 -- a step's reward of the group's member's step, if the server says the others get it
 local function reward_of(rtask)
-	if not (rtask and rtask.on_complete and coop_rules.flag("story_rewards_all", false)) then
+	if not (rtask and rtask.on_complete and coop_rules.flag("story_rewards_all", false)) or shelters(rtask.id) then
 		return
 	end
 	local kept = {}
@@ -608,11 +624,11 @@ end
 
 local function on_step(sender, payload)
 	local kind, text = string.match(payload, "^([^\t]*)\t(.*)$")
-	if not (kind and db.actor and sharing() and in_our_group(sender)) then
+	if not (kind and db.actor and in_our_group(sender)) then
 		return
 	end
 	local data = coop_sync.deserialize(text)
-	if type(data) ~= "table" then
+	if type(data) ~= "table" or not (sharing() or shelters(data.info or data.id)) then
 		return
 	end
 	local to = get_actor_true_community()
@@ -629,7 +645,7 @@ local function on_step(sender, payload)
 		return
 	end
 	local task_id = for_faction(data.id or "", "task", data.faction, to)
-	if not storyline(task_id) then
+	if not (storyline(task_id) or shelters(task_id)) then
 		return
 	end
 	local tm = task_manager.get_task_manager()
@@ -663,11 +679,11 @@ local function wrap_tasks()
 	local task_callback = task_manager.task_callback
 	task_manager.task_callback = function(tsk, state)
 		local task_id = tsk and tsk:get_id()
-		if not (coop.connected() and storyline(task_id)) then
+		if not (coop.connected() and (storyline(task_id) or shelters(task_id))) then
 			return task_callback(tsk, state)
 		end
 		local rtask = task_manager.get_task_manager().task_info[task_id]
-		if state == task.completed and rtask and sharing() then
+		if state == task.completed and rtask and shared(task_id) then
 			local by = done_by[task_id]
 			if by and time_global() - by.at < DONE_MS then
 				return theirs_done(task_id, {})
@@ -678,7 +694,7 @@ local function wrap_tasks()
 		else
 			task_callback(tsk, state)
 		end
-		if applying or not rtask or not sharing() then
+		if applying or not rtask or not shared(task_id) then
 			return
 		end
 		local faction = get_actor_true_community()
@@ -695,7 +711,7 @@ local function wrap_tasks()
 	-- right after a member's story info our story task may be theirs: it waits for their word
 	local task_complete = task_manager.task_complete
 	task_manager.task_complete = function(task_id)
-		if time_global() - heard_info < HOLD_MS and heard_info > 0 and storyline(task_id) and sharing() then
+		if time_global() - heard_info < HOLD_MS and heard_info > 0 and shared(task_id) then
 			return false
 		end
 		return task_complete(task_id)
@@ -715,7 +731,7 @@ local function tell_new()
 	for task_id in pairs(pending_new) do
 		pending_new[task_id] = nil
 		local rtask = tm.task_info[task_id]
-		if rtask and sharing() then
+		if rtask and shared(task_id) then
 			local drx = {}
 			for _, name in ipairs(DRX_VARS) do
 				drx[name] = load_var(db.actor, name)
@@ -797,7 +813,7 @@ function on_game_start()
 	coop_sync.on_event("story_step", on_step)
 
 	_G.coop_on_info = function(info, given)
-		if not applying and db.actor and is_story_info(info) and sharing() then
+		if not applying and db.actor and shared(info) then
 			step("info", { info = info, given = given, faction = get_actor_true_community() })
 		end
 	end
