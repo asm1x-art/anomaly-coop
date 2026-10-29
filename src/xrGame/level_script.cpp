@@ -2294,14 +2294,27 @@ static void hide_static_visual(int index)
 	vis.sphere.set(far_away, 0.001f);
 }
 
-// ... and its collision triangles ("first-last,index,..." into level.cform) get materials\fake: passable (physics, the
-// player, the crosshair), shot and heard through
+// ... and its collision triangles ("first-last,index,..." into level.cform) are taken out: each gets the corners of the
+// level's lowest triangle. Queries test a triangle only where the collision tree has it, its old place, where it no
+// longer is, so nothing meets it: the physics, the player, bullets, the crosshair. (materials\fake, passable for the
+// physics, is an obstacle for the player: he walked on the invisible doors and heaps; another passable material makes
+// his steps sound as it, bushes or water.)
 static void make_static_passable(LPCSTR triangles)
 {
 	CDB::MODEL* model = Level().ObjectSpace.GetStaticModel();
 	CDB::TRI* tris = model->get_tris();
+	const Fvector* verts = model->get_verts();
 	u32 count = (u32)model->get_tris_count();
-	u16 fake = GMLib.GetMaterialIdx("materials\\fake");
+	u32 lowest = 0;
+	float lowest_y = flt_max;
+	for (u32 t = 0; t < count; ++t)
+		for (int k = 0; k < 3; ++k)
+			if (verts[tris[t].verts[k]].y < lowest_y)
+			{
+				lowest_y = verts[tris[t].verts[k]].y;
+				lowest = t;
+			}
+	u32 far_corners[3] = { tris[lowest].verts[0], tris[lowest].verts[1], tris[lowest].verts[2] };
 	string32 part;
 	for (int i = 0, n = _GetItemCount(triangles); i < n; ++i)
 	{
@@ -2313,7 +2326,7 @@ static void make_static_passable(LPCSTR triangles)
 		if (read < 2)
 			last = first;
 		for (u32 t = first; t <= last && t < count; ++t)
-			tris[t].material = fake;
+			CopyMemory(tris[t].verts, far_corners, sizeof(far_corners));
 	}
 }
 
