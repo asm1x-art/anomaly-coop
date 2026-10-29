@@ -53,7 +53,7 @@
 		<text>Artefact container</text>
 	</string>
 	<string id="st_shelter_container_descr">
-		<text>A lead container from professor Sakharov for Sidorovich. Heavy: about thirty kilograms.</text>
+		<text>A sealed case from professor Sakharov for Sidorovich: artefact samples in shielded cells.</text>
 	</string>
 	<string id="st_shelter_laptop_name">
 		<text>Laptop</text>
@@ -119,7 +119,7 @@
 		<text>Brought your container from Sakharov.</text>
 	</string>
 	<string id="shelter_sid_container_1">
-		<text>I see, I see. Back aching? Thirty kilos isn't vodka. Here's your laptop. And mind: I'm not in the business of charging it. Find your own power, a generator or an anomaly.</text>
+		<text>I see, I see. Back aching? That's no bottle of vodka. Here's your laptop. And mind: I'm not in the business of charging it. Find your own power, a generator or an anomaly.</text>
 	</string>
 	<string id="shelter_sid_container_2">
 		<text>Thanks for that much.</text>
@@ -128,7 +128,7 @@
 		<text>Professor, Sidorovich sent me. He says you have a container for him.</text>
 	</string>
 	<string id="shelter_sakharov_1">
-		<text>Ah, the container... Yes, yes, samples for our mutual acquaintance. A warning, young man: it is lead and weighs about thirty kilograms. Don't strain yourself.</text>
+		<text>Ah, the container... Yes, yes, samples for our mutual acquaintance. A warning, young man: the case is a heavy one and its cells are shielded. Don't even think of opening it: the samples are, shall we say, temperamental.</text>
 	</string>
 	<string id="shelter_sakharov_2">
 		<text>I'll manage.</text>
