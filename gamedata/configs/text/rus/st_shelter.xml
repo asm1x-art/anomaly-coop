@@ -384,4 +384,82 @@
 	<string id="st_shelter_chemist_vector_descr">
 		<text>Kriss Vector под .45 ACP, с которым ходил Химик. Прокачан до предела, изнашивается вдвое медленнее прокачанного обычного и легче на четверть. Глушитель и коллиматор; на планку Пикатинни встаёт и другой прицел. Химик заряжал его экспансивными Hydra-Shok.</text>
 	</string>
+	<string id="st_shelter_notes_chemist_notes">
+		<text>Заметки</text>
+	</string>
+	<string id="st_shelter_notes_chemist_ideas">
+		<text>Идеи</text>
+	</string>
+	<string id="st_shelter_notes_chemist_recipes">
+		<text>Рецепты</text>
+	</string>
+	<string id="st_shelter_goal_synthesis">
+		<text>Синтез артефактов</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_1">
+		<text>Поговорить с профессором Германом в бункере учёных на Юпитере о капсулах для аномальной среды.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_2">
+		<text>Наполнить капсулы в аномалиях: %s из %s. Только в ССП не ниже «Топаза» или в «Севе» Химика.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_3">
+		<text>Отнести профессору Герману по капсуле каждой природы.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_4">
+		<text>Установить капсулы в камеры у входа в убежище.</text>
+	</string>
+	<string id="st_shelter_capsule_name">
+		<text>Капсула для аномальной среды</text>
+	</string>
+	<string id="st_shelter_capsule_descr">
+		<text>Экспериментальная капсула-ловушка профессора Германа, пустая. Поместить в аномалию той природы, что указана на капсуле — около минуты, и среда внутри; аномалия после этого выгорает до выброса. Только в ССП не ниже «Топаза» или в «Севе» Химика: в другом костюме капсула при закрытии убивает.</text>
+	</string>
+	<string id="st_shelter_capsule_gravi_name">
+		<text>Капсула для гравитационной аномалии</text>
+	</string>
+	<string id="st_shelter_capsule_thermo_name">
+		<text>Капсула для термической аномалии</text>
+	</string>
+	<string id="st_shelter_capsule_chem_name">
+		<text>Капсула для химической аномалии</text>
+	</string>
+	<string id="st_shelter_capsule_electro_name">
+		<text>Капсула для электрической аномалии</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi">
+		<text>Гравитационная капсула</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi_1">
+		<text>Наполнить капсулы для гравитационной аномалии: %s из %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi_2">
+		<text>Капсулы наполнены.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo">
+		<text>Термическая капсула</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo_1">
+		<text>Наполнить капсулы для термической аномалии: %s из %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo_2">
+		<text>Капсулы наполнены.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem">
+		<text>Химическая капсула</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem_1">
+		<text>Наполнить капсулы для химической аномалии: %s из %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem_2">
+		<text>Капсулы наполнены.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro">
+		<text>Электрическая капсула</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro_1">
+		<text>Наполнить капсулы для электрической аномалии: %s из %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro_2">
+		<text>Капсулы наполнены.</text>
+	</string>
 </string_table>

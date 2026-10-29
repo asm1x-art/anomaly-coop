@@ -440,16 +440,54 @@ function note_read(obj)
 	end
 end
 
+-- an idea of the Chemist's notes read (ui_pda_shelter_base.script): the questline it starts, the group's in co-op
+local IDEAS = { synthesis = { info = "shelter_idea_synthesis_read", task = "shelter_synthesis" } }
+
+function idea_read(name)
+	local idea = IDEAS[name]
+	if idea and not has_alife_info(idea.info) and not no_group() then
+		give_info(idea.info)
+		task_manager.get_task_manager():give_task(idea.task)
+	end
+end
+
 ----------------------------------------------------------------------------------------------------
 -- The tasks: the laptop and the generator, each on its own, listed in the PDA under "Убежище" (the engine asks
--- _G.CGameTask__group). Each one's stage follows the game's state; the last is done.
+-- _G.CGameTask__group); artefact synthesis under its own heading, with a task for each nature's capsules while
+-- they're being filled. Each one's stage follows the game's state; the last is done.
 
-local GOAL = { shelter_laptop = "laptop", shelter_tools = "tools" }
-local GOAL_DONE = { laptop = 6, tools = 5 }
+local NATURES = { "gravi", "thermo", "chem", "electro" }
+local GOAL = { shelter_laptop = "laptop", shelter_tools = "tools", shelter_synthesis = "synthesis" }
+local GOAL_DONE = { laptop = 6, tools = 5, synthesis = 5 }
+for _, nature in ipairs(NATURES) do
+	GOAL["shelter_synthesis_" .. nature] = "synthesis_" .. nature
+	GOAL_DONE["synthesis_" .. nature] = 2
+end
+local CAPSULES = 8 -- Herman's for the anomalies: two of each nature, one of each back to him, one into each chamber
+local CAPSULES_EACH = CAPSULES / #NATURES
 local GROUP = "st_shelter_restore_title"
+local SYNTHESIS_GROUP = "st_shelter_goal_synthesis"
+
+-- a nature's capsules filled (the world's)
+local function filled(nature)
+	return state("capsules_filled_" .. nature, 0)
+end
+
+local function filled_all()
+	local n = 0
+	for _, nature in ipairs(NATURES) do
+		n = n + filled(nature)
+	end
+	return n
+end
 
 local function goal_stage(goal)
-	if goal == "laptop" then
+	if goal == "synthesis" then -- talk to Herman, fill his capsules, his half back, ours into the chambers
+		return state("chambers_ready", false) and 5 or has_alife_info("shelter_capsules_paid") and 4
+			or filled_all() >= CAPSULES and 3 or has_alife_info("shelter_capsules_got") and 2 or 1
+	elseif string.find(goal, "^synthesis_") then -- a nature's capsules: being filled, filled
+		return filled(string.sub(goal, 11)) >= CAPSULES_EACH and 2 or 1
+	elseif goal == "laptop" then
 		return has_alife_info("shelter_flash_inserted") and 6 or has_alife_info("shelter_laptop_installed") and 5
 			or has_alife_info("shelter_laptop_got") and 4 or db.actor:object(CONTAINER) and 3
 			or has_alife_info("shelter_laptop_asked") and 2 or 1
@@ -459,7 +497,12 @@ local function goal_stage(goal)
 end
 
 local function goal_target(goal, stage)
-	if goal == "laptop" then
+	if goal == "synthesis" then
+		return (stage == 1 or stage == 3) and get_story_object_id("jup_b6_scientist_nuclear_physicist")
+			or stage == 4 and state("stash_id", nil) or nil
+	elseif string.find(goal, "^synthesis_") then
+		return nil
+	elseif goal == "laptop" then
 		if stage == 1 or stage == 3 then
 			return get_story_object_id("esc_m_trader")
 		elseif stage == 2 then
@@ -494,6 +537,12 @@ local function task_functor_shelter(task_id, field, p, tsk)
 	if field == "title" then
 		return "st_shelter_goal_" .. goal
 	elseif field == "descr" then
+		if goal == "synthesis" and stage == 2 then
+			return string.format(game.translate_string("st_shelter_goal_synthesis_2"), filled_all(), CAPSULES)
+		elseif string.find(goal, "^synthesis_") and stage == 1 then
+			return string.format(game.translate_string("st_shelter_goal_" .. goal .. "_1"), filled(string.sub(goal, 11)),
+				CAPSULES_EACH)
+		end
 		return "st_shelter_goal_" .. goal .. "_" .. stage
 	elseif field == "target" then
 		return goal_target(goal, stage)
@@ -526,6 +575,20 @@ end
 
 function dlg_has_pda(a, b)
 	return db.actor:object(PDA) ~= nil
+end
+
+-- Herman's capsules for anomalous matter (artefact synthesis): an even share for each nature of anomalies, and a
+-- task for each nature's
+function dlg_give_capsules(a, b)
+	local tm = task_manager.get_task_manager()
+	for _, nature in ipairs(NATURES) do
+		local section = "shelter_capsule_" .. nature
+		for _ = 1, CAPSULES_EACH do
+			alife_create_item(section, db.actor)
+		end
+		news_manager.relocate_item(db.actor, "in", section, CAPSULES_EACH)
+		tm:give_task("shelter_synthesis_" .. nature)
+	end
 end
 
 function dlg_give_container(a, b)
@@ -1182,7 +1245,7 @@ function on_game_start()
 		xr_sound.set_sound_play(AC_ID, "pda_task")
 		local caption = game.translate_string(typ == "new" and "general_new_task" or "general_update_task")
 		local text = game.translate_string(tsk:get_title() or "") .. ". "
-			.. game.translate_string("st_shelter_goal_" .. goal .. "_" .. goal_stage(goal))
+			.. game.translate_string(task_functor_shelter(tsk:get_id(), "descr")) -- with its numbers, if it has
 		local icon = tsk:get_icon_name() or "ui_iconsTotal_storyline"
 		if db.actor:is_talking() then
 			db.actor:give_talk_message2(caption, text, icon, "iconed_answer_item")
@@ -1192,7 +1255,8 @@ function on_game_start()
 	end
 	local group_of = _G.CGameTask__group
 	_G.CGameTask__group = function(task_id)
-		return GOAL[task_id] and GROUP or group_of and group_of(task_id) or ""
+		local goal = GOAL[task_id]
+		return goal and (string.find(goal, "^synthesis") and SYNTHESIS_GROUP or GROUP) or group_of and group_of(task_id) or ""
 	end
 	local need_flicker = bind_dynamic_light.need_flicker
 	bind_dynamic_light.need_flicker = function(lamp)

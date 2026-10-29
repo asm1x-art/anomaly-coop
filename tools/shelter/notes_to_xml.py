@@ -1,5 +1,7 @@
 # notes_to_xml.py <SHETER ZOMBIE.md> <out.xml>: the Brigadier's and the Chemist's PDA notes as a cp1251 string table
-# (st_shelter_note_<who>_<n>_title / _text), the md's markup cleaned, file remarks in brackets grey
+# (st_shelter_note_<who>_<n>_title / _text), the Chemist's ideas and recipes (st_shelter_idea_chemist_<n>_...,
+# st_shelter_recipe_chemist_<n>_...) and the dialog lines (a "### <string id>" heading each), the md's markup cleaned,
+# file remarks in brackets grey
 import html
 import re
 import sys
@@ -9,16 +11,23 @@ text = open(src, encoding="utf-8").read()
 text = text.replace("&#x20;", " ").replace("\r\n", "\n")
 lines = [re.sub(r"\\([#*\[\]_>])", r"\1", l).rstrip() for l in text.split("\n")]
 
+def find(text, default=None):
+    return next((i for i, l in enumerate(lines) if text in l), default)
+
+
 brig_end = next(i for i, l in enumerate(lines) if l.startswith("====="))
-chem_archive = next(i for i, l in enumerate(lines) if "Заметки КПК Химика" in l)
+chem_archive = find("Заметки КПК Химика")
+ideas_start = find("## Идеи Химика", len(lines))
+recipes_start = find("## Рецепты Химика", len(lines))
+dialog_start = find("## Диалог с", len(lines))
 
 
-def notes(start, end):
+def notes(start, end, word="Заметка"):
     found, cur = [], None
     for l in lines[start:end]:
-        m = re.match(r"^###\s*Заметка\s*(\d+)\.\s*(.*)$", l)
+        m = re.match(r"^###\s*%s\s*(\d+)\.\s*(.*)$" % word, l)
         if m:
-            cur = {"n": int(m.group(1)), "title": "Заметка %s. %s" % (m.group(1), m.group(2).strip()), "body": []}
+            cur = {"n": int(m.group(1)), "title": "%s %s. %s" % (word, m.group(1), m.group(2).strip()), "body": []}
             found.append(cur)
         elif l.startswith("#"):
             cur = None  # a heading of the design notes: not a PDA's
@@ -37,7 +46,18 @@ def notes(start, end):
 
 
 brigadier = notes(0, brig_end)
-chemist = notes(brig_end, chem_archive)[:1] + notes(chem_archive, len(lines))  # its note 0, then the archive
+chemist = notes(brig_end, chem_archive)[:1] + notes(chem_archive, ideas_start)  # its note 0, then the archive
+ideas = notes(ideas_start, recipes_start, "Идея")
+recipes = notes(recipes_start, dialog_start, "Рецепт")
+# dialog lines: "### <string id>", the text under it
+dialog, cur = [], None
+for l in lines[dialog_start:]:
+    m = re.match(r"^###\s*([a-z0-9_]+)\s*$", l)
+    if m:
+        cur = [m.group(1), []]
+        dialog.append(cur)
+    elif cur is not None and l.strip():
+        cur[1].append(re.sub(r"^\s*>\s?", "", l).strip())
 
 
 def body(paras):
@@ -50,11 +70,14 @@ def body(paras):
 
 
 rows = []
-for who, ns in (("brigadier", brigadier), ("chemist", chemist)):
+for prefix, ns in (("st_shelter_note_brigadier", brigadier), ("st_shelter_note_chemist", chemist),
+                   ("st_shelter_idea_chemist", ideas), ("st_shelter_recipe_chemist", recipes)):
     for n in ns:
-        key = "st_shelter_note_%s_%d" % (who, n["n"])
+        key = "%s_%d" % (prefix, n["n"])
         rows.append((key + "_title", n["title"]))
         rows.append((key + "_text", body(n["paras"])))
+for sid, text in dialog:
+    rows.append((sid, " ".join(text)))
 xml = ['<?xml version="1.0" encoding="windows-1251"?>', "",
        "<!-- The Brigadier's and the Chemist's PDA notes (the PDA's Base tab, ui_pda_shelter_base.script), made by",
        "     notes_to_xml.py from the author's SHETER ZOMBIE.md -->",
@@ -67,7 +90,8 @@ xml.append("</string_table>")
 data = "\r\n".join(xml) + "\r\n"
 bad = sorted({c for c in data if c not in "\r\n" and not c.encode("cp1251", "ignore")})
 open(out, "wb").write(data.encode("cp1251", "replace"))
-print("brigadier", [n["n"] for n in brigadier], "chemist", [n["n"] for n in chemist], "not in cp1251:", bad)
-for who, ns in (("brigadier", brigadier), ("chemist", chemist)):
+print("brigadier", [n["n"] for n in brigadier], "chemist", [n["n"] for n in chemist], "ideas", [n["n"] for n in ideas],
+      "recipes", [n["n"] for n in recipes], "dialog", [d[0] for d in dialog], "not in cp1251:", bad)
+for who, ns in (("brigadier", brigadier), ("chemist", chemist), ("idea", ideas)):
     for n in ns:
         print(who, n["title"], len(n["paras"]), "paras,", sum(len(p) for p in n["paras"]), "chars")

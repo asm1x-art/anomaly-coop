@@ -122,4 +122,28 @@
 			</phrase>
 		</phrase_list>
 	</dialog>
+	<!-- Herman: the capsules for the Chemist's synthesis chambers, once his idea is read in the PDA -->
+	<dialog id="shelter_herman_capsules">
+		<has_info>shelter_idea_synthesis_read</has_info>
+		<dont_has_info>shelter_capsules_got</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_herman_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_herman_1</text>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_herman_2</text>
+				<next>3</next>
+			</phrase>
+			<phrase id="3">
+				<text>shelter_herman_3</text>
+				<action>shelter.dlg_give_capsules</action>
+				<give_info>shelter_capsules_got</give_info>
+			</phrase>
+		</phrase_list>
+	</dialog>
 </game_dialogs>

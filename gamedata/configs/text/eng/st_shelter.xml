@@ -384,4 +384,82 @@
 	<string id="st_shelter_chemist_vector_descr">
 		<text>The .45 ACP Kriss Vector the Chemist carried. Upgraded to the limit, it wears down half as fast as an upgraded ordinary one and is a quarter lighter. A silencer and a red dot; another sight fits its Picatinny rail too. The Chemist loaded it with expansive Hydra-Shok.</text>
 	</string>
+	<string id="st_shelter_notes_chemist_notes">
+		<text>Notes</text>
+	</string>
+	<string id="st_shelter_notes_chemist_ideas">
+		<text>Ideas</text>
+	</string>
+	<string id="st_shelter_notes_chemist_recipes">
+		<text>Recipes</text>
+	</string>
+	<string id="st_shelter_goal_synthesis">
+		<text>Artefact synthesis</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_1">
+		<text>Talk to Professor Herman in the scientists' bunker on Jupiter about the capsules for anomalous matter.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_2">
+		<text>Fill the capsules in anomalies: %s of %s. Only in an SSP from Topaz up or in the Chemist's SEVA.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_3">
+		<text>Take Professor Herman a capsule of each nature.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_4">
+		<text>Put the capsules into the chambers by the shelter's entrance.</text>
+	</string>
+	<string id="st_shelter_capsule_name">
+		<text>Capsule for anomalous matter</text>
+	</string>
+	<string id="st_shelter_capsule_descr">
+		<text>Professor Herman's experimental trap capsule, empty. Put into an anomaly of the nature it is marked for, it takes in its matter in about a minute; the anomaly burns out till the next emission. Only in an SSP from Topaz up or in the Chemist's SEVA: in another suit the capsule kills as it closes.</text>
+	</string>
+	<string id="st_shelter_capsule_gravi_name">
+		<text>Capsule for a gravitational anomaly</text>
+	</string>
+	<string id="st_shelter_capsule_thermo_name">
+		<text>Capsule for a thermal anomaly</text>
+	</string>
+	<string id="st_shelter_capsule_chem_name">
+		<text>Capsule for a chemical anomaly</text>
+	</string>
+	<string id="st_shelter_capsule_electro_name">
+		<text>Capsule for an electrical anomaly</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi">
+		<text>Gravitational capsule</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi_1">
+		<text>Fill the capsules for a gravitational anomaly: %s of %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_gravi_2">
+		<text>The capsules are filled.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo">
+		<text>Thermal capsule</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo_1">
+		<text>Fill the capsules for a thermal anomaly: %s of %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_thermo_2">
+		<text>The capsules are filled.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem">
+		<text>Chemical capsule</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem_1">
+		<text>Fill the capsules for a chemical anomaly: %s of %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_chem_2">
+		<text>The capsules are filled.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro">
+		<text>Electrical capsule</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro_1">
+		<text>Fill the capsules for an electrical anomaly: %s of %s.</text>
+	</string>
+	<string id="st_shelter_goal_synthesis_electro_2">
+		<text>The capsules are filled.</text>
+	</string>
 </string_table>

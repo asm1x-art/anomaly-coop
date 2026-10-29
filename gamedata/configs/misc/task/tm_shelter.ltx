@@ -21,6 +21,34 @@ descr_functor   = shelter_task
 target_functor  = shelter_task
 status_functor  = shelter_task
 
+; artefact synthesis (the Chemist's idea, read in the PDA's Base tab): Herman's capsules for the anomalies, filled,
+; his half back, ours into the chambers by the shelter's entrance
+[shelter_synthesis]
+prior           = 118
+storyline       = true
+title_functor   = shelter_task
+descr_functor   = shelter_task
+target_functor  = shelter_task
+status_functor  = shelter_task
+
+; a nature's two capsules to fill (given with Herman's capsules, listed under artefact synthesis)
+[shelter_synthesis_gravi]
+prior           = 117
+storyline       = true
+title_functor   = shelter_task
+descr_functor   = shelter_task
+target_functor  = shelter_task
+status_functor  = shelter_task
+
+[shelter_synthesis_thermo]:shelter_synthesis_gravi
+prior           = 116
+
+[shelter_synthesis_chem]:shelter_synthesis_gravi
+prior           = 115
+
+[shelter_synthesis_electro]:shelter_synthesis_gravi
+prior           = 114
+
 ; the questline's one task in earlier saves: on load it gives way to the two above
 [shelter_restore]
 prior           = 120

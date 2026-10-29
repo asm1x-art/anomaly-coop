@@ -91,6 +91,39 @@ inv_name        = st_shelter_pda_chemist_name
 inv_name_short  = st_shelter_pda_chemist_name
 shelter_notes   = shelter_notes_chemist
 
+; Herman's capsules for anomalous matter (artefact synthesis, shelter.script): two for each nature of anomalies,
+; filled in an anomaly of theirs, one of each back to him, one of each into the shelter's chambers
+[shelter_capsule]:tch_quest
+visual          = dynamics\equipments\aa\aam
+inv_name        = st_shelter_capsule_name
+inv_name_short  = st_shelter_capsule_name
+description     = st_shelter_capsule_descr
+inv_grid_x      = 3
+inv_grid_y      = 28
+inv_weight      = 1.5
+quest_item      = true
+shelter_keep    = true
+
+[shelter_capsule_gravi]:shelter_capsule
+inv_name        = st_shelter_capsule_gravi_name
+inv_name_short  = st_shelter_capsule_gravi_name
+shelter_nature  = gravi
+
+[shelter_capsule_thermo]:shelter_capsule
+inv_name        = st_shelter_capsule_thermo_name
+inv_name_short  = st_shelter_capsule_thermo_name
+shelter_nature  = thermo
+
+[shelter_capsule_chem]:shelter_capsule
+inv_name        = st_shelter_capsule_chem_name
+inv_name_short  = st_shelter_capsule_chem_name
+shelter_nature  = chem
+
+[shelter_capsule_electro]:shelter_capsule
+inv_name        = st_shelter_capsule_electro_name
+inv_name_short  = st_shelter_capsule_electro_name
+shelter_nature  = electro
+
 ; Sakharov's samples for Sidorovich
 [shelter_af_container]:tch_quest
 visual          = dynamics\equipments\quest\safe_container.ogf

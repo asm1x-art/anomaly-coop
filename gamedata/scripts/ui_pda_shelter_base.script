@@ -1,13 +1,23 @@
 -- The PDA's Base tab (pda_dynamic_tabs.script, right after the map's): the notes unloaded from the shelter's
--- occupants' broken PDAs (shelter.pda_upload), each PDA's under its own heading. The tab is there once any are; its
--- notes are string tables' (configs\text\*\st_shelter_notes.xml, tools\shelter\notes_to_xml.py).
+-- occupants' broken PDAs (shelter.pda_upload), each PDA's under its own heading, the Chemist's in parts (notes,
+-- ideas, recipes). The tab is there once any are; the entries are string tables' (configs\text\*\st_shelter_notes.xml,
+-- tools\shelter\notes_to_xml.py): a part shows the entries its prefix has strings for, none -> the part isn't shown.
 
--- whose notes, the info their unloading gave, and the numbers of the notes
+-- whose notes, the info their unloading gave, their parts: a heading (none: the entries right under the PDA's) and
+-- the entries' string ids' prefix
 local SOURCES = {
-	{ key = "brigadier", info = "shelter_notes_brigadier", title = "st_shelter_notes_brigadier", from = 1, to = 10 },
-	{ key = "chemist", info = "shelter_notes_chemist", title = "st_shelter_notes_chemist", from = 0, to = 8 },
+	{ info = "shelter_notes_brigadier", title = "st_shelter_notes_brigadier",
+		parts = { { prefix = "st_shelter_note_brigadier_" } } },
+	{ info = "shelter_notes_chemist", title = "st_shelter_notes_chemist",
+		parts = { { title = "st_shelter_notes_chemist_notes", prefix = "st_shelter_note_chemist_" },
+			{ title = "st_shelter_notes_chemist_ideas", prefix = "st_shelter_idea_chemist_" },
+			{ title = "st_shelter_notes_chemist_recipes", prefix = "st_shelter_recipe_chemist_" } } },
 }
+-- an entry read starts what it leads to (shelter.idea_read)
+local ON_READ = { st_shelter_idea_chemist_1 = "synthesis" }
+local LAST_ENTRY = 50 -- entries are numbered from 0 or 1 up to this, gaps allowed
 local HEADING_COLOR = { 255, 230, 200, 120 }
+local PART_COLOR = { 255, 200, 180, 130 }
 local NOTE_COLOR = { 255, 210, 210, 210 }
 local ROW = { min = 22, pad = 6, left = 4 } -- a row's least height, the room around its title, its title's indent
 local SINGLETON = nil
@@ -30,6 +40,18 @@ function shelter_base_row:__init(height, width, text, color) super(height)
 	self:SetTextColor(GetARGB(unpack(color)))
 end
 
+-- a part's entries: the ids of the strings there are for it
+local function entries(part)
+	local ids = {}
+	for n = 0, LAST_ENTRY do
+		local id = part.prefix .. n
+		if game.translate_string(id .. "_title") ~= id .. "_title" then
+			ids[#ids + 1] = id
+		end
+	end
+	return ids
+end
+
 local function any_notes()
 	for _, s in ipairs(SOURCES) do
 		if has_alife_info(s.info) then
@@ -42,8 +64,8 @@ end
 class "pda_shelter_base_tab" (CUIScriptWnd)
 
 function pda_shelter_base_tab:__init() super()
-	self.rows = {} -- the list's rows: { source = i } for a heading, { id = the note's string id } for a note
-	self.collapsed = {} -- source index -> its notes hidden
+	self.rows = {} -- the list's rows: { fold = key } for a heading, { id = the entry's string id } for an entry
+	self.collapsed = {} -- a heading's key ("<source>" or "<source>.<part>") -> what's under it hidden
 	self:InitControls()
 end
 
@@ -59,6 +81,8 @@ function pda_shelter_base_tab:InitControls()
 	xml:InitFrame("frame_list", self)
 	self.list = xml:InitListBox("list", self)
 	self.list:ShowSelectedItem(true)
+	self:Register(self.list, "list")
+	self:AddCallback("list", ui_events.LIST_ITEM_CLICKED, self.OnClick, self)
 	xml:InitFrame("frame_text", self)
 	self.title = xml:InitTextWnd("title", self)
 	self.scroll = xml:InitScrollView("scroll", self)
@@ -80,33 +104,46 @@ function pda_shelter_base_tab:AddRow(text, color, row)
 	self.rows[#self.rows + 1] = row
 end
 
--- the list again: each source unloaded, its heading (a click folds its notes away or back) and notes
+function pda_shelter_base_tab:AddHeading(key, title, color, indent)
+	local sign = self.collapsed[key] and "+ " or "- "
+	self:AddRow(indent .. sign .. game.translate_string(title), color, { fold = key })
+	return not self.collapsed[key]
+end
+
+-- the list again: each source unloaded under its heading, its parts under theirs (a click on a heading folds what's
+-- under it away or back), the entries
 function pda_shelter_base_tab:Fill()
 	self.list:RemoveAll()
 	self.rows = {}
 	for i, s in ipairs(SOURCES) do
-		if has_alife_info(s.info) then
-			local sign = self.collapsed[i] and "+ " or "- "
-			self:AddRow(sign .. game.translate_string(s.title), HEADING_COLOR, { source = i })
-			if not self.collapsed[i] then
-				for n = s.from, s.to do
-					local id = "st_shelter_note_" .. s.key .. "_" .. n
-					self:AddRow(game.translate_string(id .. "_title"), NOTE_COLOR, { id = id })
+		if has_alife_info(s.info) and self:AddHeading(tostring(i), s.title, HEADING_COLOR, "") then
+			for j, part in ipairs(s.parts) do
+				local ids = entries(part)
+				local open = #ids > 0 and (not part.title or self:AddHeading(i .. "." .. j, part.title, PART_COLOR, "  "))
+				for _, id in ipairs(open and ids or {}) do
+					self:AddRow((part.title and "    " or "  ") .. game.translate_string(id .. "_title"), NOTE_COLOR, { id = id })
 				end
 			end
 		end
 	end
-	self.picked = self.list:GetSelectedIndex()
 end
 
--- the list, the first note shown
+-- the list, its first entry shown
 function pda_shelter_base_tab:Reset()
 	self:Fill()
-	self:ShowNote(self.rows[2] and self.rows[2].id)
+	for _, row in ipairs(self.rows) do
+		if row.id then
+			return self:ShowNote(row.id)
+		end
+	end
+	self:ShowNote(nil)
 end
 
 function pda_shelter_base_tab:ShowNote(id)
 	self.shown = id
+	if id and ON_READ[id] then
+		shelter.idea_read(ON_READ[id])
+	end
 	self.title:SetText(id and game.translate_string(id .. "_title") or "")
 	self.text:SetText(id and game.translate_string(id .. "_text") or "")
 	self.text:AdjustHeightToText()
@@ -117,17 +154,11 @@ function pda_shelter_base_tab:ShowNote(id)
 	self.scroll:ScrollToBegin()
 end
 
--- a row clicked: a heading folds or unfolds its source, a note is shown
-function pda_shelter_base_tab:Update()
-	CUIScriptWnd.Update(self)
-	local index = self.list:GetSelectedIndex()
-	if index == self.picked then
-		return
-	end
-	self.picked = index
-	local row = self.rows[index + 1]
-	if row and row.source then
-		self.collapsed[row.source] = not self.collapsed[row.source]
+-- a row clicked: a heading folds or unfolds what's under it, an entry is shown
+function pda_shelter_base_tab:OnClick()
+	local row = self.rows[self.list:GetSelectedIndex() + 1]
+	if row and row.fold then
+		self.collapsed[row.fold] = not self.collapsed[row.fold]
 		self:Fill()
 	elseif row and row.id ~= self.shown then
 		self:ShowNote(row.id)
