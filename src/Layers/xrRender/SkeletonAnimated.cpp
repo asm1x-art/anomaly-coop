@@ -824,7 +824,8 @@ void CKinematicsAnimated::Load(const char* N, IReader* data, u32 dwFlags)
 				FS.file_list(fset, "$game_meshes$", FS_ListFiles, nm);
 				FS.file_list(fset, "$level$", FS_ListFiles, nm);
 
-				m_Motions.reserve(fset.size() - 1);
+				// not size() - 1: with no file found that wrapped around to a 128 GB reserve
+				m_Motions.reserve(m_Motions.size() + fset.size());
 
 				for (FS_FileSet::iterator it = fset.begin(); it != fset.end(); it++)
 					loadOMF((*it).name.c_str());
@@ -866,7 +867,7 @@ void CKinematicsAnimated::Load(const char* N, IReader* data, u32 dwFlags)
 				FS.file_list(fset, "$game_meshes$", FS_ListFiles, nm);
 				FS.file_list(fset, "$level$", FS_ListFiles, nm);
 
-				m_Motions.reserve(fset.size() - 1);
+				m_Motions.reserve(m_Motions.size() + fset.size());
 
 				for (FS_FileSet::iterator it = fset.begin(); it != fset.end(); it++)
 					loadOMF((*it).name.c_str());
