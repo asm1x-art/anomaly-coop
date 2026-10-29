@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding="windows-1251"?>
+<xml>
+	<!-- the shelter's zombies (character_desc_shelter.xml, scripts/shelter.script) -->
+	<character id="shelter_zombie_nosorog">
+		<class>shelter_zombie_nosorog</class>
+		<specific_character>shelter_zombie_nosorog</specific_character>
+	</character>
+	<character id="shelter_zombie_seva">
+		<class>shelter_zombie_seva</class>
+		<specific_character>shelter_zombie_seva</specific_character>
+	</character>
+</xml>

@@ -1,0 +1,25 @@
+-- The shelter's questline (shelter.script): its dialogs on Sidorovich, Sakharov and Kardan (gameplay\dialogs_shelter.xml)
+local dialogs = {
+	[ [[gameplay\character_desc_escape.xml]] ] = { "esc_2_12_stalker_trader", "shelter_sid_laptop", "shelter_sid_container" },
+	[ [[gameplay\character_desc_yantar.xml]] ] = { "yan_stalker_sakharov", "shelter_sakharov_container" },
+	[ [[gameplay\character_desc_zaton.xml]] ] = { "zat_a2_stalker_mechanic", "shelter_kardan_tools", "shelter_kardan_pda" },
+}
+
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		local add = dialogs[xml_file_name]
+		if not add then
+			return
+		end
+		local character = xml_obj:query("specific_character[id=" .. add[1] .. "]")[1]
+		if not character then
+			printf("! [shelter] %s: no %s to give the dialogs to", xml_file_name, add[1])
+			return
+		end
+		local inject = ""
+		for i = 2, #add do
+			inject = inject .. "<actor_dialog>" .. add[i] .. "</actor_dialog>"
+		end
+		xml_obj:insertFromXMLString(inject, character, 0) -- first in the list, as story options are
+	end)
+end

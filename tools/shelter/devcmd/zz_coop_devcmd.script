@@ -1,0 +1,33 @@
+-- temporary dev helper (not in the repo): runs <appdata>\coop_devcmd.lua once when it appears, "[devcmd]" in the log
+local next_check = 0
+local function run()
+	if time_global() < next_check then
+		return
+	end
+	next_check = time_global() + 1000
+	local path = getFS():update_path("$app_data_root$", "coop_devcmd.lua")
+	local f = io.open(path, "r")
+	if not f then
+		return
+	end
+	local text = f:read("*all")
+	f:close()
+	if not text or text == "" then
+		return
+	end
+	f = io.open(path, "w") -- emptied: run once
+	if f then
+		f:close()
+	end
+	local chunk, err = loadstring(text)
+	if not chunk then
+		printf("[devcmd] syntax: %s", tostring(err))
+	else
+		local ok, res = pcall(chunk)
+		printf("[devcmd] %s %s", ok and "ok" or "error", tostring(res))
+	end
+	get_console():execute("flush")
+end
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", run)
+end

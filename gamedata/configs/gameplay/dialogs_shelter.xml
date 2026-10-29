@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- The shelter's questline "Восстановление" (scripts/shelter.script): Sidorovich's laptop for Sakharov's container,
+     Kardan's tools taken by the stalker who went to Lab X-8. Put on the NPCs by modxml_shelter.script. -->
+<game_dialogs>
+	<!-- Sidorovich: the laptop the group ordered; he wants Sakharov's container for it -->
+	<dialog id="shelter_sid_laptop">
+		<has_info>shelter_note_read</has_info>
+		<dont_has_info>shelter_laptop_asked</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_sid_laptop_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_sid_laptop_1</text>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_sid_laptop_2</text>
+				<next>3</next>
+			</phrase>
+			<phrase id="3">
+				<text>shelter_sid_laptop_3</text>
+				<give_info>shelter_laptop_asked</give_info>
+				<next>4</next>
+			</phrase>
+			<phrase id="4">
+				<text>shelter_sid_laptop_4</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- Sidorovich: the container for the laptop -->
+	<dialog id="shelter_sid_container">
+		<precondition>shelter.dlg_has_container</precondition>
+		<dont_has_info>shelter_laptop_got</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_sid_container_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_sid_container_1</text>
+				<action>shelter.dlg_container_for_laptop</action>
+				<give_info>shelter_laptop_got</give_info>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_sid_container_2</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- Sakharov: gives the container -->
+	<dialog id="shelter_sakharov_container">
+		<has_info>shelter_laptop_asked</has_info>
+		<dont_has_info>shelter_container_given</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_sakharov_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_sakharov_1</text>
+				<action>shelter.dlg_give_container</action>
+				<give_info>shelter_container_given</give_info>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_sakharov_2</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- Kardan: the tools, the drink, "Изделие 62", the stalker gone to the test centre under Zaton's Iron Forest; his
+	     spare access card to it -->
+	<dialog id="shelter_kardan_tools">
+		<has_info>shelter_note_read</has_info>
+		<dont_has_info>shelter_tools_asked</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_kardan_tools_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_kardan_tools_1</text>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_kardan_tools_2</text>
+				<next>3</next>
+			</phrase>
+			<phrase id="3">
+				<text>shelter_kardan_tools_3</text>
+				<action>shelter.dlg_give_card</action>
+				<give_info>shelter_tools_asked</give_info>
+				<next>4</next>
+			</phrase>
+			<phrase id="4">
+				<text>shelter_kardan_tools_4</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- Kardan: the stalker's PDA, for an electric artefact -->
+	<dialog id="shelter_kardan_pda">
+		<precondition>shelter.dlg_has_pda</precondition>
+		<dont_has_info>shelter_pda_returned</dont_has_info>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_kardan_pda_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_kardan_pda_1</text>
+				<action>shelter.dlg_pda_for_artefact</action>
+				<give_info>shelter_pda_returned</give_info>
+				<next>2</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_kardan_pda_2</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+</game_dialogs>

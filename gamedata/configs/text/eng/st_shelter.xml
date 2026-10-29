@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<!-- the generator -->
+	<string id="st_shelter_generator_broken">
+		<text>Needs repair</text>
+	</string>
+	<string id="st_shelter_generator_repair">
+		<text>Repair the generator</text>
+	</string>
+	<string id="st_shelter_generator_open">
+		<text>Generator</text>
+	</string>
+	<string id="st_shelter_generator_repaired">
+		<text>The generator is repaired. It needs an electric artefact to run.</text>
+	</string>
+	<string id="st_shelter_generator_on">
+		<text>The generator is running: the shelter has light.</text>
+	</string>
+	<string id="st_shelter_generator_off">
+		<text>The generator has stopped.</text>
+	</string>
+
+	<!-- things -->
+	<string id="st_shelter_generator_tools_name">
+		<text>Kardan's tools</text>
+	</string>
+	<string id="st_shelter_generator_tools_descr">
+		<text>The tool kit Kardan lent to repair the generator in the shelter.</text>
+	</string>
+	<string id="st_shelter_note_name">
+		<text>Note</text>
+	</string>
+	<string id="st_shelter_note_descr">
+		<text>A crumpled notebook page in hurried handwriting.</text>
+	</string>
+	<string id="st_shelter_note_text">
+		<text>Whoever finds this, read it.\n\nWe found a proper bunker: thick walls, room for the whole group. But there's work up to our necks: rubble to clear, the corridors to look through.\n\nWe ordered a laptop from Sidorovich and paid in advance: someone has to go and fetch it. I keep its flash drive on me: the map of the rooms, the wiring and the rest. Without it we're blind kittens here.\n\nNothing to give us light: there's a generator, but it's dead. Lom went to Kardan at Yanov: he has the right tool kit and promised to lend it for old times' sake.\n\nWe'll sit tight a couple of days. My head has been splitting for two days now, and the dreams... Must be just tired.</text>
+	</string>
+	<string id="st_shelter_read">
+		<text>Read</text>
+	</string>
+	<string id="st_shelter_close">
+		<text>Close</text>
+	</string>
+	<string id="st_zat_a23_access_card">
+		<text>Test centre access card</text>
+	</string>
+	<string id="st_zat_a23_access_card_descr">
+		<text>Kardan's spare card: opens the way into the test centre by the Iron Forest on Zaton.</text>
+	</string>
+	<string id="st_shelter_container_name">
+		<text>Artefact container</text>
+	</string>
+	<string id="st_shelter_container_descr">
+		<text>A lead container from professor Sakharov for Sidorovich. Heavy: about thirty kilograms.</text>
+	</string>
+	<string id="st_shelter_laptop_name">
+		<text>Laptop</text>
+	</string>
+	<string id="st_shelter_laptop_descr">
+		<text>A laptop with a flash drive: the map of the bunker's rooms and its wiring. Runs on mains power only.</text>
+	</string>
+	<string id="st_shelter_lom_name">
+		<text>Lom</text>
+	</string>
+	<string id="st_shelter_pda_name">
+		<text>Lom's PDA</text>
+	</string>
+	<string id="st_shelter_pda_descr">
+		<text>The PDA of a stalker called Lom. The last entry: "The test centre. Kardan wasn't lying..."</text>
+	</string>
+
+	<!-- the laptop -->
+	<string id="st_shelter_laptop_installed">
+		<text>The laptop is set on the desk.</text>
+	</string>
+	<string id="st_shelter_laptop_no_power">
+		<text>No power: the generator isn't running.</text>
+	</string>
+	<string id="st_shelter_desktop">
+		<text>Desktop</text>
+	</string>
+	<string id="st_shelter_clean">
+		<text>Clean up the shelter</text>
+	</string>
+	<string id="st_shelter_clean_hint">
+		<text>Clear the heaps of earth and rubble, carry the bodies out of the rooms you can get to. Takes about a day.</text>
+	</string>
+	<string id="st_shelter_clean_nothing">
+		<text>The rooms you can get to are clean already.</text>
+	</string>
+	<string id="st_shelter_clean_hungry">
+		<text>It's a lot of work: eat and drink first.</text>
+	</string>
+	<string id="st_shelter_clean_done">
+		<text>The cleaning took a day. The shelter is clean.</text>
+	</string>
+
+	<!-- the tasks -->
+
+	<!-- the dialogs -->
+	<string id="shelter_sid_laptop_0">
+		<text>A group of stalkers ordered a laptop from you. The ones who settled in the bunker.</text>
+	</string>
+	<string id="shelter_sid_laptop_1">
+		<text>That they did. Ordered it, paid up, and nobody came to collect. I thought somebody did them in.</text>
+	</string>
+	<string id="shelter_sid_laptop_2">
+		<text>Worse. They're zombified, wandering around their bunker.</text>
+	</string>
+	<string id="shelter_sid_laptop_3">
+		<text>Damn... Shame about the lads, good customers: paid up front, never haggled. Fine, the laptop's yours, but not for a thank-you. Sakharov owes me a container of artefacts, and my legs aren't government issue. Go to Yantar, bring it here, and you get the laptop.</text>
+	</string>
+	<string id="shelter_sid_laptop_4">
+		<text>Deal.</text>
+	</string>
+	<string id="shelter_sid_container_0">
+		<text>Brought your container from Sakharov.</text>
+	</string>
+	<string id="shelter_sid_container_1">
+		<text>I see, I see. Back aching? Thirty kilos isn't vodka. Here's your laptop. And mind: I'm not in the business of charging it. Find your own power, a generator or an anomaly.</text>
+	</string>
+	<string id="shelter_sid_container_2">
+		<text>Thanks for that much.</text>
+	</string>
+	<string id="shelter_sakharov_0">
+		<text>Professor, Sidorovich sent me. He says you have a container for him.</text>
+	</string>
+	<string id="shelter_sakharov_1">
+		<text>Ah, the container... Yes, yes, samples for our mutual acquaintance. A warning, young man: it is lead and weighs about thirty kilograms. Don't strain yourself.</text>
+	</string>
+	<string id="shelter_sakharov_2">
+		<text>I'll manage.</text>
+	</string>
+	<string id="shelter_kardan_tools_0">
+		<text>Kardan, did a stalker come by? From the group that settled in the bunker. For tools for a generator.</text>
+	</string>
+	<string id="shelter_kardan_tools_1">
+		<text>Lom? He did... I gave him the tools, good ones, from the old days. Then we sat down and had a drink, as you do. And drunk as I was I ran my mouth: the test centre on Zaton I worked in, "Item 62"... He lit up. Said he'd go have a peek. Drunk, at nightfall.</text>
+	</string>
+	<string id="shelter_kardan_tools_2">
+		<text>And then?</text>
+	</string>
+	<string id="shelter_kardan_tools_3">
+		<text>Nothing. Not a word since. That centre is by the Iron Forest, the way down is by the crashed helicopter. He talked me out of my access card, but I kept a spare: here. If he went in there, it's bad. I'd like to know what became of him... I'm not one to go there anymore.</text>
+	</string>
+	<string id="shelter_kardan_tools_4">
+		<text>I'll see what happened to him.</text>
+	</string>
+	<string id="shelter_kardan_pda_0">
+		<text>I found Lom. In the test centre, dead. Here's his PDA.</text>
+	</string>
+	<string id="shelter_kardan_pda_1">
+		<text>Ah... It was me who sent him there, with my tongue. Thanks for bringing it, at least now I know. Here, take this "Flash". It's no use to me, and you'll need it to start your generator.</text>
+	</string>
+	<string id="shelter_kardan_pda_2">
+		<text>Thank you, Kardan.</text>
+	</string>
+	<string id="st_shelter_zombie_nosorog_name">
+		<text>Foreman</text>
+	</string>
+	<string id="st_shelter_zombie_seva_name">
+		<text>Chemist</text>
+	</string>
+	<string id="st_shelter_flash_name">
+		<text>Flash drive</text>
+	</string>
+	<string id="st_shelter_flash_descr">
+		<text>The bunker group's flash drive: the map of the rooms, the wiring and the rest. The laptop needs it.</text>
+	</string>
+	<string id="st_shelter_laptop_no_flash">
+		<text>It needs the flash drive: without it the laptop has neither the map of the rooms nor the wiring.</text>
+	</string>
+	<string id="st_shelter_laptop_flash">
+		<text>The flash drive is in the laptop.</text>
+	</string>
+	<string id="st_shelter_laptop_flash_no_power">
+		<text>The flash drive is in. No power: the generator isn't running.</text>
+	</string>
+	<string id="st_shelter_laptop_tip_flash">
+		<text>Insert the flash drive</text>
+	</string>
+	<string id="st_shelter_laptop_tip_no_flash">
+		<text>Laptop: needs the flash drive</text>
+	</string>
+	<string id="st_shelter_laptop_tip_no_power">
+		<text>Laptop: no power</text>
+	</string>
+	<string id="st_shelter_laptop_tip_open">
+		<text>Open the laptop</text>
+	</string>
+	<string id="st_shelter_restore_title">
+		<text>Shelter</text>
+	</string>
+	<string id="st_shelter_goal_laptop">
+		<text>Laptop</text>
+	</string>
+	<string id="st_shelter_goal_laptop_1">
+		<text>Ask Sidorovich about the laptop the group ordered.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_2">
+		<text>Get the artefact container for Sidorovich from professor Sakharov at Yantar.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_3">
+		<text>Bring the container to Sidorovich.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_4">
+		<text>Set the laptop on the desk in the small room by the passage.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_5">
+		<text>Put the flash drive into the laptop.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_6">
+		<text>The laptop is ready.</text>
+	</string>
+	<string id="st_shelter_goal_tools">
+		<text>Generator</text>
+	</string>
+	<string id="st_shelter_goal_tools_1">
+		<text>Ask Kardan at Yanov about the tools.</text>
+	</string>
+	<string id="st_shelter_goal_tools_2">
+		<text>Find Lom: he went to the test centre by the Iron Forest on Zaton. The way down is by the crashed helicopter; Kardan's card opens the door.</text>
+	</string>
+	<string id="st_shelter_goal_tools_3">
+		<text>Repair the generator with Kardan's tools.</text>
+	</string>
+	<string id="st_shelter_goal_tools_4">
+		<text>Start the generator: put an electric artefact into it.</text>
+	</string>
+	<string id="st_shelter_goal_tools_5">
+		<text>The generator is running.</text>
+	</string>
+
+	<!-- the rubble -->
+	<string id="st_shelter_dig_tip">
+		<text>Clear the rubble with a shovel (%d%%)</text>
+	</string>
+	<string id="st_shelter_dig_need_shovel">
+		<text>A shovel is needed</text>
+	</string>
+	<string id="st_shelter_dig_no_shovel">
+		<text>A shovel is needed. Cleared %d%%</text>
+	</string>
+	<string id="st_shelter_dig_progress">
+		<text>Clearing the rubble: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_broke">
+		<text>The shovel broke. Clearing the rubble: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_stopped">
+		<text>Clearing the rubble stopped: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_done">
+		<text>The rubble is cleared, the way is open</text>
+	</string>
+</string_table>

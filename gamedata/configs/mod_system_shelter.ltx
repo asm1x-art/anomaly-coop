@@ -1,0 +1,175 @@
+; The group's shelter (docs/coop/shelter.md, scripts/shelter.script).
+
+; the questline's dialogs with Sidorovich, Sakharov, Kardan (put on them by modxml_shelter.script)
+![dialogs]
+>files = dialogs_shelter
+
+; the first visit's zombies, the group that found the shelter: zombified, in their own suits (character_desc_shelter.xml)
+![profiles]
+>files = npc_profile_shelter
+>specific_characters_files = character_desc_shelter
+
+[shelter_zombie_nosorog]:stalker_zombied
+character_profile = shelter_zombie_nosorog
+spec_rank         = novice
+community         = zombied
+
+[shelter_zombie_seva]:stalker_zombied
+character_profile = shelter_zombie_seva
+spec_rank         = novice
+community         = zombied
+
+; The generator: says what it needs till Kardan's tools are used on it, then opens its box (below) to take an electric
+; artefact that powers the shelter's lamps. The root bone is fixed, as in vanilla [disel_generator]; motions "idle"
+; (stopped) and "work" (running).
+[shelter_generator]:physic_object
+visual            = dynamics\el_tehnika\disel_generator.ogf
+startup_animation = idle
+fixed_bones       = link
+script_binding    = shelter.init_generator
+
+; what the generator holds: a box hidden in its body, opened from the generator's use (inventory boxes have no
+; physics, so the generator itself can't be one: the player would walk through it)
+[shelter_generator_box]:inventory_box
+
+; the shelter's stash: a crate under the desk in the cabin next to the laptop's (an inventory box has no physics:
+; nobody walks under a desk)
+[shelter_stash]:inventory_box
+visual          = dynamics\box\box_wood_02.ogf
+
+; the laptop on the desk in the room by the passage; works while the generator runs
+[shelter_laptop]:physic_object
+visual          = dynamics\efp_props\prop_laptop.ogf
+script_binding  = shelter.init_laptop
+
+; the questline's things: none can be sold or dropped
+
+; on the zombie in the Nosorog suit: read, it gives the questline (the task shelter_restore)
+[shelter_note]:tch_quest
+visual              = dynamics\equipments\quest\notes_writing_book_2.ogf
+inv_name            = st_shelter_note_name
+inv_name_short      = st_shelter_note_name
+description         = st_shelter_note_descr
+inv_grid_x          = 6
+inv_grid_y          = 14
+inv_weight          = 0.02
+quest_item          = true
+use1_functor        = shelter.note_menu
+use1_action_functor = shelter.note_read
+
+; also on that zombie: the map of the rooms and the wiring, for the laptop (it works only with it)
+[shelter_flash]:tch_quest
+visual          = dynamics\devices\dev_flash_2\dev_flash_2.ogf
+inv_name        = st_shelter_flash_name
+inv_name_short  = st_shelter_flash_name
+description     = st_shelter_flash_descr
+inv_grid_x      = 9
+inv_grid_y      = 3
+inv_weight      = 0.05
+quest_item      = true
+
+; Sakharov's samples for Sidorovich
+[shelter_af_container]:tch_quest
+visual          = dynamics\equipments\lead_box_closed.ogf
+inv_name        = st_shelter_container_name
+inv_name_short  = st_shelter_container_name
+description     = st_shelter_container_descr
+inv_grid_x      = 1
+inv_grid_y      = 27
+inv_grid_height = 2
+inv_weight      = 30
+quest_item      = true
+
+; Sidorovich's for the container; set on the desk in the shelter it becomes [shelter_laptop]
+[shelter_laptop_item]:tch_quest
+visual          = dynamics\equipments\quest\notebook.ogf
+inv_name        = st_shelter_laptop_name
+inv_name_short  = st_shelter_laptop_name
+description     = st_shelter_laptop_descr
+inv_grid_x      = 6
+inv_grid_y      = 11
+inv_grid_width  = 2
+inv_grid_height = 2
+inv_weight      = 3.5
+quest_item      = true
+
+; on the missing stalker in the test centre under Zaton's Iron Forest, with Kardan's tools
+[shelter_stalker_pda]:tch_quest
+visual          = dynamics\devices\dev_pda\dev_pda.ogf
+inv_name        = st_shelter_pda_name
+inv_name_short  = st_shelter_pda_name
+description     = st_shelter_pda_descr
+inv_grid_x      = 4
+inv_grid_y      = 27
+quest_item      = true
+
+; Kardan's tool kit the missing stalker took to repair the generator; used up by the repair
+[shelter_generator_tools]:tch_quest
+visual          = dynamics\equipments\quest\box_toolkit_2.ogf
+inv_name        = st_shelter_generator_tools_name
+inv_name_short  = st_shelter_generator_tools_name
+description     = st_shelter_generator_tools_descr
+inv_grid_x      = 2
+inv_grid_y      = 54
+inv_grid_width  = 2
+inv_grid_height = 1
+inv_weight      = 2.56
+quest_item      = true
+
+; Kardan's spare card to the test centre (the cut CoP quest zat_a23): its door lock asks for exactly this item. Vanilla
+; derives it from a flash drive (dev_flash_2): PDA class, which can't spawn without a hud section, and the PDA slot,
+; where the engine takes whatever lies for a PDA. A plain quest item instead.
+![zat_a23_access_card]:!dev_flash_2,tch_quest
+quest_item      = true
+
+; The rubble that closes the bunker's passages (shelter.script, MOUNDS): models fitted to each opening
+; (tools/shelter/mound.py). Frozen once spawned, their bones left free: a shell with every bone fixed has no body to
+; update and crashes the engine. shelter_zone: dug out with shovels, it opens that zone to the cleaning
+; (scripts\shelter\cleaning.ltx); shelter_dig: how many full shovels it takes.
+[shelter_mound_2]:physic_object
+visual          = dynamics\shelter\mound_2b.ogf
+script_binding  = shelter.init_mound
+
+[shelter_mound_3]:physic_object
+visual          = dynamics\shelter\mound_3a.ogf
+script_binding  = shelter.init_mound
+shelter_zone    = corridor
+shelter_dig     = 3
+
+[shelter_mound_4]:physic_object
+visual          = dynamics\shelter\mound_4a.ogf
+script_binding  = shelter.init_mound
+
+; the north corridor's side doorways, in pairs face to face
+[shelter_mound_8]:physic_object
+visual          = dynamics\shelter\mound_8a.ogf
+script_binding  = shelter.init_mound
+shelter_zone    = room_8
+shelter_dig     = 2
+
+[shelter_mound_9]:shelter_mound_8
+visual          = dynamics\shelter\mound_9a.ogf
+shelter_zone    = room_9
+
+[shelter_mound_10]:shelter_mound_8
+visual          = dynamics\shelter\mound_10a.ogf
+shelter_zone    = room_10
+
+[shelter_mound_11]:shelter_mound_8
+visual          = dynamics\shelter\mound_11a.ogf
+shelter_zone    = room_11
+
+[shelter_mound_12]:shelter_mound_8
+visual          = dynamics\shelter\mound_12a.ogf
+shelter_zone    = room_12
+
+[shelter_mound_13]:shelter_mound_8
+visual          = dynamics\shelter\mound_13a.ogf
+shelter_zone    = room_13
+
+; shovels wear out digging: their condition shows and is kept
+![shovel_old]
+use_condition   = true
+
+![shovel_mili]
+use_condition   = true

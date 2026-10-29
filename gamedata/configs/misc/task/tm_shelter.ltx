@@ -1,0 +1,31 @@
+; The shelter's questline (scripts/shelter.script, docs/coop/shelter.md): two tasks on their own, given by the note on
+; the zombie in the shelter and listed in the PDA together under "Убежище" (the engine asks _G.CGameTask__group).
+; Each one's stage, description and target come from the game's state (the shelter_task functors), so they follow
+; along whichever way it gets there.
+
+; Sidorovich's laptop: ask him, Sakharov's container for it, set it on the desk in the shelter, the flash drive in it
+[shelter_laptop]
+prior           = 120
+storyline       = true
+title_functor   = shelter_task
+descr_functor   = shelter_task
+target_functor  = shelter_task
+status_functor  = shelter_task
+
+; the generator: ask Kardan about his tools, find the stalker who took them, repair it, power it
+[shelter_tools]
+prior           = 119
+storyline       = true
+title_functor   = shelter_task
+descr_functor   = shelter_task
+target_functor  = shelter_task
+status_functor  = shelter_task
+
+; the questline's one task in earlier saves: on load it gives way to the two above
+[shelter_restore]
+prior           = 120
+storyline       = true
+title_functor   = shelter_task
+descr_functor   = shelter_task
+target_functor  = shelter_task
+status_functor  = shelter_task

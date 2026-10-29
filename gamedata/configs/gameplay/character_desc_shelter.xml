@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding="windows-1251"?>
+<xml>
+	<!-- The shelter's first occupants (scripts/shelter.script): two zombified stalkers of the group that found it, in
+	     their own suits, by their names. Fields as gameplay\profiles\character_desc_zombied_1.xml, but a class of
+	     their own, so random zombies elsewhere don't get these profiles. Their models are the suits' own with the
+	     zombies' animations added (tools/shelter/zombie_meshes.py): without them a zombie moves like a live stalker. -->
+	<specific_character id="shelter_zombie_nosorog" team_default="1">
+		<name>st_shelter_zombie_nosorog_name</name>
+		<icon>ui_inGame2_Zombied_1</icon>
+		<bio></bio>
+		<class>shelter_zombie_nosorog</class>
+		<community>zombied</community>
+		<crouch_type>0</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="500" max="1500" infinitive="0"/>
+		<rank min="500" max="3000" />
+		<reputation min="-1500" max="1500" />
+		<snd_config>characters_voice\human\zombied_1\</snd_config>
+		<visual>actors\stalker_zombak\shelter_zombied_nosorog</visual>
+		<supplies>
+#include "gameplay\loadouts\zombied_base.ltx"
+#include "gameplay\loadouts\zombied_tier_1.ltx"
+[spawn] \n
+#include "gameplay\supplies\character_food.xml"
+#include "gameplay\supplies\character_medical.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+
+	<specific_character id="shelter_zombie_seva" team_default="1">
+		<name>st_shelter_zombie_seva_name</name>
+		<icon>ui_inGame2_Zombied_1</icon>
+		<bio></bio>
+		<class>shelter_zombie_seva</class>
+		<community>zombied</community>
+		<crouch_type>0</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="500" max="1500" infinitive="0"/>
+		<rank min="500" max="3000" />
+		<reputation min="-1500" max="1500" />
+		<snd_config>characters_voice\human\zombied_1\</snd_config>
+		<visual>actors\stalker_zombak\shelter_zombied_seva</visual>
+		<supplies>
+#include "gameplay\loadouts\zombied_base.ltx"
+#include "gameplay\loadouts\zombied_tier_1.ltx"
+[spawn] \n
+#include "gameplay\supplies\character_food.xml"
+#include "gameplay\supplies\character_medical.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+</xml>

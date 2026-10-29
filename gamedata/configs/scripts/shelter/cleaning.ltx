@@ -1,0 +1,37 @@
+; The shelter's cleaning (scripts\shelter.script): what the laptop's "clean up" takes out of bunker_a1, by zone.
+; visuals: indices of its static visuals ("level" file); triangles: their collision triangles in level.cform;
+; items: what the cleaning puts into the stash for what it takes away (skipped where the section is missing).
+; Made from the level files by a script (tools\shelter\cleaning.py); the indices only fit these files.
+
+; the lower hall, the water hall: open from the first visit; the doors lying on the floor
+[start]
+visuals = 339, 361, 274, 70, 544, 545
+triangles = 36801-37741,81003-81004,81013-81014,83478-84342,88138-88229,181029-181358
+
+; the north corridor and its two southern side rooms (open to it), behind point 3's mound; the overturned tables there go to the stash
+[corridor]
+visuals = 57, 200, 501
+triangles = 32416-32489,149589-149738,150090-150239,152140-154103
+items = prop_table_1, prop_table_1
+
+; the north-west side room
+[room_8]
+visuals = 218
+triangles = 33555-33625
+
+; the west side room in the middle; its overturned table goes to the stash
+[room_10]
+visuals = 237, 500
+triangles = 35271-35273,149439-149588
+items = prop_table_1
+
+; the east side room in the middle
+[room_11]
+visuals = 273
+triangles = 36727-36800
+
+; the south-west side room; its long table on its edge goes to the stash as two
+[room_12]
+visuals = 266, 496, 497, 498
+triangles = 36594-36667,148668-148852,148854-148985,148987-149174,149176-149198
+items = prop_table_1, prop_table_1

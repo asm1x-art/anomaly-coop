@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<!-- the generator -->
+	<string id="st_shelter_generator_broken">
+		<text>Необходим ремонт</text>
+	</string>
+	<string id="st_shelter_generator_repair">
+		<text>Починить генератор</text>
+	</string>
+	<string id="st_shelter_generator_open">
+		<text>Генератор</text>
+	</string>
+	<string id="st_shelter_generator_repaired">
+		<text>Генератор починен. Для запуска нужен артефакт электрической природы.</text>
+	</string>
+	<string id="st_shelter_generator_on">
+		<text>Генератор запущен: в убежище есть свет.</text>
+	</string>
+	<string id="st_shelter_generator_off">
+		<text>Генератор остановлен.</text>
+	</string>
+
+	<!-- things -->
+	<string id="st_shelter_generator_tools_name">
+		<text>Инструменты Кардана</text>
+	</string>
+	<string id="st_shelter_generator_tools_descr">
+		<text>Набор инструментов, который Кардан одолжил для ремонта генератора в убежище.</text>
+	</string>
+	<string id="st_shelter_note_name">
+		<text>Записка</text>
+	</string>
+	<string id="st_shelter_note_descr">
+		<text>Помятый листок из блокнота, исписанный торопливым почерком.</text>
+	</string>
+	<string id="st_shelter_note_text">
+		<text>Кто найдёт — прочтите.\n\nБункер мы нашли что надо: стены толстые, места на всю группу. Только работы тут по горло — завалы разбирать, смотреть, что дальше по коридорам.\n\nНоутбук заказали у Сидоровича, заплатили вперёд — надо сходить забрать. Флешку к нему держу при себе: на ней карта помещений, схемы проводки и прочее. Без неё мы тут как слепые котята.\n\nСвет дать нечем: генератор есть, но мёртвый. Лом пошёл к Кардану на «Янов» — у того нашёлся нужный комплект инструментов, обещал одолжить по старой дружбе.\n\nПересидим пару дней. Голова раскалывается вторые сутки, и снится всякое... Наверное, просто устали.</text>
+	</string>
+	<string id="st_shelter_read">
+		<text>Прочитать</text>
+	</string>
+	<string id="st_shelter_close">
+		<text>Закрыть</text>
+	</string>
+	<string id="st_zat_a23_access_card">
+		<text>Карточка доступа в испытательный цех</text>
+	</string>
+	<string id="st_zat_a23_access_card_descr">
+		<text>Запасная карточка Кардана: открывает вход в испытательный цех у Железного леса на Затоне.</text>
+	</string>
+	<string id="st_shelter_container_name">
+		<text>Контейнер с артефактами</text>
+	</string>
+	<string id="st_shelter_container_descr">
+		<text>Свинцовый контейнер от профессора Сахарова для Сидоровича. Тяжёлый — около тридцати килограммов.</text>
+	</string>
+	<string id="st_shelter_laptop_name">
+		<text>Ноутбук</text>
+	</string>
+	<string id="st_shelter_laptop_descr">
+		<text>Ноутбук с флешкой: на ней карта помещений бункера и схемы электропроводки. Работает только от сети.</text>
+	</string>
+	<string id="st_shelter_lom_name">
+		<text>Лом</text>
+	</string>
+	<string id="st_shelter_pda_name">
+		<text>КПК Лома</text>
+	</string>
+	<string id="st_shelter_pda_descr">
+		<text>КПК сталкера по прозвищу Лом. Последняя запись: «Цех. Кардан не врал...»</text>
+	</string>
+
+	<!-- the laptop -->
+	<string id="st_shelter_laptop_installed">
+		<text>Ноутбук установлен на стол.</text>
+	</string>
+	<string id="st_shelter_laptop_no_power">
+		<text>Нет питания: генератор не работает.</text>
+	</string>
+	<string id="st_shelter_desktop">
+		<text>Рабочий стол</text>
+	</string>
+	<string id="st_shelter_clean">
+		<text>Убраться в убежище</text>
+	</string>
+	<string id="st_shelter_clean_hint">
+		<text>Разобрать кучи земли и щебня, вынести трупы в доступных помещениях. Займёт около суток.</text>
+	</string>
+	<string id="st_shelter_clean_nothing">
+		<text>В доступных помещениях уже чисто.</text>
+	</string>
+	<string id="st_shelter_clean_hungry">
+		<text>Работы много: сначала надо подкрепиться — поесть и попить.</text>
+	</string>
+	<string id="st_shelter_clean_done">
+		<text>Уборка заняла сутки. В убежище чисто.</text>
+	</string>
+
+	<!-- the tasks -->
+
+	<!-- the dialogs -->
+	<string id="shelter_sid_laptop_0">
+		<text>Тебе группа сталкеров ноутбук заказывала. Те, что в бункере осели.</text>
+	</string>
+	<string id="shelter_sid_laptop_1">
+		<text>Было дело. Заказали, денежки отдали — а забирать никто не пришёл. Я уж думал, порешили их где-нибудь.</text>
+	</string>
+	<string id="shelter_sid_laptop_2">
+		<text>Хуже. Зомбированные они. Бродят по своему бункеру.</text>
+	</string>
+	<string id="shelter_sid_laptop_3">
+		<text>Тьфу ты... Жалко ребят, хорошие были клиенты: платили вперёд и не торговались. Ну, ноутбук-то я тебе отдам — только не за спасибо. Мне от Сахарова контейнер с артефактами должны передать, а ноги у меня не казённые. Сходишь на Янтарь, принесёшь — получишь ноутбук.</text>
+	</string>
+	<string id="shelter_sid_laptop_4">
+		<text>Договорились.</text>
+	</string>
+	<string id="shelter_sid_container_0">
+		<text>Принёс твой контейнер от Сахарова.</text>
+	</string>
+	<string id="shelter_sid_container_1">
+		<text>Вижу, вижу. Что, спина ноет? Тридцать кило — это тебе не водку таскать. Держи ноутбук. И учти: заряжать его я не нанимался. Электричество сам ищи — хоть от генератора, хоть от аномалии.</text>
+	</string>
+	<string id="shelter_sid_container_2">
+		<text>Спасибо и на этом.</text>
+	</string>
+	<string id="shelter_sakharov_0">
+		<text>Профессор, я от Сидоровича. Говорит, у вас для него контейнер.</text>
+	</string>
+	<string id="shelter_sakharov_1">
+		<text>А, контейнер... Да-да, образцы для нашего общего знакомого. Только предупреждаю, молодой человек: контейнер свинцовый, весит около тридцати килограммов. Не надорвитесь.</text>
+	</string>
+	<string id="shelter_sakharov_2">
+		<text>Донесу как-нибудь.</text>
+	</string>
+	<string id="shelter_kardan_tools_0">
+		<text>Кардан, к тебе сталкер заходил? Из группы, что в бункере осела. За инструментами для генератора.</text>
+	</string>
+	<string id="shelter_kardan_tools_1">
+		<text>Лом-то? Заходил... Инструменты я ему дал, хорошие, ещё с тех времён. Ну и посидели мы, выпили, как водится. А я спьяну язык распустил: про испытательный цех на Затоне, где работал, про «Изделие 62»... Он и загорелся. Сказал — схожу, гляну одним глазком. Пьяный, на ночь глядя.</text>
+	</string>
+	<string id="shelter_kardan_tools_2">
+		<text>И что потом?</text>
+	</string>
+	<string id="shelter_kardan_tools_3">
+		<text>А ничего. Ни слуху ни духу. Цех тот у Железного леса, вход под землю возле упавшего вертолёта. Карточку доступа он у меня выпросил — а вторую я сберёг, держи. Если он туда полез, дело плохо. Мне бы знать, что с ним стало... Сам-то я туда уже не ходок.</text>
+	</string>
+	<string id="shelter_kardan_tools_4">
+		<text>Посмотрю, что с ним.</text>
+	</string>
+	<string id="shelter_kardan_pda_0">
+		<text>Нашёл я Лома. В испытательном цеху, мёртвый. Вот его КПК.</text>
+	</string>
+	<string id="shelter_kardan_pda_1">
+		<text>Эх... Это ведь я его туда отправил, своим языком. Спасибо, что принёс — хоть знаю теперь. На вот, возьми «Вспышку». Мне она ни к чему, а тебе генератор запустить пригодится.</text>
+	</string>
+	<string id="shelter_kardan_pda_2">
+		<text>Спасибо, Кардан.</text>
+	</string>
+	<string id="st_shelter_zombie_nosorog_name">
+		<text>Бригадир</text>
+	</string>
+	<string id="st_shelter_zombie_seva_name">
+		<text>Химик</text>
+	</string>
+	<string id="st_shelter_flash_name">
+		<text>Флешка</text>
+	</string>
+	<string id="st_shelter_flash_descr">
+		<text>Флешка группы из бункера: карта помещений, схемы электропроводки и прочее. Нужна для ноутбука.</text>
+	</string>
+	<string id="st_shelter_laptop_no_flash">
+		<text>Нужна флешка: без неё в ноутбуке ни карты помещений, ни схем проводки.</text>
+	</string>
+	<string id="st_shelter_laptop_flash">
+		<text>Флешка вставлена в ноутбук.</text>
+	</string>
+	<string id="st_shelter_laptop_flash_no_power">
+		<text>Флешка вставлена. Нет питания: генератор не работает.</text>
+	</string>
+	<string id="st_shelter_laptop_tip_flash">
+		<text>Вставить флешку</text>
+	</string>
+	<string id="st_shelter_laptop_tip_no_flash">
+		<text>Ноутбук: нужна флешка</text>
+	</string>
+	<string id="st_shelter_laptop_tip_no_power">
+		<text>Ноутбук: нет питания</text>
+	</string>
+	<string id="st_shelter_laptop_tip_open">
+		<text>Открыть ноутбук</text>
+	</string>
+	<string id="st_shelter_restore_title">
+		<text>Убежище</text>
+	</string>
+	<string id="st_shelter_goal_laptop">
+		<text>Ноутбук</text>
+	</string>
+	<string id="st_shelter_goal_laptop_1">
+		<text>Узнать у Сидоровича про заказанный ноутбук.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_2">
+		<text>Забрать у профессора Сахарова на Янтаре контейнер с артефактами для Сидоровича.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_3">
+		<text>Отнести контейнер Сидоровичу.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_4">
+		<text>Поставить ноутбук на стол в комнатке у прохода.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_5">
+		<text>Вставить в ноутбук флешку.</text>
+	</string>
+	<string id="st_shelter_goal_laptop_6">
+		<text>Ноутбук готов к работе.</text>
+	</string>
+	<string id="st_shelter_goal_tools">
+		<text>Генератор</text>
+	</string>
+	<string id="st_shelter_goal_tools_1">
+		<text>Расспросить Кардана на «Янове» про инструменты.</text>
+	</string>
+	<string id="st_shelter_goal_tools_2">
+		<text>Найти Лома: он ушёл в испытательный цех у Железного леса на Затоне. Вход под землю — у упавшего вертолёта, дверь открывается карточкой Кардана.</text>
+	</string>
+	<string id="st_shelter_goal_tools_3">
+		<text>Починить генератор инструментами Кардана.</text>
+	</string>
+	<string id="st_shelter_goal_tools_4">
+		<text>Запустить генератор: положить в него электрический артефакт.</text>
+	</string>
+	<string id="st_shelter_goal_tools_5">
+		<text>Генератор работает.</text>
+	</string>
+
+	<!-- the rubble -->
+	<string id="st_shelter_dig_tip">
+		<text>Разобрать завал лопатой (%d%%)</text>
+	</string>
+	<string id="st_shelter_dig_need_shovel">
+		<text>Нужна лопата</text>
+	</string>
+	<string id="st_shelter_dig_no_shovel">
+		<text>Нужна лопата. Разобрано %d%%</text>
+	</string>
+	<string id="st_shelter_dig_progress">
+		<text>Разбор завала: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_broke">
+		<text>Лопата сломалась. Разбор завала: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_stopped">
+		<text>Разбор завала прерван: %d%%</text>
+	</string>
+	<string id="st_shelter_dig_done">
+		<text>Завал разобран, проход открыт</text>
+	</string>
+</string_table>

@@ -1,0 +1,1012 @@
+-- The group's shelter (docs/coop/shelter.md): bunker_a1's middle floor, and its questline "Восстановление".
+--  * The first visit finds it dark and taken: a controller and two zombified stalkers, one with the note that gives
+--    the two tasks (configs\misc\task\tm_shelter.ltx).
+--  * The lamps stay dark until the generator runs: repaired with Kardan's tools (the stalker who took them lies in the
+--    test centre under Zaton's Iron Forest, where "Item 62" was made), then powered by an electric artefact put into
+--    its box (a hidden inventory box the generator opens).
+--  * Sidorovich gives the laptop for Sakharov's container (gameplay\dialogs_shelter.xml); set on the desk it opens a
+--    desktop while there is power. Its "clean up" takes the heaps of earth out of the open rooms (static geometry,
+--    level.hide_static_visual / make_static_passable) and the bodies, and takes a day.
+--  * Rubble closes its passages: generated mounds (tools/shelter/mound.py). Some are dug out with shovels, each
+--    opening its rooms to the cleaning; there the level's overturned tables go to the stash as furniture.
+local LEVEL = "bunker_a1"
+local GENERATOR = {
+	section = "shelter_generator",
+	box = "shelter_generator_box",
+	pos = vector():set(0.6, 2.95, -15.6), -- point 6: the lower hall, its back to the south wall
+	look = vector():set(1, 0, 0), -- its length along the wall
+	ai = vector():set(0.41, 2.95, -15.43),
+}
+local LAMPS = {
+	centre = vector():set(3, 4, 0), radius = 45, -- every hanging lamp of the bunker's middle and top floors
+	steady = [[light\light_galogen_idle]], -- halogen lamps burn steady on power, most blink (light_galogen_br_01) otherwise
+	template = "light_galogen_1_glass_0012", -- a side room's ceiling lamp, copied along the north corridor (it has none):
+	corridor = { x = 2.34, y = 6.51, z = { 3.5, 10, 16.5, 23, 29.5 }, floor = 3.38 },
+}
+-- the first visit's occupants: aggressive to players as their kinds are
+local OCCUPANTS = {
+	{ section = "shelter_zombie_nosorog", pos = vector():set(2.0, 2.95, -10.0), -- the lower hall: the note, the flash drive
+		items = { "shelter_note", "shelter_flash" } },
+	{ section = "shelter_zombie_seva", pos = vector():set(-3.89, 2.95, -1.67) }, -- the passage by the laptop's room
+	{ section = "m_controller_normal", pos = vector():set(16.56, 1.32, -10.94) }, -- the water hall, point 5
+}
+local LAPTOP = {
+	pos = vector():set(-1.55, 3.87, -4.95), -- the desk along the south wall of the small room by the passage
+	look = vector():set(-1, 0, 0), -- the model's screen faces its +x: here north, to the room's door
+	ai = vector():set(-1.55, 2.95, -3.9),
+	near = 2.5, -- carried this close to the desk, the laptop is set on it
+	mark = "space_restrictor", -- a shapeless object on the desk for the task to point at till the laptop is set there
+}
+local STASH = { -- a crate under the desk in the cabin east of the laptop's (desk x 5.57..7.27, z -5.53..-4.62; its
+	-- drawers on the east half, the crate in the knee space, its length along the desk's depth)
+	section = "shelter_stash",
+	pos = vector():set(6.0, 2.95, -5.03),
+	yaw = math.pi / 2,
+	ai = vector():set(6.4, 2.95, -3.9),
+}
+local LOM = { -- the stalker who took Kardan's tools, dead in the test centre under Zaton's Iron Forest (the cut CoP
+	-- quest zat_a23, "Item 62"; its door opens with zat_a23_access_card, Kardan gives his spare one)
+	level = "zaton",
+	section = "sim_default_stalker_2",
+	pos = vector():set(-427.24, 25.16, -383.62), -- where the docs were read (zat_a23_actor_animpoint)
+	smart = "zat_a23_smart_terrain", -- the task points here till he lies there
+	card = "zat_a23_access_card",
+}
+local CLEAN = {
+	ini = "scripts\\shelter\\cleaning.ltx", -- each zone's heaps: static visuals, collision triangles
+	zones = { -- the rooms' boxes (x0, x1, y0, y1, z0, z1) for the bodies; each but start opens when its mound is dug out
+		start = { { -8, 10.5, 0.5, 7.5, -30, -0.2 }, { 9.5, 25.5, 0, 7, -29, -6 } },
+		corridor = { { 0.8, 3.9, 3, 7, -0.6, 32 }, { -7.5, 0.8, 3, 7, 3.5, 11 }, { 3.9, 11.5, 3, 7, 3.5, 11 } }, -- with the
+		-- two southern side rooms, open to it
+		room_8 = { { -7.5, 0.8, 3, 7, 25.5, 32.6 } }, -- the side rooms behind the doorway mounds
+		room_9 = { { 3.9, 11.5, 3, 7, 25.5, 32.6 } },
+		room_10 = { { -7.5, 0.8, 3, 7, 18.3, 25.5 } },
+		room_11 = { { 3.9, 11.5, 3, 7, 18.3, 25.5 } },
+		room_12 = { { -7.5, 0.8, 3, 7, 11, 18.3 } },
+		room_13 = { { 3.9, 11.5, 3, 7, 11, 18.3 } },
+	},
+	hours = 24,
+	satiety = 0.6, -- below it the player is too hungry to start
+}
+local TOOLS = "shelter_generator_tools"
+local CONTAINER = "shelter_af_container"
+local LAPTOP_ITEM = "shelter_laptop_item"
+local PDA = "shelter_stalker_pda"
+local FLASH = "shelter_flash" -- the map of the rooms and the wiring: the laptop works only with it
+local KARDAN_REWARD = "af_electra_flash"
+local SOUND_START = [[ambient\pripyat\pri_b306_generator_start]]
+local SOUND_WORK = [[ambient\pripyat\pri_b306_generator_work]]
+
+local electric = nil -- artefacts that power it: [af_class_electro], [af_class_electro_musor] (items\settings\artefacts.ltx)
+local hum = nil
+local dark = false -- no power: the lamps stay off, flickering (psy mutants, emissions) turns them on otherwise
+local power = false -- the generator runs (for the laptop)
+local next_check = 0
+GUI = nil -- the shelter's window open now (the note, the laptop's desktop)
+
+local function msg(id)
+	actor_menu.set_msg(1, game.translate_string(id), 6)
+end
+
+local function is_electric(section)
+	if not electric then
+		electric = {}
+		local ini = ini_file("items\\settings\\artefacts.ltx")
+		for _, list in ipairs({ "af_class_electro", "af_class_electro_musor" }) do
+			for i = 0, ini:section_exist(list) and ini:line_count(list) - 1 or -1 do
+				local _, name = ini:r_line(list, i, "", "")
+				electric[name] = true
+			end
+		end
+	end
+	return electric[section] == true
+end
+
+local function repaired()
+	return load_var(db.actor, "shelter_generator_repaired", false)
+end
+
+local function generator_box()
+	local id = load_var(db.actor, "shelter_generator_box_id", nil)
+	return id and level.object_by_id(id)
+end
+
+local function powered()
+	local box = generator_box()
+	local found = false
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			found = is_electric(item:section())
+			return found
+		end, box)
+	end
+	return found
+end
+
+-- off without power; with it on and steady, but left to flicker when Anomaly makes them (emissions, psy mutants)
+local function set_lamps(on)
+	level.iterate_nearest(LAMPS.centre, LAMPS.radius, function(obj)
+		local lamp = obj:clsid() == clsid.hlamp_s and obj:get_hanging_lamp()
+		if not lamp then
+			return
+		end
+		if not on then
+			if lamp:is_on() then
+				lamp:reset_color_animator()
+				lamp:turn_off()
+			end
+		elseif not lamp:is_flickering() then
+			if not lamp:is_on() then
+				lamp:turn_on()
+			end
+			if string.find(obj:get_visual_name() or "", "galogen", 1, true) then
+				lamp:set_color_animator(LAMPS.steady, false, 0, 0, 0)
+			end
+		end
+	end)
+end
+
+-- a hanging lamp's state; utils_stpk.get_lamp_data misreads lamps whose physics saved their bones (flSavedData), as all
+-- the level's lamps have: a 36-byte header and 8 bytes a bone sit before the lamp's own properties
+local function lamp_data(se)
+	local p = net_packet()
+	p:w_begin(0)
+	se:STATE_Write(p)
+	p:r_seek(2)
+	local t = {}
+	utils_stpk.parse_cse_alife_object_properties_packet(t, p)
+	utils_stpk.parse_cse_visual_properties_packet(t, p)
+	utils_stpk.parse_cse_ph_skeleton_properties_packet(t, p)
+	if bit_and(t.skeleton_flags, 4) ~= 0 then
+		for _ = 1, 34 do
+			p:r_u8()
+		end
+		for _ = 1, p:r_u16() * 8 do
+			p:r_u8()
+		end
+	end
+	return utils_stpk.parse_cse_alife_object_hanging_lamp_properties_packet(t, p)
+end
+
+local LAMP_KEYS = { "visual_name", "visual_flags", "skeleton_name", "main_color", "main_brightness", "main_range",
+	"light_flags", "startup_animation", "lamp_fixed_bones", "health", "main_virtual_size", "ambient_radius", "ambient_power",
+	"ambient_texture", "main_texture", "main_bone", "main_cone_angle", "glow_texture", "glow_radius", "ambient_bone",
+	"volumetric_quality", "volumetric_intensity", "volumetric_distance" }
+
+-- the north corridor's lamps, copies of a side room's one
+local function spawn_corridor_lamps()
+	local template
+	level.iterate_nearest(LAMPS.centre, LAMPS.radius, function(obj)
+		if obj:name() == LAMPS.template then
+			template = alife_object(obj:id())
+			return true
+		end
+	end)
+	if not template then
+		return
+	end
+	local t = lamp_data(template)
+	local c = LAMPS.corridor
+	for _, z in ipairs(c.z) do
+		local se = alife_create("lights_hanging_lamp", vector():set(c.x, c.y, z), level.vertex_id(vector():set(c.x, c.floor, z)),
+			db.actor:game_vertex_id())
+		if se then
+			se.angle = vector():set(template.angle)
+			local d = utils_stpk.get_lamp_data(se) -- a new lamp has no saved bones
+			for _, k in ipairs(LAMP_KEYS) do
+				d[k] = t[k]
+			end
+			d.main_color_animator = LAMPS.steady
+			utils_stpk.set_lamp_data(d, se)
+		end
+	end
+	save_var(db.actor, "shelter_corridor_lamps", true)
+end
+
+local function set_sound(gen, on)
+	if on and not hum then
+		sound_object(SOUND_START):play_at_pos(gen, gen:position(), 0, sound_object.s3d)
+		hum = sound_object(SOUND_WORK)
+		hum:play_at_pos(gen, gen:position(), 3, sound_object.s3d + sound_object.looped)
+	elseif not on and hum then
+		hum:stop()
+		hum = nil
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The generator: its tip says what it needs; use repairs it (with the tools) or opens its box; runs while the box
+-- holds an electric artefact
+
+class "generator_binder" (object_binder)
+function generator_binder:__init(obj) super(obj)
+	self.on = nil
+	self.tip = nil
+	self.next = 0
+end
+function generator_binder:update(delta)
+	object_binder.update(self, delta)
+	local now = time_global()
+	if now < self.next or not db.actor then
+		return
+	end
+	self.next = now + 1000
+	local gen = self.object
+	if self.on == nil then
+		gen:set_callback(callback.use_object, generator_binder.use, self)
+	end
+	local tip = repaired() and "st_shelter_generator_open"
+		or db.actor:object(TOOLS) and "st_shelter_generator_repair" or "st_shelter_generator_broken"
+	if tip ~= self.tip then
+		self.tip = tip
+		gen:set_tip_text(tip)
+	end
+	local on = repaired() and powered()
+	if on ~= self.on then
+		if self.on ~= nil then
+			msg(on and "st_shelter_generator_on" or "st_shelter_generator_off")
+		end
+		self.on = on
+		dark = not on
+		power = on
+		if on then
+			save_var(db.actor, "shelter_generator_powered", true) -- the task's done, whatever comes after
+		end
+		gen:play_cycle(on and "work" or "idle", true)
+		set_lamps(on)
+		set_sound(gen, on)
+	else
+		set_lamps(on)
+	end
+end
+function generator_binder:use()
+	if repaired() then
+		local box = generator_box()
+		if box then
+			ui_inventory.start("loot", box)
+		end
+		return
+	end
+	local tools = db.actor:object(TOOLS)
+	if tools then
+		alife_release(tools)
+		save_var(db.actor, "shelter_generator_repaired", true)
+		self.next = 0
+		msg("st_shelter_generator_repaired")
+	end
+end
+function generator_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	set_sound(self.object, false)
+	dark = false
+	power = false
+	object_binder.net_destroy(self)
+end
+function init_generator(obj)
+	obj:bind_object(generator_binder(obj))
+end
+
+----------------------------------------------------------------------------------------------------
+-- The note: read from the inventory, it gives the questline
+
+class "UIShelterNote" (CUIScriptWnd)
+function UIShelterNote:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_shelter.xml")
+	local form = xml:InitStatic("note", self)
+	xml:InitTextWnd("note:caption", form)
+	xml:InitFrame("note:frame", form)
+	xml:InitTextWnd("note:body", form)
+	self:Register(xml:Init3tButton("note:btn_close", form), "btn_close")
+	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
+end
+function UIShelterNote:Close()
+	self:HideDialog()
+	GUI = nil
+end
+function UIShelterNote:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik_to_bind(dik) == key_bindings.kQUIT then
+		self:Close()
+	end
+	return res
+end
+
+function note_menu(obj)
+	local p = obj:parent()
+	return p and p:id() == AC_ID and game.translate_string("st_shelter_read") or nil
+end
+
+function note_read(obj)
+	hide_hud_inventory()
+	GUI = UIShelterNote()
+	GUI:ShowDialog(true)
+	if not has_alife_info("shelter_note_read") then
+		give_info("shelter_note_read")
+		local tm = task_manager.get_task_manager()
+		tm:give_task("shelter_laptop")
+		tm:give_task("shelter_tools")
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The tasks: the laptop and the generator, each on its own, listed in the PDA under "�������" (the engine asks
+-- _G.CGameTask__group). Each one's stage follows the game's state; the last is done.
+
+local GOAL = { shelter_laptop = "laptop", shelter_tools = "tools" }
+local GOAL_DONE = { laptop = 6, tools = 5 }
+local GROUP = "st_shelter_restore_title"
+
+local function goal_stage(goal)
+	if goal == "laptop" then
+		return has_alife_info("shelter_flash_inserted") and 6 or has_alife_info("shelter_laptop_installed") and 5
+			or has_alife_info("shelter_laptop_got") and 4 or db.actor:object(CONTAINER) and 3
+			or has_alife_info("shelter_laptop_asked") and 2 or 1
+	end
+	return load_var(db.actor, "shelter_generator_powered", false) and 5 or repaired() and 4
+		or db.actor:object(TOOLS) and 3 or has_alife_info("shelter_tools_asked") and 2 or 1
+end
+
+local function goal_target(goal, stage)
+	if goal == "laptop" then
+		if stage == 1 or stage == 3 then
+			return get_story_object_id("esc_m_trader")
+		elseif stage == 2 then
+			return get_story_object_id("yan_stalker_sakharov")
+		elseif stage == 4 then
+			return load_var(db.actor, "shelter_desk_id", nil) or load_var(db.actor, "shelter_generator_id", nil)
+		elseif stage == 5 then
+			return load_var(db.actor, "shelter_laptop_id", nil)
+		end
+		return nil
+	end
+	if stage == 1 then
+		return get_story_object_id("zat_a2_stalker_mechanic")
+	elseif stage == 2 then
+		local lom = load_var(db.actor, "shelter_lom_id", nil)
+		if lom and alife_object(lom) then
+			return lom
+		end
+		local smart = SIMBOARD.smarts_by_names[LOM.smart]
+		return smart and smart.id
+	elseif stage < 5 then
+		return load_var(db.actor, "shelter_generator_id", nil)
+	end
+end
+
+local function task_functor_shelter(task_id, field, p, tsk)
+	local goal = GOAL[task_id]
+	if not goal then -- shelter_restore, the one task of earlier saves (migrate_task)
+		return field == "title" and GROUP or field == "descr" and "" or nil
+	end
+	local stage = goal_stage(goal)
+	if field == "title" then
+		return "st_shelter_goal_" .. goal
+	elseif field == "descr" then
+		return "st_shelter_goal_" .. goal .. "_" .. stage
+	elseif field == "target" then
+		return goal_target(goal, stage)
+	end
+end
+
+local function task_status_shelter(tsk, task_id)
+	local goal = GOAL[task_id]
+	if goal and goal_stage(goal) >= GOAL_DONE[goal] then
+		return "complete"
+	end
+end
+
+-- a save from when the questline was one task: it gives way to the two
+local function migrate_task()
+	if db.actor:get_task("shelter_restore", true) then
+		local tm = task_manager.get_task_manager()
+		tm:set_task_cancelled("shelter_restore")
+		tm:give_task("shelter_laptop")
+		tm:give_task("shelter_tools")
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The dialogs (gameplay\dialogs_shelter.xml)
+
+function dlg_has_container(a, b)
+	return db.actor:object(CONTAINER) ~= nil
+end
+
+function dlg_has_pda(a, b)
+	return db.actor:object(PDA) ~= nil
+end
+
+function dlg_give_container(a, b)
+	dialogs.relocate_item_section_to_actor(a, b, CONTAINER)
+end
+
+function dlg_container_for_laptop(a, b)
+	dialogs.relocate_item_section_from_actor(a, b, CONTAINER)
+	dialogs.relocate_item_section_to_actor(a, b, LAPTOP_ITEM)
+end
+
+function dlg_give_card(a, b)
+	dialogs.relocate_item_section_to_actor(a, b, LOM.card)
+end
+
+function dlg_pda_for_artefact(a, b)
+	dialogs.relocate_item_section_from_actor(a, b, PDA)
+	dialogs.relocate_item_section_to_actor(a, b, KARDAN_REWARD)
+end
+
+----------------------------------------------------------------------------------------------------
+-- Lom: once Kardan has told about him, the first visit to Zaton finds him dead in the test centre, his tools and PDA on
+-- him
+
+-- his name, not a generated one (also put on a body spawned before it was named, from its next spawn)
+local function name_lom(se)
+	se:set_character_name(game.translate_string("st_shelter_lom_name"))
+end
+
+local function spawn_lom()
+	local lvid = level.vertex_id(LOM.pos)
+	if not lvid or lvid >= 4294967295 then
+		printf("! [shelter] no AI vertex for Lom at %s", vec_to_str(LOM.pos))
+		return
+	end
+	local se = alife_create(LOM.section, level.vertex_position(lvid), lvid, db.actor:game_vertex_id())
+	if not se then
+		return
+	end
+	name_lom(se)
+	alife_create_item(TOOLS, se)
+	alife_create_item(PDA, se)
+	se:kill()
+	save_var(db.actor, "shelter_lom_id", se.id)
+end
+
+----------------------------------------------------------------------------------------------------
+-- The laptop: set on the desk when carried to it; takes the flash drive; opens the desktop while the generator runs
+
+class "UIShelterLaptop" (CUIScriptWnd)
+function UIShelterLaptop:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_shelter.xml")
+	local form = xml:InitStatic("laptop", self)
+	xml:InitTextWnd("laptop:caption", form)
+	xml:InitFrame("laptop:frame", form)
+	self:Register(xml:Init3tButton("laptop:btn_clean", form), "btn_clean")
+	xml:InitTextWnd("laptop:hint_clean", form)
+	self:Register(xml:Init3tButton("laptop:btn_close", form), "btn_close")
+	self:AddCallback("btn_clean", ui_events.BUTTON_CLICKED, self.OnClean, self)
+	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
+end
+function UIShelterLaptop:Close()
+	self:HideDialog()
+	GUI = nil
+end
+function UIShelterLaptop:OnClean()
+	self:Close()
+	clean()
+end
+function UIShelterLaptop:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik_to_bind(dik) == key_bindings.kQUIT then
+		self:Close()
+	end
+	return res
+end
+
+local function set_laptop()
+	local item = db.actor:object(LAPTOP_ITEM)
+	if not item or db.actor:position():distance_to(LAPTOP.pos) > LAPTOP.near then
+		return
+	end
+	alife_release(item)
+	local desk = load_var(db.actor, "shelter_desk_id", nil)
+	if desk and alife_object(desk) then
+		alife_release_id(desk)
+	end
+	local se = alife_create("shelter_laptop", LAPTOP.pos, level.vertex_id(LAPTOP.ai), db.actor:game_vertex_id())
+	if se then
+		se.angle = vector():set(0, LAPTOP.look:getH(), 0)
+		save_var(db.actor, "shelter_laptop_id", se.id)
+	end
+	give_info("shelter_laptop_installed")
+	msg("st_shelter_laptop_installed")
+end
+
+class "laptop_binder" (object_binder)
+function laptop_binder:__init(obj) super(obj)
+	self.ready = false
+	self.tip = nil
+end
+function laptop_binder:update(delta)
+	object_binder.update(self, delta)
+	if not self.ready then
+		local shell = self.object:get_physics_shell()
+		if not shell then
+			return
+		end
+		shell:freeze() -- stays on the desk
+		self.ready = true
+		self.object:set_callback(callback.use_object, laptop_binder.use, self)
+	end
+	if not db.actor then
+		return
+	end
+	-- the tip says what use does now
+	local tip = not has_alife_info("shelter_flash_inserted")
+		and (db.actor:object(FLASH) and "st_shelter_laptop_tip_flash" or "st_shelter_laptop_tip_no_flash")
+		or not power and "st_shelter_laptop_tip_no_power" or "st_shelter_laptop_tip_open"
+	if tip ~= self.tip then
+		self.tip = tip
+		self.object:set_tip_text(tip)
+	end
+end
+function laptop_binder:use()
+	if not has_alife_info("shelter_flash_inserted") then
+		local flash = db.actor:object(FLASH)
+		if not flash then
+			msg("st_shelter_laptop_no_flash")
+			return
+		end
+		alife_release(flash)
+		give_info("shelter_flash_inserted")
+		msg(power and "st_shelter_laptop_flash" or "st_shelter_laptop_flash_no_power")
+		if not power then
+			return
+		end
+	end
+	if not power then
+		msg("st_shelter_laptop_no_power")
+		return
+	end
+	if not (GUI and GUI:IsShown()) then
+		GUI = UIShelterLaptop()
+		GUI:ShowDialog(true)
+	end
+end
+function laptop_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	object_binder.net_destroy(self)
+end
+function init_laptop(obj)
+	obj:bind_object(laptop_binder(obj))
+end
+
+----------------------------------------------------------------------------------------------------
+-- The rubble: mounds close the bunker's passages, each a model fitted to its opening (tools/shelter/mound.py). One
+-- whose section names a zone (shelter_zone) is dug out with shovels (shelter_dig: how many full shovels it takes): look
+-- at it, press use, and the player digs on till it's gone, the shovels are worn out or they step away. Its zone then
+-- counts for the cleaning. Strokes done are kept on the actor.
+
+-- section, the floor at the opening's face (x, y, z), facing into the closed side (x, z)
+local MOUNDS = {
+	{ "shelter_mound_2", -2.911, 2.95, -16.43, 0, -1 }, -- the stairs down
+	{ "shelter_mound_3", 2.335, 2.95, -0.515, 0, 1 }, -- the north corridor's mouth
+	{ "shelter_mound_4", 2.34, 3.38, 31.405, 0, 1 }, -- the corridor's end, the stairs up
+	{ "shelter_mound_8", 0.81, 3.38, 28.83, -1, 0 }, -- the corridor's side doorways, in pairs face to face
+	{ "shelter_mound_9", 3.86, 3.38, 28.83, 1, 0 },
+	{ "shelter_mound_10", 0.81, 3.38, 21.75, -1, 0 },
+	{ "shelter_mound_11", 3.86, 3.38, 21.75, 1, 0 },
+	{ "shelter_mound_12", 0.81, 3.38, 14.61, -1, 0 },
+	{ "shelter_mound_13", 3.86, 3.38, 14.61, 1, 0 },
+}
+local EARLY_MOUNDS = { shelter_mound_2 = true, shelter_mound_3 = true, shelter_mound_4 = true } -- put by the test copy
+-- before the side doorways had theirs (the save's shelter_test_blocks)
+DIG = { -- global: the test copy speeds it up
+	stroke = 1300, -- ms
+	wear = 0.025, -- of a shovel's condition a stroke: 40 strokes a shovel
+	shovels = { shovel_mili = true, shovel_old = true },
+	leave = 0.6, -- stepping this far from where it began stops it
+	hit = { [[material\large_weapon\collide\impact_wpn_large_earth1]], [[material\large_weapon\collide\impact_wpn_large_earth2]] },
+	throw = { [[material\actor\step\n_gravel_1]], [[material\actor\step\n_gravel_2]], [[material\actor\step\n_gravel_3]], [[material\actor\step\n_gravel_4]] },
+}
+local digging = nil -- { id, section, pos, next, throw }
+local dig_sounds = {}
+
+local function mound_zone(obj)
+	return ini_sys:r_string_ex(obj:section(), "shelter_zone")
+end
+
+-- dug out: kept by name (point 3's also by the test copy's var from before)
+local function mound_dug(section)
+	return load_var(db.actor, "shelter_dug_" .. section, false)
+		or section == "shelter_mound_3" and load_var(db.actor, "shelter_point3_open", false)
+end
+
+-- the mound's strokes done (its var; mound 3's is the test copy's one) and needed
+local function mound_dig(section)
+	local shovels = ini_sys:r_float_ex(section, "shelter_dig") or 1
+	return "shelter_dig_" .. (string.match(section, "%d+$") or section), math.max(math.floor(shovels / DIG.wear + 0.5), 1)
+end
+
+local function dig_percent(section)
+	local var, strokes = mound_dig(section)
+	return math.floor(load_var(db.actor, var, 0) * 100 / strokes)
+end
+
+local function dig_msg(id, section)
+	actor_menu.set_msg(1, string.format(game.translate_string(id), dig_percent(section)), 6)
+end
+
+local function dig_tip(mound)
+	mound:set_tip_text(string.format(game.translate_string("st_shelter_dig_tip"), dig_percent(mound:section())))
+end
+
+-- the most worn shovel first
+local function dig_shovel()
+	local best
+	db.actor:iterate_inventory(function(_, item)
+		if DIG.shovels[item:section()] and (not best or item:condition() < best:condition()) then
+			best = item
+		end
+	end, db.actor)
+	return best
+end
+
+local function dig_sound(list)
+	local path = list[math.random(#list)]
+	dig_sounds[path] = dig_sounds[path] or sound_object(path)
+	dig_sounds[path]:play(db.actor, 0, sound_object.s2d)
+end
+
+local function dig_stop(id)
+	local section = digging.section
+	digging = nil
+	db.actor:restore_weapon()
+	if id then
+		dig_msg(id, section)
+	end
+end
+
+local function dig_stroke()
+	local mound = level.object_by_id(digging.id)
+	local shovel = dig_shovel()
+	if not mound then
+		return dig_stop()
+	elseif not shovel then
+		return dig_stop("st_shelter_dig_no_shovel")
+	end
+	dig_sound(DIG.hit)
+	digging.throw = time_global() + 500
+	level.add_cam_effector("camera_effects\\switch\\low" .. math.random(1, 4) .. ".anm", 23240, false, "")
+	shovel:set_condition(math.max(shovel:condition() - DIG.wear, 0))
+	local var, strokes = mound_dig(digging.section)
+	local done = load_var(db.actor, var, 0) + 1
+	save_var(db.actor, var, done)
+	local broke = shovel:condition() < 0.001
+	if broke then
+		alife_release(shovel)
+	end
+	if done >= strokes then
+		save_var(db.actor, "shelter_dug_" .. digging.section, true)
+		save_var(db.actor, "shelter_open_" .. mound_zone(mound), true) -- its rooms count for the cleaning
+		alife_release(mound)
+		return dig_stop("st_shelter_dig_done")
+	end
+	dig_tip(mound)
+	dig_msg(broke and "st_shelter_dig_broke" or "st_shelter_dig_progress", digging.section)
+end
+
+local function dig_update()
+	if not digging then
+		return
+	end
+	if db.actor:position():distance_to(digging.pos) > DIG.leave then
+		return dig_stop("st_shelter_dig_stopped")
+	end
+	local now = time_global()
+	if digging.throw and now >= digging.throw then
+		digging.throw = nil
+		dig_sound(DIG.throw)
+	end
+	if now >= digging.next then
+		digging.next = now + DIG.stroke
+		dig_stroke()
+	end
+end
+
+-- use on a mound: start digging, or stop it
+function dig_use(mound)
+	if digging then
+		return dig_stop("st_shelter_dig_stopped")
+	end
+	if not dig_shovel() then
+		return msg("st_shelter_dig_need_shovel")
+	end
+	digging = { id = mound:id(), section = mound:section(), pos = vector():set(db.actor:position()), next = time_global() + 300 }
+	db.actor:hide_weapon()
+end
+
+-- a mound stays where it is put: frozen on its first update (a shell with every bone fixed has no body to update and
+-- crashes the engine); one with a zone is dug out
+class "mound_binder" (object_binder)
+function mound_binder:__init(obj) super(obj)
+	self.frozen = false
+	self.ready = false
+end
+function mound_binder:update(delta)
+	object_binder.update(self, delta)
+	if not self.frozen then
+		local shell = self.object:get_physics_shell()
+		if shell then
+			shell:freeze()
+			self.frozen = true
+		end
+	end
+	if not self.ready and db.actor then
+		self.ready = true
+		if mound_zone(self.object) then
+			dig_tip(self.object)
+			self.object:set_callback(callback.use_object, dig_use)
+		end
+	end
+end
+function mound_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	object_binder.net_destroy(self)
+end
+function init_mound(obj)
+	obj:bind_object(mound_binder(obj))
+end
+
+-- the mounds, each once and none dug out
+local function place_mounds()
+	local early = load_var(db.actor, "shelter_test_blocks", false)
+	local gvid = db.actor:game_vertex_id()
+	for _, m in ipairs(MOUNDS) do
+		local section, x, y, z, fx, fz = unpack(m)
+		local var = "shelter_placed_" .. section
+		if not (load_var(db.actor, var, false) or mound_dug(section) or early and EARLY_MOUNDS[section]) then
+			local pos = vector():set(x, y, z)
+			local lvid = level.vertex_id(pos)
+			if not lvid or lvid >= 4294967295 then
+				lvid = db.actor:level_vertex_id() -- the opening's face is off the AI map
+			end
+			local se = alife_create(section, pos, lvid, gvid)
+			if se then
+				se.angle = vector():set(0, vector():set(fx, 0, fz):getH(), 0)
+			end
+			save_var(db.actor, var, true)
+		end
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The cleaning: the open rooms' heaps (once, kept in the save and put again on every load) and bodies
+
+local function zone_open(name)
+	return name == "start" or load_var(db.actor, "shelter_open_" .. name, false)
+		or name == "corridor" and load_var(db.actor, "shelter_point3_open", false) -- dug out by the test copy's script
+end
+
+local function zone_cleaned(name)
+	return load_var(db.actor, "shelter_clean_" .. name, false)
+end
+
+local function zone_of(p)
+	for name, boxes in pairs(CLEAN.zones) do
+		for _, b in ipairs(boxes) do
+			if p.x >= b[1] and p.x <= b[2] and p.y >= b[3] and p.y <= b[4] and p.z >= b[5] and p.z <= b[6] then
+				return name
+			end
+		end
+	end
+end
+
+-- the zone's heaps out of the level: their visuals no longer drawn, their collision passable (the engine, level_script.cpp)
+local function take_heaps(name)
+	if not level.hide_static_visual then
+		printf("! [shelter] the engine can't take the level's heaps out (an older exe)")
+		return
+	end
+	local ini = ini_file(CLEAN.ini)
+	if not ini:section_exist(name) then
+		return -- a room with nothing to take out
+	end
+	for _, v in ipairs(str_explode(ini:r_string_ex(name, "visuals") or "", ",")) do
+		local index = tonumber(v)
+		if index then
+			level.hide_static_visual(index)
+		end
+	end
+	level.make_static_passable(ini:r_string_ex(name, "triangles") or "")
+end
+
+-- what the zone's cleaning puts into the stash for what it took away: the level's overturned tables come as Hideout
+-- Furniture's (left out where those sections are missing)
+local function stash_items(name)
+	local ini = ini_file(CLEAN.ini)
+	local id = load_var(db.actor, "shelter_stash_id", nil)
+	local stash = id and alife_object(id)
+	if not (stash and ini:section_exist(name)) then
+		return
+	end
+	for _, section in ipairs(str_explode(ini:r_string_ex(name, "items") or "", ",")) do
+		section = string.match(section, "^%s*(.-)%s*$")
+		if section ~= "" and ini_sys:section_exist(section) then
+			alife_create_item(section, stash)
+		end
+	end
+end
+
+-- the bodies lying in the open rooms
+local function bodies()
+	local found = {}
+	level.iterate_nearest(LAMPS.centre, 60, function(obj)
+		if (IsStalker(obj) or IsMonster(obj)) and obj:id() ~= AC_ID and not obj:alive() then
+			local zone = zone_of(obj:position())
+			if zone and zone_open(zone) then
+				found[#found + 1] = obj:id()
+			end
+		end
+	end)
+	return found
+end
+
+function clean()
+	local zones = {}
+	for name in pairs(CLEAN.zones) do
+		if zone_open(name) and not zone_cleaned(name) then
+			zones[#zones + 1] = name
+		end
+	end
+	local dead = bodies()
+	if #zones == 0 and #dead == 0 then
+		msg("st_shelter_clean_nothing")
+		return
+	end
+	if db.actor.satiety < CLEAN.satiety or actor_status_thirst.get_water_deprivation(true) > 0 then
+		msg("st_shelter_clean_hungry")
+		return
+	end
+	level.add_pp_effector("sleep_fade.ppe", 11, false)
+	level.change_game_time(0, CLEAN.hours, 0)
+	for _, name in ipairs(zones) do
+		save_var(db.actor, "shelter_clean_" .. name, true)
+		take_heaps(name)
+		stash_items(name)
+	end
+	for _, id in ipairs(dead) do
+		local se = alife_object(id)
+		if se and not alife_release(se) then -- it leaves an NPC with no squad (ours are made one by one) where it lies
+			alife():release(se, true)
+		end
+	end
+	db.actor:change_satiety(-0.4)
+	db.actor.power = 0.2
+	msg("st_shelter_clean_done")
+end
+
+----------------------------------------------------------------------------------------------------
+
+-- the generator, its box inside it
+local function spawn_generator()
+	local lvid, gvid = level.vertex_id(GENERATOR.ai), db.actor:game_vertex_id()
+	local se = alife_create(GENERATOR.section, GENERATOR.pos, lvid, gvid)
+	local box = alife_create(GENERATOR.box, vector():set(GENERATOR.pos):add(vector():set(0, 0.3, 0)), lvid, gvid)
+	if se and box then
+		se.angle = vector():set(0, GENERATOR.look:getH(), 0)
+		save_var(db.actor, "shelter_generator_id", se.id)
+		save_var(db.actor, "shelter_generator_box_id", box.id)
+	end
+end
+
+-- the stash, there from the first visit
+local function spawn_stash()
+	local se = alife_create(STASH.section, STASH.pos, level.vertex_id(STASH.ai), db.actor:game_vertex_id())
+	if se then
+		se.angle = vector():set(0, STASH.yaw, 0)
+		save_var(db.actor, "shelter_stash_id", se.id)
+	end
+end
+
+-- the desk's mark for the laptop's task
+local function spawn_desk()
+	local se = alife_create(LAPTOP.mark, LAPTOP.pos, level.vertex_id(LAPTOP.ai), db.actor:game_vertex_id())
+	if se then
+		save_var(db.actor, "shelter_desk_id", se.id)
+	end
+end
+
+-- the controller and the zombies, the note and the flash drive on the one in the Nosorog suit
+local function spawn_occupants()
+	local gvid = db.actor:game_vertex_id()
+	for _, o in ipairs(OCCUPANTS) do
+		local lvid = level.vertex_id(o.pos)
+		if lvid and lvid < 4294967295 then
+			local se = alife_create(o.section, level.vertex_position(lvid), lvid, gvid)
+			for _, item in ipairs(se and o.items or {}) do
+				alife_create_item(item, se)
+			end
+		else
+			printf("! [shelter] no AI vertex for %s at %s", o.section, vec_to_str(o.pos))
+		end
+	end
+	save_var(db.actor, "shelter_occupants", true)
+end
+
+-- what the shelter gets on the first visit (each part once), and the cleaned zones' heaps taken out again
+local function on_first_update()
+	local name = level.name()
+	if name == LOM.level and has_alife_info("shelter_tools_asked") then
+		local lom = load_var(db.actor, "shelter_lom_id", nil)
+		if not lom then
+			spawn_lom()
+		elseif alife_object(lom) then
+			name_lom(alife_object(lom))
+		end
+	end
+	if name ~= LEVEL then
+		return
+	end
+	if not load_var(db.actor, "shelter_generator_id", nil) then
+		spawn_generator()
+	end
+	if not load_var(db.actor, "shelter_corridor_lamps", false) then
+		spawn_corridor_lamps()
+	end
+	if not load_var(db.actor, "shelter_desk_id", nil) and not has_alife_info("shelter_laptop_installed") then
+		spawn_desk()
+	end
+	if not load_var(db.actor, "shelter_stash_id", nil) then
+		spawn_stash()
+	end
+	place_mounds()
+	if not load_var(db.actor, "shelter_occupants", false) then
+		spawn_occupants()
+	end
+	for zone in pairs(CLEAN.zones) do
+		if zone_cleaned(zone) then
+			take_heaps(zone)
+		end
+	end
+end
+
+local function on_update()
+	local now = time_global()
+	if now < next_check then
+		return
+	end
+	next_check = now + 1000
+	if level.name() == LEVEL and not has_alife_info("shelter_laptop_installed") then
+		set_laptop()
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", on_first_update)
+	RegisterScriptCallback("actor_on_first_update", migrate_task)
+	RegisterScriptCallback("actor_on_update", on_update)
+	RegisterScriptCallback("actor_on_update", dig_update)
+	task_functor.shelter_task = task_functor_shelter
+	task_status_functor.shelter_task = task_status_shelter
+	-- these tasks' news (given, updated) say what to do now, not only the title (news_manager.send_task)
+	local send_task = news_manager.send_task
+	news_manager.send_task = function(actor, typ, tsk)
+		local goal = tsk and GOAL[tsk:get_id()]
+		if not (goal and db.actor and (typ == "new" or typ == "updated")) then
+			return send_task(actor, typ, tsk)
+		end
+		xr_sound.set_sound_play(AC_ID, "pda_task")
+		local caption = game.translate_string(typ == "new" and "general_new_task" or "general_update_task")
+		local text = game.translate_string(tsk:get_title() or "") .. ". "
+			.. game.translate_string("st_shelter_goal_" .. goal .. "_" .. goal_stage(goal))
+		local icon = tsk:get_icon_name() or "ui_iconsTotal_storyline"
+		if db.actor:is_talking() then
+			db.actor:give_talk_message2(caption, text, icon, "iconed_answer_item")
+		else
+			db.actor:give_game_news(caption, text, icon, 0, 10000)
+		end
+	end
+	local group_of = _G.CGameTask__group
+	_G.CGameTask__group = function(task_id)
+		return GOAL[task_id] and GROUP or group_of and group_of(task_id) or ""
+	end
+	local need_flicker = bind_dynamic_light.need_flicker
+	bind_dynamic_light.need_flicker = function(lamp)
+		return not (dark and level.name() == LEVEL) and need_flicker(lamp)
+	end
+end
