@@ -78,9 +78,6 @@
 	<string id="st_shelter_laptop_no_power">
 		<text>Нет питания: генератор не работает.</text>
 	</string>
-	<string id="st_shelter_desktop">
-		<text>Рабочий стол</text>
-	</string>
 	<string id="st_shelter_clean">
 		<text>Убраться в убежище</text>
 	</string>
@@ -545,5 +542,116 @@
 	</string>
 	<string id="st_shelter_chamber_made">
 		<text>Синтез %s завершён: артефакт в камере.</text>
+	</string>
+	<string id="st_shelter_os_start">
+		<text>Пуск</text>
+	</string>
+	<string id="st_shelter_os_shutdown">
+		<text>Завершение работы</text>
+	</string>
+	<string id="st_shelter_app_plan">
+		<text>План убежища</text>
+	</string>
+	<string id="st_shelter_app_clean">
+		<text>Уборка</text>
+	</string>
+	<string id="st_shelter_plan_hint">
+		<text>Щёлкните по комнате на плане.</text>
+	</string>
+	<string id="st_shelter_room_state_blocked">
+		<text>Состояние: завалена</text>
+	</string>
+	<string id="st_shelter_room_state_dirty">
+		<text>Состояние: открыта, не убрана</text>
+	</string>
+	<string id="st_shelter_room_state_clean">
+		<text>Состояние: убрана</text>
+	</string>
+	<string id="st_shelter_room_role">
+		<text>Назначение: %s</text>
+	</string>
+	<string id="st_shelter_role_none">
+		<text>нет</text>
+	</string>
+	<string id="st_shelter_role_store">
+		<text>склад бара</text>
+	</string>
+	<string id="st_shelter_room_make_store">
+		<text>Сделать складом бара</text>
+	</string>
+	<string id="st_shelter_room_unassign">
+		<text>Снять назначение</text>
+	</string>
+	<string id="st_shelter_room_blocked_store">
+		<text>Склад — когда разберёте завал.</text>
+	</string>
+	<string id="st_shelter_mark_generator">
+		<text>Генератор</text>
+	</string>
+	<string id="st_shelter_mark_laptop">
+		<text>Ноутбук</text>
+	</string>
+	<string id="st_shelter_mark_stash">
+		<text>Тайник</text>
+	</string>
+	<string id="st_shelter_mark_chamber">
+		<text>Камеры синтеза</text>
+	</string>
+	<string id="st_shelter_mark_me">
+		<text>Вы</text>
+	</string>
+	<string id="st_shelter_mark_friend">
+		<text>Группа</text>
+	</string>
+	<string id="st_shelter_room_laptop">
+		<text>Комната с ноутбуком</text>
+	</string>
+	<string id="st_shelter_room_stash">
+		<text>Комната с тайником</text>
+	</string>
+	<string id="st_shelter_room_cells_north">
+		<text>Камеры синтеза</text>
+	</string>
+	<string id="st_shelter_room_cells_south">
+		<text>Ячейки</text>
+	</string>
+	<string id="st_shelter_room_entrance">
+		<text>Вход</text>
+	</string>
+	<string id="st_shelter_room_passage">
+		<text>Проход</text>
+	</string>
+	<string id="st_shelter_room_lower_hall">
+		<text>Нижний зал</text>
+	</string>
+	<string id="st_shelter_room_water_hall">
+		<text>Зал с водой</text>
+	</string>
+	<string id="st_shelter_room_corridor">
+		<text>Коридор</text>
+	</string>
+	<string id="st_shelter_room_sw">
+		<text>Комната 1</text>
+	</string>
+	<string id="st_shelter_room_se">
+		<text>Комната 2</text>
+	</string>
+	<string id="st_shelter_room_12">
+		<text>Комната 3</text>
+	</string>
+	<string id="st_shelter_room_13">
+		<text>Комната 4</text>
+	</string>
+	<string id="st_shelter_room_10">
+		<text>Комната 5</text>
+	</string>
+	<string id="st_shelter_room_11">
+		<text>Комната 6</text>
+	</string>
+	<string id="st_shelter_room_8">
+		<text>Комната 7</text>
+	</string>
+	<string id="st_shelter_room_9">
+		<text>Комната 8</text>
 	</string>
 </string_table>

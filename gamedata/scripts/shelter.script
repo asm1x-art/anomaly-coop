@@ -83,7 +83,7 @@ local hum = nil
 local dark = false -- no power: the lamps stay off, flickering (psy mutants, emissions) turns them on otherwise
 local power = false -- the generator runs (for the laptop)
 local next_check = 0
-GUI = nil -- the shelter's window open now (the note, the laptop's desktop)
+GUI = nil -- the shelter's window open now (the note)
 
 local function msg(id)
 	actor_menu.set_msg(1, game.translate_string(id), 6)
@@ -661,37 +661,7 @@ end
 
 ----------------------------------------------------------------------------------------------------
 -- The laptop: set on the desk when carried to it; takes the flash drive; opens the desktop while the generator runs
-
-class "UIShelterLaptop" (CUIScriptWnd)
-function UIShelterLaptop:__init() super()
-	self:SetWndRect(Frect():set(0, 0, 1024, 768))
-	self:SetAutoDelete(true)
-	local xml = CScriptXmlInit()
-	xml:ParseFile("ui_shelter.xml")
-	local form = xml:InitStatic("laptop", self)
-	xml:InitTextWnd("laptop:caption", form)
-	xml:InitFrame("laptop:frame", form)
-	self:Register(xml:Init3tButton("laptop:btn_clean", form), "btn_clean")
-	xml:InitTextWnd("laptop:hint_clean", form)
-	self:Register(xml:Init3tButton("laptop:btn_close", form), "btn_close")
-	self:AddCallback("btn_clean", ui_events.BUTTON_CLICKED, self.OnClean, self)
-	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
-end
-function UIShelterLaptop:Close()
-	self:HideDialog()
-	GUI = nil
-end
-function UIShelterLaptop:OnClean()
-	self:Close()
-	clean()
-end
-function UIShelterLaptop:OnKeyboard(dik, keyboard_action)
-	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
-	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik_to_bind(dik) == key_bindings.kQUIT then
-		self:Close()
-	end
-	return res
-end
+-- (ui_shelter_laptop.script)
 
 local function set_laptop()
 	local item = db.actor:object(LAPTOP_ITEM)
@@ -760,10 +730,7 @@ function laptop_binder:use()
 		msg("st_shelter_laptop_no_power")
 		return
 	end
-	if not (GUI and GUI:IsShown()) then
-		GUI = UIShelterLaptop()
-		GUI:ShowDialog(true)
-	end
+	ui_shelter_laptop.open()
 end
 function laptop_binder:net_destroy()
 	self.object:set_callback(callback.use_object, nil)
@@ -982,6 +949,11 @@ end
 
 local function zone_cleaned(name)
 	return state("clean_" .. name, false)
+end
+
+-- a cleaning zone's state for the laptop's plan: "blocked" (its rubble not dug out), "dirty", "clean"
+function zone_state(name)
+	return not zone_open(name) and "blocked" or zone_cleaned(name) and "clean" or "dirty"
 end
 
 local function zone_of(p)

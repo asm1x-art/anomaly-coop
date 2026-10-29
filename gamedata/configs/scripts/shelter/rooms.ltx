@@ -1,0 +1,115 @@
+; The shelter's rooms for the laptop's plan (ui_shelter_laptop.script; docs/coop/shelter.md, "План развития"): each
+; one's name, its box on the main floor (x0, x1, z0, z1, read off tools\shelter\plan.py's walls), the cleaning zone
+; whose state it shows (shelter.zone_state: blocked by rubble, open and dirty, cleaned) and what it can be made.
+; Listed in the order they're tried under the cursor: the small rooms before the halls they sit in.
+[rooms]
+laptop_room
+stash_room
+cells_north
+cells_south
+entrance
+passage
+lower_hall
+water_hall
+room_sw
+room_se
+room_12
+room_13
+room_10
+room_11
+room_8
+room_9
+corridor
+
+[laptop_room]
+name    = st_shelter_room_laptop
+box     = -4.5, -0.2, -5.9, -2.75
+zone    = start
+
+[stash_room]
+name    = st_shelter_room_stash
+box     = 5.1, 9.75, -5.9, -2.75
+zone    = start
+
+[cells_north]
+name    = st_shelter_room_cells_north
+box     = -7.9, 3.9, -25.4, -22.95
+zone    = start
+
+[cells_south]
+name    = st_shelter_room_cells_south
+box     = -7.9, 3.9, -31.4, -28.9
+zone    = start
+
+[entrance]
+name    = st_shelter_room_entrance
+box     = -7.9, 3.9, -28.9, -25.4
+zone    = start
+
+[passage]
+name    = st_shelter_room_passage
+box     = 4.1, 9.6, -28.4, -21.3
+zone    = start
+
+[lower_hall]
+name    = st_shelter_room_lower_hall
+box     = -5.1, 9.9, -21.3, -0.4
+zone    = start
+
+[water_hall]
+name    = st_shelter_room_water_hall
+box     = 9.9, 24.3, -28.2, -6.6
+zone    = start
+
+[room_sw]
+name    = st_shelter_room_sw
+box     = -6.6, 0.6, 2.9, 9.9
+zone    = corridor
+roles   = store
+
+[room_se]
+name    = st_shelter_room_se
+box     = 4.4, 11.3, 2.9, 9.9
+zone    = corridor
+roles   = store
+
+[room_12]
+name    = st_shelter_room_12
+box     = -6.6, 0.6, 9.9, 17.0
+zone    = room_12
+roles   = store
+
+[room_13]
+name    = st_shelter_room_13
+box     = 4.4, 11.3, 9.9, 17.0
+zone    = room_13
+roles   = store
+
+[room_10]
+name    = st_shelter_room_10
+box     = -6.6, 0.6, 17.0, 24.1
+zone    = room_10
+roles   = store
+
+[room_11]
+name    = st_shelter_room_11
+box     = 4.4, 11.3, 17.0, 24.1
+zone    = room_11
+roles   = store
+
+[room_8]
+name    = st_shelter_room_8
+box     = -6.6, 0.6, 24.1, 31.2
+zone    = room_8
+roles   = store
+
+[room_9]
+name    = st_shelter_room_9
+box     = 4.4, 11.3, 24.1, 31.2
+zone    = room_9
+roles   = store
+
+[corridor]
+name    = st_shelter_room_corridor
+box     = 0.6, 4.4, -0.4, 32.5
+zone    = corridor

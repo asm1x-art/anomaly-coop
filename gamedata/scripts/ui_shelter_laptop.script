@@ -1,0 +1,477 @@
+-- The laptop's desktop (docs/coop/shelter.md, "План развития", phase 1): an old OS on the Chemist's laptop. Its
+-- shortcuts open programs in a window over the desktop; the taskbar has the Start menu (shutting down closes the
+-- laptop), the open program and the game's time. It's all put together here from a white tinted and sized
+-- (ui_shelter_laptop.xml) and the textures of tools\shelter\laptop_ui.py; clicks and the hover are found by the cursor.
+-- Laid out in square units: the screen is that many wide (1024 on 4:3, more on a wide one) and 768 high, squeezed
+-- into the interface's 1024 across, so the plan, the icons and the marks keep their shape.
+-- Programs: the shelter's plan (the rooms by state, what is where, who is in; a room picked shows its card, where it
+-- can be given a role, the world's) and the cleaning.
+
+local XML = "ui_shelter_laptop.xml"
+local SCREEN = { h = 768 } -- w: the screen's width in square units, set as the laptop opens
+local TASKBAR = 28
+local C = { -- an old OS's colours
+	face = { 192, 192, 192 }, light = { 255, 255, 255 }, shadow = { 128, 128, 128 }, dark = { 0, 0, 0 },
+	title = { 0, 0, 128 }, white = { 255, 255, 255 }, text = { 0, 0, 0 }, grey_text = { 80, 80, 80 },
+	pick = { 255, 220, 0 },
+}
+local ROOM_TINT = { blocked = { 170, 0, 0, 0 }, dirty = { 50, 230, 170, 40 } } -- alpha, r, g, b; a clean one: none
+local MARKS = { -- the shelter's things on the plan: the state keeping its object's id, its mark
+	{ state = "generator_id", mark = "generator" },
+	{ state = "laptop_id", mark = "laptop" },
+	{ state = "stash_id", mark = "stash" },
+	{ state = "chamber_panel_gravi", mark = "chamber" },
+	{ state = "chamber_panel_thermo", mark = "chamber" },
+	{ state = "chamber_panel_chem", mark = "chamber" },
+	{ state = "chamber_panel_electro", mark = "chamber" },
+}
+local LEGEND = { "generator", "laptop", "stash", "chamber", "me", "friend" }
+local ROLES = { "store" } -- what a room can be made, in its card's order
+local BUNKER = "bunker_a1"
+
+local gui -- the laptop open
+
+local function argb(c, a)
+	return GetARGB(a or 255, c[1], c[2], c[3])
+end
+
+local function tr(id, ...)
+	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
+end
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+-------------------------------------------------------------------------------
+-- the plan's data: the texture and the world's box on it (tools\shelter\plan.py), the rooms
+
+local plan, rooms
+
+local function load_plan()
+	if plan then
+		return
+	end
+	local ini = ini_file("scripts\\shelter\\plan.ltx")
+	plan = { texture = ini:r_string_ex("plan_main", "texture"), w = ini:r_float_ex("plan_main", "width"),
+		h = ini:r_float_ex("plan_main", "height"), x0 = ini:r_float_ex("plan_main", "x0"), x1 = ini:r_float_ex("plan_main", "x1"),
+		z0 = ini:r_float_ex("plan_main", "z0"), z1 = ini:r_float_ex("plan_main", "z1") }
+	rooms = {}
+	ini = ini_file("scripts\\shelter\\rooms.ltx")
+	for i = 0, ini:line_count("rooms") - 1 do
+		local _, id = ini:r_line_ex("rooms", i, "", "")
+		local box = str_explode(ini:r_string_ex(id, "box"), ",")
+		local roles = {}
+		for _, role in ipairs(str_explode(ini:r_string_ex(id, "roles") or "", ",")) do
+			roles[role] = true
+		end
+		rooms[#rooms + 1] = { id = id, name = ini:r_string_ex(id, "name"), zone = ini:r_string_ex(id, "zone"), roles = roles,
+			box = { tonumber(box[1]), tonumber(box[2]), tonumber(box[3]), tonumber(box[4]) } }
+	end
+end
+
+-- a room's role, the world's: the room each role is given to
+local function role_of(room)
+	for _, role in ipairs(ROLES) do
+		if shelter.state("room_" .. role, nil) == room.id then
+			return role
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the desktop
+
+class "UIShelterOS" (CUIScriptWnd)
+
+function UIShelterOS:__init() super()
+	self.k = utils_xml.screen_ratio() -- a square unit across, in the interface's units
+	SCREEN.w = math.floor(1024 / self.k + 0.5)
+	self:SetWndRect(Frect():set(0, 0, 1024, SCREEN.h))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self.clicks = {} -- the desktop's and the taskbar's: { x, y, w, h, f }
+	self.app_clicks = {}
+	self.menu_clicks = nil
+	self:image(0, 0, SCREEN.w, SCREEN.h - TASKBAR, "ui\\shelter\\laptop_wallpaper")
+	self:image(math.floor(SCREEN.w / 2 - 200), math.floor((SCREEN.h - TASKBAR) / 2 - 190), 400, 360,
+		"ui\\shelter\\laptop_logo")
+	self:shortcuts()
+	self:taskbar()
+end
+
+-- a window put at x, y (in its parent) and sized, in square units
+function UIShelterOS:place(wnd, x, y, w, h)
+	wnd:SetWndPos(vector2():set(x * self.k, y))
+	wnd:SetWndSize(vector2():set(w * self.k, h))
+end
+
+-- the cursor in square units
+function UIShelterOS:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k, p.y)
+end
+
+function UIShelterOS:rect(x, y, w, h, color, parent, alpha)
+	local s = self.xml:InitStatic("white", parent or self)
+	self:place(s, x, y, w, h)
+	s:SetTextureColor(argb(color, alpha))
+	return s
+end
+
+function UIShelterOS:image(x, y, w, h, texture, parent)
+	local s = self.xml:InitStatic("image", parent or self)
+	s:InitTexture(texture)
+	s:SetStretchTexture(true)
+	self:place(s, x, y, w, h)
+	return s
+end
+
+function UIShelterOS:text(x, y, w, h, str, color, parent, align, font)
+	local t = self.xml:InitTextWnd("text", parent or self)
+	self:place(t, x, y, w, h)
+	if font then
+		t:SetFont(font)
+	end
+	t:SetTextAlignment(align or CGameFont.alLeft)
+	t:SetTextColor(argb(color or C.text))
+	t:SetText(str)
+	return t
+end
+
+-- a raised (or sunken) panel as an old OS draws them; its face
+function UIShelterOS:panel(x, y, w, h, parent, sunken)
+	self:rect(x, y, w, h, sunken and C.light or C.dark, parent)
+	self:rect(x, y, w - 1, h - 1, sunken and C.shadow or C.light, parent)
+	self:rect(x + 1, y + 1, w - 2, h - 2, sunken and C.light or C.shadow, parent)
+	return self:rect(x + 1, y + 1, w - 3, h - 3, C.face, parent)
+end
+
+-- a button: a raised panel with its text; f on a click (ax, ay: the parent's place on the screen)
+function UIShelterOS:button(x, y, w, h, str, f, list, parent, ax, ay)
+	self:panel(x, y, w, h, parent)
+	self:text(x, y, w, h, str, C.text, parent, CGameFont.alCenter)
+	list[#list + 1] = { (ax or 0) + x, (ay or 0) + y, w, h, f }
+end
+
+function UIShelterOS:shortcuts()
+	local apps = { { "plan", "st_shelter_app_plan" }, { "clean", "st_shelter_app_clean" } }
+	for i, app in ipairs(apps) do
+		local y = 20 + (i - 1) * 92
+		self:image(36, y, 48, 48, "ui\\shelter\\laptop_icon_" .. app[1])
+		self:text(8, y + 52, 104, 34, tr(app[2]), C.white, nil, CGameFont.alCenter)
+		self.clicks[#self.clicks + 1] = { 8, y, 104, 86, function() self:open(app[1]) end }
+	end
+end
+
+function UIShelterOS:taskbar()
+	local y = SCREEN.h - TASKBAR
+	self:rect(0, y, SCREEN.w, TASKBAR, C.face)
+	self:rect(0, y + 1, SCREEN.w, 1, C.light)
+	self:button(3, y + 3, 64, 22, tr("st_shelter_os_start"), function() self:toggle_menu() end, self.clicks)
+	self:panel(SCREEN.w - 74, y + 3, 71, 22, nil, true)
+	self.clock = self:text(SCREEN.w - 74, y + 3, 71, 22, "", C.text, nil, CGameFont.alCenter)
+	self.task = nil
+	self:tick()
+end
+
+function UIShelterOS:tick()
+	self.clock:SetText(string.format("%02d:%02d", level.get_time_hours(), level.get_time_minutes()))
+end
+
+function UIShelterOS:toggle_menu()
+	if self.menu then
+		self:DetachChild(self.menu)
+		self.menu, self.menu_clicks = nil, nil
+		return
+	end
+	local h = 34
+	self.menu = self:rect(3, SCREEN.h - TASKBAR - h, 200, h, C.dark)
+	self:panel(0, 0, 200, h, self.menu)
+	self.menu_clicks = {}
+	self:button(4, 5, 192, 24, tr("st_shelter_os_shutdown"), function() self:Close() end, self.menu_clicks, self.menu,
+		3, SCREEN.h - TASKBAR - h)
+end
+
+-------------------------------------------------------------------------------
+-- a program's window
+
+function UIShelterOS:open(app)
+	self:close_app()
+	if self.menu then
+		self:toggle_menu()
+	end
+	self.app = app
+	self["open_" .. app](self)
+	local y = SCREEN.h - TASKBAR
+	self.task = self:rect(70, y + 3, 200, 22, C.dark)
+	self:panel(0, 0, 200, 22, self.task, true)
+	self:text(6, 0, 192, 22, tr("st_shelter_app_" .. app), C.text, self.task)
+end
+
+function UIShelterOS:close_app()
+	if self.win then
+		self:DetachChild(self.win)
+		self:DetachChild(self.task)
+	end
+	self.win, self.task, self.app, self.app_clicks, self.app_update = nil, nil, nil, {}, nil
+end
+
+-- the window's frame, title and close box; its place on the screen kept for the clicks
+function UIShelterOS:window(x, y, w, h, title)
+	self.win = self:rect(x, y, w, h, C.dark)
+	self.wx, self.wy = x, y
+	self:panel(0, 0, w, h, self.win)
+	self:rect(4, 4, w - 8, 20, C.title, self.win)
+	self:text(10, 4, w - 60, 20, title, C.white, self.win, CGameFont.alLeft)
+	self:button(w - 24, 6, 18, 16, "x", function() self:close_app() end, self.app_clicks, self.win, x, y)
+	return self.win
+end
+
+-------------------------------------------------------------------------------
+-- the shelter's plan
+
+function UIShelterOS:to_plan(x, z)
+	local p = self.plan_area
+	return p.x + (x - plan.x0) / (plan.x1 - plan.x0) * p.w, p.y + (plan.z1 - z) / (plan.z1 - plan.z0) * p.h
+end
+
+function UIShelterOS:room_rect(room)
+	local u0, v0 = self:to_plan(room.box[1], room.box[4])
+	local u1, v1 = self:to_plan(room.box[2], room.box[3])
+	return u0, v0, u1 - u0, v1 - v0
+end
+
+function UIShelterOS:mark(x, z, kind, win)
+	local u, v = self:to_plan(x, z)
+	self:image(u - 7, v - 7, 14, 14, "ui\\shelter\\laptop_mark_" .. kind, win)
+end
+
+function UIShelterOS:open_plan()
+	load_plan()
+	local W, H = 880, 708
+	local win = self:window(math.max(120, math.floor((SCREEN.w - W) / 2)), 16, W, H, tr("st_shelter_app_plan"))
+	local ph = H - 42
+	self.plan_area = { x = 12, y = 32, w = math.floor(ph * plan.w / plan.h), h = ph }
+	local a = self.plan_area
+	self:panel(a.x - 2, a.y - 2, a.w + 4, a.h + 4, win, true)
+	self:image(a.x, a.y, a.w, a.h, plan.texture, win)
+	-- the rooms by state
+	for _, room in ipairs(rooms) do
+		local tint = ROOM_TINT[shelter.zone_state(room.zone)]
+		if tint then
+			local x, y, w, h = self:room_rect(room)
+			self:rect(x, y, w, h, { tint[2], tint[3], tint[4] }, win, tint[1])
+		end
+	end
+	-- what is where, who is in
+	for _, m in ipairs(MARKS) do
+		local se = alife_object(shelter.state(m.state, 65535))
+		if se then
+			self:mark(se.position.x, se.position.z, m.mark, win)
+		end
+	end
+	if level.name() == BUNKER then
+		self:mark(db.actor:position().x, db.actor:position().z, "me", win)
+	end
+	if coop and coop.connected and coop.connected() then
+		local group = {}
+		for _, name in ipairs(coop.group()) do
+			group[name] = true
+		end
+		for _, peer in ipairs(coop.peers()) do
+			if group[peer.name] and peer.level == BUNKER then
+				self:mark(peer.position.x, peer.position.z, "friend", win)
+				local u, v = self:to_plan(peer.position.x, peer.position.z)
+				self:text(u + 8, v - 9, 120, 18, peer.name, C.white, win)
+			end
+		end
+	end
+	-- the hover and the pick, over the rooms
+	self.hover = self:rect(0, 0, 1, 1, C.white, win, 50)
+	self.hover:Show(false)
+	self.pick = {}
+	for i = 1, 4 do
+		self.pick[i] = self:rect(0, 0, 1, 1, C.pick, win)
+		self.pick[i]:Show(false)
+	end
+	self.card_x = a.x + a.w + 16
+	self.card_w = W - self.card_x - 12
+	self.card = nil
+	self:show_card(nil)
+	self.app_update = self.update_plan
+	self.app_clicks[#self.app_clicks + 1] = { self.wx + a.x, self.wy + a.y, a.w, a.h, function(p) self:pick_room(p) end }
+end
+
+function UIShelterOS:room_at(p)
+	local a = self.plan_area
+	if not inside(p, { self.wx + a.x, self.wy + a.y, a.w, a.h }) then
+		return nil
+	end
+	for _, room in ipairs(rooms) do
+		local x, y, w, h = self:room_rect(room)
+		if inside(p, { self.wx + x, self.wy + y, w, h }) then
+			return room
+		end
+	end
+end
+
+function UIShelterOS:update_plan()
+	local room = self:room_at(self:cursor())
+	if room ~= self.hovered then
+		self.hovered = room
+		if room then
+			self:place(self.hover, self:room_rect(room))
+		end
+		self.hover:Show(room and true or false)
+	end
+end
+
+function UIShelterOS:pick_room(p)
+	local room = self:room_at(p)
+	if room then
+		local x, y, w, h = self:room_rect(room)
+		local sides = { { x, y, w, 2 }, { x, y + h - 2, w, 2 }, { x, y, 2, h }, { x + w - 2, y, 2, h } }
+		for i, s in ipairs(sides) do
+			self:place(self.pick[i], s[1], s[2], s[3], s[4])
+			self.pick[i]:Show(true)
+		end
+	end
+	self:show_card(room)
+end
+
+-- the card of the room picked: its name, state, role and what it can be made; the legend under it
+function UIShelterOS:show_card(room)
+	if self.card then
+		self.win:DetachChild(self.card)
+	end
+	-- the card's buttons go: the plan's own click stays first
+	for i = #self.app_clicks, 1, -1 do
+		if self.app_clicks[i].card then
+			table.remove(self.app_clicks, i)
+		end
+	end
+	local x, y, w = self.card_x, 32, self.card_w
+	local card = self:rect(x, y, w, self.plan_area.h, C.face, self.win)
+	self.card = card
+	local ax, ay = self.wx + x, self.wy + y
+	if not room then
+		self:text(0, 0, w, 40, tr("st_shelter_plan_hint"), C.grey_text, card)
+	else
+		self:text(0, 0, w, 26, tr(room.name), C.text, card, CGameFont.alLeft, GetFontLetterica18Russian())
+		local state = shelter.zone_state(room.zone)
+		self:text(0, 30, w, 20, tr("st_shelter_room_state_" .. state), C.text, card)
+		local role = role_of(room)
+		self:text(0, 52, w, 20, tr("st_shelter_room_role", tr("st_shelter_role_" .. (role or "none"))), C.text, card)
+		local by = 84
+		for _, r in ipairs(ROLES) do
+			if room.roles[r] then
+				local label, f
+				if role == r then
+					label, f = tr("st_shelter_room_unassign"), function()
+						shelter.set_state("room_" .. r, nil)
+						self:show_card(room)
+					end
+				elseif state == "blocked" then
+					label = nil
+					self:text(0, by, w, 20, tr("st_shelter_room_blocked_" .. r), C.grey_text, card)
+				else
+					label, f = tr("st_shelter_room_make_" .. r), function()
+						shelter.set_state("room_" .. r, room.id)
+						self:show_card(room)
+					end
+				end
+				if label then
+					local n = #self.app_clicks
+					self:button(0, by, 240, 26, label, f, self.app_clicks, card, ax, ay)
+					self.app_clicks[n + 1].card = true
+				end
+				by = by + 34
+			end
+		end
+	end
+	-- the legend
+	local ly = self.plan_area.h - #LEGEND * 20 - 4
+	self:rect(0, ly - 8, w, 1, C.shadow, card)
+	for i, kind in ipairs(LEGEND) do
+		self:image(0, ly + (i - 1) * 20 + 2, 14, 14, "ui\\shelter\\laptop_mark_" .. kind, card)
+		self:text(20, ly + (i - 1) * 20, w - 20, 18, tr("st_shelter_mark_" .. kind), C.text, card)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the cleaning: what it does, and the start
+
+function UIShelterOS:open_clean()
+	local W, H = 460, 210
+	local win = self:window(math.floor((SCREEN.w - W) / 2), 200, W, H, tr("st_shelter_app_clean"))
+	self:text(14, 34, W - 28, 120, tr("st_shelter_clean_hint"), C.text, win)
+	self:button(math.floor((W - 200) / 2), H - 42, 200, 28, tr("st_shelter_clean"), function()
+		self:Close()
+		shelter.clean()
+	end, self.app_clicks, win, self.wx, self.wy)
+end
+
+-------------------------------------------------------------------------------
+-- the input, the time
+
+function UIShelterOS:click(p)
+	for _, list in ipairs({ self.menu_clicks or {}, self.app_clicks, self.clicks }) do
+		for i = #list, 1, -1 do
+			local c = list[i]
+			if inside(p, c) then
+				c[5](p)
+				return
+			end
+		end
+	end
+	if self.menu then
+		self:toggle_menu()
+	end
+end
+
+function UIShelterOS:Update()
+	CUIScriptWnd.Update(self)
+	local now = time_global()
+	if not self.ticked or now >= self.ticked then
+		self.ticked = now + 1000
+		self:tick()
+	end
+	if self.app_update then
+		self.app_update(self)
+	end
+end
+
+function UIShelterOS:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			self:click(self:cursor())
+			return true
+		elseif dik_to_bind(dik) == key_bindings.kQUIT then
+			if self.menu then
+				self:toggle_menu()
+			elseif self.app then
+				self:close_app()
+			else
+				self:Close()
+			end
+			return true
+		end
+	end
+	return res
+end
+
+function UIShelterOS:Close()
+	self:HideDialog()
+	gui = nil
+end
+
+-- the laptop opened (shelter.script's laptop_binder)
+function open()
+	if not (gui and gui:IsShown()) then
+		gui = UIShelterOS()
+		gui:ShowDialog(true)
+	end
+end

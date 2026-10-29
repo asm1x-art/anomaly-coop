@@ -78,9 +78,6 @@
 	<string id="st_shelter_laptop_no_power">
 		<text>No power: the generator isn't running.</text>
 	</string>
-	<string id="st_shelter_desktop">
-		<text>Desktop</text>
-	</string>
 	<string id="st_shelter_clean">
 		<text>Clean up the shelter</text>
 	</string>
@@ -545,5 +542,116 @@
 	</string>
 	<string id="st_shelter_chamber_made">
 		<text>%s is made: the artefact is in the chamber.</text>
+	</string>
+	<string id="st_shelter_os_start">
+		<text>Start</text>
+	</string>
+	<string id="st_shelter_os_shutdown">
+		<text>Shut down</text>
+	</string>
+	<string id="st_shelter_app_plan">
+		<text>Shelter plan</text>
+	</string>
+	<string id="st_shelter_app_clean">
+		<text>Cleaning</text>
+	</string>
+	<string id="st_shelter_plan_hint">
+		<text>Click a room on the plan.</text>
+	</string>
+	<string id="st_shelter_room_state_blocked">
+		<text>State: blocked by rubble</text>
+	</string>
+	<string id="st_shelter_room_state_dirty">
+		<text>State: open, not cleaned</text>
+	</string>
+	<string id="st_shelter_room_state_clean">
+		<text>State: cleaned</text>
+	</string>
+	<string id="st_shelter_room_role">
+		<text>Role: %s</text>
+	</string>
+	<string id="st_shelter_role_none">
+		<text>none</text>
+	</string>
+	<string id="st_shelter_role_store">
+		<text>the bar's store</text>
+	</string>
+	<string id="st_shelter_room_make_store">
+		<text>Make it the bar's store</text>
+	</string>
+	<string id="st_shelter_room_unassign">
+		<text>Take the role off</text>
+	</string>
+	<string id="st_shelter_room_blocked_store">
+		<text>A store once the rubble is dug out.</text>
+	</string>
+	<string id="st_shelter_mark_generator">
+		<text>Generator</text>
+	</string>
+	<string id="st_shelter_mark_laptop">
+		<text>Laptop</text>
+	</string>
+	<string id="st_shelter_mark_stash">
+		<text>Stash</text>
+	</string>
+	<string id="st_shelter_mark_chamber">
+		<text>Synthesis chambers</text>
+	</string>
+	<string id="st_shelter_mark_me">
+		<text>You</text>
+	</string>
+	<string id="st_shelter_mark_friend">
+		<text>Group</text>
+	</string>
+	<string id="st_shelter_room_laptop">
+		<text>Laptop room</text>
+	</string>
+	<string id="st_shelter_room_stash">
+		<text>Stash room</text>
+	</string>
+	<string id="st_shelter_room_cells_north">
+		<text>Synthesis chambers</text>
+	</string>
+	<string id="st_shelter_room_cells_south">
+		<text>Cells</text>
+	</string>
+	<string id="st_shelter_room_entrance">
+		<text>Entrance</text>
+	</string>
+	<string id="st_shelter_room_passage">
+		<text>Passage</text>
+	</string>
+	<string id="st_shelter_room_lower_hall">
+		<text>Lower hall</text>
+	</string>
+	<string id="st_shelter_room_water_hall">
+		<text>Water hall</text>
+	</string>
+	<string id="st_shelter_room_corridor">
+		<text>Corridor</text>
+	</string>
+	<string id="st_shelter_room_sw">
+		<text>Room 1</text>
+	</string>
+	<string id="st_shelter_room_se">
+		<text>Room 2</text>
+	</string>
+	<string id="st_shelter_room_12">
+		<text>Room 3</text>
+	</string>
+	<string id="st_shelter_room_13">
+		<text>Room 4</text>
+	</string>
+	<string id="st_shelter_room_10">
+		<text>Room 5</text>
+	</string>
+	<string id="st_shelter_room_11">
+		<text>Room 6</text>
+	</string>
+	<string id="st_shelter_room_8">
+		<text>Room 7</text>
+	</string>
+	<string id="st_shelter_room_9">
+		<text>Room 8</text>
 	</string>
 </string_table>

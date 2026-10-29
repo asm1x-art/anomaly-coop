@@ -1,0 +1,12 @@
+<w>
+	<!-- The laptop's desktop, an old OS (scripts/ui_shelter_laptop.script): parts it puts together and sizes itself -->
+	<white x="0" y="0" width="8" height="8" stretch="1">
+		<texture>ui\shelter\laptop_white</texture>
+	</white>
+	<image x="0" y="0" width="64" height="64" stretch="1">
+		<texture>ui\shelter\laptop_white</texture>
+	</image>
+	<text x="0" y="0" width="100" height="18">
+		<text font="letterica16" r="0" g="0" b="0" align="l" vert_align="c" complex_mode="1"/>
+	</text>
+</w>

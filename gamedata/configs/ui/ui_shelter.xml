@@ -1,5 +1,5 @@
 <w>
-	<!-- The shelter (scripts/shelter.script): the note read from the inventory, the laptop's desktop -->
+	<!-- The shelter (scripts/shelter.script): the note read from the inventory -->
 	<note x="212" y="84" width="600" height="600" stretch="1">
 		<texture>ui_inGame2_opt_main_window</texture>
 		<caption x="20" y="6" width="560" height="24" stretch="1">
@@ -17,24 +17,4 @@
 		</btn_close>
 	</note>
 
-	<laptop x="112" y="84" width="800" height="600" stretch="1">
-		<texture>ui_inGame2_opt_main_window</texture>
-		<caption x="20" y="6" width="760" height="24" stretch="1">
-			<text r="170" g="170" b="170" font="graffiti22" align="l" vert_align="c">st_shelter_desktop</text>
-		</caption>
-		<frame x="16" y="38" width="768" height="510" stretch="1">
-			<texture>ui_inGame2_servers_list_frame</texture>
-		</frame>
-		<btn_clean x="36" y="58" width="220" height="30" stretch="1">
-			<texture>ui_button_ordinary</texture>
-			<text font="letterica18">st_shelter_clean</text>
-		</btn_clean>
-		<hint_clean x="36" y="94" width="300" height="60" stretch="1">
-			<text r="150" g="150" b="150" font="letterica16" align="l" vert_align="t" complex_mode="1">st_shelter_clean_hint</text>
-		</hint_clean>
-		<btn_close x="325" y="562" width="150" height="24" stretch="1">
-			<texture>ui_button_ordinary</texture>
-			<text font="letterica18">st_shelter_close</text>
-		</btn_close>
-	</laptop>
 </w>
