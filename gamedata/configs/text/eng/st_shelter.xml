@@ -525,4 +525,25 @@
 	<string id="st_shelter_goal_synthesis_5">
 		<text>The synthesis chambers are ready. Recipes next.</text>
 	</string>
+	<string id="st_shelter_chamber_tip_recipe">
+		<text>%s: make %s</text>
+	</string>
+	<string id="st_shelter_chamber_tip_making">
+		<text>%s: making %s, %d min left</text>
+	</string>
+	<string id="st_shelter_chamber_tip_take">
+		<text>%s: take %s</text>
+	</string>
+	<string id="st_shelter_chamber_need_junk">
+		<text>To make %s it needs: %s.</text>
+	</string>
+	<string id="st_shelter_chamber_started">
+		<text>Making %s: ready in %s h.</text>
+	</string>
+	<string id="st_shelter_chamber_making">
+		<text>Making %s: %d min left.</text>
+	</string>
+	<string id="st_shelter_chamber_made">
+		<text>%s is made: the artefact is in the chamber.</text>
+	</string>
 </string_table>
