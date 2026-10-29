@@ -2688,6 +2688,7 @@ void CActor::UpdateArtefactsOnBeltAndOutfit()
 		update_time = 0.0f;
 	}
 
+	CCustomOutfit* outfit = GetOutfit();
 	for (TIItemContainer::iterator it = inventory().m_belt.begin();
 	     inventory().m_belt.end() != it; ++it)
 	{
@@ -2701,15 +2702,18 @@ void CActor::UpdateArtefactsOnBeltAndOutfit()
 			conditions().ChangeSatiety((artefact->m_fSatietyRestoreSpeed * art_cond) * f_update_time);
 			if ((artefact->m_fRadiationRestoreSpeed * art_cond) > 0.0f)
 			{
-				float val = (artefact->m_fRadiationRestoreSpeed * art_cond) - conditions().GetBoostRadiationImmunity();
-				clamp(val, 0.0f, val);
-				conditions().ChangeRadiation(val * f_update_time);
+				// an outfit shielding its artefact containers lets none of their radiation through
+				if (!(outfit && outfit->m_bArtefactRadiationShield))
+				{
+					float val = (artefact->m_fRadiationRestoreSpeed * art_cond) - conditions().GetBoostRadiationImmunity();
+					clamp(val, 0.0f, val);
+					conditions().ChangeRadiation(val * f_update_time);
+				}
 			}
 			else
 				conditions().ChangeRadiation((artefact->m_fRadiationRestoreSpeed * art_cond) * f_update_time);
 		}
 	}
-	CCustomOutfit* outfit = GetOutfit();
 	CHelmet* pHelmet = smart_cast<CHelmet*>(inventory().ItemFromSlot(HELMET_SLOT));
 	if (outfit || pHelmet)
 	{

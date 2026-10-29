@@ -28,6 +28,7 @@ CCustomOutfit::CCustomOutfit()
 
 	m_boneProtection = xr_new<SBoneProtections>();
 	m_artefact_count = 0;
+	m_bArtefactRadiationShield = false;
 	m_BonesProtectionSect = NULL;
 }
 
@@ -115,6 +116,7 @@ void CCustomOutfit::Load(LPCSTR section)
 	m_artefact_count = READ_IF_EXISTS(pSettings, r_u32, section, "artefact_count", 0);
 	//clamp(m_artefact_count, (u32)0, (u32)5);
 	m_artefact_count = _max(m_artefact_count, (u32)0);
+	m_bArtefactRadiationShield = READ_IF_EXISTS(pSettings, r_bool, section, "artefact_radiation_shield", false);
 
 	m_BonesProtectionSect = READ_IF_EXISTS(pSettings, r_string, section, "bones_koeff_protection", "");
 	bIsHelmetAvaliable = !!READ_IF_EXISTS(pSettings, r_bool, section, "helmet_avaliable", true);

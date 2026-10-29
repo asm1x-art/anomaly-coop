@@ -50,6 +50,7 @@ public:
 	float m_fPowerLoss;
 	float m_additional_weight;
 	float m_additional_weight2;
+	bool m_bArtefactRadiationShield; // the belt's artefacts don't irradiate the wearer
 
 	float m_fHealthRestoreSpeed;
 	float m_fRadiationRestoreSpeed;
