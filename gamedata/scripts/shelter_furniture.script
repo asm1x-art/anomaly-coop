@@ -291,7 +291,75 @@ local function actor_on_update()
 	end
 end
 
+-----------------------------------------------------------------------------------------------------------------------
+-- The bunker's props (configs\scripts\shelter\props.ltx, tools\shelter\props.py): the level's furniture and clutter
+-- cut out into Hideout Furniture's pieces. What of the level they replace is hidden and its collision taken out on
+-- every load; the pieces are spawned once, where it stood.
+
+local PROPS = "scripts\\shelter\\props.ltx"
+
+-- visuals an older cleaning took away (its zone's items, Hideout Furniture's tables, went into the stash): their pieces
+-- aren't spawned in a game where that zone is cleaned
+local CLEANED_BEFORE = { start = { 544, 545 }, corridor = { 501 }, room_10 = { 500 }, room_12 = { 496, 497, 498 } }
+-- the visuals of the first room turned into props (the corridor's west side room), all placed under one flag then
+local FIRST_ROOM = { [501] = true, [504] = true, [502] = true, [503] = true, [458] = true, [457] = true, [459] = true,
+	[460] = true, [434] = true, [435] = true }
+
+local function cleaned_before(visuals)
+	for zone, ids in pairs(CLEANED_BEFORE) do
+		if load_var(db.actor, "shelter_clean_" .. zone, false) then
+			for _, v in ipairs(ids) do
+				if visuals[v] then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function place_props()
+	local ini = ini_file(PROPS)
+	for _, v in ipairs(str_explode(ini:r_string_ex("replaced", "visuals") or "", ",")) do
+		local index = tonumber(v)
+		if index then
+			level.hide_static_visual(index)
+		end
+	end
+	level.make_static_passable(ini:r_string_ex("replaced", "triangles") or "")
+	-- the first prop room's games (one flag for all its props): those are out already
+	local first_room = load_var(db.actor, "shelter_props_placed", false)
+	for i = 0, ini:line_count("places") - 1 do
+		local _, _, value = ini:r_line_ex("places", i, "", "")
+		local t = str_explode(value, ",")
+		local visuals, only_first_room = {}, true
+		for v in string.gmatch(t[6] or "", "%d+") do
+			visuals[tonumber(v)] = true
+			only_first_room = only_first_room and FIRST_ROOM[tonumber(v)] or false
+		end
+		-- each prop spawned once, known by where it stands
+		local key = "shelter_prop_" .. t[2] .. "_" .. t[3] .. "_" .. t[4]
+		local done = load_var(db.actor, key, false) or (first_room and only_first_room)
+		save_var(db.actor, key, true)
+		if not done and not cleaned_before(visuals) then
+			local pos = vector():set(tonumber(t[2]), tonumber(t[3]), tonumber(t[4]))
+			local lv = level.vertex_id(pos)
+			if lv >= 4294967295 then
+				lv = db.actor:level_vertex_id()
+			end
+			placeable_furniture.create_object(t[1], pos, vector():set(0, tonumber(t[5]), 0), lv, db.actor:game_vertex_id())
+		end
+	end
+end
+
+local function actor_on_first_update()
+	if level.name() == LEVEL and level.hide_static_visual then
+		place_props()
+	end
+end
+
 function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_key_press", on_key_press)
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)
 	RegisterScriptCallback("on_before_key_hold", on_before_key_other)

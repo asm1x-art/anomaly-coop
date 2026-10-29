@@ -15,17 +15,19 @@ class Geom:
         top = {cid: (off, sz) for cid, off, sz in chunks(d)}
         self.data = d
         self.vbs, self.ibs = [], []      # (positions array, file offset of vertex 0, stride) / (file offset of index 0, count)
+        self.raws, self.decls = [], []   # each vb's raw vertices; its declaration {(usage, usage index): offset}
         off, _ = top[9]
         n = struct.unpack_from('<I', d, off)[0]
         p = off + 4
         for _ in range(n):
-            stride, pos_off = 0, None
+            stride, pos_off, decl = 0, None, {}
             while True:
                 stream, eoff, typ, meth, usage, uidx = struct.unpack_from('<HHBBBB', d, p)
                 p += 8
                 if stream == 0xFF:
                     break
                 stride = max(stride, eoff + SIZES[typ])
+                decl[(usage, uidx)] = eoff
                 if usage == 0 and pos_off is None:
                     assert typ == 2, typ
                     pos_off = eoff
@@ -34,6 +36,8 @@ class Geom:
             raw = np.frombuffer(d, np.uint8, count * stride, p).reshape(count, stride)
             pos = raw[:, pos_off:pos_off + 12].copy().view('<f4').reshape(count, 3).astype(np.float64)
             self.vbs.append((pos, p, stride))
+            self.raws.append(raw)
+            self.decls.append(decl)
             p += count * stride
         off, _ = top[10]
         n = struct.unpack_from('<I', d, off)[0]
@@ -53,3 +57,21 @@ class Geom:
         start = self.ibs[ib][0] + ibase * 2
         idx = np.frombuffer(self.data, '<u2', icount, start).astype(np.int64) + vbase
         return pos[idx].reshape(-1, 3, 3)
+
+    def mesh(self, level_data, visual):
+        """the visual's own vertices and triangles: positions, normals, base texture coordinates (as the static
+        shaders unpack them: the normal a D3DCOLOR with x in its red byte; the uv shorts, plus the alpha bytes of the
+        tangent and the binormal as their fraction, over 1024), triangles indexing them"""
+        vb, vbase, vcount, ib, ibase, icount = self.container(level_data, visual)
+        raw, decl = self.raws[vb][vbase:vbase + vcount], self.decls[vb]
+        P = self.vbs[vb][0][vbase:vbase + vcount]
+        n = raw[:, decl[(3, 0)]:decl[(3, 0)] + 4].astype(np.float64)
+        N = np.stack([n[:, 2], n[:, 1], n[:, 0]], 1) / 255.0 * 2 - 1
+        N /= np.maximum(np.linalg.norm(N, axis=1, keepdims=True), 1e-9)
+        tc = raw[:, decl[(5, 0)]:decl[(5, 0)] + 4].copy().view('<i2').reshape(-1, 2).astype(np.float64)
+        du = raw[:, decl[(6, 0)] + 3].astype(np.float64) / 255.0
+        dv = raw[:, decl[(7, 0)] + 3].astype(np.float64) / 255.0
+        UV = (tc + np.stack([du, dv], 1)) / 1024.0
+        start = self.ibs[ib][0] + ibase * 2
+        I = np.frombuffer(self.data, '<u2', icount, start).astype(np.int64).reshape(-1, 3)
+        return P, N, UV, I

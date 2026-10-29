@@ -276,4 +276,40 @@
 	<string id="st_shelter_item_chair_descr">
 		<text>Простой деревянный стул из бункера. Можно поставить в убежище.</text>
 	</string>
+	<string id="st_shelter_prop_table">
+		<text>Старый стол</text>
+	</string>
+	<string id="st_shelter_prop_table_descr">
+		<text>Деревянный стол из бункера, видавший виды. Можно поставить в убежище.</text>
+	</string>
+	<string id="st_shelter_prop_crate">
+		<text>Деревянный ящик</text>
+	</string>
+	<string id="st_shelter_prop_crate_descr">
+		<text>Деревянный ящик из бункера. Можно поставить в убежище.</text>
+	</string>
+	<string id="st_shelter_prop_rack">
+		<text>Металлический стеллаж</text>
+	</string>
+	<string id="st_shelter_prop_rack_descr">
+		<text>Ржавый металлический стеллаж из бункера. Можно поставить в убежище.</text>
+	</string>
+	<string id="st_shelter_prop_boards">
+		<text>Доски</text>
+	</string>
+	<string id="st_shelter_prop_boards_descr">
+		<text>Старые доски из бункера. Можно положить в убежище.</text>
+	</string>
+	<string id="st_shelter_prop_pallet">
+		<text>Деревянный поддон</text>
+	</string>
+	<string id="st_shelter_prop_pallet_descr">
+		<text>Деревянный поддон из бункера. Можно положить в убежище.</text>
+	</string>
+	<string id="st_shelter_prop_door">
+		<text>Старая дверь</text>
+	</string>
+	<string id="st_shelter_prop_door_descr">
+		<text>Белая дверь, снятая с петель. Можно поставить в убежище.</text>
+	</string>
 </string_table>

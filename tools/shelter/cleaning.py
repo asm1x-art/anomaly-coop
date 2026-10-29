@@ -11,15 +11,14 @@ from levelgeom import Geom
 from levelvis import level
 
 ZONES = [
-    ('start', 'the lower hall, the water hall: open from the first visit; the doors lying on the floor', [339, 361, 274, 70, 544, 545]),
-    ('corridor', "the north corridor and its two southern side rooms (open to it), behind point 3's mound; the "
-     "overturned tables there go to the stash", [57, 200, 501], 'prop_table_1, prop_table_1'),
+    ('start', 'the lower hall, the water hall: open from the first visit (the doors lying on the floor are props)', [339, 361, 274, 70]),
+    ('corridor', "the north corridor and its two southern side rooms (open to it), behind point 3's mound (their "
+     "furniture is movable props: props.py)", [57, 200]),
     # the side rooms behind the doorway mounds (8..13): each opens when its mound is dug out
     ('room_8', 'the north-west side room', [218]),
-    ('room_10', 'the west side room in the middle; its overturned table goes to the stash', [237, 500], 'prop_table_1'),
+    ('room_10', 'the west side room in the middle', [237]),
     ('room_11', 'the east side room in the middle', [273]),
-    ('room_12', 'the south-west side room; its long table on its edge goes to the stash as two', [266, 496, 497, 498],
-     'prop_table_1, prop_table_1'),
+    ('room_12', 'the south-west side room', [266]),
 ]
 
 level_dir, out = sys.argv[1], sys.argv[2]

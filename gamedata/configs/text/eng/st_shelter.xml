@@ -276,4 +276,40 @@
 	<string id="st_shelter_item_chair_descr">
 		<text>A plain wooden chair from the bunker. Can be placed in the shelter.</text>
 	</string>
+	<string id="st_shelter_prop_table">
+		<text>Old table</text>
+	</string>
+	<string id="st_shelter_prop_table_descr">
+		<text>A battered wooden table from the bunker. Can be placed in the shelter.</text>
+	</string>
+	<string id="st_shelter_prop_crate">
+		<text>Wooden crate</text>
+	</string>
+	<string id="st_shelter_prop_crate_descr">
+		<text>A wooden crate from the bunker. Can be placed in the shelter.</text>
+	</string>
+	<string id="st_shelter_prop_rack">
+		<text>Metal rack</text>
+	</string>
+	<string id="st_shelter_prop_rack_descr">
+		<text>A rusty metal rack from the bunker. Can be placed in the shelter.</text>
+	</string>
+	<string id="st_shelter_prop_boards">
+		<text>Boards</text>
+	</string>
+	<string id="st_shelter_prop_boards_descr">
+		<text>Old boards from the bunker. Can be laid in the shelter.</text>
+	</string>
+	<string id="st_shelter_prop_pallet">
+		<text>Wooden pallet</text>
+	</string>
+	<string id="st_shelter_prop_pallet_descr">
+		<text>A wooden pallet from the bunker. Can be laid in the shelter.</text>
+	</string>
+	<string id="st_shelter_prop_door">
+		<text>Old door</text>
+	</string>
+	<string id="st_shelter_prop_door_descr">
+		<text>A white door off its hinges. Can be placed in the shelter.</text>
+	</string>
 </string_table>
