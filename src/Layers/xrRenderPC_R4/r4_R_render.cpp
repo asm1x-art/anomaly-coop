@@ -599,6 +599,9 @@ void CRender::Render()
 	{
 		PIX_EVENT(DEFER_SELF_ILLUM);
 		Target->phase_accumulator();
+		// The sun's shadow maps leave PHASE_SMAP behind, and in it static visuals draw their position-only fast
+		// geometry, which the emissive shaders read garbage from (streaks across the screen)
+		phase = PHASE_NORMAL;
 		// Render emissive geometry, stencil - write 0x0 at pixel pos
 		RCache.set_xform_project(Device.mProject);
 		RCache.set_xform_view(Device.mView);
