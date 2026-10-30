@@ -16,6 +16,7 @@
 #include "script_engine.h"
 #include "Level.h"
 #include "Actor.h"
+#include "../xrEngine/XR_IOConsole.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -728,6 +729,12 @@ namespace coop
 			clear_projectiles();
 			reset_id_blocks();
 			reset_world_sync();
+			// the host lives for its server: the server starts it again (a game left over would hold its folder)
+			if (is_host())
+			{
+				Msg("[coop] the host lost its server: quitting");
+				Console->Execute("quit");
+			}
 			return;
 		}
 

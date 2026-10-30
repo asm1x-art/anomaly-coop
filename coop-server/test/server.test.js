@@ -939,6 +939,39 @@ test('saves: the master saves when asked; a player coming in gets the last save 
   }
 });
 
+test('the journal and the client ids outlive a server restart', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  let server = await startServer(options(dataDir));
+  try {
+    const a = await player(server.address().port, 'artem');
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    a.send(M.ITEM_PARENT, Buffer.from('item 1'));
+    await roundTrip(a);
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+  server = await startServer(options(dataDir));
+  try {
+    const b = await connect(server.address().port);
+    b.send(M.HELLO, hello('друг'));
+    assert.equal((await b.next()).payload.readUInt32LE(0), 2); // after artem's 1
+    b.send(M.WORLD_REQUEST);
+    const journal = [];
+    let names = null;
+    for (let msg = await b.next(); msg.type !== M.WORLD_DONE; msg = await b.next()) {
+      if (msg.type === M.JOURNAL) journal.push(msg.payload);
+      if (msg.type === M.NAMES) names = msg.payload;
+    }
+    assert.deepEqual(journal, [Buffer.concat([u16le(M.ITEM_PARENT), u32le(1), Buffer.from('item 1')])]);
+    assert.equal(names.readUInt16LE(0), 2);
+    assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['artem']);
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 function snapshot(record, progress, things) {
   const sized = (b) => Buffer.concat([u32le(b.length), b]);
   return Buffer.concat([sized(Buffer.from(record)), sized(Buffer.from(progress)), Buffer.from(things)]);

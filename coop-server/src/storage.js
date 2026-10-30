@@ -25,6 +25,10 @@ import { normalizeSettings } from './settings.js';
 //                            meta.json { id, time, name, by, group }: group, the members' names of a group's save
 //                            (the same id in every member's folder); personal_next.json, the next id
 //   personal/<hex name>/things.bin  the things of a save the character was put back to, for its next download
+//   journal.jsonl           the world changes since the last save (server.js), a { t, m: base64 } line each, so a
+//                            server started again still has them
+//   clients.json            { id: name }: every client id given out, so ids go on growing across runs (the journal's
+//                            changes are by id)
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
 
@@ -154,7 +158,7 @@ export function openStorage(dir) {
     // the world and everything that only makes sense with it: saves, characters, id leases, groups
     resetWorld() {
       fs.rmSync(file('saves'), { recursive: true, force: true });
-      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json'])
+      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json', 'journal.jsonl'])
         fs.rmSync(file(f), { force: true });
       facts = {};
       fs.rmSync(file('progress'), { recursive: true, force: true });
@@ -162,6 +166,37 @@ export function openStorage(dir) {
       fs.rmSync(file('personal_next.json'), { force: true });
       saves.length = 0;
       characters = {};
+    },
+
+    // [{ time, message }], oldest first
+    journal() {
+      let text = '';
+      try {
+        text = fs.readFileSync(file('journal.jsonl'), 'utf8');
+      } catch {
+        return [];
+      }
+      return text.split('\n').filter(Boolean).flatMap((line) => {
+        try {
+          const { t, m } = JSON.parse(line);
+          return [{ time: t, message: Buffer.from(m, 'base64') }];
+        } catch {
+          return []; // a line cut short by a crash
+        }
+      });
+    },
+    appendJournal({ time, message }) {
+      fs.appendFileSync(file('journal.jsonl'), JSON.stringify({ t: time, m: message.toString('base64') }) + '\n');
+    },
+    saveJournal(entries) {
+      writeAtomic('journal.jsonl', entries.map(({ time, message }) =>
+        JSON.stringify({ t: time, m: message.toString('base64') }) + '\n').join(''));
+    },
+    clientNames() {
+      return new Map(Object.entries(readJson('clients.json', {})).map(([id, name]) => [Number(id), name]));
+    },
+    saveClientNames(names) {
+      writeAtomic('clients.json', JSON.stringify(Object.fromEntries(names)));
     },
 
     nextCharacterSaveId() {

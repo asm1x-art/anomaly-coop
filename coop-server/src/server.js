@@ -12,7 +12,9 @@ import { settingsText } from './settings.js';
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
   journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false } = {}) {
   const storage = openStorage(dataDir);
-  let nextId = 1;
+  // id -> name: every player and the host so far, for the journal's ids; ids go on growing across runs
+  const names = storage.clientNames();
+  let nextId = Math.max(0, ...names.keys()) + 1;
   const clients = new Map(); // id -> { send, name, state, host, socket }
   // what happened, for the Telegram bot (coop.on): joined, left { name }; host_up, host_down; save_failed
   const events = new EventEmitter();
@@ -192,10 +194,16 @@ autosave_minutes=${autosaveMinutes}`));
   // the latest yet); replaying one the save has changes nothing.
   // Lua events that change the world (coop_sync.script, coop_events.script); the others are for the players there
   const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
-  let journal = []; // { time, message: u16 type, then the payload as relayed }
-  const names = new Map(); // id -> name: every player and the host of this run, for the journal's ids
+  let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
-    if (storage.worldInfo()) journal.push({ time: Date.now(), message: Buffer.concat([u16(type), payload]) });
+    if (!storage.worldInfo()) return;
+    const entry = { time: Date.now(), message: Buffer.concat([u16(type), payload]) };
+    journal.push(entry);
+    storage.appendJournal(entry);
+  };
+  const setJournal = (entries) => {
+    journal = entries;
+    storage.saveJournal(entries);
   };
   const namesPayload = () => Buffer.concat([u16(names.size),
     ...[...names].map(([cid, n]) => Buffer.concat([u32(cid), stringZ(n)]))]);
@@ -282,7 +290,7 @@ autosave_minutes=${autosaveMinutes}`));
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
     if (!now) return 0;
-    journal = []; // the changes since were made to the world as it was
+    setJournal([]); // the changes since were made to the world as it was
     log(`world taken back to revision ${revision} (${how}): revision ${now}`);
     // each game puts its character where that save had it
     for (const c of clients.values()) {
@@ -353,6 +361,7 @@ autosave_minutes=${autosaveMinutes}`));
           client = { send, name, state: null, host: isHost, socket };
           clients.set(id, client);
           names.set(id, name);
+          storage.saveClientNames(names);
           log(`[${id}] '${client.name}' joined from ${addr} (${players().length} online${isHost ? ', the world host' : ''})`);
           send(M.WELCOME, u32(id));
           if (isHost) {
@@ -594,7 +603,7 @@ autosave_minutes=${autosaveMinutes}`));
           if (!upload) break;
           const revision = storage.writeWorld(client.name, upload.files, upload.meta);
           log(`[${id}] '${client.name}' uploaded the world, revision ${revision} (${upload.meta.reason})`);
-          journal = journal.filter((entry) => entry.time >= upload.startedAt - journalOverlapMs);
+          setJournal(journal.filter((entry) => entry.time >= upload.startedAt - journalOverlapMs));
           upload = null;
           creatorId = null;
           announceWorld();
