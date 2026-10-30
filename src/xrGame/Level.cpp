@@ -86,6 +86,9 @@ u32 lvInterpSteps = 0;
 BOOL spawn_antifreeze = TRUE;
 BOOL spawn_antifreeze_debug = FALSE;
 static HANDLE prefetch_thread_signal;
+// set by the prefetch thread as it ends: the level frees what they share only then (it may be mid-prefetch when the
+// level goes, and would insert into a freed set)
+static HANDLE prefetch_thread_exited;
 
 static void unpausePrefetchThreadSignal()
 {
@@ -109,6 +112,7 @@ static void createPrefetchThreadSignal()
 {
 	if (spawn_antifreeze_debug) Msg("prefetch_thread_signal CreateEvent");
 	prefetch_thread_signal = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	prefetch_thread_exited = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 }
 
 struct spawn_and_prefetch_events
@@ -339,12 +343,20 @@ CLevel::~CLevel()
     xr_delete(game_events);
 
 #ifdef SPAWN_ANTIFREEZE
+    {
+        xrSRWLockGuard g(prefetch_lock);
+        closeSignal = true; // signal ProcessPrefetchEvents thread to exit
+    }
+    unpausePrefetchThreadSignal();
+    // the thread may be prefetching (a level change while NPCs come online): it stops before its next model; what it
+    // uses is freed once it is gone
+    if (WaitForSingleObject(prefetch_thread_exited, 30000) != WAIT_OBJECT_0)
+        Msg("! [ProcessPrefetchEvents] the prefetch thread did not end in 30 s");
+    CloseHandle(prefetch_thread_exited);
     xr_delete(spawn_events);
     xr_delete(spawn_events_data);
     xr_delete(prefetch_events);
     xr_delete(prefetched_models);
-    closeSignal = true; // signal ProcessPrefetchEvents thread to exit
-    unpausePrefetchThreadSignal();
 #endif
 
     xr_delete(m_pBulletManager);
@@ -574,15 +586,25 @@ void CLevel::ProcessPrefetchEvents(void* args)
     auto closeSignal = events->closeSignal;
     auto prefetch_lock = events->prefetch_lock;
 
+    // the level's close, read under the lock (it sets it under the lock)
+    auto closing = [&]()
+    {
+        xrSRWLockGuard g(prefetch_lock, true);
+        return *closeSignal;
+    };
+
     while (true)
     {
-        WaitForSingleObject(prefetch_thread_signal, INFINITE); // wait for prefetch queue event to be signaled
+        // not waited for once the level closes: a batch taken as it closed reset the signal it set
+        if (!closing())
+            WaitForSingleObject(prefetch_thread_signal, INFINITE); // wait for prefetch queue event to be signaled
 
-        if (*closeSignal == true)
+        if (closing())
         {
             if (spawn_antifreeze_debug) Msg("[ProcessPrefetchEvents] closeSignal received, destroying thread");
             closePrefetchThreadSignal();
             delete events;
+            SetEvent(prefetch_thread_exited); // the level waits for this before it frees what the thread uses
             return;
         }
 
@@ -605,6 +627,7 @@ void CLevel::ProcessPrefetchEvents(void* args)
             pausePrefetchThreadSignal();
         }
 
+        bool closed = false;
         for (const auto& E : saved_prefetch_events)
         {
             for (const auto& model : E.models)
@@ -613,8 +636,11 @@ void CLevel::ProcessPrefetchEvents(void* args)
 
                 {
                     xrSRWLockGuard g(prefetch_lock, true);
-                    not_prefetched = prefetched_models->find(model) == prefetched_models->end();
+                    closed = *closeSignal; // the level is going: the batch is dropped, the thread ends at the loop's top
+                    not_prefetched = !closed && prefetched_models->find(model) == prefetched_models->end();
                 }
+                if (closed)
+                    break;
 
                 if (not_prefetched)
                 {
@@ -627,7 +653,11 @@ void CLevel::ProcessPrefetchEvents(void* args)
                     }
                 }
             }
+            if (closed)
+                break;
         }
+        if (closed)
+            continue;
 
         {
             xrSRWLockGuard g(prefetch_lock);
