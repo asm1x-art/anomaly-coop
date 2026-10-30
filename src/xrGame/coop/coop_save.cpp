@@ -236,6 +236,7 @@ namespace coop
 			file.clear();
 		forget_progress();
 		forget_facts();
+		drop_held_world_changes();
 		g_downloading = true;
 		NET_Packet R;
 		R.w_begin(M_WORLD_REQUEST);
@@ -591,6 +592,11 @@ namespace coop
 		return g_has_record ? g_record.community.c_str() : "";
 	}
 
+	bool world_downloading()
+	{
+		return g_downloading;
+	}
+
 	bool world_busy()
 	{
 		return g_downloading || g_load_pending || g_loading || (g_pGameLevel && !world_ready());
@@ -887,13 +893,20 @@ namespace coop
 		}
 	}
 
+	static void put_character();
+
 	void on_world_loaded()
 	{
 		if (!g_loading)
 			return;
 		g_loading = false;
 		g_in_world = g_loading_revision;
+		put_character();
+		replay_journal(); // what changed since the save, onto the world with our character in it
+	}
 
+	static void put_character()
+	{
 		apply_progress();
 		put_infos_on_load(); // after it: what the server knows of the world wins over both
 		name_actor();

@@ -49,6 +49,11 @@ namespace coop
 	void begin_shared_spawns();
 	void end_shared_spawns();
 
+	// A player coming in gets the world's last save and the changes made since (the journal, M_JOURNAL): they are
+	// replayed while the save loads, nothing online yet (coop_save.cpp on_world_loaded). Replaying what the save
+	// already has changes nothing: an item where it should be stays, the dead don't die again.
+	void replay_journal();
+
 	// from other clients
 	void apply_entity_death(NET_Packet& P);
 	void apply_item_parent(NET_Packet& P);

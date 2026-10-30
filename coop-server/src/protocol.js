@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 21;
+export const PROTOCOL_VERSION = 22;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -85,6 +85,12 @@ export const M = {
   HOST: 52,           // s->c: u32 the world's host (0: none), stringZ its name; after WELCOME and to all on every change.
                       // The host (the game the server started with -coop_host) is the sim master whenever it is in the
                       // world, and no player: no PEER_STATE, no level, no group, no say in votes
+  // Joining: the world's last save comes with the changes made since (the journal); the game replays them while
+  // it loads, so nobody saves for a player to come in or go
+  JOURNAL: 53,        // s->c: a world change made since the save: u16 type, then the message as it was relayed;
+                      // after the facts, before WORLD_DONE
+  NAMES: 54,          // s->c: u16 count, per player u32 id, stringZ name: everyone of this server run (the journal's
+                      // changes are by ids, some of players gone), before the journal
 };
 
 export const REFUSED = { FULL: 0, VERSION: 1, HOST: 2 }; // HOST: a wrong secret, or a host is there already

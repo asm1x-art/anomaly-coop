@@ -103,6 +103,11 @@ namespace coop
 		xr_map<shared_str, u32> m_authorities;    // level -> its authority, levels with players on them (M_LEVELS)
 		u32 m_host_id = 0;                        // the world's host (M_HOST), 0: none
 		xr_string m_host_name;
+		xr_map<u32, xr_string> m_names;           // every player and host of this server run (M_NAMES, M_PEER_STATE)
+		xr_vector<xr_vector<u8>> m_journal;       // M_JOURNAL: what came with the world to download
+
+		std::mutex& inbox_lock() { return m_inbox_lock; }
+		std::deque<xr_vector<u8>>& inbox() { return m_inbox; }
 	};
 
 	static CClient g_client;
@@ -210,6 +215,8 @@ namespace coop
 		m_authorities.clear();
 		m_host_id = 0;
 		m_host_name.clear();
+		m_names.clear();
+		m_journal.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -401,6 +408,7 @@ namespace coop
 			auto [it, inserted] = m_peers.try_emplace(id);
 			SPeer& peer = it->second;
 			P.r_stringZ(peer.name);
+			m_names[id] = peer.name;
 			P.r_stringZ(peer.level);
 			P.r_vec3(peer.position);
 			P.r_float(peer.yaw);
@@ -469,6 +477,17 @@ namespace coop
 			m_authorities.swap(authorities);
 			break;
 		}
+		case M_NAMES:
+			for (u16 count = P.r_u16(); count; --count)
+			{
+				const u32 id = P.r_u32();
+				P.r_stringZ(m_names[id]);
+			}
+			break;
+		case M_JOURNAL:
+			if (world_downloading())
+				m_journal.emplace_back().assign(P.B.data + P.r_tell(), P.B.data + P.B.count);
+			break;
 		case M_HOST:
 			m_host_id = P.r_u32();
 			P.r_stringZ(m_host_name);
@@ -734,12 +753,15 @@ namespace coop
 			const bool from_sender = type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
 				type == M_SCRIPT_EVENT || type == M_OBJECT_STATE;
 			const bool world_change = from_sender || type == M_ENTITY_DEATH;
+			// relayed before the journal the world comes with: in it
+			if (world_change && world_downloading())
+				continue;
 			if (from_sender && msg.size() >= sizeof(u16) + sizeof(u32))
 			{
 				const u32 sender = *(const u32*)(msg.data() + sizeof(u16));
 				if (m_left.count(sender))
 					continue; // that player is gone: no shadow to apply it to
-				if (!m_peers.count(sender) && sender != m_host_id)
+				if (!m_peers.count(sender) && sender != m_host_id && !m_names.count(sender))
 					hold = true;
 			}
 			if (world_change && hold)
@@ -834,6 +856,40 @@ namespace coop
 	}
 
 	bool is_host() { return g_coop_headless; }
+
+	LPCSTR player_name(u32 id)
+	{
+		if (id == my_id())
+			return my_name().c_str();
+		auto it = g_client.m_names.find(id);
+		return it != g_client.m_names.end() ? it->second.c_str() : is_host_id(id) ? host_name().c_str() : "";
+	}
+
+	void take_journal(xr_vector<xr_vector<u8>>& out)
+	{
+		out.swap(g_client.m_journal);
+		g_client.m_journal.clear();
+	}
+
+	void defer_messages(xr_vector<xr_vector<u8>>& messages)
+	{
+		std::lock_guard<std::mutex> lock(g_client.inbox_lock());
+		g_client.inbox().insert(g_client.inbox().begin(), std::make_move_iterator(messages.begin()),
+		                        std::make_move_iterator(messages.end()));
+		messages.clear();
+	}
+
+	void drop_held_world_changes()
+	{
+		std::lock_guard<std::mutex> lock(g_client.inbox_lock());
+		auto& inbox = g_client.inbox();
+		inbox.erase(std::remove_if(inbox.begin(), inbox.end(), [](const xr_vector<u8>& msg) {
+			const u16 type = *(const u16*)msg.data();
+			return type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
+				type == M_SCRIPT_EVENT || type == M_OBJECT_STATE || type == M_ENTITY_DEATH;
+		}), inbox.end());
+		g_client.m_journal.clear();
+	}
 	bool is_host_id(u32 id) { return id && id == g_client.m_host_id; }
 	const xr_string& host_name() { return g_client.m_host_name; }
 

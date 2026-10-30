@@ -69,6 +69,7 @@ namespace coop
 	bool runs_shared_world();
 	// the world is on its way: downloaded, waiting to load, or loading (nothing else should take frames then)
 	bool world_busy();
+	bool world_downloading(); // asked for, its files and journal coming
 
 	// per frame. A game played while connected to a server without a world becomes the world: after it
 	// has run a while it is saved and uploaded, and keeps running as the shared world.

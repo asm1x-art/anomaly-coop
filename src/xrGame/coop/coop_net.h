@@ -77,6 +77,11 @@ namespace coop
 		                        // there longest); to all on every change
 		M_HOST = 52,            // s->c: u32 the world's host (0: none), stringZ its name; after M_WELCOME and to all on every
 		                        // change. Not a player: no M_PEER_STATE, but the world changes it sends are applied
+		// Joining: the world's last save comes with the changes made since (the journal), replayed while it loads
+		// (coop_world.h replay_journal); no game saves for a player to come in
+		M_JOURNAL = 53,         // s->c: a world change made since the save (u16 type, then as relayed), before M_WORLD_DONE
+		M_NAMES = 54,           // s->c: u16 count, u32 id, stringZ name: every player and host of this server run, before
+		                        // the journal (its changes are by ids, some of players gone)
 	};
 
 	enum EGroupAction : u8
@@ -89,7 +94,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 21;
+	const u16 PROTOCOL_VERSION = 22;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -161,6 +166,14 @@ namespace coop
 	bool is_host();               // this game is the host
 	bool is_host_id(u32 id);      // that client is the host
 	const xr_string& host_name(); // "" while there is none
+	LPCSTR player_name(u32 id);   // a player or the host of this server run, gone or not; "" if unknown
+
+	// the journal that came with the world (M_JOURNAL), handed over once for the replay
+	void take_journal(xr_vector<xr_vector<u8>>& out);
+	// messages for OnFrame to handle before the ones waiting (the journal's script events, once the level runs)
+	void defer_messages(xr_vector<xr_vector<u8>>& messages);
+	// a new download of the world: the world changes waiting for a level are in its journal
+	void drop_held_world_changes();
 
 	// Groups of players: names, leader first. same_group: either may be my_id()
 	const xr_vector<xr_string>* group_of(const xr_string& name);

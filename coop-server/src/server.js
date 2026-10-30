@@ -7,7 +7,9 @@ import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
 
 // hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
-export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null } = {}) {
+// journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0)
+export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
+  journalOverlapMs = 60000 } = {}) {
   const storage = openStorage(dataDir);
   let nextId = 1;
   const clients = new Map(); // id -> { send, name, state, host, socket }
@@ -168,6 +170,20 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     const info = worldInfo();
     for (const c of clients.values()) c.send(M.WORLD_INFO, info);
   };
+  // The journal: the world changes since the world's last save, as relayed. A player coming in gets the save and
+  // then these, and replays them while it loads: nobody saves for them. A new save keeps those that came within
+  // journalOverlapMs before its upload began (the game made the save a little earlier, and may not have applied
+  // the latest yet); replaying one the save has changes nothing.
+  // Lua events that change the world (coop_sync.script, coop_events.script); the others are for the players there
+  const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  let journal = []; // { time, message: u16 type, then the payload as relayed }
+  const names = new Map(); // id -> name: every player and the host of this run, for the journal's ids
+  const record = (type, payload) => {
+    if (storage.worldInfo()) journal.push({ time: Date.now(), message: Buffer.concat([u16(type), payload]) });
+  };
+  const namesPayload = () => Buffer.concat([u16(names.size),
+    ...[...names].map(([cid, n]) => Buffer.concat([u32(cid), stringZ(n)]))]);
+
   // the player's own progress goes with it, before WORLD_DONE: the game puts it on its actor while loading
   const sendWorld = (send, name) => {
     const info = storage.worldInfo();
@@ -176,6 +192,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         send(M.WORLD_CHUNK, Buffer.concat([Buffer.from([file]), u32(offset), data.subarray(offset, offset + CHUNK_SIZE)]));
     });
     for (const [key, value] of Object.entries(storage.facts())) send(M.FACT, Buffer.concat([stringZ(key), stringZ(value)]));
+    send(M.NAMES, namesPayload());
+    for (const entry of journal) send(M.JOURNAL, entry.message);
     const progress = storage.progress(name) ?? Buffer.alloc(0);
     let offset = 0;
     do {
@@ -193,15 +211,6 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     for (const c of clients.values()) if (c.inWorld) c.send(M.PROGRESS_REQUEST);
     master.send(M.SAVE_NOW, Buffer.concat([stringZ(name), stringZ(reason), stringZ(who)]));
     return true;
-  };
-  // a player coming in waits for the master's save of the world as it is now, JOIN_WAIT_MS at most
-  const JOIN_WAIT_MS = 30000;
-  const awaiting = new Map(); // id -> timer
-  const giveWorld = (cid) => {
-    clearTimeout(awaiting.get(cid));
-    awaiting.delete(cid);
-    const c = clients.get(cid);
-    if (c && storage.worldInfo()) sendWorld(c.send, c.name);
   };
   const savesPayload = () => {
     const list = storage.saves().reverse().slice(0, MAX_SAVES_LISTED);
@@ -224,6 +233,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
     if (!now) return 0;
+    journal = []; // the changes since were made to the world as it was
     log(`world taken back to revision ${revision} (${how}): revision ${now}`);
     // each game puts its character where that save had it
     for (const c of clients.values()) {
@@ -299,6 +309,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           }
           client = { send, name, state: null, host: isHost, socket };
           clients.set(id, client);
+          names.set(id, name);
           log(`[${id}] '${client.name}' joined from ${addr} (${players().length} online${isHost ? ', the world host' : ''})`);
           send(M.WELCOME, u32(id));
           if (isHost) {
@@ -352,14 +363,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           break;
         case M.LEFT_WORLD: {
           if (!client.inWorld) break;
-          const wasMaster = masterId() === id;
           client.inWorld = false;
           client.state = null;
           log(`[${id}] '${client.name}' went back to the menu`);
           announceRoles();
           if (moveToLevel(id, client, null)) announceLevels();
-          // their things are in the master's world: saved now, unless they were the master (saved on the way)
-          if (!wasMaster) requestSave('leave', client.name);
           break;
         }
         case M.ID_BLOCK_REQUEST: {
@@ -430,10 +438,10 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         }
         case M.WORLD_REQUEST:
           if (!storage.worldInfo()) send(M.WORLD_INFO, worldInfo());
-          // a player coming in gets the world as it is now: the master saves it first
-          else if (!awaiting.has(id) && requestSave('join', client.name))
-            awaiting.set(id, setTimeout(() => giveWorld(id), JOIN_WAIT_MS).unref());
-          else if (!awaiting.has(id)) sendWorld(send, client.name);
+          else {
+            sendWorld(send, client.name);
+            log(`[${id}] '${client.name}' got the world, revision ${storage.worldInfo().revision}, and ${journal.length} change(s) since`);
+          }
           break;
         case M.SAVE_REQUEST: {
           const name = readStringZ(payload, 0);
@@ -501,7 +509,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
             break;
           }
           upload = { files: WORLD_FILES.map((_, i) => Buffer.alloc(payload.readUInt32LE(i * 4))),
-            meta: { name, reason: reason || 'auto', who } };
+            meta: { name, reason: reason || 'auto', who }, startedAt: Date.now() };
           break;
         }
         case M.WORLD_CHUNK:
@@ -511,13 +519,14 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (!upload) break;
           const revision = storage.writeWorld(client.name, upload.files, upload.meta);
           log(`[${id}] '${client.name}' uploaded the world, revision ${revision} (${upload.meta.reason})`);
+          journal = journal.filter((entry) => entry.time >= upload.startedAt - journalOverlapMs);
           upload = null;
           creatorId = null;
           announceWorld();
-          for (const cid of [...awaiting.keys()]) giveWorld(cid);
           break;
         }
         case M.ENTITY_DEATH:
+          record(type, payload);
           broadcast(id, type, Buffer.from(payload));
           break;
         case M.GROUP:
@@ -528,6 +537,10 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.OBJECT_SPAWN:
         case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
+          if (type !== M.SCRIPT_EVENT || JOURNAL_EVENTS.has(readStringZ(payload, 0)))
+            record(type, Buffer.concat([u32(id), payload]));
+          broadcast(id, type, Buffer.concat([u32(id), payload]));
+          break;
         case M.ACTOR_ACTION:
         case M.NPC_STATES:
         case M.COOP_HIT:
@@ -551,7 +564,6 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     socket.on('error', () => {}); // 'close' follows and reports
     socket.on('close', () => {
       if (!clients.has(id)) return;
-      const wasMaster = masterId() === id;
       clients.delete(id);
       if (client.host) {
         hostId = null;
@@ -570,10 +582,6 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         log(`[${id}] '${client.name}' left before the world was made: anyone may create it`);
         announceWorld();
       }
-      clearTimeout(awaiting.get(id));
-      awaiting.delete(id);
-      // their things are in the master's world: saved now, unless they were the master (saved on the way)
-      if (client.inWorld && !wasMaster) requestSave('leave', client.name);
       if (vote?.proposerId === id) endVote(ROLLBACK.CANCELLED, client.name);
       else if (vote?.waiting.delete(id) && !vote.waiting.size) endVote(ROLLBACK.ACCEPTED);
       if (!players().length && pausedBy) setPaused(''); // nobody left to let it go on
@@ -629,6 +637,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (players().length) return false;
       if (hostId !== null) clients.get(hostId).socket.destroy();
       storage.resetWorld();
+      journal = [];
       idLeases.clear();
       groups.length = 0;
       log('world reset on the admin page');

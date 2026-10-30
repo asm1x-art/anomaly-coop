@@ -545,6 +545,7 @@ test('world: uploaded into an empty server, announced to all, downloaded in chun
         assert.equal(msg.payload.readUInt32LE(0), 0); // none kept for this player
         continue;
       }
+      if (msg.type === M.NAMES) continue; // the journal's names (here, no journal)
       assert.equal(msg.type, M.WORLD_CHUNK);
       msg.payload.copy(files[msg.payload[0]], msg.payload.readUInt32LE(1), 5);
     }
@@ -824,8 +825,29 @@ async function player(port, name) {
   return c;
 }
 
-test('saves: the master is whoever is in the world; it saves for players coming in, leaving and asking', async () => {
-  const server = await startServer(options());
+// the message types that came before a round trip's PONG
+async function drain(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const types = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return types;
+    types.push(msg.type);
+  }
+}
+
+function event(name, payload) {
+  return Buffer.concat([encodeText(name), Buffer.from([0]), encodeText(payload), Buffer.from([0])]);
+}
+
+function u16le(v) {
+  const b = Buffer.alloc(2);
+  b.writeUInt16LE(v, 0);
+  return b;
+}
+
+test('saves: the master saves when asked; a player coming in gets the last save and the journal since, nobody saves', async () => {
+  const server = await startServer({ ...options(), journalOverlapMs: 0 });
   const { port } = server.address();
   try {
     const menu = await player(port, 'menu');       // lowest id, stays in the main menu
@@ -836,31 +858,60 @@ test('saves: the master is whoever is in the world; it saves for players coming 
     await roundTrip(master);
     assert.equal(master.roles.at(-1), 2); // in the world: the master now, not the one in the menu
 
-    // a player coming in: the master saves first, then the newcomer gets that world
+    // world changes since the save are kept; Lua events only when they change the world
+    master.send(M.ITEM_PARENT, Buffer.from('item 1'));
+    master.send(M.SCRIPT_EVENT, event('news', 'hello'));
+    master.send(M.SCRIPT_EVENT, event('stash_opened', '77'));
+    master.send(M.ENTITY_DEATH, Buffer.from('death'));
+    master.send(M.NPC_STATES, Buffer.from('npcs'));
+    await roundTrip(master);
+
+    // a player coming in: the save and the journal at once, nobody saves
     const joiner = await player(port, 'joiner');
     joiner.send(M.WORLD_REQUEST);
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'join', who: 'joiner' });
-    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, '', 'join', 'joiner');
-    const done = await until(joiner, M.WORLD_DONE);
-    assert.equal(done.payload.readUInt32LE(done.payload.indexOf(0) + 1), 2);
+    const journal = [];
+    let names = null;
+    for (;;) {
+      const msg = await joiner.next();
+      if (msg.type === M.NAMES) names = msg.payload;
+      if (msg.type === M.JOURNAL) journal.push(msg.payload);
+      if (msg.type !== M.WORLD_DONE) continue;
+      assert.equal(msg.payload.readUInt32LE(msg.payload.indexOf(0) + 1), 1);
+      break;
+    }
+    const by = (type, payload, id = 2) => Buffer.concat([u16le(type), ...(id ? [u32le(id)] : []), payload]);
+    assert.deepEqual(journal, [by(M.ITEM_PARENT, Buffer.from('item 1')), by(M.SCRIPT_EVENT, event('stash_opened', '77')),
+      by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
+    assert.equal(names.readUInt16LE(0), 3);
+    assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['menu']);
+    assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
 
     // asked by name
-    menu.send(M.SAVE_REQUEST, Buffer.from('Перед Баром\0', 'latin1').length ? Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]) : null);
+    menu.send(M.SAVE_REQUEST, Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]));
     assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: 'Перед Баром', reason: 'named', who: 'menu' });
+    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, 'Перед Баром', 'named', 'menu');
+    await roundTrip(master);
 
-    // a player in the world leaving
+    // a player in the world leaving: no save either; the new save started the journal again
     joiner.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
     await roundTrip(joiner);
     joiner.socket.destroy();
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'leave', who: 'joiner' });
+    await until(master, M.PEER_LEFT);
+    assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
+    const late = await player(port, 'late');
+    late.send(M.WORLD_REQUEST);
+    const types = [];
+    for (let msg = await late.next(); msg.type !== M.WORLD_DONE; msg = await late.next()) types.push(msg.type);
+    assert.ok(!types.includes(M.JOURNAL));
 
     menu.send(M.SAVES_REQUEST);
     const saves = await until(menu, M.SAVES);
     assert.equal(saves.payload.readUInt16LE(0), 2);
     assert.equal(saves.payload.readUInt32LE(2), 2); // newest first
-    assert.deepEqual(readStringsZ(saves.payload, 10, 3), ['', 'join', 'joiner']);
+    assert.deepEqual(readStringsZ(saves.payload, 10, 3), ['Перед Баром', 'named', 'menu']);
     menu.socket.destroy();
     master.socket.destroy();
+    late.socket.destroy();
   } finally {
     server.close();
   }
@@ -969,30 +1020,21 @@ test('progress: asked of everyone in the world with each save, given back with t
     sendProgress(b, Buffer.alloc(0)); // nothing to keep: no change
     await roundTrip(b);
 
-    // b comes back: its latest progress comes with the world, before WORLD_DONE
+    // b comes back: its latest progress comes with the world, before WORLD_DONE (no save for leaving or coming)
     b.socket.destroy();
-    await until(a, M.SAVE_NOW); // b's leave save
-    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'leave', 'друг');
-    await roundTrip(a);
     const b2 = await player(port, 'друг');
     b2.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW); // join save
-    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3, '', 'join', 'друг');
     assert.deepEqual(await downloadProgress(b2), late);
 
     // a player without progress gets none
     const c = await player(port, 'третий');
     c.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w5'), Buffer.from('l5')], 4, '', 'join', 'третий');
     assert.equal(await downloadProgress(c), null);
 
     // back to revision 2: the progress kept with it
     assert.ok(server.coop.rollback(2));
     await until(b2, M.WORLD_RELOAD);
     b2.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w7'), Buffer.from('l7')], 6, '', 'join', 'друг');
     assert.deepEqual(await downloadProgress(b2), early);
     a.socket.destroy();
     b2.socket.destroy();
@@ -1116,8 +1158,6 @@ test('facts: kept by the server, passed on when they change, given with the worl
 
     const c = await player(port, 'третий');
     c.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'join', 'третий');
     assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0',
       'once:create_squad(lazarus_dolg_squad,bar_dolg_general)': 'artem' });
 
