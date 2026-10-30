@@ -1,0 +1,70 @@
+-- Co-op: one offline world (docs/coop/multiplayer.md). The world's host moves the squads no player has online, and
+-- every SEND_MS tells the other games where they are and where they go; those games don't move them themselves
+-- (the engine's CSE_ALifeOnlineOfflineGroup::update, coop_npc.h) and put them there. A squad a player's game has
+-- online is that game's until it goes offline again: the host leaves it be, then goes on with it.
+
+local SEND_MS = 5000
+local PER_EVENT = 120 -- squads per event: well within a message
+local NO_TARGET = 65535
+local next_send = 0
+
+local function send_squads()
+	local now = time_global()
+	if now < next_send or not coop.connected() or not coop.is_host() then
+		return
+	end
+	next_send = now + SEND_MS
+	local part = {}
+	local function flush()
+		if #part > 0 then
+			coop_sync.send_event("squads", table.concat(part, ";"))
+			part = {}
+		end
+	end
+	local sim = alife()
+	for id in pairs(SIMBOARD.squads) do
+		local squad = sim:object(id)
+		if squad and not squad.online and not coop.squad_online_elsewhere(id) then
+			local p = squad.position
+			part[#part + 1] = string.format("%d,%d,%d,%.2f,%.2f,%.2f,%d", id, squad.m_game_vertex_id,
+				squad.m_level_vertex_id, p.x, p.y, p.z, squad.assigned_target_id or NO_TARGET)
+			if #part >= PER_EVENT then
+				flush()
+			end
+		end
+	end
+	flush()
+end
+
+local function on_squads(sender, payload)
+	if coop.is_host() then
+		return
+	end
+	local sim = alife()
+	local moved = 0
+	for id, gvid, lvid, x, y, z, target in string.gmatch(payload,
+		"(%d+),(%d+),(%d+),([%-%d%.]+),([%-%d%.]+),([%-%d%.]+),(%d+)") do
+		id, gvid, lvid, target = tonumber(id), tonumber(gvid), tonumber(lvid), tonumber(target)
+		local squad = SIMBOARD.squads[id] and sim:object(id)
+		if squad and not squad.online then
+			if squad.m_game_vertex_id ~= gvid or squad.m_level_vertex_id ~= lvid then
+				TeleportSquad(squad, vector():set(tonumber(x), tonumber(y), tonumber(z)), lvid, gvid)
+				moved = moved + 1
+			end
+			if target ~= NO_TARGET then
+				squad.assigned_target_id = target
+			end
+		end
+	end
+	if moved > 0 and get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] %s squad(s) moved where the host has them", moved)
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	RegisterScriptCallback("actor_on_update", send_squads)
+	coop_sync.on_event("squads", on_squads)
+end

@@ -6,6 +6,7 @@
 #include "coop_puppet.h"
 #include "coop_progress.h"
 #include "coop_facts.h"
+#include "coop_npc.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -151,6 +152,8 @@ namespace coop
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
+			def("is_host", &is_host),                  // this game is the world's headless host
+			def("squad_online_elsewhere", &squad_online_elsewhere), // (squad id) the host: a player's game has it online
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none
 			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count

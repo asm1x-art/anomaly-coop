@@ -171,6 +171,7 @@ namespace coop
 	// The world's headless host (-coop_host <secret>, docs/coop/multiplayer.md): the sim master whenever it runs,
 	// never a player. Its actor is a ghost on fake_start; it saves the world.
 	bool is_host();               // this game is the host
+	bool host_runs_world();       // the host is the sim master: it runs the world
 	bool is_host_id(u32 id);      // that client is the host
 	const xr_string& host_name(); // "" while there is none
 	LPCSTR player_name(u32 id);   // a player or the host of this server run, gone or not; "" if unknown

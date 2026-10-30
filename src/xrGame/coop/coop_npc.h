@@ -10,6 +10,7 @@
 
 class CObject;
 class CCustomMonster;
+class CSE_ALifeDynamicObject;
 class CEntityAlive;
 class CWeapon;
 class NET_Packet;
@@ -46,4 +47,12 @@ namespace coop
 
 	void update_npc_sync(); // per frame
 	void clear_npc_sync();  // disconnect, level unload
+
+	// One offline world (docs/coop/multiplayer.md): the world's host moves the squads no player has online, the
+	// other games put them where it says (coop_squads.script) and don't move them themselves. A squad some player's
+	// game has online (its members in that level's M_NPC_STATES) the host leaves be, and takes on from where it was
+	// last seen once it is gone from the stream.
+	bool moves_offline_squad(const CSE_ALifeDynamicObject* squad); // CSE_ALifeOnlineOfflineGroup::update
+	bool squad_online_elsewhere(u16 squad_id); // the host: a player's game has it online
+	void update_host_squads(); // per frame
 }

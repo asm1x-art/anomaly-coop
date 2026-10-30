@@ -792,6 +792,7 @@ namespace coop
 		update_map_markers();
 		update_puppets();
 		update_npc_sync();
+		update_host_squads();
 		update_combat();
 		update_projectiles();
 		update_id_blocks();
@@ -901,6 +902,7 @@ namespace coop
 		g_client.m_journal.clear();
 	}
 	bool is_host_id(u32 id) { return id && id == g_client.m_host_id; }
+	bool host_runs_world() { return is_connected() && is_host_id(g_client.master()); }
 	const xr_string& host_name() { return g_client.m_host_name; }
 
 	bool is_sim_master()
