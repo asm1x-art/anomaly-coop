@@ -1,0 +1,28 @@
+; Raids (scripts/raid.script, docs/coop/shelter.md "Рейды")
+
+[raid_gps]
+life_hours      = 168   ; a beacon's charge, game hours from the first raid stash it is found in
+check_seconds   = 10    ; how often the carried beacons are checked for a flat one
+
+; a GPS beacon: in a stash on a raid level it shows the stash on the raid app's map, what is in it and its own charge,
+; till it is flat; a flat one is charged at a workbench with batteries (items\settings\mod_craft_raid.ltx)
+[raid_gps_beacon]:tch_junk
+$spawn          = "devices\roubles"
+visual          = dynamics\devices\dev_fmradio\dev_fmradio.ogf
+kind            = i_device
+inv_name        = st_raid_gps_beacon
+inv_name_short  = st_raid_gps_beacon
+description     = st_raid_gps_beacon_descr
+inv_weight      = 0.35
+inv_grid_width  = 1
+inv_grid_height = 1
+inv_grid_x      = 2
+inv_grid_y      = 43
+cost            = 1800
+tier            = 2
+
+[raid_gps_beacon_dead]:raid_gps_beacon
+inv_name        = st_raid_gps_beacon_dead
+inv_name_short  = st_raid_gps_beacon_dead
+description     = st_raid_gps_beacon_dead_descr
+cost            = 600

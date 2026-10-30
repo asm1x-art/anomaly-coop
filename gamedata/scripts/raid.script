@@ -1,0 +1,325 @@
+-- Raids (docs/coop/shelter.md, "Raids"): the raid's levels are copies of the north's (tools/raid/raid_copy.py), each a
+-- level of its own named raid_*, with no way in from the world. A raid starts from the laptop's "Raid" app (once the
+-- Brain Scorcher is off) and lands in Limansk where the Red Forest's level changer brings one. A transition of a copy
+-- is a restrictor whose custom data has [raid_transition] (level: another copy or a level outside the raid, position,
+-- node, direction; its logic calls raid_transition): the way one came onto a level leads out, straight to the
+-- shelter; the others lead on; a level outside the raid is shut. The PDA is jammed in a raid.
+
+local LEVELS_LTX = "scripts\\raid\\levels.ltx"
+-- the way back: the shelter's entrance (point 1 of bunker_a1), facing into the corridor
+local SHELTER = { level = "bunker_a1", position = vector():set(-6.99, 3.28, -27.09), node = 1600,
+	look = vector():set(0.978, 0, -0.124) }
+local JAM_MSG_MS = 3000
+
+local levels -- the raid's levels: order = { names }, [name] = { original, map = { texture, x1, z1, x2, z2 } }, landing
+
+local function vector_of(s)
+	local p = str_explode(s, ",")
+	return vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+end
+
+function get_levels()
+	if levels then
+		return levels
+	end
+	levels = { order = {} }
+	local ini = ini_file(LEVELS_LTX)
+	if not ini:section_exist("levels") then
+		return levels
+	end
+	for _, name in ipairs(str_explode(ini:r_string_ex("levels", "order"), ",")) do
+		local l = { name = name, original = ini:r_string_ex(name, "original") }
+		local texture = ini:r_string_ex(name, "map_texture")
+		if texture then
+			local b = str_explode(ini:r_string_ex(name, "map_bounds"), ",")
+			l.map = { texture = texture, x1 = tonumber(b[1]), z1 = tonumber(b[2]), x2 = tonumber(b[3]), z2 = tonumber(b[4]) }
+		end
+		levels.order[#levels.order + 1] = name
+		levels[name] = l
+	end
+	levels.landing = { level = ini:r_string_ex("landing", "level"), came_from = ini:r_string_ex("landing", "came_from"),
+		position = vector_of(ini:r_string_ex("landing", "position")), node = ini:r_u32("landing", "node"),
+		direction = ini:r_float_ex("landing", "direction") or 0 }
+	return levels
+end
+
+function is_raid_level(name)
+	return name and string.find(name, "^raid_") ~= nil
+end
+
+-- the raid app is there once the Brain Scorcher is off (in the story after the Radar, in free play from the start)
+function available()
+	return has_alife_info("bar_deactivate_radar_done")
+end
+
+-- The graph vertex of a level nearest to a position there.
+local function graph_vertex(level_name, position)
+	local gg, sim = game_graph(), alife()
+	local best, best_d
+	local gvid = 0
+	while gg:valid_vertex_id(gvid) do
+		local v = gg:vertex(gvid)
+		if sim:level_name(v:level_id()) == level_name then
+			local d = v:level_point():distance_to_sqr(position)
+			if not best_d or d < best_d then
+				best, best_d = gvid, d
+			end
+		end
+		gvid = gvid + 1
+	end
+	return best
+end
+
+local function go(level_name, position, node, yaw)
+	local gvid = graph_vertex(level_name, position)
+	if not gvid then
+		printf("! raid: level %s has no graph vertices", level_name)
+		return false
+	end
+	ChangeLevel(position, node, gvid, vector():set(0, yaw, 0))
+	return true
+end
+
+-- into the raid: the landing; the way out of the landing level is the transition to where the landing comes from
+function start()
+	local l = get_levels().landing
+	printf("raid: start, landing on %s", l.level)
+	save_var(db.actor, "raid_came_from", l.came_from)
+	go(l.level, l.position, l.node, l.direction)
+end
+
+function exit_to_shelter()
+	printf("raid: out of %s to the shelter", level.name())
+	save_var(db.actor, "raid_came_from", nil)
+	save_var(db.actor, "raid_face_shelter", true)
+	go(SHELTER.level, SHELTER.position, SHELTER.node, 0)
+end
+
+function transition(obj)
+	local ini = obj and obj:spawn_ini()
+	if not (ini and ini:section_exist("raid_transition")) then
+		return
+	end
+	local target = ini:r_string_ex("raid_transition", "level")
+	if target == load_var(db.actor, "raid_came_from") then
+		exit_to_shelter()
+		return
+	end
+	if not is_raid_level(target) then
+		actor_menu.set_msg(1, game.translate_string("st_raid_exit_closed"), 4)
+		return
+	end
+	printf("raid: %s -> %s", obj:name(), target)
+	save_var(db.actor, "raid_came_from", level.name())
+	go(target, vector_of(ini:r_string_ex("raid_transition", "position")), ini:r_u32("raid_transition", "node"),
+		ini:r_float_ex("raid_transition", "direction") or 0)
+end
+
+-------------------------------------------------------------------------------
+-- GPS beacons ([raid_gps] in mod_system_raid.ltx): one runs from the first time it is found in a box on a raid level
+-- (the world's raid_beacon_<id>: that game time) for life_hours, then it is flat: made a raid_gps_beacon_dead where
+-- it lies. A box with a running beacon is a stash the raid app shows, with what is in it.
+
+local BEACON, FLAT = "raid_gps_beacon", "raid_gps_beacon_dead"
+local NO_PARENT = 65535
+
+local function game_seconds()
+	return game.get_game_time():diffSec(level.get_start_time())
+end
+
+local function life_seconds()
+	return (ini_sys:r_float_ex("raid_gps", "life_hours") or 168) * 3600
+end
+
+local function level_of(se)
+	return alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id())
+end
+
+-- a beacon's charge, 0..1 (1 till it runs), and the game hours it has left
+function beacon_charge(id)
+	local started = shelter.state("raid_beacon_" .. id, nil)
+	if not started then
+		return 1, life_seconds() / 3600
+	end
+	local left = math.max(0, life_seconds() - (game_seconds() - started))
+	return left / life_seconds(), left / 3600
+end
+
+local function start_beacon(id)
+	if not shelter.state("raid_beacon_" .. id, nil) then
+		shelter.set_state("raid_beacon_" .. id, game_seconds())
+	end
+end
+
+-- a flat beacon made a flat one's item where it lies: in its owner (an actor, a box) or on the ground
+local function make_flat(se)
+	local owner = se.parent_id ~= NO_PARENT and alife():object(se.parent_id)
+	local at = owner or { se.position, se.m_level_vertex_id, se.m_game_vertex_id }
+	shelter.set_state("raid_beacon_" .. se.id, nil)
+	alife_release_id(se.id)
+	alife_create_item(FLAT, at)
+	printf("raid: beacon %s is flat", se.id)
+end
+
+-- The stashes: the boxes on raid levels with a running beacon, { id, level, position, charge, hours,
+-- items = { { section, count } } }; flat beacons found on the way made flat items. A pass over all the objects.
+function stashes()
+	local sim = alife()
+	local beacons, children = {}, {}
+	for id = 1, NO_PARENT - 1 do
+		local se = sim:object(id)
+		if se then
+			if se.parent_id ~= NO_PARENT then
+				local list = children[se.parent_id] or {}
+				list[#list + 1] = se
+				children[se.parent_id] = list
+			end
+			if se:section_name() == BEACON then
+				beacons[#beacons + 1] = se
+			end
+		end
+	end
+	local out, flat, seen = {}, {}, {}
+	for _, beacon in ipairs(beacons) do
+		local box = beacon.parent_id ~= NO_PARENT and beacon.parent_id ~= 0 and sim:object(beacon.parent_id)
+		if box and IsInvbox(nil, box:clsid()) and is_raid_level(level_of(box)) then
+			start_beacon(beacon.id)
+			local charge, hours = beacon_charge(beacon.id)
+			if charge <= 0 then
+				flat[#flat + 1] = beacon
+			elseif not seen[box.id] or seen[box.id].charge < charge then
+				local counts, items = {}, {}
+				for _, child in ipairs(children[box.id] or {}) do
+					local sec = child:section_name()
+					if not counts[sec] then
+						items[#items + 1] = { section = sec, count = 0 }
+						counts[sec] = items[#items]
+					end
+					counts[sec].count = counts[sec].count + 1
+				end
+				local s = { id = box.id, level = level_of(box), position = box.position, charge = charge, hours = hours,
+					items = items }
+				if seen[box.id] then
+					for i, o in ipairs(out) do
+						if o.id == box.id then
+							out[i] = s
+						end
+					end
+				else
+					out[#out + 1] = s
+				end
+				seen[box.id] = s
+			end
+		end
+	end
+	for _, se in ipairs(flat) do
+		make_flat(se)
+	end
+	return out
+end
+
+-- the carried beacons that ran flat
+local function check_carried()
+	local flat = {}
+	db.actor:iterate_inventory(function(_, item)
+		if item:section() == BEACON and shelter.state("raid_beacon_" .. item:id(), nil) and beacon_charge(item:id()) <= 0 then
+			flat[#flat + 1] = item:id()
+		end
+	end)
+	for _, id in ipairs(flat) do
+		local se = alife():object(id)
+		if se then
+			make_flat(se)
+		end
+	end
+end
+
+local function actor_on_item_put_in_box(box, item)
+	if item:section() == BEACON and is_raid_level(level.name()) then
+		start_beacon(item:id())
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the group's marks on the raid maps: raid_mark_<n> = "level|x|z|text" (the world's), n below raid_mark_next
+
+function marks()
+	local out = {}
+	for n = 1, (tonumber(shelter.state("raid_mark_next", 1)) or 1) - 1 do
+		local s = shelter.state("raid_mark_" .. n, nil)
+		local level_name, x, z, text
+		if type(s) == "string" then
+			level_name, x, z, text = string.match(s, "^([^|]*)|([^|]*)|([^|]*)|(.*)$")
+		end
+		x, z = tonumber(x), tonumber(z)
+		if level_name and x and z then
+			out[#out + 1] = { n = n, level = level_name, x = x, z = z, text = text }
+		end
+	end
+	return out
+end
+
+-- a mark saved: n nil for a new one; no text: the mark removed. Whole metres: a fraction would be written with the
+-- locale's decimal comma, which tonumber does not read.
+function set_mark(n, level_name, x, z, text)
+	if not n then
+		n = tonumber(shelter.state("raid_mark_next", 1)) or 1
+		shelter.set_state("raid_mark_next", n + 1)
+	end
+	if text and text ~= "" then
+		shelter.set_state("raid_mark_" .. n, string.format("%s|%d|%d|%s", level_name, math.floor(x + 0.5), math.floor(z + 0.5), text))
+	else
+		shelter.set_state("raid_mark_" .. n, nil)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the PDA in a raid: jammed. The 2D one asks pda.pda_use before it opens; the 3D one is put away when taken out.
+
+local jam_msg_at = 0
+
+local function jammed()
+	local now = time_global()
+	if now >= jam_msg_at then
+		jam_msg_at = now + JAM_MSG_MS
+		actor_menu.set_msg(1, game.translate_string("st_raid_pda_jammed"), 3)
+	end
+end
+
+local checked_at = 0
+
+local function actor_on_update()
+	if is_raid_level(level.name()) and db.actor:active_slot() == 8 then
+		db.actor:activate_slot(0)
+		jammed()
+	end
+	local now = time_global()
+	if now >= checked_at then
+		checked_at = now + (ini_sys:r_float_ex("raid_gps", "check_seconds") or 10) * 1000
+		check_carried()
+	end
+end
+
+local function actor_on_first_update()
+	if level.name() == SHELTER.level and load_var(db.actor, "raid_face_shelter") then
+		save_var(db.actor, "raid_face_shelter", nil)
+		db.actor:set_actor_direction(-SHELTER.look:getH())
+	end
+end
+
+function on_game_start()
+	xr_effects.raid_transition = function(actor, obj)
+		transition(obj)
+	end
+	local pda_use = pda.pda_use
+	pda.pda_use = function()
+		if is_raid_level(level.name()) then
+			jammed()
+			return false
+		end
+		return pda_use()
+	end
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_item_put_in_box", actor_on_item_put_in_box)
+end

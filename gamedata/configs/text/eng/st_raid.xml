@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_app_raid">
+		<text>Raid</text>
+	</string>
+	<string id="st_raid_go">
+		<text>Go on a raid</text>
+	</string>
+	<string id="st_raid_landing">
+		<text>Landing: Limansk, from the Red Forest side. Then the Hospital and the plant.\nOut of any level the way you came onto it: straight to the shelter. Every other way out of the raid is shut.\nThe PDA does not work in a raid.</text>
+	</string>
+	<string id="st_raid_map_hint">
+		<text>Drag to move, + and - to zoom.\nClick the map to mark it.</text>
+	</string>
+	<string id="st_raid_no_map">
+		<text>There is no map of this level</text>
+	</string>
+	<string id="st_raid_exit_closed">
+		<text>There is no way out of the raid here</text>
+	</string>
+	<string id="st_raid_pda_jammed">
+		<text>PDA: interference, no signal</text>
+	</string>
+	<string id="st_raid_stash">
+		<text>Stash</text>
+	</string>
+	<string id="st_raid_stash_label">
+		<text>Stash, beacon %s%%</text>
+	</string>
+	<string id="st_raid_beacon_charge">
+		<text>GPS beacon: %s%%, %s more hours</text>
+	</string>
+	<string id="st_raid_stash_empty">
+		<text>Empty</text>
+	</string>
+	<string id="st_raid_stash_more">
+		<text>and %s more</text>
+	</string>
+	<string id="st_raid_mark">
+		<text>Mark</text>
+	</string>
+	<string id="st_raid_mark_new">
+		<text>New mark</text>
+	</string>
+	<string id="st_raid_mark_hint">
+		<text>What is here? For example: "A big camp. Some fighters in heavy armour"</text>
+	</string>
+	<string id="st_raid_save">
+		<text>Save</text>
+	</string>
+	<string id="st_raid_delete">
+		<text>Remove</text>
+	</string>
+	<string id="st_raid_close">
+		<text>Close</text>
+	</string>
+	<string id="st_raid_gps_beacon">
+		<text>GPS beacon</text>
+	</string>
+	<string id="st_raid_gps_beacon_descr">
+		<text>A beacon for a stash. Put it into a stash on a raid level: the stash shows on the map of the shelter's laptop (the Raid app), with what is in it.\nIt runs for a week from the first stash, then goes flat and the mark is gone. A flat beacon is charged at a workbench with batteries.</text>
+	</string>
+	<string id="st_raid_gps_beacon_dead">
+		<text>GPS beacon (flat)</text>
+	</string>
+	<string id="st_raid_gps_beacon_dead_descr">
+		<text>A flat GPS beacon. Charged at a workbench with batteries.</text>
+	</string>
+</string_table>

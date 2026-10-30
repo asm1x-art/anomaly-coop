@@ -145,7 +145,16 @@ def map_icon(d, s, im):
     d.ellipse([33 * s, 24 * s, 43 * s, 34 * s], fill=WHITE)
 
 
-for name, fn in (("plan", plan_icon), ("bar", bar_icon), ("synth", synth_icon), ("clean", clean_icon), ("map", map_icon)):
+def raid_icon(d, s, im):
+    tile(d, s, im, (236, 92, 76), (170, 40, 40))
+    d.ellipse([17 * s, 17 * s, 47 * s, 47 * s], outline=WHITE, width=int(3 * s))  # a sight's ring
+    for a, b in (((32, 11), (32, 22)), ((32, 42), (32, 53)), ((11, 32), (22, 32)), ((42, 32), (53, 32))):  # its ticks
+        d.line([(a[0] * s, a[1] * s), (b[0] * s, b[1] * s)], fill=WHITE, width=int(3 * s))
+    d.ellipse([29 * s, 29 * s, 35 * s, 35 * s], fill=WHITE)
+
+
+for name, fn in (("plan", plan_icon), ("bar", bar_icon), ("synth", synth_icon), ("clean", clean_icon), ("map", map_icon),
+                 ("raid", raid_icon)):
     drawn(64, fn, "laptop_icon_" + name)
 
 
@@ -171,6 +180,8 @@ marks = {
                                            d.polygon([(28 * s, 26 * s), (36 * s, 26 * s), (46 * s, 46 * s), (18 * s, 46 * s)], fill=DARK))),
     "me": badge((100, 220, 120)),
     "friend": badge((110, 170, 255)),
+    "raid_note": badge((236, 92, 76), lambda d, s: (d.rounded_rectangle([28 * s, 15 * s, 36 * s, 38 * s], radius=3 * s, fill=DARK),
+                                                    d.ellipse([28 * s, 42 * s, 36 * s, 50 * s], fill=DARK))),
 }
 for name, fn in marks.items():
     drawn(32, fn, "laptop_mark_" + name)

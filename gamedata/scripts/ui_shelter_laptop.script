@@ -5,7 +5,8 @@
 -- and 768 high, squeezed into the interface's 1024 across, so the plan, the icons and the marks keep their shape.
 -- Programs: the shelter's plan (the rooms by state, what is where, who is in; a room picked shows its card, where it
 -- can be given a role, the world's), the bar (shelter_bar.script: its store, markup, till and sales), the synthesis
--- chambers and their journal (shelter_synthesis.script) and the cleaning.
+-- chambers and their journal (shelter_synthesis.script), the cleaning and, once the Brain Scorcher is off, the raid
+-- (raid.script: the raid's maps, the landing, the start).
 
 local XML = "ui_shelter_laptop.xml"
 local SCREEN = { h = 768 } -- w: the screen's width in square units, set as the laptop opens
@@ -14,7 +15,7 @@ local C = ui_shelter_style.C
 local TOP = ui_shelter_style.TITLE_H + 12 -- a window's content from here down
 local LEFT = 128 -- the windows keep right of the shortcuts
 local APPS = { { "plan", "st_shelter_app_plan" }, { "bar", "st_shelter_app_bar" }, { "synth", "st_shelter_app_synth" },
-	{ "clean", "st_shelter_app_clean" } }
+	{ "clean", "st_shelter_app_clean" }, { "raid", "st_shelter_app_raid", when = function() return raid.available() end } }
 local ROOM_TINT = { blocked = { 150, 0, 0, 0 }, dirty = { 46, 240, 180, 70 } } -- alpha, r, g, b; a clean one: none
 local MARKS = { -- the shelter's things on the plan: the state keeping its object's id, its mark
 	{ state = "generator_id", mark = "generator" },
@@ -115,13 +116,17 @@ function UIShelterOS:click_at(list, x, y, w, h, f, hover, tag)
 end
 
 function UIShelterOS:shortcuts()
-	for i, app in ipairs(APPS) do
-		local y = 16 + (i - 1) * 104
-		local hb = self:hover_of(12, y, 104, 98, self, 8)
-		self:image(36, y + 8, 56, 56, "ui\\shelter\\laptop_icon_" .. app[1], self)
-		self:text(13, y + 67, 104, 26, tr(app[2]), C.black, self, CGameFont.alCenter, "s") -- a shadow under the name
-		self:text(12, y + 66, 104, 26, tr(app[2]), C.text, self, CGameFont.alCenter, "s")
-		self.clicks[#self.clicks + 1] = { 12, y, 104, 98, function() self:open(app[1]) end, hover = hb }
+	local i = 0
+	for _, app in ipairs(APPS) do
+		if not app.when or app.when() then
+			i = i + 1
+			local y = 16 + (i - 1) * 104
+			local hb = self:hover_of(12, y, 104, 98, self, 8)
+			self:image(36, y + 8, 56, 56, "ui\\shelter\\laptop_icon_" .. app[1], self)
+			self:text(13, y + 67, 104, 26, tr(app[2]), C.black, self, CGameFont.alCenter, "s") -- a shadow under the name
+			self:text(12, y + 66, 104, 26, tr(app[2]), C.text, self, CGameFont.alCenter, "s")
+			self.clicks[#self.clicks + 1] = { 12, y, 104, 98, function() self:open(app[1]) end, hover = hb }
+		end
 	end
 end
 
@@ -193,6 +198,7 @@ function UIShelterOS:close_app()
 		self:DetachChild(self.task)
 	end
 	self.win, self.task, self.app, self.app_clicks, self.app_update = nil, nil, nil, {}, nil
+	self.raid_dragging, self.raid_press, self.raid_card_box, self.raid_edit = nil, nil, nil, nil
 end
 
 -- the window: its frame, title (the program's) and close box; its place kept for the clicks
@@ -706,6 +712,358 @@ function UIShelterOS:fill_synth(only_if_changed)
 end
 
 -------------------------------------------------------------------------------
+-- the raid (raid.script): the raid's levels in a list and the map of the one picked (the PDA's: dragged to move, + and
+-- - to zoom; none for a level without one) with the group's marks and the stashes with a running GPS beacon, the
+-- landing and the way out, the start. A click on the map (not a drag) opens a card: on a stash what is in it and the
+-- beacon's charge, on a mark its text to change or remove, elsewhere a new mark's.
+
+local RAID = { list_w = 230, zoom = 1.5, min_scale = 0.25, pin = 22, pick = 12, label_chars = 48, card_rows = 10 }
+-- scale: the texture's pixels a square unit shows; pick: how near a click takes a mark
+local map_sizes = {} -- a map texture's size in pixels, once seen: the engine sets a static's texture rect to the whole
+-- texture as it first draws it (a new texture: the rect zeroed first, the map unseen till then)
+
+function UIShelterOS:open_raid()
+	local levels = raid.get_levels()
+	local W, x = self:fit(1000)
+	local H = 704
+	local win = self:window(x, 8, W, H, "raid")
+	local lw = RAID.list_w
+	self.raid_area = { x = 14 + lw + 14, y = TOP, w = W - lw - 42, h = H - TOP - 14 }
+	local a = self.raid_area
+	self:round(a.x - 1, a.y - 1, a.w + 2, a.h + 2, C.border, win, 4)
+	self:rect(a.x, a.y, a.w, a.h, C.field, win)
+	self.raid_map = self:image(a.x, a.y, a.w, a.h, "ui\\shelter\\laptop_white", win)
+	self.raid_map:Show(false)
+	self.raid_no_map = self:text(a.x, a.y, a.w, a.h, tr("st_raid_no_map"), C.dim, win, CGameFont.alCenter)
+	self.raid_no_map:Show(false)
+	-- over the map: the marks, then the hovered one's label (each layer keeps its place, its parts are made anew)
+	self.raid_pin_layer = self:box(a.x, a.y, a.w, a.h, win)
+	self.raid_label_layer = self:box(a.x, a.y, a.w, a.h, win)
+	self.raid_pins_box, self.raid_label = nil, nil
+	self.app_clicks[#self.app_clicks + 1] = { self.wx + a.x, self.wy + a.y, a.w, a.h, function(p) self:raid_press_at(p) end }
+	self:button(a.x + a.w - 92, a.y + 10, 38, 34, "+", function() self:raid_zoom(1 / RAID.zoom) end, self.app_clicks, win,
+		self.wx, self.wy)
+	self:button(a.x + a.w - 48, a.y + 10, 38, 34, "-", function() self:raid_zoom(RAID.zoom) end, self.app_clicks, win,
+		self.wx, self.wy)
+	-- under the list: the landing, the way out, the start
+	local by = H - 14 - 44
+	local ty = TOP + 44 * #levels.order + 12
+	self:text(14, ty, lw, by - 56 - ty, tr("st_raid_landing"), C.dim, win, nil, "s")
+	self:text(14, by - 50, lw, 44, tr("st_raid_map_hint"), C.faint, win, nil, "s")
+	self:button(14, by, lw, 44, tr("st_raid_go"), function()
+		self:Close()
+		raid.start()
+	end, self.app_clicks, win, self.wx, self.wy, "primary")
+	self.raid_stashes = raid.stashes()
+	self.raid_marks = raid.marks()
+	self.raid_list, self.raid_card_box = nil, nil
+	self.raid_dragging, self.raid_press = nil, nil
+	self.app_update = self.update_raid
+	self:raid_select(self.raid_level or levels.order[1])
+end
+
+-- the list, the picked level's row lit; the picked level's map, all of it in view
+function UIShelterOS:raid_select(name)
+	self.raid_level = name
+	self:raid_card_close()
+	local levels = raid.get_levels()
+	if self.raid_list then
+		self.win:DetachChild(self.raid_list)
+	end
+	for i = #self.app_clicks, 1, -1 do
+		if self.app_clicks[i].raid_list then
+			table.remove(self.app_clicks, i)
+		end
+	end
+	self.raid_list = self:box(14, TOP, RAID.list_w, 44 * #levels.order, self.win)
+	for i, n in ipairs(levels.order) do
+		local c = self:button(0, (i - 1) * 44, RAID.list_w, 38, tr(levels[n].original), function() self:raid_select(n) end,
+			self.app_clicks, self.raid_list, self.wx + 14, self.wy + TOP, n == name and "on" or "flat")
+		c.raid_list = true
+	end
+
+	local m = levels[name] and levels[name].map
+	self.raid_view, self.raid_measure = nil, nil
+	self:raid_pins()
+	self.raid_map:Show(m and true or false)
+	self.raid_no_map:Show(not m)
+	if not m then
+		return
+	end
+	if not map_sizes[m.texture] then
+		self.raid_map:SetTextureRect(Frect():set(0, 0, 0, 0))
+		self.raid_map:SetTextureColor(GetARGB(0, 255, 255, 255))
+		self.raid_measure = m.texture
+	end
+	self.raid_map:InitTexture(m.texture)
+	if map_sizes[m.texture] then
+		self:raid_view_of(m.texture)
+	end
+end
+
+-- the view of a map whose size is known: all of it
+function UIShelterOS:raid_view_of(texture)
+	local size, a = map_sizes[texture], self.raid_area
+	local fit = math.max(size.w / a.w, size.h / a.h)
+	self.raid_view = { tw = size.w, th = size.h, u = size.w / 2, v = size.h / 2, scale = fit, fit = fit }
+	self.raid_map:SetTextureColor(GetARGB(255, 255, 255, 255))
+	self:raid_pins()
+end
+
+-- the marks of the picked level (none till its map is seen): the stashes, then the group's marks
+function UIShelterOS:raid_pins()
+	if self.raid_pins_box then
+		self.raid_pin_layer:DetachChild(self.raid_pins_box)
+	end
+	local a = self.raid_area
+	self.raid_pins_box = self:box(0, 0, a.w, a.h, self.raid_pin_layer)
+	self.raid_pin_list = {}
+	self:raid_hover(nil)
+	if not self.raid_view then
+		return
+	end
+	local function pin(kind, x, z, data)
+		self.raid_pin_list[#self.raid_pin_list + 1] = { kind = kind, x = x, z = z, data = data,
+			img = self:image(0, 0, RAID.pin, RAID.pin, "ui\\shelter\\laptop_mark_" .. (kind == "stash" and "stash" or "raid_note"),
+				self.raid_pins_box) }
+	end
+	for _, s in ipairs(self.raid_stashes) do
+		if s.level == self.raid_level then
+			pin("stash", s.position.x, s.position.z, s)
+		end
+	end
+	for _, m in ipairs(self.raid_marks) do
+		if m.level == self.raid_level then
+			pin("note", m.x, m.z, m)
+		end
+	end
+	self:raid_draw()
+end
+
+-- a world point (x, z) on the map's texture, by the level map's bounds (the PDA's: the texture spans them, north up)
+function UIShelterOS:raid_tex_of(x, z)
+	local m, v = raid.get_levels()[self.raid_level].map, self.raid_view
+	return (x - m.x1) / (m.x2 - m.x1) * v.tw, (m.z2 - z) / (m.z2 - m.z1) * v.th
+end
+
+function UIShelterOS:raid_world_of(u, w)
+	local m, v = raid.get_levels()[self.raid_level].map, self.raid_view
+	return m.x1 + u / v.tw * (m.x2 - m.x1), m.z2 - w / v.th * (m.z2 - m.z1)
+end
+
+-- a texture point in the map's area (its top left: 0, 0) and back
+function UIShelterOS:raid_area_of(u, w)
+	local v = self.raid_view
+	return v.ox + (u - v.u + v.vw / 2) / v.scale, v.oy + (w - v.v + v.vh / 2) / v.scale
+end
+
+function UIShelterOS:raid_tex_at(sx, sy)
+	local v = self.raid_view
+	return (sx - v.ox) * v.scale + v.u - v.vw / 2, (sy - v.oy) * v.scale + v.v - v.vh / 2
+end
+
+-- the map's part in view: as much of the texture as the area holds at the scale, around u, v (kept inside the
+-- texture); a texture smaller than the area at that scale is shown whole in its middle. The marks follow; one out of
+-- the map's part is hidden.
+function UIShelterOS:raid_draw()
+	local v, a = self.raid_view, self.raid_area
+	v.vw, v.vh = math.min(a.w * v.scale, v.tw), math.min(a.h * v.scale, v.th)
+	v.u = math.max(v.vw / 2, math.min(v.tw - v.vw / 2, v.u))
+	v.v = math.max(v.vh / 2, math.min(v.th - v.vh / 2, v.v))
+	local sw, sh = v.vw / v.scale, v.vh / v.scale
+	v.ox, v.oy = (a.w - sw) / 2, (a.h - sh) / 2
+	self:place(self.raid_map, a.x + v.ox, a.y + v.oy, sw, sh)
+	self.raid_map:SetTextureRect(Frect():set(v.u - v.vw / 2, v.v - v.vh / 2, v.u + v.vw / 2, v.v + v.vh / 2))
+	local half = RAID.pin / 2
+	for _, p in ipairs(self.raid_pin_list or {}) do
+		p.sx, p.sy = self:raid_area_of(self:raid_tex_of(p.x, p.z))
+		p.seen = p.sx >= v.ox and p.sx <= v.ox + sw and p.sy >= v.oy and p.sy <= v.oy + sh
+		if p.seen then
+			self:place(p.img, p.sx - half, p.sy - half, RAID.pin, RAID.pin)
+		end
+		p.img:Show(p.seen)
+	end
+end
+
+function UIShelterOS:raid_zoom(k)
+	local v = self.raid_view
+	if v then
+		v.scale = math.max(RAID.min_scale, math.min(v.fit, v.scale * k))
+		self:raid_draw()
+		self:raid_hover(nil)
+	end
+end
+
+-- the mark nearest to a point of the map's area, if near enough
+function UIShelterOS:raid_pin_at(sx, sy)
+	local best, best_d
+	for _, p in ipairs(self.raid_pin_list or {}) do
+		local d = p.seen and math.max(math.abs(p.sx - sx), math.abs(p.sy - sy))
+		if d and d <= RAID.pick and (not best_d or d < best_d) then
+			best, best_d = p, d
+		end
+	end
+	return best
+end
+
+-- the press on the map: a drag starts; let go where it was pressed, it is a click
+function UIShelterOS:raid_press_at(p)
+	self.raid_press = p
+	local v = self.raid_view
+	if v then
+		self.raid_dragging = { p = p, u = v.u, v = v.v }
+	end
+end
+
+function UIShelterOS:raid_release(p)
+	local press = self.raid_press
+	self.raid_dragging, self.raid_press = nil, nil
+	if not (press and self.raid_view) or math.abs(p.x - press.x) + math.abs(p.y - press.y) > 4 then
+		return
+	end
+	local a = self.raid_area
+	local sx, sy = p.x - self.wx - a.x, p.y - self.wy - a.y
+	local pin, v = self:raid_pin_at(sx, sy), self.raid_view
+	if pin then
+		self:raid_card(pin)
+	elseif sx >= v.ox and sx <= v.ox + v.vw / v.scale and sy >= v.oy and sy <= v.oy + v.vh / v.scale then
+		local x, z = self:raid_world_of(self:raid_tex_at(sx, sy))
+		self:raid_card({ kind = "note", x = x, z = z })
+	end
+end
+
+-- the label of the mark under the cursor: a stash's charge, a mark's text (its start)
+function UIShelterOS:raid_hover(pin)
+	if pin == self.raid_hovered and (pin or not self.raid_label) then
+		return
+	end
+	self.raid_hovered = pin
+	if self.raid_label then
+		self.raid_label_layer:DetachChild(self.raid_label)
+		self.raid_label = nil
+	end
+	if not pin then
+		return
+	end
+	local text = pin.kind == "stash" and tr("st_raid_stash_label", math.floor(pin.data.charge * 100)) or pin.data.text
+	if string.len(text) > RAID.label_chars then
+		text = string.sub(text, 1, RAID.label_chars - 3) .. "..."
+	end
+	local a = self.raid_area
+	local w = math.min(a.w - 8, 24 + 8 * string.len(text))
+	local x = math.max(4, math.min(a.w - w - 4, pin.sx + RAID.pin / 2 + 6))
+	local y = math.max(4, math.min(a.h - 32, pin.sy - 14))
+	self.raid_label = self:box(x, y, w, 28, self.raid_label_layer)
+	self:framed(0, 0, w, 28, C.raised, self.raid_label, 6)
+	self:text(10, 0, w - 20, 28, text, C.text, self.raid_label, nil, "s")
+end
+
+function UIShelterOS:update_raid()
+	if self.raid_measure then
+		local r = self.raid_map:GetTextureRect()
+		if r.x2 > 0 and r.y2 > 0 then
+			map_sizes[self.raid_measure] = { w = r.x2, h = r.y2 }
+			local texture = self.raid_measure
+			self.raid_measure = nil
+			self:raid_view_of(texture)
+		end
+		return
+	end
+	local d, v = self.raid_dragging, self.raid_view
+	if d and v then
+		local p = self:cursor()
+		v.u = d.u - (p.x - d.p.x) * v.scale
+		v.v = d.v - (p.y - d.p.y) * v.scale
+		self:raid_draw()
+		self:raid_hover(nil)
+	elseif v and not self.raid_card_box then
+		local p, a = self:cursor(), self.raid_area
+		self:raid_hover(self:raid_pin_at(p.x - self.wx - a.x, p.y - self.wy - a.y))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the card over the map's bottom: a stash's (its beacon's charge, what is in it) or a mark's (its text in a field;
+-- saved, removed); it takes the clicks off the map under it
+
+function UIShelterOS:raid_card_close()
+	if self.raid_card_box then
+		self.win:DetachChild(self.raid_card_box)
+	end
+	self.raid_card_box, self.raid_edit = nil, nil
+	for i = #self.app_clicks, 1, -1 do
+		if self.app_clicks[i].raid_card then
+			table.remove(self.app_clicks, i)
+		end
+	end
+end
+
+function UIShelterOS:raid_card(pin)
+	self:raid_card_close()
+	self:raid_hover(nil)
+	local a = self.raid_area
+	local stash = pin.kind == "stash" and pin.data
+	local rows = stash and math.min(#stash.items, RAID.card_rows) or 0
+	local w = math.min(520, a.w - 24)
+	local h = stash and 116 + math.max(1, rows) * 24 + (#stash.items > rows and 24 or 0) or 196
+	local x, y = a.x + 12, a.y + a.h - h - 12
+	local card = self:box(x, y, w, h, self.win)
+	self.raid_card_box = card
+	for i = 3, 1, -1 do -- a soft shadow
+		self:round(-2 * i, 3 - i, w + 4 * i, h + 4 * i, C.black, card, 10 + 2 * i, 18)
+	end
+	self:framed(0, 0, w, h, C.surface, card, 10)
+	self:click_at(self.app_clicks, x, y, w, h, function() end, nil, "raid_card")
+	local function button(bx, label, f, kind)
+		local c = self:button(bx, h - 52, 150, 38, label, f, self.app_clicks, card, self.wx + x, self.wy + y, kind)
+		c.raid_card = true
+	end
+	button(w - 166, tr("st_raid_close"), function() self:raid_card_close() end)
+
+	if stash then
+		self:text(18, 10, w - 36, 30, tr("st_raid_stash"), C.text, card, nil, "l")
+		self:text(18, 42, w - 36, 24, tr("st_raid_beacon_charge", math.floor(stash.charge * 100), math.floor(stash.hours)),
+			stash.charge < 0.2 and C.warn or C.dim, card, nil, "s")
+		if #stash.items == 0 then
+			self:text(18, 76, w - 36, 24, tr("st_raid_stash_empty"), C.faint, card, nil, "s")
+		end
+		for i = 1, rows do
+			local it = stash.items[i]
+			local name = ui_item.get_sec_name(it.section)
+			self:text(18, 76 + (i - 1) * 24, w - 36, 24, it.count > 1 and string.format("%s  x%d", name, it.count) or name,
+				C.text, card, nil, "s")
+		end
+		if #stash.items > rows then
+			self:text(18, 76 + rows * 24, w - 36, 24, tr("st_raid_stash_more", #stash.items - rows), C.faint, card, nil, "s")
+		end
+		return
+	end
+
+	local mark = pin.data
+	self:text(18, 10, w - 36, 30, tr(mark and "st_raid_mark" or "st_raid_mark_new"), C.text, card, nil, "l")
+	self:text(18, 42, w - 36, 38, tr("st_raid_mark_hint"), C.faint, card, nil, "s")
+	self:framed(16, 86, w - 32, 38, C.field, card, 6)
+	local edit = self.xml:InitEditBox("edit", card)
+	self:place(edit, 26, 92, w - 52, 26)
+	if mark then
+		edit:SetText(mark.text)
+	end
+	edit:CaptureFocus(true)
+	self.raid_edit = edit
+	self:click_at(self.app_clicks, x + 16, y + 86, w - 32, 38, function() edit:CaptureFocus(true) end, nil, "raid_card")
+	local function save(text)
+		raid.set_mark(mark and mark.n, self.raid_level, pin.x, pin.z, text)
+		self.raid_marks = raid.marks()
+		self:raid_card_close()
+		self:raid_pins()
+	end
+	button(18, tr("st_raid_save"), function() save(trim(edit:GetText() or "")) end, "primary")
+	if mark then
+		button(176, tr("st_raid_delete"), function() save(nil) end)
+	end
+end
+
+-------------------------------------------------------------------------------
 -- the cleaning: what it does, and the start
 
 function UIShelterOS:open_clean()
@@ -759,6 +1117,12 @@ function UIShelterOS:OnKeyboard(dik, keyboard_action)
 		if dik == DIK_keys.MOUSE_1 then
 			self:click(self:cursor())
 			return true
+		elseif self.app == "raid" and (dik == DIK_keys.DIK_EQUALS or dik == DIK_keys.DIK_ADD) then
+			self:raid_zoom(1 / RAID.zoom)
+			return true
+		elseif self.app == "raid" and (dik == DIK_keys.DIK_MINUS or dik == DIK_keys.DIK_SUBTRACT) then
+			self:raid_zoom(RAID.zoom)
+			return true
 		elseif dik_to_bind(dik) == key_bindings.kQUIT then
 			if self.menu then
 				self:toggle_menu()
@@ -769,6 +1133,8 @@ function UIShelterOS:OnKeyboard(dik, keyboard_action)
 			end
 			return true
 		end
+	elseif keyboard_action == ui_events.WINDOW_KEY_RELEASED and dik == DIK_keys.MOUSE_1 and self.app == "raid" then
+		self:raid_release(self:cursor())
 	end
 	return res
 end
