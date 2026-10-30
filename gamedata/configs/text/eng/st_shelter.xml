@@ -507,44 +507,149 @@
 	<string id="st_shelter_chamber_tip_install">
 		<text>%s: install the capsule</text>
 	</string>
-	<string id="st_shelter_chamber_tip_ready">
-		<text>%s: the capsule is in</text>
-	</string>
 	<string id="st_shelter_chamber_need_capsule">
 		<text>It needs a filled capsule of its nature.</text>
 	</string>
 	<string id="st_shelter_chamber_installed">
 		<text>The capsule is in. %s is ready.</text>
 	</string>
-	<string id="st_shelter_chamber_ready">
-		<text>%s is ready. Transmutations need recipes.</text>
-	</string>
 	<string id="st_shelter_goal_synthesis_5">
 		<text>The synthesis chambers are ready. Recipes next.</text>
 	</string>
-	<string id="st_shelter_chamber_tip_recipe">
-		<text>%s: make %s</text>
-	</string>
 	<string id="st_shelter_chamber_tip_making">
-		<text>%s: making %s, %d min left</text>
+		<text>%s: synthesis under way (%s)</text>
 	</string>
 	<string id="st_shelter_chamber_tip_take">
 		<text>%s: take %s</text>
 	</string>
-	<string id="st_shelter_chamber_need_junk">
-		<text>To make %s it needs: %s.</text>
+	<string id="st_shelter_chamber_tip_load">
+		<text>%s: load the chamber</text>
 	</string>
-	<string id="st_shelter_chamber_started">
-		<text>Making %s: ready in %s h.</text>
+	<string id="st_shelter_synth_duration">
+		<text>%d h %02d min</text>
 	</string>
-	<string id="st_shelter_chamber_making">
-		<text>Making %s: %d min left.</text>
+	<string id="st_shelter_synth_stone_name">
+		<text>Stone</text>
 	</string>
-	<string id="st_shelter_chamber_made">
-		<text>%s is made: the artefact is in the chamber.</text>
+	<string id="st_shelter_synth_stone_descr">
+		<text>All that's left of a failed synthesis: a fused lump in which nothing put in can be told any more. Scientists take them for pennies, for their statistics.</text>
 	</string>
-	<string id="st_shelter_os_start">
-		<text>Start</text>
+	<string id="st_shelter_synth_news_made">
+		<text>Synthesis succeeded: %s.</text>
+	</string>
+	<string id="st_shelter_synth_news_stone">
+		<text>A stone came out. Resonance: %d of %d.</text>
+	</string>
+	<string id="st_shelter_synth_news_who">
+		<text>Loaded by %s.</text>
+	</string>
+	<string id="st_shelter_synth_missing">
+		<text>Missing: %s.</text>
+	</string>
+	<string id="st_shelter_synth_started">
+		<text>%s is sealed. Synthesis under way.</text>
+	</string>
+	<string id="st_shelter_synth_making">
+		<text>%s: synthesis under way, %s so far.</text>
+	</string>
+	<string id="st_shelter_synth_tuning">
+		<text>The chamber is still being tuned. Try again in a few seconds.</text>
+	</string>
+	<string id="st_shelter_synth_window">
+		<text>Loading: %s</text>
+	</string>
+	<string id="st_shelter_synth_things">
+		<text>What can go in (junk, mutant parts, artefacts):</text>
+	</string>
+	<string id="st_shelter_synth_nothing">
+		<text>Nothing in the backpack can go into the chamber.</text>
+	</string>
+	<string id="st_shelter_synth_page">
+		<text>%d / %d</text>
+	</string>
+	<string id="st_shelter_synth_load">
+		<text>The load: two or three things</text>
+	</string>
+	<string id="st_shelter_synth_hint">
+		<text>Click a thing to put it into the load, click a slot of the load to take it back.</text>
+	</string>
+	<string id="st_shelter_synth_new">
+		<text>This load has not been tried in this chamber yet.</text>
+	</string>
+	<string id="st_shelter_synth_known_chemist">
+		<text>The Chemist's recipe: makes %s.</text>
+	</string>
+	<string id="st_shelter_synth_known_made">
+		<text>Made before: %s.</text>
+	</string>
+	<string id="st_shelter_synth_known_stone">
+		<text>Tried before: a stone, resonance %d of %d.</text>
+	</string>
+	<string id="st_shelter_synth_start">
+		<text>Start the synthesis</text>
+	</string>
+	<string id="st_shelter_synth_cancel">
+		<text>Cancel</text>
+	</string>
+	<string id="st_shelter_app_synth">
+		<text>Synthesis</text>
+	</string>
+	<string id="st_shelter_synth_journal">
+		<text>Synthesis journal</text>
+	</string>
+	<string id="st_shelter_synth_filter_all">
+		<text>All loads</text>
+	</string>
+	<string id="st_shelter_synth_filter_made">
+		<text>Successes</text>
+	</string>
+	<string id="st_shelter_synth_filter_stone">
+		<text>Stones</text>
+	</string>
+	<string id="st_shelter_synth_short_gravi">
+		<text>Gravitational</text>
+	</string>
+	<string id="st_shelter_synth_short_thermo">
+		<text>Thermal</text>
+	</string>
+	<string id="st_shelter_synth_short_chem">
+		<text>Chemical</text>
+	</string>
+	<string id="st_shelter_synth_short_electro">
+		<text>Electric</text>
+	</string>
+	<string id="st_shelter_synth_card_empty">
+		<text>No capsule installed</text>
+	</string>
+	<string id="st_shelter_synth_card_making">
+		<text>Synthesis: %s</text>
+	</string>
+	<string id="st_shelter_synth_card_out">
+		<text>In the cell: %s</text>
+	</string>
+	<string id="st_shelter_synth_card_free">
+		<text>Free</text>
+	</string>
+	<string id="st_shelter_synth_journal_empty">
+		<text>The journal is empty: load a chamber at its panel.</text>
+	</string>
+	<string id="st_shelter_synth_found_none">
+		<text>Nothing found.</text>
+	</string>
+	<string id="st_shelter_synth_chemist">
+		<text>Chemist's recipe</text>
+	</string>
+	<string id="st_shelter_synth_days_ago">
+		<text>%d d ago, %s</text>
+	</string>
+	<string id="st_shelter_synth_yesterday">
+		<text>yesterday, %s</text>
+	</string>
+	<string id="st_shelter_synth_row_stone">
+		<text>Stone (%d of %d)</text>
+	</string>
+	<string id="st_shelter_synth_count">
+		<text>Entries: %d</text>
 	</string>
 	<string id="st_shelter_os_shutdown">
 		<text>Shut down</text>
@@ -653,5 +758,65 @@
 	</string>
 	<string id="st_shelter_room_9">
 		<text>Room 8</text>
+	</string>
+	<string id="st_shelter_app_bar">
+		<text>Bar</text>
+	</string>
+	<string id="st_shelter_bar_store">
+		<text>%s</text>
+	</string>
+	<string id="st_shelter_bar_no_store">
+		<text>No store: make a room the store in the Shelter plan.</text>
+	</string>
+	<string id="st_shelter_bar_stock">
+		<text>Goods in the store: %d (food %d, drink and smokes %d)</text>
+	</string>
+	<string id="st_shelter_bar_markup">
+		<text>Markup: x%s</text>
+	</string>
+	<string id="st_shelter_bar_next">
+		<text>Sells once in %s h; the next sale in %d min.</text>
+	</string>
+	<string id="st_shelter_bar_till">
+		<text>In the till: %d RU (a safe under the laptop's desk)</text>
+	</string>
+	<string id="st_shelter_bar_no_till">
+		<text>No till yet: a safe will be under the laptop's desk.</text>
+	</string>
+	<string id="st_shelter_bar_total">
+		<text>Takings so far: %d RU</text>
+	</string>
+	<string id="st_shelter_bar_log">
+		<text>Last sales:</text>
+	</string>
+	<string id="st_shelter_bar_log_empty">
+		<text>No sales yet.</text>
+	</string>
+	<string id="st_shelter_os_user">
+		<text>Denis</text>
+	</string>
+	<string id="st_shelter_os_name">
+		<text>Chemist OS</text>
+	</string>
+	<string id="st_shelter_bar_store_title">
+		<text>The bar's store</text>
+	</string>
+	<string id="st_shelter_bar_money_title">
+		<text>The till</text>
+	</string>
+	<string id="st_shelter_synth_col_when">
+		<text>Time</text>
+	</string>
+	<string id="st_shelter_synth_col_chamber">
+		<text>Chamber</text>
+	</string>
+	<string id="st_shelter_synth_col_load">
+		<text>Load</text>
+	</string>
+	<string id="st_shelter_synth_col_result">
+		<text>Result</text>
+	</string>
+	<string id="st_shelter_synth_col_who">
+		<text>Who</text>
 	</string>
 </string_table>

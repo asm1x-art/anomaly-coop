@@ -1,6 +1,7 @@
 # The shelter's floor plan for the laptop (docs/coop/shelter.md, "План развития", phase 1): bunker_a1's walls cut a
 # metre over the floor wherever it is (the entrance and the corridor ~3.3, the lower hall ~2.95, the water hall
-# ~1.45), drawn as a blueprint into a UI texture; where the world lies on it goes to configs\scripts\shelter\plan.ltx.
+# ~1.45), drawn as a dark blueprint (the laptop's colours) into a UI texture; where the world lies on it goes to
+# configs\scripts\shelter\plan.ltx.
 # Furniture and clutter are left out (the walls are the collision's tall faces).
 #   plan.py <level dir>   -> gamedata\textures\ui\shelter\plan_main.dds, gamedata\configs\scripts\shelter\plan.ltx
 import os
@@ -17,7 +18,7 @@ S = 16  # px per metre
 CELL = 0.25  # the floor raster's step (m)
 CUTS = (2.45, 3.95, 4.3)  # a metre over each floor
 WALL_SPAN = 1.0  # a face this tall at least is a wall, not a thing on the floor
-BG, GRID, GRID5, WALL = (16, 28, 44, 255), (24, 40, 60, 255), (32, 52, 76, 255), (170, 214, 236, 255)
+BG, GRID, GRID5, WALL = (19, 21, 25, 255), (27, 30, 35, 255), (34, 38, 44, 255), (176, 214, 206, 255)
 
 cf = open(os.path.join(sys.argv[1], "level.cform"), "rb").read()
 _, vc, fc = struct.unpack_from("<III", cf, 0)

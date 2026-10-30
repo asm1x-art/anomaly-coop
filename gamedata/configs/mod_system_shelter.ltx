@@ -37,6 +37,23 @@ script_binding    = shelter.init_generator
 [shelter_stash]:inventory_box
 visual          = dynamics\box\box_wood_02.ogf
 
+; the bar (shelter_bar.script): what it sells from the store room's boxes (items' kinds: food; drink, which has the
+; smokes too), one thing every sell_hours game hours at the item's cost times the markup (set on the laptop: from
+; markup_min to markup_max by markup_step); the till it puts the money into: a safe under the laptop's desk
+[shelter_bar]
+kinds           = i_food, i_drink
+sell_hours      = 1
+markup          = 1.1
+markup_min      = 1
+markup_max      = 3
+markup_step     = 0.05
+till            = shelter_till
+till_pos        = -2.0, 2.95, -5.0
+till_yaw        = 1.5708
+
+[shelter_till]:inventory_box
+visual          = dynamics\equipment_cache\equipment_seif_01_case.ogf
+
 ; the laptop on the desk in the room by the passage; works while the generator runs
 [shelter_laptop]:physic_object
 visual          = dynamics\efp_props\prop_laptop.ogf
@@ -181,33 +198,115 @@ shelter_nature  = chem
 shelter_nature  = electro
 
 ; the work with the capsules and the chambers (shelter_synthesis.script): the suits it allows, how long a capsule
-; takes to fill (s), how near an anomaly takes the actor's capsule (m)
+; takes to fill (s), how near an anomaly takes the actor's capsule (m); the alchemy: a load's game hours from hours_min
+; (junk) to hours_max, by its worth (the things' cost) to worth_max, raised to worth_power; the artefacts' tier from
+; which they're rare (made of a common one)
 [shelter_synthesis]
 suits           = shelter_chemist_outfit, ecolog_outfit_yello, ecolog_outfit_blue, ecolog_outfit_green, ecolog_outfit_red
 fill_seconds    = 60
 reach           = 4
+hours_min       = 1
+hours_max       = 12
+worth_max       = 120000
+worth_power     = 0.7
+rare_tier       = 4
+
+; what goes into the chambers besides the artefacts (items\settingsrtefacts.ltx, af_class_*): each world deals these
+; among the natures, each sounding in one (shelter_synthesis.script)
+[shelter_synth_junk]
+ball_hammer
+beadspread
+boots
+broken_detector
+cards
+cutlery
+duct_tape
+e_syringe
+flashlight_broken
+gloves
+grease
+headlamp
+jar
+jewelry_box
+meinkampf
+mirror
+picture_woman
+porn
+porn2
+radio
+radio2
+rope
+steel_wool
+synthrope
+tarpaulin
+underwear
+walkie
+welding_goggles
+
+[shelter_synth_parts]
+mutant_part_boar_leg
+mutant_part_brain_burer
+mutant_part_burer_hand
+mutant_part_cat_claw
+mutant_part_cat_tail
+mutant_part_cat_thyroid
+mutant_part_chimera_claw
+mutant_part_chimera_kogot
+mutant_part_controller_glass
+mutant_part_controller_hand
+mutant_part_crow_beak
+mutant_part_dog_heart
+mutant_part_dog_liver
+mutant_part_dog_tail
+mutant_part_fang_psevdodog
+mutant_part_flesh_eye
+mutant_part_fracture_hand
+mutant_part_heart_bloodsucker
+mutant_part_heart_chimera
+mutant_part_krovosos_jaw
+mutant_part_lurker_eye
+mutant_part_lurker_tail
+mutant_part_pseudogigant_eye
+mutant_part_pseudogigant_hand
+mutant_part_psevdodog_tail
+mutant_part_psysucker_hand
+mutant_part_snork_leg
+mutant_part_snork_mask
+mutant_part_tushkano_head
+mutant_part_tusk_boar
+mutant_part_zombi_hand
+
+; what a load that's no recipe makes (tools\shelter\synth_stone.py: the model and the icon)
+[shelter_synth_stone]:tch_junk
+visual          = dynamics\shelter\synth_stone.ogf
+icons_texture   = ui\shelter\synth_stone
+inv_grid_x      = 0
+inv_grid_y      = 0
+inv_grid_width  = 1
+inv_grid_height = 1
+inv_name        = st_shelter_synth_stone_name
+inv_name_short  = st_shelter_synth_stone_name
+description     = st_shelter_synth_stone_descr
+inv_weight      = 1.4
+cost            = 250
 
 ; the Chemist's recipes, one for each chamber's nature (shelter_synthesis.script; their texts: his archive's
-; "Рецепты"): the junk artefact the chamber makes, of what junk (one of each), in how many game hours
+; "Рецепты"): the junk artefact the chamber makes, of what junk (one of each); every world keeps them
 [shelter_recipe_gravi]
 result          = af_ear
 junk            = ball_hammer, steel_wool
-hours           = 1
 
 [shelter_recipe_thermo]
 result          = af_repei
 junk            = grease, tarpaulin
-hours           = 1
 
 [shelter_recipe_chem]
 result          = af_skull_miser
 junk            = e_syringe, jar
-hours           = 1
 
 [shelter_recipe_electro]
 result          = af_moh
 junk            = radio2, duct_tape
-hours           = 1
 
 ; Sakharov's samples for Sidorovich
 [shelter_af_container]:tch_quest

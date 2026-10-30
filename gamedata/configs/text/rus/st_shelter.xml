@@ -507,44 +507,149 @@
 	<string id="st_shelter_chamber_tip_install">
 		<text>%s: установить капсулу</text>
 	</string>
-	<string id="st_shelter_chamber_tip_ready">
-		<text>%s: капсула установлена</text>
-	</string>
 	<string id="st_shelter_chamber_need_capsule">
 		<text>Нужна наполненная капсула этой природы.</text>
 	</string>
 	<string id="st_shelter_chamber_installed">
 		<text>Капсула установлена. %s готова.</text>
 	</string>
-	<string id="st_shelter_chamber_ready">
-		<text>%s готова. Для трансмутаций нужны рецепты.</text>
-	</string>
 	<string id="st_shelter_goal_synthesis_5">
 		<text>Камеры синтеза готовы. Дальше — рецепты.</text>
 	</string>
-	<string id="st_shelter_chamber_tip_recipe">
-		<text>%s: синтез %s</text>
-	</string>
 	<string id="st_shelter_chamber_tip_making">
-		<text>%s: синтез %s, ещё %d мин</text>
+		<text>%s: идёт синтез (%s)</text>
 	</string>
 	<string id="st_shelter_chamber_tip_take">
 		<text>%s: забрать %s</text>
 	</string>
-	<string id="st_shelter_chamber_need_junk">
-		<text>Для синтеза %s нужно: %s.</text>
+	<string id="st_shelter_chamber_tip_load">
+		<text>%s: загрузить камеру</text>
 	</string>
-	<string id="st_shelter_chamber_started">
-		<text>Синтез %s начат: готово через %s ч.</text>
+	<string id="st_shelter_synth_duration">
+		<text>%d ч %02d мин</text>
 	</string>
-	<string id="st_shelter_chamber_making">
-		<text>Идёт синтез %s: ещё %d мин.</text>
+	<string id="st_shelter_synth_stone_name">
+		<text>Булыжник</text>
 	</string>
-	<string id="st_shelter_chamber_made">
-		<text>Синтез %s завершён: артефакт в камере.</text>
+	<string id="st_shelter_synth_stone_descr">
+		<text>Всё, что осталось от неудачного синтеза: спёкшийся ком, в котором уже не узнать заложенных вещей. Учёные берут такие за гроши — для статистики.</text>
 	</string>
-	<string id="st_shelter_os_start">
-		<text>Пуск</text>
+	<string id="st_shelter_synth_news_made">
+		<text>Синтез удался: %s.</text>
+	</string>
+	<string id="st_shelter_synth_news_stone">
+		<text>Вышел булыжник. Резонанс: %d из %d.</text>
+	</string>
+	<string id="st_shelter_synth_news_who">
+		<text>Закладывал: %s.</text>
+	</string>
+	<string id="st_shelter_synth_missing">
+		<text>Не хватает: %s.</text>
+	</string>
+	<string id="st_shelter_synth_started">
+		<text>%s закрыта. Синтез пошёл.</text>
+	</string>
+	<string id="st_shelter_synth_making">
+		<text>%s: идёт синтез, прошло %s.</text>
+	</string>
+	<string id="st_shelter_synth_tuning">
+		<text>Камера ещё настраивается. Попробуйте через пару секунд.</text>
+	</string>
+	<string id="st_shelter_synth_window">
+		<text>Загрузка: %s</text>
+	</string>
+	<string id="st_shelter_synth_things">
+		<text>Что можно заложить (хлам, части мутантов, артефакты):</text>
+	</string>
+	<string id="st_shelter_synth_nothing">
+		<text>В рюкзаке нет ничего, что можно заложить в камеру.</text>
+	</string>
+	<string id="st_shelter_synth_page">
+		<text>%d / %d</text>
+	</string>
+	<string id="st_shelter_synth_load">
+		<text>Закладка: две или три вещи</text>
+	</string>
+	<string id="st_shelter_synth_hint">
+		<text>Щелчок по вещи кладёт её в закладку, щелчок по ячейке закладки убирает обратно.</text>
+	</string>
+	<string id="st_shelter_synth_new">
+		<text>В этой камере такое сочетание ещё не пробовали.</text>
+	</string>
+	<string id="st_shelter_synth_known_chemist">
+		<text>Рецепт Химика: выйдет %s.</text>
+	</string>
+	<string id="st_shelter_synth_known_made">
+		<text>Уже получалось: %s.</text>
+	</string>
+	<string id="st_shelter_synth_known_stone">
+		<text>Уже пробовали: вышел булыжник, резонанс %d из %d.</text>
+	</string>
+	<string id="st_shelter_synth_start">
+		<text>Запустить синтез</text>
+	</string>
+	<string id="st_shelter_synth_cancel">
+		<text>Отмена</text>
+	</string>
+	<string id="st_shelter_app_synth">
+		<text>Синтез</text>
+	</string>
+	<string id="st_shelter_synth_journal">
+		<text>Журнал синтеза</text>
+	</string>
+	<string id="st_shelter_synth_filter_all">
+		<text>Все закладки</text>
+	</string>
+	<string id="st_shelter_synth_filter_made">
+		<text>Удачные</text>
+	</string>
+	<string id="st_shelter_synth_filter_stone">
+		<text>Булыжники</text>
+	</string>
+	<string id="st_shelter_synth_short_gravi">
+		<text>Гравитационная</text>
+	</string>
+	<string id="st_shelter_synth_short_thermo">
+		<text>Термическая</text>
+	</string>
+	<string id="st_shelter_synth_short_chem">
+		<text>Химическая</text>
+	</string>
+	<string id="st_shelter_synth_short_electro">
+		<text>Электрическая</text>
+	</string>
+	<string id="st_shelter_synth_card_empty">
+		<text>Капсула не установлена</text>
+	</string>
+	<string id="st_shelter_synth_card_making">
+		<text>Идёт синтез: %s</text>
+	</string>
+	<string id="st_shelter_synth_card_out">
+		<text>В ячейке: %s</text>
+	</string>
+	<string id="st_shelter_synth_card_free">
+		<text>Свободна</text>
+	</string>
+	<string id="st_shelter_synth_journal_empty">
+		<text>Журнал пуст: заложите вещи в камеру у её пульта.</text>
+	</string>
+	<string id="st_shelter_synth_found_none">
+		<text>Ничего не найдено.</text>
+	</string>
+	<string id="st_shelter_synth_chemist">
+		<text>Рецепт Химика</text>
+	</string>
+	<string id="st_shelter_synth_days_ago">
+		<text>%d дн. назад, %s</text>
+	</string>
+	<string id="st_shelter_synth_yesterday">
+		<text>вчера, %s</text>
+	</string>
+	<string id="st_shelter_synth_row_stone">
+		<text>Булыжник (%d из %d)</text>
+	</string>
+	<string id="st_shelter_synth_count">
+		<text>Записей: %d</text>
 	</string>
 	<string id="st_shelter_os_shutdown">
 		<text>Завершение работы</text>
@@ -653,5 +758,65 @@
 	</string>
 	<string id="st_shelter_room_9">
 		<text>Комната 8</text>
+	</string>
+	<string id="st_shelter_app_bar">
+		<text>Бар</text>
+	</string>
+	<string id="st_shelter_bar_store">
+		<text>%s</text>
+	</string>
+	<string id="st_shelter_bar_no_store">
+		<text>Склад не назначен: назначьте комнату в «Плане убежища».</text>
+	</string>
+	<string id="st_shelter_bar_stock">
+		<text>Товар на складе: %d (еда — %d, выпивка и курево — %d)</text>
+	</string>
+	<string id="st_shelter_bar_markup">
+		<text>Наценка: x%s</text>
+	</string>
+	<string id="st_shelter_bar_next">
+		<text>Продаёт раз в %s ч; следующая продажа через %d мин.</text>
+	</string>
+	<string id="st_shelter_bar_till">
+		<text>В кассе: %d руб. (сейф под столом с ноутбуком)</text>
+	</string>
+	<string id="st_shelter_bar_no_till">
+		<text>Кассы ещё нет: сейф появится под столом с ноутбуком.</text>
+	</string>
+	<string id="st_shelter_bar_total">
+		<text>Выручка за всё время: %d руб.</text>
+	</string>
+	<string id="st_shelter_bar_log">
+		<text>Последние продажи:</text>
+	</string>
+	<string id="st_shelter_bar_log_empty">
+		<text>Продаж пока не было.</text>
+	</string>
+	<string id="st_shelter_os_user">
+		<text>Денис</text>
+	</string>
+	<string id="st_shelter_os_name">
+		<text>Химик OS</text>
+	</string>
+	<string id="st_shelter_bar_store_title">
+		<text>Склад бара</text>
+	</string>
+	<string id="st_shelter_bar_money_title">
+		<text>Касса</text>
+	</string>
+	<string id="st_shelter_synth_col_when">
+		<text>Время</text>
+	</string>
+	<string id="st_shelter_synth_col_chamber">
+		<text>Камера</text>
+	</string>
+	<string id="st_shelter_synth_col_load">
+		<text>Закладка</text>
+	</string>
+	<string id="st_shelter_synth_col_result">
+		<text>Результат</text>
+	</string>
+	<string id="st_shelter_synth_col_who">
+		<text>Кто</text>
 	</string>
 </string_table>

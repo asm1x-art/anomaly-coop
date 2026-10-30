@@ -1,0 +1,188 @@
+-- The look of the shelter's computers (the Chemist's laptop, ui_shelter_laptop.script; the chambers' panels,
+-- ui_shelter_chamber.script): a modern dark system. Its parts are put together from ui_shelter_laptop.xml's white
+-- (tinted and sized), a white disc whose quarters round the corners of boxes (tools\shelter\laptop_ui.py: os_corner),
+-- glyphs and Letterica texts, laid out in square units: a window class given these methods (apply) keeps self.xml (the
+-- xml parsed) and self.k (a square unit across, in the interface's units).
+
+C = {
+	surface = { 30, 33, 38 }, raised = { 41, 45, 52 }, field = { 20, 22, 26 }, border = { 58, 63, 71 },
+	line = { 47, 51, 58 }, bar = { 16, 18, 21 }, text = { 232, 234, 237 }, dim = { 150, 157, 167 },
+	faint = { 98, 104, 113 }, accent = { 46, 196, 170 }, on_accent = { 8, 30, 26 }, good = { 92, 210, 128 },
+	bad = { 240, 98, 88 }, warn = { 240, 180, 70 }, white = { 255, 255, 255 }, black = { 0, 0, 0 },
+	close = { 200, 46, 34 },
+}
+TITLE_H = 42 -- a window's title bar
+local CORNER = "ui\\shelter\\os_corner"
+local QUARTERS = { { 0, 0 }, { 32, 0 }, { 0, 32 }, { 32, 32 } } -- the disc's quarters: top left, top right, ...
+local TEXTS = { s = "text_s", m = "text", l = "text_l" } -- Letterica 16, 18, 25
+
+function argb(c, a)
+	return GetARGB(a or 255, c[1], c[2], c[3])
+end
+
+local M = {}
+
+-- a window put at x, y (in its parent) and sized, in square units. Its edges fall on whole pixels: the engine rounds
+-- a part's place and size apart, so the parts of a round box would leave a pixel's gap or overlap between them.
+function M:place(wnd, x, y, w, h)
+	local sx, sy = device().width / 1024, device().height / 768
+	local x0, x1 = math.floor(x * self.k * sx + 0.5), math.floor((x + w) * self.k * sx + 0.5)
+	local y0, y1 = math.floor(y * sy + 0.5), math.floor((y + h) * sy + 0.5)
+	wnd:SetWndPos(vector2():set((x0 + 0.02) / sx, (y0 + 0.02) / sy)) -- a hair in: cut or rounded, the same pixel
+	wnd:SetWndSize(vector2():set((x1 - x0) / sx, (y1 - y0) / sy))
+end
+
+function M:rect(x, y, w, h, color, parent, alpha)
+	local s = self.xml:InitStatic("white", parent)
+	self:place(s, x, y, w, h)
+	s:SetTextureColor(argb(color, alpha))
+	return s
+end
+
+-- an unseen holder of parts, to move, hide or drop them together
+function M:box(x, y, w, h, parent)
+	return self:rect(x, y, w, h, C.black, parent, 0)
+end
+
+function M:image(x, y, w, h, texture, parent, color, alpha)
+	local s = self.xml:InitStatic("image", parent)
+	s:InitTexture(texture)
+	s:SetStretchTexture(true)
+	if color then
+		s:SetTextureColor(argb(color, alpha))
+	end
+	self:place(s, x, y, w, h)
+	return s
+end
+
+-- a box with round corners of radius r
+function M:round(x, y, w, h, color, parent, r, alpha)
+	r = math.min(r or 6, math.floor(math.min(w, h) / 2))
+	if r < 1 then
+		return self:rect(x, y, w, h, color, parent, alpha)
+	end
+	self:rect(x + r, y, w - 2 * r, h, color, parent, alpha)
+	self:rect(x, y + r, r, h - 2 * r, color, parent, alpha)
+	self:rect(x + w - r, y + r, r, h - 2 * r, color, parent, alpha)
+	for _, q in ipairs(QUARTERS) do
+		local s = self.xml:InitStatic("image", parent)
+		s:InitTexture(CORNER)
+		s:SetTextureRect(Frect():set(q[1], q[2], q[1] + 32, q[2] + 32))
+		s:SetStretchTexture(true)
+		s:SetTextureColor(argb(color, alpha))
+		self:place(s, q[1] == 0 and x or x + w - r, q[2] == 0 and y or y + h - r, r, r)
+	end
+end
+
+-- a round box with a thin border
+function M:framed(x, y, w, h, fill, parent, r, border)
+	r = r or 6
+	self:round(x, y, w, h, border or C.border, parent, r)
+	self:round(x + 1, y + 1, w - 2, h - 2, fill, parent, r - 1)
+end
+
+-- a text: size "s", "m" (the default) or "l"
+function M:text(x, y, w, h, str, color, parent, align, size)
+	local t = self.xml:InitTextWnd(TEXTS[size or "m"], parent)
+	self:place(t, x, y, w, h)
+	t:SetTextAlignment(align or CGameFont.alLeft)
+	t:SetTextColor(argb(color or C.text))
+	t:SetText(str)
+	return t
+end
+
+-- an item's icon fitted into a box, its shape kept
+function M:icon(sec, x, y, box, parent)
+	local ico = utils_xml.get_item_axis(sec)
+	if ico.w <= 0 or ico.h <= 0 then
+		return
+	end
+	local s = self.xml:InitStatic("image", parent)
+	s:InitTexture(utils_xml.get_icons_texture(sec))
+	s:SetTextureRect(Frect():set(ico.x1, ico.y1, ico.x2, ico.y2))
+	s:SetStretchTexture(true)
+	local scale = math.min(box / ico.w, box / ico.h)
+	local w, h = ico.w * scale, ico.h * scale
+	self:place(s, x + (box - w) / 2, y + (box - h) / 2, w, h)
+end
+
+-- the hover of a click's area: a light over it, seen while the cursor is there
+function M:hover_of(x, y, w, h, parent, r, color, alpha)
+	local hb = self:box(x, y, w, h, parent)
+	self:round(0, 0, w, h, color or C.white, hb, r or 6, alpha or 22)
+	hb:Show(false)
+	return hb
+end
+
+-- a button, f on a click (list: its clicks; ax, ay: the parent's place in the clicks' frame). kind: "primary" (the
+-- accent), "normal", "on" (picked, as a pressed tab), "flat" (no face) or "off" (not to be pressed). Returns its
+-- click's entry (for "off" one in no list), to be tagged.
+function M:button(x, y, w, h, str, f, list, parent, ax, ay, kind)
+	kind = kind or "normal"
+	local face = kind == "primary" and C.accent or kind == "on" and C.accent or kind ~= "flat" and C.raised or nil
+	if face then
+		self:round(x, y, w, h, face, parent, 6, kind == "on" and 60 or nil)
+	end
+	local hb = kind ~= "off" and self:hover_of(x, y, w, h, parent, 6) or nil
+	local color = kind == "primary" and C.on_accent or kind == "off" and C.faint or C.text
+	self:text(x, y, w, h, str, color, parent, CGameFont.alCenter)
+	local c = { (ax or 0) + x, (ay or 0) + y, w, h, f, hover = hb }
+	if kind ~= "off" then
+		list[#list + 1] = c
+	end
+	return c
+end
+
+-- a window's frame: a soft shadow, the surface, the title with an icon, the close box (its click into list, with the
+-- window's place ax, ay in the clicks' frame); returns the window, its content below TITLE_H
+function M:chrome(x, y, w, h, title, icon, parent, list, ax, ay, on_close)
+	local win = self:box(x, y, w, h, parent)
+	for i = 4, 1, -1 do -- the shadow, fading out
+		self:round(-2 * i, 3 - i, w + 4 * i, h + 4 * i, C.black, win, 10 + 2 * i, 16)
+	end
+	self:framed(0, 0, w, h, C.surface, win, 10)
+	if icon then
+		self:image(14, (TITLE_H - 22) / 2, 22, 22, icon, win)
+	end
+	self:text(icon and 46 or 16, 0, w - 120, TITLE_H, title, C.text, win)
+	local cx = w - 48
+	local hb = self:hover_of(cx, 6, 40, TITLE_H - 12, win, 6, C.close, 255)
+	self:image(cx + 14, TITLE_H / 2 - 6, 12, 12, "ui\\shelter\\os_close", win, C.dim)
+	list[#list + 1] = { (ax or 0) + cx, (ay or 0) + 6, 40, TITLE_H - 12, on_close, hover = hb }
+	self:rect(1, TITLE_H, w - 2, 1, C.line, win)
+	return win
+end
+
+-- the hovers of clicks' lists (the first list's on top): only that under the cursor p is lit. One lit before whose
+-- click is no longer listed went with its parts: left alone.
+function M:hovers(p, lists)
+	local lit, still
+	for _, list in ipairs(lists) do
+		for i = #list, 1, -1 do
+			local c = list[i]
+			if not lit and c.hover and p.x >= c[1] and p.x < c[1] + c[3] and p.y >= c[2] and p.y < c[2] + c[4] then
+				lit = c.hover
+			end
+			still = still or self.lit and c.hover == self.lit
+		end
+	end
+	if not still then
+		self.lit = nil
+	end
+	if lit ~= self.lit then
+		if self.lit then
+			self.lit:Show(false)
+		end
+		if lit then
+			lit:Show(true)
+		end
+		self.lit = lit
+	end
+end
+
+-- the methods to a window class
+function apply(cls)
+	for name, f in pairs(M) do
+		cls[name] = f
+	end
+end

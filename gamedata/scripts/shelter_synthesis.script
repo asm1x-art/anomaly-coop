@@ -238,10 +238,10 @@ end
 -- use: it takes a full capsule of the nature, which is then seen in the cell with a real anomaly of the nature round it
 -- (the visor and the detectors see it; the transmutations need it), small enough to stay behind the window, and a
 -- glow. The panels come on the first visit.
--- Once the Chemist's PDA is unloaded his recipes are known ([shelter_recipe_<nature>]): at a ready chamber's panel the
--- recipe's junk goes in, and some game hours later the artefact lies in the cell, to be taken at the panel. The chamber
--- is busy meanwhile. Putting the junk in and taking the artefact out, as all the work, only in the allowed suits. What
--- is being made and what lies in the cells are the world's.
+-- At a ready chamber's panel up to three things go in (ui_shelter_chamber.script), and some game hours later in the
+-- cell lies an artefact, if they are one of the chamber's recipes, or a stone; taken at the panel. The chamber is busy
+-- meanwhile. Loading it and taking out, as all the work, only in the allowed suits. What is being made and what lies in
+-- the cells are the world's. The alchemy below.
 
 local LEVEL = "bunker_a1"
 local CHAMBERS = { -- from the door: the x of the cell's panel and of its window, the cell's anomaly
@@ -262,9 +262,9 @@ local CELL_FX = {
 	electro = { lanim = "koster_01_electra" },
 }
 local CELL_GLOW = { range = 3, height = 1, brightness = 0.006 } -- m, m over the floor; a light animation's 0..255 to 0..1.5
-local MADE_HOVER = { height = 1.0, out = 0.4, light = 1.2 } -- the made artefact held in the window: m over the cell's
--- floor, m from the cell's middle towards the glass (a small one is lost on the floor); a light on it of its own colour
--- (its trail_light_color), so a faint one is seen too
+local MADE_HOVER = { height = 1.0, out = 0.4, light = 1.2, color = "0.6,0.6,0.6" } -- what's made held in the window: m
+-- over the cell's floor, m from the cell's middle towards the glass (a small one is lost on the floor); a light on it of
+-- its own colour (an artefact's trail_light_color, a stone's grey), so a faint one is seen too
 
 local function full(nature)
 	return "shelter_capsule_" .. nature .. "_full"
@@ -352,45 +352,383 @@ local function spawn_panels()
 	end
 end
 
+local NATURES = { "gravi", "thermo", "chem", "electro" }
+STONE = "shelter_synth_stone" -- what a load that's no recipe makes
+SLOTS = 3 -- a load: two or three things
+local RECIPES_INFO = "shelter_notes_chemist" -- his PDA unloaded
+
 local function chamber_name(nature)
 	return game.translate_string("st_shelter_chamber_" .. nature)
 end
-
-local RECIPES_INFO = "shelter_notes_chemist" -- his PDA unloaded
 
 -- the game's time in seconds
 local function game_sec()
 	return game.get_game_time():diffSec(game.CTime())
 end
 
-local function recipe(nature)
-	local sec = "shelter_recipe_" .. nature
-	if not has_alife_info(RECIPES_INFO) or not ini_sys:section_exist(sec) then
+local function name(sec)
+	return sec == STONE and game.translate_string("st_shelter_synth_stone_name") or ui_item.get_sec_name(sec)
+end
+
+-- so long, as "2 h 05 min"
+function duration_text(seconds)
+	local m = math.max(0, math.floor(seconds / 60))
+	return string.format(game.translate_string("st_shelter_synth_duration"), math.floor(m / 60), m % 60)
+end
+
+-------------------------------------------------------------------------------
+-- the alchemy (docs/coop/shelter.md, "Алхимия"): two or three things into a chamber make an artefact when they are one
+-- of the chamber's recipes, a stone otherwise, with the chamber's resonance: the most of them one of its recipes has,
+-- of the recipes of the load's kind (junk alone: those of junk; with an artefact: those it is the seed of).
+-- Each world has its own recipes, from its seed: every junk item and mutant part ([shelter_synth_junk],
+-- [shelter_synth_parts]) sounds in one nature only, dealt evenly, an artefact in its own (items\settings\artefacts.ltx).
+-- A junk artefact is made of three junk items; a common one (tier under [shelter_synthesis] rare_tier) of a junk
+-- artefact of its nature and two junk items or mutant parts; a rare one of a common one of its nature and two mutant
+-- parts or junk artefacts. The Chemist's recipes ([shelter_recipe_<nature>]) stay as he wrote them, their junk sounding
+-- in their chamber. The dearer the load, the longer it takes: hours_min for junk to hours_max. Every load's outcome goes
+-- into the world's journal (the laptop's "Синтез"), and every game of the group hears of it in its PDA.
+
+local alchemy -- the world's: its seed, pool (section -> "junk", "part", "artefact"), affinity (section -> nature),
+-- recipes (nature -> { { result, parts, key, seed (the artefact it grows on), chemist } })
+
+-- Park-Miller: the same numbers from the same seed in every game
+local function rng(seed)
+	local s = seed % 2147483647
+	if s <= 0 then
+		s = s + 2147483646
+	end
+	return function(n)
+		s = s * 16807 % 2147483647
+		return s % n + 1
+	end
+end
+
+local function section_list(ini, sec)
+	local t = {}
+	if ini:section_exist(sec) then
+		for i = 0, ini:line_count(sec) - 1 do
+			local _, id = ini:r_line_ex(sec, i, "", "")
+			if id and ini_sys:section_exist(id) then
+				t[#t + 1] = id
+			end
+		end
+	end
+	table.sort(t)
+	return t
+end
+
+-- count of list's (distinct), nil if it has too few
+local function pick(r, list, count)
+	local t, out = {}, {}
+	for i, s in ipairs(list) do
+		t[i] = s
+	end
+	for i = 1, count do
+		if #t == 0 then
+			return nil
+		end
+		out[i] = table.remove(t, r(#t))
+	end
+	return out
+end
+
+local function concat(a, b)
+	local t = {}
+	for _, s in ipairs(a) do
+		t[#t + 1] = s
+	end
+	for _, s in ipairs(b) do
+		t[#t + 1] = s
+	end
+	return t
+end
+
+-- a load's sections in one order: the same load, the same key
+function key(parts)
+	local t = {}
+	for i, s in ipairs(parts) do
+		t[i] = s
+	end
+	table.sort(t)
+	return table.concat(t, ",")
+end
+
+local function generate(seed)
+	local r = rng(seed)
+	local rare_tier = ini_sys:r_float_ex(SETTINGS, "rare_tier") or 4
+	local arts = ini_file("items\\settings\\artefacts.ltx")
+	local a = { seed = seed, pool = {}, affinity = {}, recipes = {} }
+	local junk_af, common, rare, things = {}, {}, {}, {}
+	for _, n in ipairs(NATURES) do
+		junk_af[n], common[n], rare[n], things[n] = section_list(arts, "af_class_" .. n .. "_musor"), {}, {}, { junk = {}, part = {} }
+		for _, af in ipairs(section_list(arts, "af_class_" .. n)) do
+			local t = (SYS_GetParam(2, af, "tier") or 1) >= rare_tier and rare[n] or common[n]
+			t[#t + 1] = af
+		end
+		for _, list in ipairs({ junk_af[n], common[n], rare[n] }) do
+			for _, af in ipairs(list) do
+				a.pool[af], a.affinity[af] = "artefact", n
+			end
+		end
+		a.recipes[n] = {}
+	end
+	local chemist = {}
+	for _, n in ipairs(NATURES) do
+		local sec = "shelter_recipe_" .. n
+		if ini_sys:section_exist(sec) then
+			local parts = str_explode(ini_sys:r_string_ex(sec, "junk") or "", ",")
+			local result = ini_sys:r_string_ex(sec, "result")
+			for _, s in ipairs(parts) do
+				a.affinity[s] = n
+			end
+			chemist[result] = true
+			table.insert(a.recipes[n], { result = result, parts = parts, key = key(parts), chemist = true })
+		end
+	end
+	-- the junk and the parts dealt among the natures: each to the one with the fewest of its kind
+	for _, kind in ipairs({ "junk", "part" }) do
+		local free = {}
+		for _, s in ipairs(section_list(ini_sys, kind == "junk" and "shelter_synth_junk" or "shelter_synth_parts")) do
+			a.pool[s] = kind
+			if a.affinity[s] then
+				table.insert(things[a.affinity[s]][kind], s)
+			else
+				free[#free + 1] = s
+			end
+		end
+		for i = #free, 2, -1 do
+			local j = r(i)
+			free[i], free[j] = free[j], free[i]
+		end
+		for _, s in ipairs(free) do
+			local best
+			for _, n in ipairs(NATURES) do
+				if not best or #things[n][kind] < #things[best][kind] then
+					best = n
+				end
+			end
+			a.affinity[s] = best
+			table.insert(things[best][kind], s)
+		end
+	end
+	local function add(n, result, seeds, from, count)
+		for _ = 1, 50 do
+			local parts = pick(r, from, count)
+			if not parts then
+				break
+			end
+			local seed = seeds and seeds[r(#seeds)]
+			if seed then
+				table.insert(parts, 1, seed)
+			end
+			local k, taken = key(parts), false
+			for _, rc in ipairs(a.recipes[n]) do
+				taken = taken or rc.key == k
+			end
+			if not taken then
+				table.insert(a.recipes[n], { result = result, parts = parts, key = k, seed = seed })
+				return
+			end
+		end
+		printf("! [shelter] no recipe for %s", result)
+	end
+	for _, n in ipairs(NATURES) do
+		for _, af in ipairs(junk_af[n]) do
+			if not chemist[af] then
+				add(n, af, nil, things[n].junk, 3)
+			end
+		end
+		if #junk_af[n] > 0 then
+			for _, af in ipairs(common[n]) do
+				add(n, af, junk_af[n], concat(things[n].junk, things[n].part), 2)
+			end
+		end
+		if #common[n] > 0 then
+			for _, af in ipairs(rare[n]) do
+				add(n, af, common[n], concat(things[n].part, junk_af[n]), 2)
+			end
+		end
+	end
+	return a
+end
+
+-- the world's alchemy, nil till it has a seed (the chambers' panels give it one)
+function get_alchemy()
+	local seed = shelter.state("synth_seed", nil)
+	if not seed then
 		return nil
 	end
-	return { result = ini_sys:r_string_ex(sec, "result"), junk = str_explode(ini_sys:r_string_ex(sec, "junk") or "", ","),
-		hours = ini_sys:r_float_ex(sec, "hours") or 1 }
+	if not alchemy or alchemy.seed ~= seed then
+		alchemy = generate(seed)
+	end
+	return alchemy
 end
 
-local function name(sec)
-	return ui_item.get_sec_name(sec)
+-- what of a section can go into a chamber: "junk", "part", "artefact" or nil
+function component(sec)
+	local a = get_alchemy()
+	return a and a.pool[sec]
 end
 
--- a chamber's work: "making" (the game second it ends, its result) or "out" (the artefact lying in the cell), or nil
+local function overlap(a, b)
+	local left, n = {}, 0
+	for _, s in ipairs(a) do
+		left[s] = (left[s] or 0) + 1
+	end
+	for _, s in ipairs(b) do
+		if (left[s] or 0) > 0 then
+			left[s], n = left[s] - 1, n + 1
+		end
+	end
+	return n
+end
+
+-- what a load makes in a chamber: the artefact or the stone, and the resonance
+function outcome(nature, parts)
+	local a = get_alchemy()
+	local k, best, has, artefacts = key(parts), 0, {}, false
+	for _, s in ipairs(parts) do
+		has[s], artefacts = true, artefacts or a.pool[s] == "artefact"
+	end
+	for _, rc in ipairs(a.recipes[nature]) do
+		if rc.key == k then
+			return rc.result, #parts
+		end
+		if rc.seed and has[rc.seed] or not rc.seed and not artefacts then
+			best = math.max(best, overlap(parts, rc.parts))
+		end
+	end
+	return STONE, best
+end
+
+-- a load's game hours by its worth: the things' cost
+local function hours_for(parts)
+	local worth = 0
+	for _, s in ipairs(parts) do
+		worth = worth + (SYS_GetParam(2, s, "cost") or 0)
+	end
+	local lo, hi = ini_sys:r_float_ex(SETTINGS, "hours_min") or 1, ini_sys:r_float_ex(SETTINGS, "hours_max") or 12
+	local k = math.min(1, worth / (ini_sys:r_float_ex(SETTINGS, "worth_max") or 120000))
+	return lo + (hi - lo) * k ^ (ini_sys:r_float_ex(SETTINGS, "worth_power") or 0.7)
+end
+
+-- the journal, the world's: each chamber's loads made, "synth_log_<nature>_<i>" (i up to "synth_logs_<nature>") =
+-- "result|parts|resonance|game second|who"
+local function logs(nature)
+	return shelter.state("synth_logs_" .. nature, 0) or 0
+end
+
+local function log_entry(nature, i)
+	local v = shelter.state("synth_log_" .. nature .. "_" .. i, nil)
+	local result, parts, resonance, t, who = string.match(tostring(v or ""), "^([^|]*)|([^|]*)|(%d*)|(%d*)|(.*)$")
+	if not result then
+		return nil
+	end
+	return { nature = nature, result = result, parts = str_explode(parts, ","), resonance = tonumber(resonance) or 0,
+		t = tonumber(t) or 0, who = who }
+end
+
+-- every load made, newest first: { nature, result, parts, resonance, t, who }
+function journal()
+	local t = {}
+	for _, n in ipairs(NATURES) do
+		for i = 1, logs(n) do
+			t[#t + 1] = log_entry(n, i)
+		end
+	end
+	table.sort(t, function(a, b)
+		return a.t > b.t
+	end)
+	return t
+end
+
+-- the Chemist's recipes, known once his PDA is unloaded: { nature, result, parts, chemist }
+function chemist_recipes()
+	local t = {}
+	if has_alife_info(RECIPES_INFO) then
+		for _, n in ipairs(NATURES) do
+			local sec = "shelter_recipe_" .. n
+			if ini_sys:section_exist(sec) then
+				t[#t + 1] = { nature = n, result = ini_sys:r_string_ex(sec, "result"), chemist = true,
+					parts = str_explode(ini_sys:r_string_ex(sec, "junk") or "", ",") }
+			end
+		end
+	end
+	return t
+end
+
+-- what's known of a load in a chamber: the journal's last word on it, or the Chemist's recipe; nil if never tried
+function known(nature, parts)
+	local k = key(parts)
+	for _, rc in ipairs(chemist_recipes()) do
+		if rc.nature == nature and key(rc.parts) == k then
+			return rc
+		end
+	end
+	for i = logs(nature), 1, -1 do
+		local e = log_entry(nature, i)
+		if e and key(e.parts) == k then
+			return e
+		end
+	end
+end
+
+local function news(e)
+	local text
+	if e.result == STONE then
+		text = string.format(game.translate_string("st_shelter_synth_news_stone"), e.resonance, SLOTS)
+	else
+		text = string.format(game.translate_string("st_shelter_synth_news_made"), name(e.result))
+	end
+	if e.who ~= "" then
+		text = text .. " " .. string.format(game.translate_string("st_shelter_synth_news_who"), e.who)
+	end
+	db.actor:give_game_news(chamber_name(e.nature), text, "ui_inGame2_Poslednie_razrabotki", 0, 8000)
+end
+
+-- the journal's new entries, heard in this game (each game counts its own; one coming into the world hears only what's
+-- new from then on)
+local function update_news()
+	for _, n in ipairs(NATURES) do
+		local count, heard = logs(n), load_var(db.actor, "shelter_synth_heard_" .. n, nil)
+		if not heard or heard > count then
+			save_var(db.actor, "shelter_synth_heard_" .. n, count)
+		elseif heard < count then
+			for i = heard + 1, count do
+				local e = log_entry(n, i)
+				if e then
+					news(e)
+				end
+			end
+			save_var(db.actor, "shelter_synth_heard_" .. n, count)
+		end
+	end
+end
+
+-- a chamber's work: "making" (the game second it began; what went in), "out" (what lies in the cell), or nil
 local function work(nature)
 	local out = shelter.state("synth_out_" .. nature, nil)
 	local se = out and alife_object(out)
 	if se then
 		return "out", se
 	end
-	local ends = shelter.state("synth_" .. nature, nil)
-	if ends then
-		return "making", ends, shelter.state("synth_result_" .. nature, "")
+	if shelter.state("synth_" .. nature, nil) then
+		return "making", shelter.state("synth_start_" .. nature, nil),
+			str_explode(tostring(shelter.state("synth_load_" .. nature, "") or ""), ",")
 	end
 end
 
-local function minutes_left(ends)
-	return math.max(1, math.ceil((ends - game_sec()) / 60))
+-- a chamber for the laptop: installed, and its work ("making": since when, what went in; "out": the section in the cell)
+function status(nature)
+	local what, a, b = work(nature)
+	local s = { installed = installed(nature), what = what }
+	if what == "making" then
+		s.elapsed = a and game_sec() - a or nil
+		s.parts = b
+	elseif what == "out" then
+		s.result = a:section_name()
+	end
+	return s
 end
 
 local function panel_tip(nature)
@@ -399,19 +737,17 @@ local function panel_tip(nature)
 		local id = db.actor:object(full(nature)) and "st_shelter_chamber_tip_install" or "st_shelter_chamber_tip_empty"
 		return string.format(game.translate_string(id), chamber_text)
 	end
-	local what, a, b = work(nature)
-	local r = recipe(nature)
+	local what, a = work(nature)
 	if what == "out" then
 		return string.format(game.translate_string("st_shelter_chamber_tip_take"), chamber_text, name(a:section_name()))
 	elseif what == "making" then
-		return string.format(game.translate_string("st_shelter_chamber_tip_making"), chamber_text, name(b), minutes_left(a))
-	elseif r then
-		return string.format(game.translate_string("st_shelter_chamber_tip_recipe"), chamber_text, name(r.result))
+		return string.format(game.translate_string("st_shelter_chamber_tip_making"), chamber_text,
+			a and duration_text(game_sec() - a) or "?")
 	end
-	return string.format(game.translate_string("st_shelter_chamber_tip_ready"), chamber_text)
+	return string.format(game.translate_string("st_shelter_chamber_tip_load"), chamber_text)
 end
 
--- the artefact made, out of the cell into the actor's inventory
+-- what was made, out of the cell into the actor's inventory
 local function take_out(nature, se)
 	local sec = se:section_name()
 	shelter.everyones(function()
@@ -422,44 +758,66 @@ local function take_out(nature, se)
 	news_manager.relocate_item(db.actor, "in", sec, 1)
 end
 
--- the recipe's junk into the chamber, the making begun
-local function start(nature, r)
-	local missing = {}
-	for _, sec in ipairs(r.junk) do
-		if not db.actor:object(sec) then
-			missing[#missing + 1] = name(sec)
-		end
+-- a load (two or three sections, as picked) out of the actor's inventory into the chamber, the making begun
+-- (ui_shelter_chamber.script)
+function load(nature, parts)
+	if #parts < 2 or work(nature) or not get_alchemy() then
+		return
 	end
-	if #missing > 0 then
-		return msg("st_shelter_chamber_need_junk", name(r.result), table.concat(missing, ", "))
-	elseif not suited() then
+	local objs, used = {}, {}
+	for _, sec in ipairs(parts) do
+		local found
+		db.actor:iterate_inventory(function(_, obj)
+			if not found and obj:section() == sec and not used[obj:id()] then
+				found = obj
+			end
+		end, db.actor)
+		if not found then
+			return msg("st_shelter_synth_missing", name(sec))
+		end
+		used[found:id()] = true
+		objs[#objs + 1] = found
+	end
+	if not suited() then
 		return kill(nature)
 	end
-	for _, sec in ipairs(r.junk) do
-		alife_release(db.actor:object(sec))
-		news_manager.relocate_item(db.actor, "out", sec, 1)
+	local result, resonance = outcome(nature, parts)
+	local now = game_sec()
+	for _, obj in ipairs(objs) do
+		news_manager.relocate_item(db.actor, "out", obj:section(), 1)
+		alife_release(obj)
 	end
-	shelter.set_state("synth_result_" .. nature, r.result)
-	shelter.set_state("synth_" .. nature, game_sec() + r.hours * 3600)
-	msg("st_shelter_chamber_started", name(r.result), r.hours)
+	shelter.set_state("synth_result_" .. nature, result)
+	shelter.set_state("synth_load_" .. nature, table.concat(parts, ","))
+	shelter.set_state("synth_resonance_" .. nature, resonance)
+	shelter.set_state("synth_who_" .. nature, (string.gsub(db.actor:character_name() or "", "|", "/")))
+	shelter.set_state("synth_start_" .. nature, now)
+	shelter.set_state("synth_" .. nature, math.floor(now + hours_for(parts) * 3600))
+	msg("st_shelter_synth_started", chamber_name(nature))
 end
 
--- a making's time up: the artefact in the cell (once for the world)
+local WORK_STATES = { "synth_", "synth_result_", "synth_load_", "synth_resonance_", "synth_who_", "synth_start_" }
+
+-- a making's time up: what it made in the cell, the journal's entry (once for the world)
 local function made(c, ends)
 	shelter.once("synth_made_" .. c.nature .. "_" .. ends, function()
-		local result = shelter.state("synth_result_" .. c.nature, nil)
-		local panel = alife_object(shelter.state("chamber_panel_" .. c.nature, 65535))
-		shelter.set_state("synth_" .. c.nature, nil)
-		shelter.set_state("synth_result_" .. c.nature, nil)
+		local n = c.nature
+		local result = shelter.state("synth_result_" .. n, nil)
+		local entry = table.concat({ result or STONE, tostring(shelter.state("synth_load_" .. n, "") or ""),
+			shelter.state("synth_resonance_" .. n, 0) or 0, ends, tostring(shelter.state("synth_who_" .. n, "") or "") }, "|")
+		for _, s in ipairs(WORK_STATES) do
+			shelter.set_state(s .. n, nil)
+		end
+		local count = logs(n) + 1
+		shelter.set_state("synth_log_" .. n .. "_" .. count, entry)
+		shelter.set_state("synth_logs_" .. n, count)
+		local panel = alife_object(shelter.state("chamber_panel_" .. n, 65535))
 		if not (result and panel and ini_sys:section_exist(result)) then
 			return
 		end
 		local se = alife_create(result, vector():set(c.window, WALL.cell_floor + 0.3, WALL.cell_z), panel.m_level_vertex_id,
 			panel.m_game_vertex_id)
-		shelter.set_state("synth_out_" .. c.nature, se and se.id or nil)
-		if level.name() == LEVEL then
-			msg("st_shelter_chamber_made", name(result))
-		end
+		shelter.set_state("synth_out_" .. n, se and se.id or nil)
 	end)
 end
 
@@ -478,19 +836,18 @@ end
 
 local function panel_use(nature)
 	if installed(nature) then
-		local what, a, b = work(nature)
-		local r = recipe(nature)
+		local what, a = work(nature)
 		if what == "out" then
 			if not suited() then
 				return kill(nature)
 			end
 			return take_out(nature, a)
 		elseif what == "making" then
-			return msg("st_shelter_chamber_making", name(b), minutes_left(a))
-		elseif r then
-			return start(nature, r)
+			return msg("st_shelter_synth_making", chamber_name(nature), a and duration_text(game_sec() - a) or "?")
+		elseif not get_alchemy() then
+			return msg("st_shelter_synth_tuning")
 		end
-		return msg("st_shelter_chamber_ready", chamber_name(nature))
+		return ui_shelter_chamber.open(nature)
 	end
 	local capsule = db.actor:object(full(nature))
 	if not capsule then
@@ -566,10 +923,18 @@ function panel_binder:update(delta)
 		cell_fx_stop(self.fx)
 		self.fx = nil
 	end
+	if on and not self.seeding and not shelter.state("synth_seed", nil) then -- the world's recipes
+		self.seeding = true
+		shelter.once("synth_seed", function()
+			shelter.set_state("synth_seed", math.random(1, 2147483646))
+		end)
+	end
 	local what, made_se = work(self.nature)
 	local af = what == "out" and level.object_by_id(made_se.id)
-	if af and af:get_artefact() then -- seen in the cell without a detector, held in the window
-		af:get_artefact():SwitchVisibility(true)
+	if af then -- held in the window, an artefact seen without a detector
+		if af:get_artefact() then
+			af:get_artefact():SwitchVisibility(true)
+		end
 		local shell = self.held ~= af:id() and af:get_physics_shell()
 		if shell then
 			local c = chamber(self.nature)
@@ -577,7 +942,7 @@ function panel_binder:update(delta)
 			af:force_set_position(pos, false)
 			shell:freeze()
 			self.held = af:id()
-			local rgb = str_explode(ini_sys:r_string_ex(af:section(), "trail_light_color") or "1,1,1", ",")
+			local rgb = str_explode(ini_sys:r_string_ex(af:section(), "trail_light_color") or MADE_HOVER.color, ",")
 			self.made_light = self.made_light or script_light()
 			self.made_light.range = MADE_HOVER.light
 			self.made_light.color = fcolor():set(tonumber(rgb[1]) or 1, tonumber(rgb[2]) or 1, tonumber(rgb[3]) or 1, 1)
@@ -629,6 +994,7 @@ local function actor_on_update()
 	update_fills(seconds)
 	update_burnt()
 	update_making()
+	update_news()
 end
 
 local takes_from = nil -- time_global() from which the actor's takes are pickups (not the inventory a load puts back)

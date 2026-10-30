@@ -1,0 +1,220 @@
+-- A synthesis chamber's loading at its panel (docs/coop/shelter.md, "Алхимия"): the actor's things that can go in
+-- (junk, mutant parts, artefacts: shelter_synthesis.component), up to three slots, what the journal knows of the load
+-- picked, and the start. The Chemist's software, in the look of his laptop (ui_shelter_style.script; clicks found by
+-- the cursor), in square units: 1024 x 768 on 4:3, wider on a wide screen.
+
+local XML = "ui_shelter_laptop.xml"
+local C = ui_shelter_style.C
+local TOP = ui_shelter_style.TITLE_H + 12
+local W, H = 880, 600
+local GRID = { x = 18, y = TOP + 30, cell = 58, cols = 8, rows = 6 }
+local SLOT = { x = 512, y = TOP + 30, size = 108, gap = 12, name_h = 44 }
+local KINDS = { "junk", "part", "artefact" } -- the grid's order
+
+local gui
+
+local function tr(id, ...)
+	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
+end
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+class "UIShelterChamber" (CUIScriptWnd)
+ui_shelter_style.apply(UIShelterChamber)
+
+function UIShelterChamber:__init(nature) super()
+	self.nature = nature
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self.x0 = math.floor((math.floor(1024 / self.k + 0.5) - W) / 2)
+	self.y0 = math.floor((768 - H) / 2)
+	self.slots = {}
+	self.page = 1
+	self:draw()
+end
+
+-- the cursor in the window's square units
+function UIShelterChamber:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k - self.x0, p.y - self.y0)
+end
+
+-- the actor's things that can go in, less what's in the slots: { sec, count }, junk, parts, artefacts, each by name
+function UIShelterChamber:things()
+	local count = {}
+	db.actor:iterate_inventory(function(_, obj)
+		local sec = obj:section()
+		if shelter_synthesis.component(sec) then
+			count[sec] = (count[sec] or 0) + 1
+		end
+	end, db.actor)
+	for _, sec in ipairs(self.slots) do
+		count[sec] = (count[sec] or 1) - 1
+	end
+	local order = {}
+	for i, kind in ipairs(KINDS) do
+		order[kind] = i
+	end
+	local t = {}
+	for sec, n in pairs(count) do
+		if n > 0 then
+			t[#t + 1] = { sec = sec, count = n, kind = order[shelter_synthesis.component(sec)], name = ui_item.get_sec_name(sec) }
+		end
+	end
+	table.sort(t, function(a, b)
+		if a.kind ~= b.kind then
+			return a.kind < b.kind
+		end
+		return a.name < b.name
+	end)
+	return t
+end
+
+function UIShelterChamber:draw()
+	if self.win then
+		self:DetachChild(self.win)
+	end
+	self.clicks = {}
+	self.cells = {}
+	local win = self:chrome(self.x0, self.y0, W, H, tr("st_shelter_synth_window", tr("st_shelter_chamber_" .. self.nature)),
+		"ui\\shelter\\laptop_icon_synth", self, self.clicks, 0, 0, function() self:Close() end)
+	self.win = win
+	-- the things, a page of them
+	local things = self:things()
+	local per_page = GRID.cols * GRID.rows
+	local pages = math.max(1, math.ceil(#things / per_page))
+	self.page = math.min(self.page, pages)
+	self:text(GRID.x, TOP, 460, 24, tr("st_shelter_synth_things"), C.dim, win, nil, "s")
+	for i = 1, per_page do
+		local col, row = (i - 1) % GRID.cols, math.floor((i - 1) / GRID.cols)
+		local x, y, size = GRID.x + col * GRID.cell, GRID.y + row * GRID.cell, GRID.cell - 6
+		self:round(x, y, size, size, C.field, win, 6)
+		local t = things[(self.page - 1) * per_page + i]
+		if t then
+			local hb = self:hover_of(x, y, size, size, win, 6, C.accent, 50)
+			self:icon(t.sec, x + 4, y + 4, size - 8, win)
+			if t.count > 1 then
+				self:text(x, y + size - 20, size - 5, 18, tostring(t.count), C.text, win, CGameFont.alRight, "s")
+			end
+			self.cells[#self.cells + 1] = { x, y, size, size, t.sec }
+			self.clicks[#self.clicks + 1] = { x, y, size, size, function()
+				if #self.slots < shelter_synthesis.SLOTS then
+					self.slots[#self.slots + 1] = t.sec
+					self:draw()
+				end
+			end, hover = hb }
+		end
+	end
+	local by = GRID.y + GRID.rows * GRID.cell + 4
+	if #things == 0 then
+		self:text(GRID.x, by, 460, 30, tr("st_shelter_synth_nothing"), C.faint, win, nil, "s")
+	end
+	if pages > 1 then
+		self:button(GRID.x, by, 34, 30, "<", function() self.page = math.max(1, self.page - 1) self:draw() end, self.clicks,
+			win, 0, 0, self.page == 1 and "off" or "normal")
+		self:text(GRID.x + 38, by, 80, 30, tr("st_shelter_synth_page", self.page, pages), C.dim, win, CGameFont.alCenter, "s")
+		self:button(GRID.x + 122, by, 34, 30, ">", function() self.page = math.min(pages, self.page + 1) self:draw() end,
+			self.clicks, win, 0, 0, self.page == pages and "off" or "normal")
+	end
+	self.hover = self:text(GRID.x + (pages > 1 and 168 or 0), by, 460, 30, "", C.text, win, nil, "s")
+	-- the slots
+	self:text(SLOT.x, TOP, 360, 24, tr("st_shelter_synth_load"), C.dim, win, nil, "s")
+	for i = 1, shelter_synthesis.SLOTS do
+		local x = SLOT.x + (i - 1) * (SLOT.size + SLOT.gap)
+		local sec = self.slots[i]
+		self:framed(x, SLOT.y, SLOT.size, SLOT.size, C.field, win, 10, sec and C.accent or C.border)
+		if sec then
+			local hb = self:hover_of(x, SLOT.y, SLOT.size, SLOT.size, win, 10, C.bad, 45)
+			self:icon(sec, x + 10, SLOT.y + 10, SLOT.size - 20, win)
+			self:text(x - 6, SLOT.y + SLOT.size + 4, SLOT.size + 12, SLOT.name_h, ui_item.get_sec_name(sec), C.text, win,
+				CGameFont.alCenter, "s")
+			self.clicks[#self.clicks + 1] = { x, SLOT.y, SLOT.size, SLOT.size, function()
+				table.remove(self.slots, i)
+				self:draw()
+			end, hover = hb }
+		else
+			self:text(x, SLOT.y, SLOT.size, SLOT.size, "+", C.faint, win, CGameFont.alCenter, "l")
+		end
+	end
+	-- what's known of the load: a note with a stripe of its colour
+	local sy = SLOT.y + SLOT.size + SLOT.name_h + 16
+	local sw = W - SLOT.x - 18
+	local say, color
+	if #self.slots < 2 then
+		say, color = tr("st_shelter_synth_hint"), C.dim
+	else
+		local e = shelter_synthesis.known(self.nature, self.slots)
+		if not e then
+			say, color = tr("st_shelter_synth_new"), C.accent
+		elseif e.chemist then
+			say, color = tr("st_shelter_synth_known_chemist", ui_item.get_sec_name(e.result)), C.good
+		elseif e.result == shelter_synthesis.STONE then
+			say, color = tr("st_shelter_synth_known_stone", e.resonance, shelter_synthesis.SLOTS), C.bad
+		else
+			say, color = tr("st_shelter_synth_known_made", ui_item.get_sec_name(e.result)), C.good
+		end
+	end
+	self:framed(SLOT.x, sy, sw, 96, C.raised, win, 8)
+	self:round(SLOT.x + 8, sy + 12, 4, 72, color, win, 2)
+	self:text(SLOT.x + 24, sy + 6, sw - 36, 84, say, color == C.dim and C.dim or C.text, win)
+	self:button(SLOT.x, H - 56, 210, 40, tr("st_shelter_synth_start"), function()
+		local parts = self.slots
+		self:Close()
+		shelter_synthesis.load(self.nature, parts)
+	end, self.clicks, win, 0, 0, #self.slots < 2 and "off" or "primary")
+	self:button(W - 18 - 128, H - 56, 128, 40, tr("st_shelter_synth_cancel"), function() self:Close() end, self.clicks, win)
+end
+
+function UIShelterChamber:Update()
+	CUIScriptWnd.Update(self)
+	local p = self:cursor()
+	self:hovers(p, { self.clicks })
+	local name = ""
+	for _, c in ipairs(self.cells or {}) do
+		if inside(p, c) then
+			name = ui_item.get_sec_name(c[5])
+		end
+	end
+	if name ~= self.hovered then
+		self.hovered = name
+		self.hover:SetText(name)
+	end
+end
+
+function UIShelterChamber:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			local p = self:cursor()
+			for i = #self.clicks, 1, -1 do
+				if inside(p, self.clicks[i]) then
+					self.clicks[i][5]()
+					return true
+				end
+			end
+			return true
+		elseif dik_to_bind(dik) == key_bindings.kQUIT or dik_to_bind(dik) == key_bindings.kUSE then
+			self:Close()
+			return true
+		end
+	end
+	return res
+end
+
+function UIShelterChamber:Close()
+	self:HideDialog()
+	gui = nil
+end
+
+-- the chamber's panel used while it's free (shelter_synthesis.script)
+function open(nature)
+	if not (gui and gui:IsShown()) then
+		gui = UIShelterChamber(nature)
+		gui:ShowDialog(true)
+	end
+end
