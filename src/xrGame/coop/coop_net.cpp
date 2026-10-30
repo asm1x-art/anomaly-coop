@@ -100,6 +100,7 @@ namespace coop
 	public:
 		xr_vector<xr_vector<xr_string>> m_groups; // as the server has them
 		xr_vector<bool> m_group_story;            // each group shares its story
+		xr_map<shared_str, u32> m_authorities;    // level -> its authority, levels with players on them (M_LEVELS)
 	};
 
 	static CClient g_client;
@@ -203,6 +204,7 @@ namespace coop
 		m_peers.clear();
 		m_left.clear();
 		m_groups.clear();
+		m_authorities.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -438,6 +440,28 @@ namespace coop
 				    peer != m_peers.end() ? peer->second.name.c_str() : "another client");
 				m_master_id = master;
 			}
+			break;
+		}
+		case M_LEVELS:
+		{
+			xr_map<shared_str, u32> authorities;
+			for (u8 count = P.r_u8(); count; --count)
+			{
+				shared_str level;
+				P.r_stringZ(level);
+				authorities[level] = P.r_u32();
+			}
+			const shared_str ours = g_pGameLevel ? Level().name() : shared_str();
+			auto before = m_authorities.find(ours), now = authorities.find(ours);
+			const u32 was = before != m_authorities.end() ? before->second : 0;
+			const u32 is = now != authorities.end() ? now->second : 0;
+			if (ours.size() && is && is != was)
+			{
+				auto peer = m_peers.find(is);
+				Msg("[coop] authority of %s: %s", ours.c_str(), is == m_client_id ? "this client" :
+				    peer != m_peers.end() ? peer->second.name.c_str() : "another client");
+			}
+			m_authorities.swap(authorities);
 			break;
 		}
 		case M_SCRIPT_EVENT:
@@ -794,15 +818,13 @@ namespace coop
 		if (!is_connected())
 			return true;
 
-		u32 owner = u32(-1);
+		auto it = g_client.m_authorities.find(level_name);
+		if (it != g_client.m_authorities.end())
+			return it->second == g_client.id();
+		// nobody there as the server knows: ours if we are on our way in, else the sim master's
 		if (g_pGameLevel && Level().name() == level_name)
-			owner = g_client.id();
-		for (const auto& [id, peer] : g_client.peers())
-			if (peer.level == level_name && id < owner)
-				owner = id;
-		if (owner == u32(-1))
-			owner = g_client.master();
-		return owner == g_client.id();
+			return true;
+		return is_sim_master();
 	}
 	const peers_t& peers() { return g_client.peers(); }
 

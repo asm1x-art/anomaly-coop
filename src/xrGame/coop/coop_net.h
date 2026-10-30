@@ -73,6 +73,8 @@ namespace coop
 		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
 		M_WORLD_CLAIM = 30,     // c->s: u8 1: we start the world on an empty server, the first to ask gets it (M_WORLD_INFO
 		                        // says who); 0: we gave it up
+		M_LEVELS = 51,          // s->c: u8 count, per level with players on it stringZ level, u32 its authority (the one
+		                        // there longest); to all on every change
 	};
 
 	enum EGroupAction : u8
@@ -85,7 +87,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 19;
+	const u16 PROTOCOL_VERSION = 20;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -147,8 +149,8 @@ namespace coop
 	const peers_t& peers();
 
 	// Who runs world logic. The sim master (the longest-connected player) runs offline A-Life and the
-	// world of levels nobody is on; a level with players on it is run by the one with the lowest id.
-	// Without a connection this client runs everything.
+	// world of levels nobody is on; a level with players on it is run by the one who came to it first,
+	// as the server says (M_LEVELS). Without a connection this client runs everything.
 	bool is_sim_master();
 	bool is_authority(const shared_str& level_name);
 

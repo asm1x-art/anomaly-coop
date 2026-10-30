@@ -18,13 +18,14 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], levels: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
     if (type === M.WORLD_INFO) return client.worldInfo.push(msg.payload);
     if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
     if (type === M.GROUPS) return client.groups.push(msg.payload);
+    if (type === M.LEVELS) return client.levels.push(parseLevels(msg.payload));
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -322,6 +323,82 @@ test('the longest-connected player is sim master, handed over when it leaves', a
     await roundTrip(b);
     assert.equal(b.roles.at(-1), idB);
     b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+// like roundTrip, skipping whatever else came first
+async function settle(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  await until(c, M.PONG);
+}
+
+// level -> its authority's id
+function parseLevels(payload) {
+  const out = {};
+  let at = 1;
+  for (let i = 0; i < payload[0]; i++) {
+    const level = readStringZ(payload, at);
+    at = payload.indexOf(0, at) + 1;
+    out[level] = payload.readUInt32LE(at);
+    at += 4;
+  }
+  return out;
+}
+
+test('a level is run by the player who came to it first, then by the next to have come', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    const idB = (await b.next()).payload.readUInt32LE(0);
+
+    // b comes to Cordon first, though a has the lower id
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    a.send(M.ACTOR_STATE, actorState('l02_garbage', 0, 0, 0, 0));
+    await settle(b);
+    await settle(a);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(a);
+    await settle(b);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idB });
+    assert.deepEqual(b.levels.at(-1), { l01_escape: idB });
+
+    // b goes away and comes back: a has been there longer now
+    b.send(M.ACTOR_STATE, actorState('l02_garbage', 0, 0, 0, 0));
+    await settle(b);
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(b);
+    await settle(a);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idA });
+    const count = b.levels.length;
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 5, 0, 0, 0)); // moving about there changes nothing
+    await settle(b);
+    assert.equal(b.levels.length, count);
+
+    // a newcomer learns who runs what at once
+    const c = await connect(port);
+    c.send(M.HELLO, hello('третий'));
+    await c.next();
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), { l01_escape: idA });
+
+    // a goes to the menu, then b runs it; b leaves the server: nobody does
+    a.send(M.LEFT_WORLD);
+    await settle(a);
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), { l01_escape: idB });
+    b.socket.destroy();
+    assert.equal((await until(c, M.PEER_LEFT)).payload.readUInt32LE(0), idB);
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), {});
+    a.socket.destroy();
+    c.socket.destroy();
   } finally {
     server.close();
   }

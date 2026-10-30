@@ -41,6 +41,37 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     for (const c of clients.values()) c.send(M.ROLES, u32(masterId()));
   };
 
+  // A level with players on it is run by the one who came to it first (its authority); when they go, by the
+  // next to have come. level -> ids in the order they came.
+  const levels = new Map();
+  const levelsPayload = () => Buffer.concat([Buffer.from([levels.size]),
+    ...[...levels].map(([level, ids]) => Buffer.concat([stringZ(level), u32(ids[0])]))]);
+  const announceLevels = () => {
+    const payload = levelsPayload();
+    for (const c of clients.values()) c.send(M.LEVELS, payload);
+  };
+  // the player is on that level now (null: on none); true when a level's authority changed
+  const moveToLevel = (id, client, level) => {
+    if (client.level === level) return false;
+    let changed = false;
+    const queue = levels.get(client.level);
+    if (queue) {
+      const at = queue.indexOf(id);
+      if (at !== -1) queue.splice(at, 1);
+      if (!queue.length) levels.delete(client.level);
+      if (at === 0) changed = true;
+    }
+    client.level = level;
+    if (level) {
+      if (!levels.has(level)) {
+        levels.set(level, []);
+        changed = true;
+      }
+      levels.get(level).push(id);
+    }
+    return changed;
+  };
+
   // Groups of players, by character name, leader first; kept between runs like the characters.
   // An invite lasts a minute and makes a group of two when the inviter has none. The leader may make the group
   // share its story ({ members, story }).
@@ -259,6 +290,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           send(M.GROUPS, groupsPayload());
           send(M.WORLD_INFO, worldInfo());
           if (pausedBy) send(M.PAUSED, pausedPayload());
+          if (levels.size) send(M.LEVELS, levelsPayload());
           // let the newcomer see players who are standing still
           for (const [otherId, other] of clients)
             if (otherId !== id && other.state) send(M.PEER_STATE, peerState(otherId, other));
@@ -270,6 +302,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           break;
         case M.ACTOR_STATE:
           client.state = Buffer.from(payload);
+          // before the state: a game that sees a player on its level knows by then who runs it
+          if (moveToLevel(id, client, readStringZ(payload, 0))) {
+            log(`[${id}] '${client.name}' is on ${client.level}, run by '${clients.get(levels.get(client.level)[0]).name}'`);
+            announceLevels();
+          }
           broadcast(id, M.PEER_STATE, peerState(id, client));
           if (!client.inWorld) {
             client.inWorld = true;
@@ -283,6 +320,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           client.state = null;
           log(`[${id}] '${client.name}' went back to the menu`);
           announceRoles();
+          if (moveToLevel(id, client, null)) announceLevels();
           // their things are in the master's world: saved now, unless they were the master (saved on the way)
           if (!wasMaster) requestSave('leave', client.name);
           break;
@@ -481,6 +519,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       log(`[${id}] '${client.name}' left (${clients.size} online)`);
       broadcast(id, M.PEER_LEFT, u32(id));
       announceRoles();
+      if (moveToLevel(id, client, null)) announceLevels();
       if (creatorId === id) {
         creatorId = null;
         log(`[${id}] '${client.name}' left before the world was made: anyone may create it`);
@@ -502,7 +541,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       const master = clients.size ? masterId() : null;
       return {
         online: [...clients].map(([cid, c]) =>
-          ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master, ping: c.ping ?? null })),
+          ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master,
+            authority: !!c.level && levels.get(c.level)[0] === cid, ping: c.ping ?? null })),
         world: storage.worldInfo(),
         paused: pausedBy || null,
         saves: storage.saves().reverse().slice(0, MAX_SAVES_LISTED),
