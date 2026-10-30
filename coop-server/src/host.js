@@ -19,7 +19,9 @@ export function splitArgs(text) {
 export function startHost({ gameDir, exe, args = '', port, secret, events, log = console.log }) {
   const exePath = path.resolve(gameDir, exe);
   // -coop_connect last: it takes the words after it (coop_connect <host>[:port] [name])
-  const argv = ['-coop_host', secret, '-nosound', ...splitArgs(args), '-coop_connect', `127.0.0.1:${port}`, HOST_NAME];
+  // -silent_error_mode: a crash ends it, with a report but no window to answer (the engine's own errors end it too)
+  const argv = ['-coop_host', secret, '-nosound', '-silent_error_mode', ...splitArgs(args), '-coop_connect',
+    `127.0.0.1:${port}`, HOST_NAME];
   let child = null;
   let startedAt = 0;
   let timer = null;
