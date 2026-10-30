@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 23;
+export const PROTOCOL_VERSION = 24;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -98,6 +98,14 @@ export const M = {
                       // record (as CHARACTER); u32 size, its progress (as PROGRESS); then its things (the game's own)
   SNAPSHOT_THINGS: 57, // s->c: u32 total size, u32 offset, data: the things of the save the character was put back to,
                       // with the world (before WORLD_DONE), once
+  // The in-game admin window (ui_coop_admin.script): the admin page's password, then what the page and the bot do
+  ADMIN_LOGIN: 58,    // c->s: stringZ the admin password: ADMIN_STATE back, or ADMIN_RESULT saying it is wrong
+  ADMIN_STATE: 59,    // s->c: stringZ lines of tab-split fields: host <text> | world <revision> <owner> | player <name>
+                      // <level> <ping> <1: runs its level> | setting <world|rules> <key> <value> <min> <max> <title> |
+                      // faction <id> <1: allowed> <title> | save <revision> <unix time> <text>
+  ADMIN_COMMAND: 60,  // c->s: stringZ tab-split: state | set <key> <value> | faction <id> <on|off> | save | restart_host |
+                      // kick <name> | rollback <revision>; ADMIN_RESULT (but for state), then ADMIN_STATE back
+  ADMIN_RESULT: 61,   // s->c: stringZ what happened, as the admin reads it (Russian)
 };
 
 export const REFUSED = { FULL: 0, VERSION: 1, HOST: 2 }; // HOST: a wrong secret, or a host is there already

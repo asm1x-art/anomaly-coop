@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { FACTIONS, DEFAULT_SETTINGS, RULE_LIMITS } from './settings.js';
+import { FACTIONS } from './settings.js';
+import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel } from './admin_commands.js';
 
 // The Telegram bot: what the admin page does, for the admins listed in server.cfg, and news for them (a player
 // joined or left, the host went down, a save failed). Long polling (getUpdates), so no port has to be open;
@@ -18,34 +19,6 @@ const FILE_MAX = 50 * 1024 * 1024; // what a bot may send
 const LOGS_LISTED = 20;
 const LOG_BUTTONS = 8;
 
-// what /settings shows and /set changes: [key, title, min, max] for numbers, [key, title] for yes/no
-const WORLD = [
-  ['story', 'Сюжет'], ['survival', 'Выживание'], ['campfire', 'Сохранение у костра'],
-  ['conditions', 'Изношенные предметы'], ['opened_routes', 'Открытые маршруты'],
-  ['difficulty', 'Сложность игры', 1, 3], ['economy', 'Экономика', 1, 3],
-];
-const RULE_TITLES = {
-  max_players: 'Игроков на сервере', group_max: 'Игроков в группе', faction_penalty: 'Штраф отношений за атаку',
-  witness_radius: 'Радиус свидетелей, м', downed_time: 'Время «лёжа», с', revive_time: 'Подъём, с',
-  revive_health: 'Здоровье после подъёма, %', rank_loss: 'Потеря ранга при откате, %', fast_travel: 'Быстрое перемещение',
-  travel_overloaded: 'Перемещение с перегрузом', travel_enemy_radius: 'Враги рядом (нет перемещения), м',
-  tool_discount_1: 'Скидка за инструменты: грубая, %', tool_discount_2: 'Скидка за инструменты: тонкая, %',
-  tool_discount_3: 'Скидка за инструменты: калибровка, %', tool_group_share: 'Доля скидки для группы, %',
-  story_rewards_all: 'Награда за общий сюжет — всем',
-};
-// a rule the bot has no title for still shows, under its key
-const RULES = Object.entries(DEFAULT_SETTINGS.rules).map(([key, value]) =>
-  (typeof value === 'boolean' ? [key, RULE_TITLES[key] ?? key] : [key, RULE_TITLES[key] ?? key, ...RULE_LIMITS[key]]));
-const FACTION_NAMES = {
-  stalker: 'Одиночки', dolg: 'Долг', freedom: 'Свобода', csky: 'Чистое Небо', ecolog: 'Учёные', killer: 'Наёмники',
-  army: 'Военные', bandit: 'Бандиты', monolith: 'Монолит', renegade: 'Ренегаты', greh: 'Грех', isg: 'ИСГ',
-};
-const REASONS = {
-  auto: () => 'Автосохранение', quick: (s) => `Быстрое · ${s.who}`, named: (s) => `«${s.name}» · ${s.who}`,
-  join: (s) => `Вход: ${s.who}`, leave: (s) => `Выход: ${s.who}`, exit: (s) => `Выход мастера: ${s.who}`,
-  new: () => 'Новый мир', level: (s) => `Переход: ${s.who}`, rollback: (s) => `Откат к №${s.from}`,
-  admin: () => 'По команде админа',
-};
 
 const COMMANDS = [
   ['status', 'Кто онлайн, мир, сохранения'],
@@ -64,13 +37,10 @@ const COMMANDS = [
 const HELP = COMMANDS.map(([c, d]) => `/${c} — ${d}`).join('\n');
 const NOT_YET = 'Сервер этого пока не умеет.';
 
-const YES = ['1', 'да', 'on', 'вкл', 'yes', 'true'];
-const NO = ['0', 'нет', 'off', 'выкл', 'no', 'false'];
-const yesNo = (value) => (value ? 'да' : 'нет');
 const when = (ms) => new Date(ms).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const size = (bytes) => (bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} КБ` : `${(bytes / 1024 / 1024).toFixed(1)} МБ`);
 const duration = (s) => (s < 3600 ? `${Math.floor(s / 60)} мин` : `${Math.floor(s / 3600)} ч ${Math.floor(s % 3600 / 60)} мин`);
-const saveLine = (s) => `№${s.revision} · ${(REASONS[s.reason] ?? (() => s.reason))(s)} · ${when(s.time)}`;
+const saveLine = (s) => `№${s.revision} · ${saveLabel(s)} · ${when(s.time)}`;
 // an event's details: a name or a reason as such, or in an object
 const detail = (e, key) => (typeof e === 'string' ? e : e?.[key] ?? '');
 
@@ -163,37 +133,11 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
       'Изменить: /set ключ значение'].join('\n');
   };
 
-  const setSetting = (args) => {
-    const [key, value = ''] = args.split(/\s+/);
-    const world = WORLD.find(([k]) => k === key);
-    const entry = world ?? RULES.find(([k]) => k === key);
-    if (!entry) return `Нет такой настройки${key ? `: ${key}` : ''}. Ключи: ${[...WORLD, ...RULES].map(([k]) => k).join(', ')}`;
-    const [, title, min, max] = entry;
-    let parsed;
-    if (min === undefined) {
-      parsed = YES.includes(value.toLowerCase()) ? true : NO.includes(value.toLowerCase()) ? false : undefined;
-      if (parsed === undefined) return `${key}: нужно «да» или «нет» (1 или 0).`;
-    } else {
-      parsed = Number(value);
-      if (!/^-?\d+$/.test(value) || parsed < min || parsed > max) return `${key}: нужно целое от ${min} до ${max}.`;
-    }
-    const s = coop.settings();
-    const group = world ? 'world' : 'rules';
-    coop.saveSettings({ ...s, [group]: { ...s[group], [key]: parsed } });
-    const now = coop.settings()[group][key];
-    return `${title}: ${typeof now === 'boolean' ? yesNo(now) : now}`;
-  };
-
   const factions = (args) => {
-    const s = coop.settings();
     const [id, value = ''] = args.toLowerCase().split(/\s+/);
     if (id) {
-      if (!FACTIONS.includes(id)) return `Нет такой фракции: ${id}. Есть: ${FACTIONS.join(', ')}`;
-      const on = YES.includes(value) ? true : NO.includes(value) ? false : undefined;
-      if (on === undefined) return `Как: /factions ${id} on или /factions ${id} off`;
-      const list = on ? [...s.factions, id] : s.factions.filter((f) => f !== id);
-      if (!list.length) return 'Нужна хотя бы одна фракция.';
-      coop.saveSettings({ ...s, factions: list });
+      const answer = setFaction(coop, id, value);
+      if (answer) return answer;
     }
     const now = coop.settings().factions;
     return ['Из каких фракций можно создать персонажа:',
@@ -265,7 +209,7 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
       case 'settings':
         return say(chat, settingsText());
       case 'set':
-        return say(chat, setSetting(args));
+        return say(chat, setSetting(coop, ...args.split(/\s+/)));
       case 'factions':
         return say(chat, factions(args));
       case 'save':

@@ -316,6 +316,102 @@
 	<string id="st_coop_load_2">
 		<text>The group's save #%s is loaded by its leader.</text>
 	</string>
+	<string id="st_coop_admin_caption">
+		<text>Server admin</text>
+	</string>
+	<string id="st_coop_admin_password">
+		<text>Admin password:</text>
+	</string>
+	<string id="st_coop_admin_login">
+		<text>Log in</text>
+	</string>
+	<string id="st_coop_admin_value">
+		<text>Value:</text>
+	</string>
+	<string id="st_coop_admin_apply">
+		<text>Change</text>
+	</string>
+	<string id="st_coop_admin_kick">
+		<text>Kick the player</text>
+	</string>
+	<string id="st_coop_admin_rollback">
+		<text>Roll the world back</text>
+	</string>
+	<string id="st_coop_admin_save_world">
+		<text>Save the world</text>
+	</string>
+	<string id="st_coop_admin_restart_host">
+		<text>Restart the host</text>
+	</string>
+	<string id="st_coop_admin_refresh">
+		<text>Refresh</text>
+	</string>
+	<string id="st_coop_admin_offline">
+		<text>Not connected to a server: connect through Co-op.</text>
+	</string>
+	<string id="st_coop_admin_ask">
+		<text>Type the server's admin password (admin_password in server.cfg, or the one in data/admin.json) and press Log in. It is remembered for this server.</text>
+	</string>
+	<string id="st_coop_admin_wait">
+		<text>Waiting for the server...</text>
+	</string>
+	<string id="st_coop_admin_hint">
+		<text>Pick a line. A setting or a faction: Change (yes/no flips, a number is taken from Value). A player: Kick the player. A world save: Roll the world back.</text>
+	</string>
+	<string id="st_coop_admin_host">
+		<text>Host: %s</text>
+	</string>
+	<string id="st_coop_admin_world">
+		<text>World: revision %s</text>
+	</string>
+	<string id="st_coop_admin_no_world">
+		<text>No world yet</text>
+	</string>
+	<string id="st_coop_admin_players">
+		<text>- Players online: %s -</text>
+	</string>
+	<string id="st_coop_admin_in_menu">
+		<text>in the menu</text>
+	</string>
+	<string id="st_coop_admin_authority">
+		<text>runs the level</text>
+	</string>
+	<string id="st_coop_admin_world_settings">
+		<text>- World (for a new world; difficulty and economy from the next load) -</text>
+	</string>
+	<string id="st_coop_admin_rules">
+		<text>- Rules (at once) -</text>
+	</string>
+	<string id="st_coop_admin_factions">
+		<text>- Factions for new characters -</text>
+	</string>
+	<string id="st_coop_admin_saves">
+		<text>- World saves -</text>
+	</string>
+	<string id="st_coop_admin_yes">
+		<text>yes</text>
+	</string>
+	<string id="st_coop_admin_no">
+		<text>no</text>
+	</string>
+	<string id="st_coop_admin_pick_setting">
+		<text>Pick a setting or a faction.</text>
+	</string>
+	<string id="st_coop_admin_pick_player">
+		<text>Pick a player.</text>
+	</string>
+	<string id="st_coop_admin_pick_save">
+		<text>Pick a world save.</text>
+	</string>
+	<string id="st_coop_admin_kick_ask">
+		<text>Disconnect %s from the server?</text>
+	</string>
+	<string id="st_coop_admin_rollback_ask">
+		<text>Roll the whole world back to save #%s (%s)? Players in the game load it again.</text>
+	</string>
+	<string id="st_coop_admin_restart_ask">
+		<text>Restart the host? The world's changes since its last save are kept in the server's journal.</text>
+	</string>
 	<string id="st_coop_saves_pick">
 		<text>Pick a save in the list.</text>
 	</string>

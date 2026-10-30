@@ -58,6 +58,8 @@ namespace coop
 		u32 rtt() const { return m_rtt; }
 		const xr_string& refusal() const { return m_refusal; }
 		const xr_string& name() const { return m_name; }
+		const xr_string& server_host() const { return m_host; }
+		u16 server_port() const { return m_port; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
 		bool wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
@@ -489,6 +491,14 @@ namespace coop
 			if (world_downloading())
 				m_journal.emplace_back().assign(P.B.data + P.r_tell(), P.B.data + P.B.count);
 			break;
+		case M_ADMIN_STATE:
+		case M_ADMIN_RESULT:
+		{
+			xr_string text;
+			P.r_stringZ(text);
+			call_lua(type == M_ADMIN_STATE ? "_G.coop_on_admin_state" : "_G.coop_on_admin_result", text.c_str());
+			break;
+		}
 		case M_HOST:
 			m_host_id = P.r_u32();
 			P.r_stringZ(m_host_name);
@@ -874,6 +884,29 @@ namespace coop
 			return my_name().c_str();
 		auto it = g_client.m_names.find(id);
 		return it != g_client.m_names.end() ? it->second.c_str() : is_host_id(id) ? host_name().c_str() : "";
+	}
+
+	LPCSTR server_address()
+	{
+		static string128 address;
+		xr_sprintf(address, "%s:%u", g_client.server_host().c_str(), g_client.server_port());
+		return g_client.server_port() ? address : "";
+	}
+
+	void admin_login(LPCSTR password)
+	{
+		NET_Packet P;
+		P.w_begin(M_ADMIN_LOGIN);
+		P.w_stringZ(password);
+		send(P);
+	}
+
+	void admin_command(LPCSTR command)
+	{
+		NET_Packet P;
+		P.w_begin(M_ADMIN_COMMAND);
+		P.w_stringZ(command);
+		send(P);
 	}
 
 	void take_journal(xr_vector<xr_vector<u8>>& out)

@@ -4,13 +4,15 @@ import { EventEmitter } from 'node:events';
 import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
-import { settingsText } from './settings.js';
+import { settingsText, FACTIONS } from './settings.js';
+import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
 
 // hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
 // journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0).
-// autosaveMinutes, pauseWhenEmpty: server.cfg's [host] (config.js), for the host
+// autosaveMinutes, pauseWhenEmpty: server.cfg's [host] (config.js), for the host. adminPassword: the admin page's,
+// for the in-game admin window too (null: the one made up in data/admin.json)
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
-  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false } = {}) {
+  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null } = {}) {
   const storage = openStorage(dataDir);
   // id -> name: every player and the host so far, for the journal's ids; ids go on growing across runs
   const names = storage.clientNames();
@@ -320,6 +322,46 @@ autosave_minutes=${autosaveMinutes}`));
     for (const c of clients.values()) c.send(msg, ask);
   };
 
+  // The in-game admin window: a connection that gave the admin password may do what the admin page does
+  const ADMIN_TRIES = 5; // wrong passwords a connection may give
+  const adminPasswordNow = () => adminPassword || storage.adminPassword().password;
+  const adminStatePayload = () => {
+    const st = server.coop.status();
+    const s = storage.settings();
+    const h = st.host;
+    const lines = [['host', !h ? 'нет: мир держит игра игрока' : [h.running === false ? 'не работает' : 'работает',
+      h.master ? 'держит мир' : h.connected ? 'загружает мир' : 'не подключён', h.gave_up ? 'упал 3 раза, ждёт перезапуска' : '']
+      .filter(Boolean).join(', ')]];
+    if (st.world) lines.push(['world', st.world.revision, st.world.owner]);
+    for (const p of st.online) lines.push(['player', p.name, p.level ?? '', p.ping ?? '', p.authority ? 1 : 0]);
+    for (const [group, list] of [['world', WORLD], ['rules', RULES]])
+      for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
+    for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
+    for (const m of st.saves.slice(0, 20)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
+    return stringZ(lines.map((l) => l.join('\t')).join('\n'));
+  };
+  // '' for state: nothing to say
+  const adminCommand = ([cmd, a = '', b = '']) => {
+    switch (cmd) {
+      case 'state':
+        return '';
+      case 'set':
+        return setSetting(server.coop, a, b);
+      case 'faction':
+        return setFaction(server.coop, a, b) ?? `${FACTION_NAMES[a] ?? a}: ${yesNo(storage.settings().factions.includes(a))}`;
+      case 'save':
+        return server.coop.saveWorld() ? 'Мир сохраняется.' : 'Сохранить сейчас некому: мир никто не держит.';
+      case 'restart_host':
+        return server.coop.restartHost() ? 'Хост перезапускается.' : 'Хоста нет: в server.cfg не указана папка игры.';
+      case 'kick':
+        return server.coop.kick(a) ? `Отключён: ${a}` : `Нет такого игрока онлайн: ${a}`;
+      case 'rollback':
+        return server.coop.rollback(Number(a)) ? `Мир возвращён к №${a}.` : `Нет сохранения №${a}.`;
+      default:
+        return `Не знаю такой команды: ${cmd}`;
+    }
+  };
+
   const server = net.createServer((socket) => {
     socket.setNoDelay(true);
     const id = nextId++;
@@ -533,6 +575,32 @@ autosave_minutes=${autosaveMinutes}`));
         case M.SAVES_REQUEST:
           send(M.SAVES, savesPayload(client.name));
           break;
+        case M.ADMIN_LOGIN:
+          if ((client.adminTries ?? 0) >= ADMIN_TRIES) break;
+          if (readStringZ(payload, 0) !== adminPasswordNow()) {
+            client.adminTries = (client.adminTries ?? 0) + 1;
+            log(`[${id}] '${client.name}' gave a wrong admin password`);
+            send(M.ADMIN_RESULT, stringZ('Неверный пароль админки.'));
+            break;
+          }
+          if (!client.admin) log(`[${id}] '${client.name}' opened the admin window`);
+          client.admin = true;
+          send(M.ADMIN_STATE, adminStatePayload());
+          break;
+        case M.ADMIN_COMMAND: {
+          if (!client.admin) {
+            send(M.ADMIN_RESULT, stringZ('Сначала пароль админки.'));
+            break;
+          }
+          const fields = readStringZ(payload, 0).split('\t');
+          const answer = adminCommand(fields);
+          if (answer) {
+            log(`[${id}] '${client.name}' (admin): ${fields.join(' ')} - ${answer}`);
+            send(M.ADMIN_RESULT, stringZ(answer));
+          }
+          if (clients.has(id)) send(M.ADMIN_STATE, adminStatePayload()); // kicked themselves: gone
+          break;
+        }
         case M.LOAD_REQUEST: {
           const saveId = payload.readUInt32LE(0);
           const result = (code) => send(M.LOAD_RESULT, Buffer.concat([Buffer.from([code]), u32(saveId)]));

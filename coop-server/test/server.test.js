@@ -490,6 +490,42 @@ test('the host: its autosave interval with the settings; paused while no player 
   }
 });
 
+test('the admin window: the admin password, then the admin page commands; the state after each', async () => {
+  const server = await startServer({ ...options(), adminPassword: 'секрет' });
+  const { port } = server.address();
+  const text = (msg) => readStringZ(msg.payload, 0);
+  const line = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ADMIN_COMMAND, line('save'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /пароль/);
+    a.send(M.ADMIN_LOGIN, line('не тот'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Неверный/);
+    a.send(M.ADMIN_LOGIN, line('секрет'));
+    const state = text(await until(a, M.ADMIN_STATE)).split('\n').map((l) => l.split('\t'));
+    assert.deepEqual(state.find((l) => l[0] === 'host'), ['host', 'нет: мир держит игра игрока']);
+    assert.deepEqual(state.find((l) => l[2] === 'group_max').slice(0, 4), ['setting', 'rules', 'group_max', '4']);
+    assert.deepEqual(state.filter((l) => l[0] === 'player').map((l) => l[1]), ['artem', 'друг']);
+    assert.deepEqual(state.find((l) => l[1] === 'monolith').slice(0, 3), ['faction', 'monolith', '1']);
+
+    a.send(M.ADMIN_COMMAND, line('set\tgroup_max\t3'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /3$/);
+    assert.equal(server.coop.settings().rules.group_max, 3);
+    assert.match(text(await until(a, M.ADMIN_STATE)), /setting\trules\tgroup_max\t3/);
+    a.send(M.ADMIN_COMMAND, line('faction\tmonolith\toff'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Монолит: нет/);
+    assert.ok(!server.coop.settings().factions.includes('monolith'));
+    a.send(M.ADMIN_COMMAND, line('kick\tдруг'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Отключён: друг/);
+    await until(a, M.PEER_LEFT);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 test('script events reach others with the sender id', async () => {
   const server = await startServer(options());
   const { port } = server.address();

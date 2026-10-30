@@ -153,6 +153,9 @@ namespace coop
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
 			def("is_host", &is_host),                  // this game is the world's headless host
+			def("server_address", &server_address),    // "host:port" we connected to, "" before
+			def("admin_login", &admin_login),          // (password) for the admin window: _G.coop_on_admin_state comes
+			def("admin_command", &admin_command),      // (tab-split command): _G.coop_on_admin_result, _admin_state
 			def("squad_online_elsewhere", &squad_online_elsewhere), // (squad id) the host: a player's game has it online
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none

@@ -89,6 +89,11 @@ namespace coop
 		                        // state (as M_OBJECT_STATE)
 		M_SNAPSHOT_THINGS = 57, // s->c: u32 total, u32 offset, data: the things of the save our character went back to,
 		                        // with the world (before M_WORLD_DONE), once
+		// the in-game admin window (ui_coop_admin.script), behind the server's admin password
+		M_ADMIN_LOGIN = 58,     // c->s: stringZ password
+		M_ADMIN_STATE = 59,     // s->c: stringZ lines of tab-split fields (coop-server/src/protocol.js): _G.coop_on_admin_state
+		M_ADMIN_COMMAND = 60,   // c->s: stringZ tab-split command
+		M_ADMIN_RESULT = 61,    // s->c: stringZ what happened: _G.coop_on_admin_result
 	};
 
 	enum EGroupAction : u8
@@ -101,7 +106,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 23;
+	const u16 PROTOCOL_VERSION = 24;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -175,6 +180,11 @@ namespace coop
 	bool is_host_id(u32 id);      // that client is the host
 	const xr_string& host_name(); // "" while there is none
 	LPCSTR player_name(u32 id);   // a player or the host of this server run, gone or not; "" if unknown
+	LPCSTR server_address();      // "host:port" we connected to, "" before
+
+	// the in-game admin window: the server's admin password, then its commands (coop-server/src/protocol.js ADMIN_*)
+	void admin_login(LPCSTR password);
+	void admin_command(LPCSTR command);
 
 	// the journal that came with the world (M_JOURNAL), handed over once for the replay
 	void take_journal(xr_vector<xr_vector<u8>>& out);

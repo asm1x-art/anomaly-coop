@@ -13,7 +13,8 @@ for (const warning of config.warnings) console.log(`config: ${warning}`);
 // the world's host, when there is a game for it: only the game started here knows the secret
 const hostSecret = config.host.game_dir ? crypto.randomBytes(8).toString('hex') : null;
 const server = await startServer({ port: config.server.port, dataDir: config.server.data_dir, hostSecret,
-  autosaveMinutes: hostSecret ? config.host.autosave_minutes : null, pauseWhenEmpty: !!hostSecret && config.host.pause_when_empty });
+  autosaveMinutes: hostSecret ? config.host.autosave_minutes : null, pauseWhenEmpty: !!hostSecret && config.host.pause_when_empty,
+  adminPassword: config.server.admin_password || null });
 if (hostSecret) {
   const host = startHost({ gameDir: config.host.game_dir, exe: config.host.exe, args: config.host.args,
     port: config.server.port, secret: hostSecret, events: server.coop.events });

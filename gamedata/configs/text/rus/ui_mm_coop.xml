@@ -316,6 +316,102 @@
 	<string id="st_coop_load_2">
 		<text>Сохранение группы №%s загружает её лидер.</text>
 	</string>
+	<string id="st_coop_admin_caption">
+		<text>Админка сервера</text>
+	</string>
+	<string id="st_coop_admin_password">
+		<text>Пароль админки:</text>
+	</string>
+	<string id="st_coop_admin_login">
+		<text>Войти</text>
+	</string>
+	<string id="st_coop_admin_value">
+		<text>Значение:</text>
+	</string>
+	<string id="st_coop_admin_apply">
+		<text>Изменить</text>
+	</string>
+	<string id="st_coop_admin_kick">
+		<text>Выкинуть игрока</text>
+	</string>
+	<string id="st_coop_admin_rollback">
+		<text>Откатить мир</text>
+	</string>
+	<string id="st_coop_admin_save_world">
+		<text>Сохранить мир</text>
+	</string>
+	<string id="st_coop_admin_restart_host">
+		<text>Перезапустить хост</text>
+	</string>
+	<string id="st_coop_admin_refresh">
+		<text>Обновить</text>
+	</string>
+	<string id="st_coop_admin_offline">
+		<text>Нет подключения к серверу: подключитесь через «Кооператив».</text>
+	</string>
+	<string id="st_coop_admin_ask">
+		<text>Введите пароль админки сервера (admin_password в server.cfg или из data/admin.json) и нажмите «Войти». Для этого сервера он запомнится.</text>
+	</string>
+	<string id="st_coop_admin_wait">
+		<text>Жду ответа сервера...</text>
+	</string>
+	<string id="st_coop_admin_hint">
+		<text>Выберите строку. Настройка или фракция: «Изменить» (да/нет переключается, число берётся из поля «Значение»). Игрок: «Выкинуть игрока». Сохранение мира: «Откатить мир».</text>
+	</string>
+	<string id="st_coop_admin_host">
+		<text>Хост: %s</text>
+	</string>
+	<string id="st_coop_admin_world">
+		<text>Мир: ревизия %s</text>
+	</string>
+	<string id="st_coop_admin_no_world">
+		<text>Мира ещё нет</text>
+	</string>
+	<string id="st_coop_admin_players">
+		<text>— Игроки онлайн: %s —</text>
+	</string>
+	<string id="st_coop_admin_in_menu">
+		<text>в меню</text>
+	</string>
+	<string id="st_coop_admin_authority">
+		<text>хозяин локации</text>
+	</string>
+	<string id="st_coop_admin_world_settings">
+		<text>— Мир (для нового мира; сложность и экономика — со следующей загрузки) —</text>
+	</string>
+	<string id="st_coop_admin_rules">
+		<text>— Правила (действуют сразу) —</text>
+	</string>
+	<string id="st_coop_admin_factions">
+		<text>— Фракции для новых персонажей —</text>
+	</string>
+	<string id="st_coop_admin_saves">
+		<text>— Сохранения мира —</text>
+	</string>
+	<string id="st_coop_admin_yes">
+		<text>да</text>
+	</string>
+	<string id="st_coop_admin_no">
+		<text>нет</text>
+	</string>
+	<string id="st_coop_admin_pick_setting">
+		<text>Выберите настройку или фракцию.</text>
+	</string>
+	<string id="st_coop_admin_pick_player">
+		<text>Выберите игрока.</text>
+	</string>
+	<string id="st_coop_admin_pick_save">
+		<text>Выберите сохранение мира.</text>
+	</string>
+	<string id="st_coop_admin_kick_ask">
+		<text>Отключить игрока %s от сервера?</text>
+	</string>
+	<string id="st_coop_admin_rollback_ask">
+		<text>Откатить весь мир к сохранению №%s (%s)? Игроки в игре загрузят его заново.</text>
+	</string>
+	<string id="st_coop_admin_restart_ask">
+		<text>Перезапустить хост? Изменения мира после его последнего сохранения хранит журнал сервера.</text>
+	</string>
 	<string id="st_coop_saves_pick">
 		<text>Выберите сохранение в списке.</text>
 	</string>

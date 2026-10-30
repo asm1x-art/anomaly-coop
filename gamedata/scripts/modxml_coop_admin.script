@@ -1,0 +1,17 @@
+-- Co-op: the server's admin window (ui_coop_admin.script) opens from the main menu by its hotkey; the engine's
+-- answers from the server go to it.
+
+function on_xml_read()
+	if not coop then
+		return -- not the co-op engine
+	end
+
+	_G.coop_on_admin_state = function(text) ui_coop_admin.on_state(text) end
+	_G.coop_on_admin_result = function(text) ui_coop_admin.on_result(text) end
+
+	RegisterScriptCallback("main_menu_on_keyboard", function(dik, keyboard_action, menu)
+		if dik == ui_coop_admin.HOTKEY and keyboard_action == ui_events.WINDOW_KEY_PRESSED and not ui_coop_admin.is_shown() then
+			ui_coop_admin.open(menu)
+		end
+	end)
+end
