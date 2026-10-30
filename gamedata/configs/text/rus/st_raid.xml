@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_app_raid">
+		<text>Рейд</text>
+	</string>
+	<string id="st_raid_go">
+		<text>Отправиться в рейд</text>
+	</string>
+	<string id="st_raid_landing">
+		<text>Высадка — Лиманск, со стороны Рыжего леса. Дальше — Госпиталь и станция.\nВыход с любого уровня — там, где на него вошёл: оттуда сразу в убежище. Остальные выходы за пределы рейда закрыты.\nПДА в рейде не работает.</text>
+	</string>
+	<string id="st_raid_map_hint">
+		<text>Тянуть мышью, + и - масштаб.\nЩелчок по карте — метка.</text>
+	</string>
+	<string id="st_raid_no_map">
+		<text>Карты этого уровня нет</text>
+	</string>
+	<string id="st_raid_exit_closed">
+		<text>Отсюда из рейда не выйти</text>
+	</string>
+	<string id="st_raid_pda_jammed">
+		<text>ПДА: помехи, сигнала нет</text>
+	</string>
+	<string id="st_raid_stash">
+		<text>Тайник</text>
+	</string>
+	<string id="st_raid_stash_label">
+		<text>Тайник, маячок %s%%</text>
+	</string>
+	<string id="st_raid_beacon_charge">
+		<text>GPS-маячок: %s%%, хватит ещё на %s ч.</text>
+	</string>
+	<string id="st_raid_stash_empty">
+		<text>Пусто</text>
+	</string>
+	<string id="st_raid_stash_more">
+		<text>и ещё %s</text>
+	</string>
+	<string id="st_raid_mark">
+		<text>Метка</text>
+	</string>
+	<string id="st_raid_mark_new">
+		<text>Новая метка</text>
+	</string>
+	<string id="st_raid_mark_hint">
+		<text>Что здесь? Например: «Крупный лагерь. Несколько бойцов в тб»</text>
+	</string>
+	<string id="st_raid_save">
+		<text>Сохранить</text>
+	</string>
+	<string id="st_raid_delete">
+		<text>Удалить</text>
+	</string>
+	<string id="st_raid_close">
+		<text>Закрыть</text>
+	</string>
+	<string id="st_raid_gps_beacon">
+		<text>GPS-маячок</text>
+	</string>
+	<string id="st_raid_gps_beacon_descr">
+		<text>Маячок для тайника. Положи его в тайник на рейдовой локации — тайник появится на карте в ноутбуке убежища (приложение «Рейд»), и оттуда будет видно, что в нём лежит.\nС первого тайника работает неделю, потом садится, и метка пропадает. Севший маячок заряжается на верстаке батарейками.</text>
+	</string>
+	<string id="st_raid_gps_beacon_dead">
+		<text>GPS-маячок (сел)</text>
+	</string>
+	<string id="st_raid_gps_beacon_dead_descr">
+		<text>Севший GPS-маячок. Заряжается на верстаке батарейками.</text>
+	</string>
+	<string id="st_raid_busy">
+		<text>В рейде: %s</text>
+	</string>
+	<string id="st_raid_news_title">
+		<text>Рейд</text>
+	</string>
+	<string id="st_raid_news_start">
+		<text>%s ушёл в рейд (%s).</text>
+	</string>
+	<string id="st_raid_news_died">
+		<text>%s погиб в рейде (%s).</text>
+	</string>
+	<string id="st_raid_news_out">
+		<text>%s вернулся из рейда (%s).</text>
+	</string>
+	<string id="st_raid_woke">
+		<text>Вы очнулись в убежище. Найденное в рейде потеряно, пропало вещей: %s.</text>
+	</string>
+</string_table>

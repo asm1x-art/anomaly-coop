@@ -1,0 +1,317 @@
+-- The Monolith on the raid levels (docs/coop/shelter.md, "Raids"; settings: mod_system_raid.ltx [raid_monolith] and
+-- [<level>_monolith]). A garrison on every smart terrain of a level, its squads by the smart's depth from the level's
+-- "from" point (thirds: near, mid, far); big ones, a rare thing on the commander, on big_count smarts of the deeper
+-- half. A garrison stays at its smart (the squad's scripted target). Killed is killed: a cleared smart stays free, but
+-- every retake_hours one is away the Monolith takes back, with retake_chance, the free smart nearest to one it holds
+-- (holding none: the level's entry smart); every refresh_hours all is held anew. Patrols of three walk routes (chains
+-- of smarts) to and fro, resting a while at each, rolled anew each time one comes onto the level.
+-- All is decided as one goes onto a level (prepare), before it loads. The world's (shelter.state): raid_g_<smart> =
+-- its garrison's squad ids, raid_p_<level>_<i> = a patrol ("squad|route|index|step"), raid_refresh_<level>,
+-- raid_seen_<level> (the game second the level was last seen: the retakes count from it).
+
+local S = "raid_monolith"
+local STEER_MS, SEEN_MS = 3000, 60000
+
+local function list(section, key)
+	local s = ini_sys:r_string_ex(section, key)
+	return s and str_explode(s, ",") or {}
+end
+
+local function number(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function game_seconds()
+	return game.get_game_time():diffSec(level.get_start_time())
+end
+
+local function pick(t)
+	return t[math.random(#t)]
+end
+
+local function ids_of(key)
+	local out = {}
+	for _, s in ipairs(str_explode(tostring(shelter.state(key, "") or ""), ",")) do
+		out[#out + 1] = tonumber(s)
+	end
+	return out
+end
+
+local function squad_alive(id)
+	local se = id and id < 65535 and alife():object(id)
+	return se and se:clsid() == clsid.online_offline_group_s and se:npc_count() > 0 and se or nil
+end
+
+local function remove_squads(ids)
+	for _, id in ipairs(ids) do
+		local se = id < 65535 and alife():object(id)
+		if se and se:clsid() == clsid.online_offline_group_s then
+			SIMBOARD:remove_squad(se)
+		end
+	end
+end
+
+-- the level's smarts { name, se, depth, i } by depth from its "from" point
+local function smarts_of(level_name)
+	local from = list(level_name .. "_monolith", "from")
+	local fx, fz = tonumber(from[1]) or 0, tonumber(from[2]) or 0
+	local out = {}
+	for name, se in pairs(SIMBOARD.smarts_by_names) do
+		if alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id()) == level_name then
+			local dx, dz = se.position.x - fx, se.position.z - fz
+			out[#out + 1] = { name = name, se = se, depth = math.sqrt(dx * dx + dz * dz) }
+		end
+	end
+	table.sort(out, function(a, b) return a.depth < b.depth end)
+	for i, smart in ipairs(out) do
+		smart.i = i
+	end
+	return out
+end
+
+local function tier_of(smart, count)
+	return smart.i <= count / 3 and "near" or smart.i <= 2 * count / 3 and "mid" or "far"
+end
+
+local function held(smart)
+	for _, id in ipairs(ids_of("raid_g_" .. smart.name)) do
+		if squad_alive(id) then
+			return true
+		end
+	end
+	return false
+end
+
+-- a squad at a smart, kept there (sent on when its scripted target is changed)
+local function spawn_squad(smart_se, section)
+	local squad = SIMBOARD:create_squad(smart_se, section)
+	if not squad then
+		printf("! raid: no squad %s at %s", section, smart_se:name())
+		return
+	end
+	for k in squad:squad_members() do
+		local se = k.object or alife():object(k.id)
+		if se then
+			SIMBOARD:setup_squad_and_group(se)
+		end
+	end
+	squad.scripted_target = smart_se:name()
+	return squad
+end
+
+local function garrison(smart, tier, big)
+	local ids, sections = {}, big and list(S, "big") or { pick(list(S, tier)) }
+	for i, section in ipairs(sections) do
+		local squad = spawn_squad(smart.se, section)
+		if squad then
+			ids[#ids + 1] = squad.id
+			local commander = big and i == 1 and alife():object(squad:commander_id())
+			if commander then
+				alife_create_item(pick(list(S, "rare_loot")), commander)
+			end
+		end
+	end
+	shelter.set_state("raid_g_" .. smart.name, table.concat(ids, ","))
+	printf("raid: %s garrison at %s: %s", big and "big" or tier, smart.name, table.concat(sections, ", "))
+end
+
+-- all held anew: the old garrisons gone, big ones on big_count smarts of the deeper half
+local function refresh(smarts)
+	for _, smart in ipairs(smarts) do
+		remove_squads(ids_of("raid_g_" .. smart.name))
+	end
+	local deeper, big = {}, {}
+	for i = math.floor(#smarts / 2) + 1, #smarts do
+		deeper[#deeper + 1] = i
+	end
+	for _ = 1, math.min(number("big_count", 2), #deeper) do
+		big[table.remove(deeper, math.random(#deeper))] = true
+	end
+	for _, smart in ipairs(smarts) do
+		garrison(smart, tier_of(smart, #smarts), big[smart.i])
+	end
+end
+
+-- steps of the Monolith's taking back: the free smart nearest to a held one (none held: the entry smart)
+local function retake(level_name, smarts, steps)
+	local entry = ini_sys:r_string_ex(level_name .. "_monolith", "entry")
+	for _ = 1, steps do
+		local free, holding = {}, {}
+		for _, smart in ipairs(smarts) do
+			local into = held(smart) and holding or free
+			into[#into + 1] = smart
+		end
+		if #free == 0 then
+			return
+		end
+		local target, best = nil, nil
+		for _, f in ipairs(free) do
+			if #holding == 0 then
+				target = (f.name == entry or not target) and f or target
+			end
+			for _, h in ipairs(holding) do
+				local d = f.se.position:distance_to_sqr(h.se.position)
+				if not best or d < best then
+					target, best = f, d
+				end
+			end
+		end
+		if math.random() < number("retake_chance", 0.6) then
+			garrison(target, tier_of(target, #smarts), false)
+		end
+	end
+end
+
+-- the patrols rolled anew: the old ones gone; each route (shuffled) has one with patrol_chance, patrol_max at most,
+-- starting at a random smart of its chain
+local function patrols(level_name)
+	local max = number("patrol_max", 2)
+	for i = 1, max do
+		local key = "raid_p_" .. level_name .. "_" .. i
+		remove_squads({ tonumber(str_explode(tostring(shelter.state(key, "") or ""), "|")[1]) })
+		shelter.set_state(key, nil)
+	end
+	local routes = list(level_name .. "_monolith", "routes")
+	for i = #routes, 2, -1 do
+		local j = math.random(i)
+		routes[i], routes[j] = routes[j], routes[i]
+	end
+	local n = 0
+	for _, route in ipairs(routes) do
+		if n < max and math.random() < number("patrol_chance", 0.4) then
+			local chain = list(route, "smarts")
+			local index = math.random(#chain)
+			local smart = SIMBOARD.smarts_by_names[chain[index]]
+			local squad = smart and spawn_squad(smart, ini_sys:r_string_ex(S, "patrol"))
+			if squad then
+				n = n + 1
+				shelter.set_state("raid_p_" .. level_name .. "_" .. n,
+					string.format("%d|%s|%d|%d", squad.id, route, index, index < #chain and 1 or -1))
+				printf("raid: patrol on %s from %s", route, chain[index])
+			end
+		end
+	end
+end
+
+-- a raid level made ready as one goes onto it (before it loads): refreshed if due, else the retakes since it was
+-- last seen; the patrols rolled
+function prepare(level_name)
+	if not ini_sys:section_exist(level_name .. "_monolith") then
+		return
+	end
+	local smarts = smarts_of(level_name)
+	if #smarts == 0 then
+		return
+	end
+	local now = game_seconds()
+	local refreshed = shelter.state("raid_refresh_" .. level_name, nil)
+	if not refreshed or now - refreshed >= number("refresh_hours", 168) * 3600 then
+		refresh(smarts)
+		shelter.set_state("raid_refresh_" .. level_name, now)
+		shelter.set_state("raid_seen_" .. level_name, now)
+	else
+		local step = number("retake_hours", 12) * 3600
+		local seen = shelter.state("raid_seen_" .. level_name, now)
+		local steps = math.floor((now - seen) / step)
+		if steps > 0 then
+			retake(level_name, smarts, steps)
+			shelter.set_state("raid_seen_" .. level_name, seen + steps * step)
+		end
+	end
+	patrols(level_name)
+end
+
+-- the level left now: the time away counts from here
+function left(level_name)
+	if ini_sys:section_exist(level_name .. "_monolith") then
+		shelter.set_state("raid_seen_" .. level_name, game_seconds())
+	end
+end
+
+-- the patrols on the level: one at its smart rests patrol_stay seconds, then goes on to the next of its chain (and
+-- back at the chain's end)
+local resting = {} -- a patrol's squad id: time_global() to go on
+
+local function steer(level_name)
+	for i = 1, number("patrol_max", 2) do
+		local key = "raid_p_" .. level_name .. "_" .. i
+		local p = str_explode(tostring(shelter.state(key, "") or ""), "|")
+		local squad = squad_alive(tonumber(p[1]))
+		local chain, index, step = squad and list(p[2], "smarts"), tonumber(p[3]), tonumber(p[4])
+		local target = chain and SIMBOARD.smarts_by_names[chain[index]]
+		raid.dbg("patrol %s: squad %s target %s (%s) action %s current %s resting %s", i, tostring(squad and squad.id),
+			tostring(target and target:name()), tostring(target and target.id), tostring(squad and squad.current_action),
+			tostring(squad and squad.current_target_id), tostring(squad and resting[squad.id] and resting[squad.id] - time_global()))
+		if target and squad.current_action == 1 and squad.current_target_id == target.id then
+			local now = time_global()
+			if not resting[squad.id] then
+				local r = list(S, "patrol_stay")
+				resting[squad.id] = now + math.random(tonumber(r[1]) or 60, tonumber(r[2]) or 180) * 1000
+			elseif now >= resting[squad.id] then
+				resting[squad.id] = nil
+				if index + step < 1 or index + step > #chain then
+					step = -step
+				end
+				index = index + step
+				squad.scripted_target = chain[index]
+				shelter.set_state(key, string.format("%d|%s|%d|%d", squad.id, p[2], index, step))
+				printf("raid: patrol %s on to %s", squad.id, chain[index])
+			end
+		end
+	end
+end
+
+-- for the debug view of the raid app's map: the smarts (their number and the garrison's men alive), the routes, where
+-- the patrols' commanders are
+function debug_view(level_name)
+	local view = { smarts = {}, routes = {}, patrols = {} }
+	for _, smart in ipairs(smarts_of(level_name)) do
+		local men = 0
+		for _, id in ipairs(ids_of("raid_g_" .. smart.name)) do
+			local squad = squad_alive(id)
+			men = men + (squad and squad:npc_count() or 0)
+		end
+		view.smarts[#view.smarts + 1] = { x = smart.se.position.x, z = smart.se.position.z,
+			label = string.format("%s:%d", string.match(smart.name, "(%d+)$") or "?", men) }
+	end
+	for _, route in ipairs(list(level_name .. "_monolith", "routes")) do
+		local points = {}
+		for _, name in ipairs(list(route, "smarts")) do
+			local se = SIMBOARD.smarts_by_names[name]
+			if se then
+				points[#points + 1] = { x = se.position.x, z = se.position.z }
+			end
+		end
+		view.routes[#view.routes + 1] = points
+	end
+	for i = 1, number("patrol_max", 2) do
+		local squad = squad_alive(tonumber(str_explode(tostring(shelter.state("raid_p_" .. level_name .. "_" .. i, "") or ""), "|")[1]))
+		local commander = squad and alife():object(squad:commander_id())
+		if commander then
+			view.patrols[#view.patrols + 1] = { x = commander.position.x, z = commander.position.z }
+		end
+	end
+	return view
+end
+
+local steer_at, seen_at = 0, 0
+
+local function actor_on_update()
+	local name = level.name()
+	if not raid.is_raid_level(name) then
+		return
+	end
+	local now = time_global()
+	if now >= steer_at then
+		steer_at = now + STEER_MS
+		steer(name)
+	end
+	if now >= seen_at then
+		seen_at = now + SEEN_MS
+		left(name)
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end
