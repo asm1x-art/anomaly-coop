@@ -1,14 +1,20 @@
 import net from 'node:net';
 import zlib from 'node:zlib';
+import { EventEmitter } from 'node:events';
 import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
 
-export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log } = {}) {
+// hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
+export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null } = {}) {
   const storage = openStorage(dataDir);
   let nextId = 1;
-  const clients = new Map(); // id -> { send, name, state }
+  const clients = new Map(); // id -> { send, name, state, host, socket }
+  // what happened, for the Telegram bot (coop.on): joined, left { name }; host_up, host_down; save_failed
+  const events = new EventEmitter();
+  let hostId = null; // the world's host, connected
+  const players = () => [...clients].filter(([, c]) => !c.host);
   // id block -> player name. Leases follow the name, so a player who reconnects
   // gets the same blocks back and keeps owning the objects created with them.
   const idLeases = storage.loadLeases();
@@ -30,11 +36,18 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     for (const [id, c] of clients) if (id !== fromId) c.send(type, payload);
   };
   const peerState = (id, c) => Buffer.concat([u32(id), stringZ(c.name), c.state]);
-  // the sim master runs offline A-Life and world spawns for empty levels, and saves the world: the
-  // longest-connected player in the world (ids only grow), or anyone while nobody is in it
+  // the sim master runs offline A-Life and world spawns for empty levels, and saves the world: the host once it
+  // runs the world; else the longest-connected player in the world (ids only grow), or anyone while nobody is in it
   const masterId = () => {
-    const inWorld = [...clients].filter(([, c]) => c.inWorld).map(([cid]) => cid);
-    return Math.min(...(inWorld.length ? inWorld : clients.keys()));
+    if (hostId !== null && clients.get(hostId).inWorld) return hostId;
+    const all = players().map(([cid]) => cid);
+    const inWorld = players().filter(([, c]) => c.inWorld).map(([cid]) => cid);
+    return Math.min(...(inWorld.length ? inWorld : all.length ? all : clients.keys()));
+  };
+  const hostPayload = () => Buffer.concat([u32(hostId ?? 0), stringZ(hostId === null ? '' : clients.get(hostId).name)]);
+  const announceHost = () => {
+    const payload = hostPayload();
+    for (const c of clients.values()) c.send(M.HOST, payload);
   };
   const announceRoles = () => {
     if (!clients.size) return;
@@ -101,7 +114,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     if (action === GROUP.INVITE || action === GROUP.ACCEPT || action === GROUP.DECLINE) {
       const otherId = payload.readUInt32LE(1);
       const other = clients.get(otherId);
-      if (!other) return;
+      if (!other || other.host) return;
       if (action === GROUP.INVITE) {
         const g = groupOf(client.name);
         if (g?.members.includes(other.name)) return groupNote(client, GROUP_NOTE.ALREADY, other.name);
@@ -239,7 +252,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   // asks the others in the world (msg with ask to all), or decides at once when there are none
   const startVote = (kind, id, client, extra, msg, ask) => {
     vote = { kind, ...extra, proposer: client.name, proposerId: id,
-      waiting: new Set([...clients].filter(([cid, c]) => cid !== id && c.inWorld).map(([cid]) => cid)) };
+      waiting: new Set(players().filter(([cid, c]) => cid !== id && c.inWorld).map(([cid]) => cid)) };
     if (!vote.waiting.size) return endVote(ROLLBACK.ACCEPTED);
     vote.timer = setTimeout(() => endVote(ROLLBACK.TIMEOUT,
       [...vote.waiting].map((cid) => clients.get(cid)?.name).filter(Boolean).join(', ')), VOTE_MS).unref();
@@ -272,15 +285,30 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
             log(`[${id}] protocol mismatch: client ${version}, server ${PROTOCOL_VERSION}`);
             return refuse(REFUSED.VERSION, PROTOCOL_VERSION);
           }
+          const name = readStringZ(payload, 2);
+          const roleAt = payload.indexOf(0, 2) + 1;
+          const isHost = roleAt > 0 && payload[roleAt] === 1;
+          if (isHost && (!hostSecret || readStringZ(payload, roleAt + 1) !== hostSecret || hostId !== null)) {
+            log(`[${id}] '${name}' says it is the host: ${hostId !== null ? 'there is one' : 'wrong secret'}, turned away`);
+            return refuse(REFUSED.HOST, 0);
+          }
           const max = storage.settings().rules.max_players;
-          if (clients.size >= max) {
-            log(`[${id}] '${readStringZ(payload, 2)}' turned away: ${clients.size} of ${max} online`);
+          if (!isHost && players().length >= max) {
+            log(`[${id}] '${name}' turned away: ${players().length} of ${max} online`);
             return refuse(REFUSED.FULL, max);
           }
-          client = { send, name: readStringZ(payload, 2), state: null };
+          client = { send, name, state: null, host: isHost, socket };
           clients.set(id, client);
-          log(`[${id}] '${client.name}' joined from ${addr} (${clients.size} online)`);
+          log(`[${id}] '${client.name}' joined from ${addr} (${players().length} online${isHost ? ', the world host' : ''})`);
           send(M.WELCOME, u32(id));
+          if (isHost) {
+            hostId = id;
+            announceHost();
+            events.emit('host_up', { name });
+          } else {
+            send(M.HOST, hostPayload());
+            events.emit('joined', { name });
+          }
           // before WORLD_INFO: a client loading the world needs it to put its own character in
           const record = storage.character(client.name);
           if (record) send(M.CHARACTER, record);
@@ -301,6 +329,15 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           send(M.PONG, payload.subarray(0, 4));
           break;
         case M.ACTOR_STATE:
+          // the host's state only says its game runs the world: it is on no level and nobody sees it
+          if (client.host) {
+            if (!client.inWorld) {
+              client.inWorld = true;
+              log(`[${id}] the host runs the world: the sim master now`);
+              announceRoles();
+            }
+            break;
+          }
           client.state = Buffer.from(payload);
           // before the state: a game that sees a player on its level knows by then who runs it
           if (moveToLevel(id, client, readStringZ(payload, 0))) {
@@ -516,7 +553,15 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (!clients.has(id)) return;
       const wasMaster = masterId() === id;
       clients.delete(id);
-      log(`[${id}] '${client.name}' left (${clients.size} online)`);
+      if (client.host) {
+        hostId = null;
+        log(`[${id}] the host left: the sim master is a player's game again`);
+        announceHost();
+        announceRoles();
+        return;
+      }
+      log(`[${id}] '${client.name}' left (${players().length} online)`);
+      events.emit('left', { name: client.name });
       broadcast(id, M.PEER_LEFT, u32(id));
       announceRoles();
       if (moveToLevel(id, client, null)) announceLevels();
@@ -531,16 +576,22 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (client.inWorld && !wasMaster) requestSave('leave', client.name);
       if (vote?.proposerId === id) endVote(ROLLBACK.CANCELLED, client.name);
       else if (vote?.waiting.delete(id) && !vote.waiting.size) endVote(ROLLBACK.ACCEPTED);
-      if (!clients.size && pausedBy) setPaused(''); // nobody left to let it go on
+      if (!players().length && pausedBy) setPaused(''); // nobody left to let it go on
     });
   });
 
-  // what the admin page (admin.js) sees and does
+  let hostProcess = null; // host.js, when this server starts the host itself
+
+  // what the admin page (admin.js) and the Telegram bot (telegram.js) see and do
   server.coop = {
     status() {
       const master = clients.size ? masterId() : null;
+      const hostClient = hostId === null ? null : clients.get(hostId);
+      const host = hostProcess || hostClient ? { ...hostProcess?.status(), connected: !!hostClient,
+        in_world: !!hostClient?.inWorld, master: hostId !== null && hostId === master } : null;
       return {
-        online: [...clients].map(([cid, c]) =>
+        host,
+        online: players().map(([cid, c]) =>
           ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master,
             authority: !!c.level && levels.get(c.level)[0] === cid, ping: c.ping ?? null })),
         world: storage.worldInfo(),
@@ -572,15 +623,33 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       for (const c of clients.values()) c.send(M.SETTINGS, text);
       return storage.settings();
     },
-    // only with nobody online: their games run the old world
+    // only with no player online: their games run the old world. The host's does too: it is sent off, comes
+    // back (host.js) and waits for a new world.
     resetWorld() {
-      if (clients.size) return false;
+      if (players().length) return false;
+      if (hostId !== null) clients.get(hostId).socket.destroy();
       storage.resetWorld();
       idLeases.clear();
       groups.length = 0;
       log('world reset on the admin page');
       return true;
     },
+    on: (event, handler) => events.on(event, handler),
+    events, // host.js tells host_down through it
+    // the master (the host, if it runs the world) saves it now
+    saveWorld: () => requestSave('admin', 'admin'),
+    // that player is off the server (their game says it lost the connection)
+    kick(name) {
+      const found = players().find(([, c]) => c.name === name);
+      if (!found) return false;
+      log(`[${found[0]}] '${name}' put off the server by an admin`);
+      found[1].socket.destroy();
+      return true;
+    },
+    setHostProcess(process) {
+      hostProcess = process;
+    },
+    restartHost: () => hostProcess?.restart() ?? false,
   };
 
   return new Promise((resolve) => {

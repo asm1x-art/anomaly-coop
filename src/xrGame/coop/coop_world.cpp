@@ -122,6 +122,8 @@ namespace coop
 
 	static LPCSTR peer_name(u32 id)
 	{
+		if (is_host_id(id))
+			return host_name().c_str();
 		auto peer = peers().find(id);
 		return peer != peers().end() ? peer->second.name.c_str() : "?";
 	}

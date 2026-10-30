@@ -101,9 +101,12 @@ namespace coop
 		xr_vector<xr_vector<xr_string>> m_groups; // as the server has them
 		xr_vector<bool> m_group_story;            // each group shares its story
 		xr_map<shared_str, u32> m_authorities;    // level -> its authority, levels with players on them (M_LEVELS)
+		u32 m_host_id = 0;                        // the world's host (M_HOST), 0: none
+		xr_string m_host_name;
 	};
 
 	static CClient g_client;
+	static LPCSTR host_secret();
 
 	int debug_mode = 1; // on while we test: a friend's game logs everything without asking (coop_debug 0 to quiet it)
 
@@ -205,6 +208,8 @@ namespace coop
 		m_left.clear();
 		m_groups.clear();
 		m_authorities.clear();
+		m_host_id = 0;
+		m_host_name.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -464,6 +469,14 @@ namespace coop
 			m_authorities.swap(authorities);
 			break;
 		}
+		case M_HOST:
+			m_host_id = P.r_u32();
+			P.r_stringZ(m_host_name);
+			if (m_host_id)
+				Msg("[coop] the world's host: '%s' (id=%u)%s", m_host_name.c_str(), m_host_id, m_host_id == m_client_id ? ", this game" : "");
+			else
+				Msg("[coop] the world has no host now");
+			break;
 		case M_SCRIPT_EVENT:
 			on_script_event(P);
 			break;
@@ -604,6 +617,8 @@ namespace coop
 		P.w_begin(M_HELLO);
 		P.w_u16(PROTOCOL_VERSION);
 		P.w_stringZ(m_name.c_str());
+		P.w_u8(is_host() ? 1 : 0);
+		P.w_stringZ(host_secret());
 		send(P);
 		m_hello_sent = true;
 	}
@@ -724,7 +739,7 @@ namespace coop
 				const u32 sender = *(const u32*)(msg.data() + sizeof(u16));
 				if (m_left.count(sender))
 					continue; // that player is gone: no shadow to apply it to
-				if (!m_peers.count(sender))
+				if (!m_peers.count(sender) && sender != m_host_id)
 					hold = true;
 			}
 			if (world_change && hold)
@@ -808,6 +823,20 @@ namespace coop
 	LPCSTR refusal() { return g_client.refusal().c_str(); }
 	const xr_string& my_name() { return g_client.name(); }
 
+	// -coop_host <secret>: Core.Params is lowercase, so is the secret the server made
+	static LPCSTR host_secret()
+	{
+		static string64 secret = "";
+		LPCSTR p = strstr(Core.Params, "-coop_host ");
+		if (p && !secret[0])
+			sscanf(p + xr_strlen("-coop_host "), "%63s", secret);
+		return secret;
+	}
+
+	bool is_host() { return g_coop_headless; }
+	bool is_host_id(u32 id) { return id && id == g_client.m_host_id; }
+	const xr_string& host_name() { return g_client.m_host_name; }
+
 	bool is_sim_master()
 	{
 		return !is_connected() || g_client.master() == g_client.id();
@@ -860,6 +889,8 @@ namespace coop
 	{
 		if (id == my_id())
 			return &my_name();
+		if (is_host_id(id))
+			return &host_name();
 		auto peer = peers().find(id);
 		return peer != peers().end() ? &peer->second.name : nullptr;
 	}

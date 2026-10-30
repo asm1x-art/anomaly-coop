@@ -204,7 +204,7 @@ namespace coop
 
 	void send_progress()
 	{
-		if (!is_connected() || !runs_shared_world() || !world_ready())
+		if (!is_connected() || !runs_shared_world() || !world_ready() || is_host())
 			return;
 		send_inventory_states(); // our things as they are, kept by the others' worlds and the save
 		CMemoryWriter out;

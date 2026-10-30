@@ -11,7 +11,7 @@ namespace coop
 {
 	enum EMessage : u16
 	{
-		M_HELLO = 1,       // c->s: u16 protocol version, stringZ name
+		M_HELLO = 1,       // c->s: u16 protocol version, stringZ name, u8 1 for the host (else 0), stringZ the host's secret
 		M_WELCOME = 2,     // s->c: u32 client id
 		M_PING = 3,        // c->s: u32 client time (ms), u32 our last round trip (ms), for the server's admin page
 		M_PONG = 4,        // s->c: u32 echoed client time (ms)
@@ -75,6 +75,8 @@ namespace coop
 		                        // says who); 0: we gave it up
 		M_LEVELS = 51,          // s->c: u8 count, per level with players on it stringZ level, u32 its authority (the one
 		                        // there longest); to all on every change
+		M_HOST = 52,            // s->c: u32 the world's host (0: none), stringZ its name; after M_WELCOME and to all on every
+		                        // change. Not a player: no M_PEER_STATE, but the world changes it sends are applied
 	};
 
 	enum EGroupAction : u8
@@ -87,7 +89,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 20;
+	const u16 PROTOCOL_VERSION = 21;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -153,6 +155,12 @@ namespace coop
 	// as the server says (M_LEVELS). Without a connection this client runs everything.
 	bool is_sim_master();
 	bool is_authority(const shared_str& level_name);
+
+	// The world's headless host (-coop_host <secret>, docs/coop/multiplayer.md): the sim master whenever it runs,
+	// never a player. Its actor is a ghost on fake_start; it saves the world.
+	bool is_host();               // this game is the host
+	bool is_host_id(u32 id);      // that client is the host
+	const xr_string& host_name(); // "" while there is none
 
 	// Groups of players: names, leader first. same_group: either may be my_id()
 	const xr_vector<xr_string>* group_of(const xr_string& name);

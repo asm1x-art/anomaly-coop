@@ -18,7 +18,7 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], levels: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], levels: [], hosts: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
@@ -26,6 +26,7 @@ function connect(port) {
     if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
     if (type === M.GROUPS) return client.groups.push(msg.payload);
     if (type === M.LEVELS) return client.levels.push(parseLevels(msg.payload));
+    if (type === M.HOST) return client.hosts.push({ id: msg.payload.readUInt32LE(0), name: readStringZ(msg.payload, 4) });
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -399,6 +400,65 @@ test('a level is run by the player who came to it first, then by the next to hav
     assert.deepEqual(c.levels.at(-1), {});
     a.socket.destroy();
     c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function hostHello(name, secret) {
+  return Buffer.concat([hello(name), Buffer.from([1]), encodeText(secret), Buffer.from([0])]);
+}
+
+test('the host: let in by its secret, the sim master once in the world, never a player', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    await settle(a);
+    const idA = a.roles.at(-1);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: 0, name: '' });
+
+    const wrong = await connect(port);
+    wrong.send(M.HELLO, hostHello('host', 'beef'));
+    const refused = await wrong.next();
+    assert.equal(refused.type, M.REFUSED);
+    assert.equal(refused.payload[0], REFUSED.HOST);
+
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    const idH = (await h.next()).payload.readUInt32LE(0);
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: idH, name: 'host' });
+    assert.equal(a.roles.at(-1), idA); // not in the world yet
+    const second = await connect(port);
+    second.send(M.HELLO, hostHello('host2', 'f00d'));
+    assert.equal((await second.next()).payload[0], REFUSED.HOST);
+
+    // in the world: the sim master; nobody sees it on a level
+    h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    await settle(h);
+    await settle(a);
+    assert.equal(a.roles.at(-1), idH);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idA });
+    const status = server.coop.status();
+    assert.deepEqual(status.online.map((p) => p.name), ['artem']);
+    assert.equal(status.host.connected, true);
+    assert.equal(status.host.master, true);
+
+    // a newcomer doesn't see it either, and the host doesn't count against the player limit
+    const b = await player(port, 'друг');
+    await settle(b);
+    assert.equal(b.hosts.at(-1).id, idH);
+    assert.equal(b.roles.at(-1), idH);
+
+    h.socket.destroy();
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: 0, name: '' });
+    assert.equal(a.roles.at(-1), idA);
+    a.socket.destroy();
+    b.socket.destroy();
   } finally {
     server.close();
   }

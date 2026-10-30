@@ -61,6 +61,9 @@ std::chrono::duration<float> time_span;
 ENGINE_API float refresh_rate = 0;
 #endif // ECO_RENDER
 
+ENGINE_API bool g_coop_headless = false;
+static const u32 HEADLESS_FRAME_MS = 33;
+
 BOOL CRenderDevice::Begin()
 {
 	PROF_EVENT();
@@ -243,7 +246,7 @@ void CRenderDevice::PreCache(u32 amount, bool b_draw_loadscreen, bool b_wait_use
 #ifdef DEDICATED_SERVER
     amount = 0;
 #else
-	if (m_pRender->GetForceGPU_REF())
+	if (m_pRender->GetForceGPU_REF() || g_coop_headless)
 		amount = 0;
 #endif
 
@@ -414,6 +417,7 @@ void CRenderDevice::on_idle()
 #ifdef DEDICATED_SERVER
     u32 FrameStartTime = TimerGlobal.GetElapsed_ms();
 #endif
+	const u32 frame_start = TimerGlobal.GetElapsed_ms();
 
 	START_PROFILE("Set stat gathering");
 	if (psDeviceFlags.test(rsStatistic))
@@ -532,7 +536,7 @@ void CRenderDevice::on_idle()
 	Statistic->RenderTOTAL_Real.FrameStart();
 	Statistic->RenderTOTAL_Real.Begin();
 
-	if (b_is_Active && Begin())
+	if (b_is_Active && !g_coop_headless && Begin())
 	{
 		START_PROFILE("Process seqRender");
 		seqRender.Process(rp_Render);
@@ -582,7 +586,13 @@ void CRenderDevice::on_idle()
     if (FrameTime < DSUpdateDelta)
         Sleep(DSUpdateDelta - FrameTime);
 #endif
-	if (!b_is_Active)
+	if (g_coop_headless)
+	{
+		const u32 frame_time = TimerGlobal.GetElapsed_ms() - frame_start;
+		if (frame_time < HEADLESS_FRAME_MS)
+			Sleep(HEADLESS_FRAME_MS - frame_time);
+	}
+	else if (!b_is_Active)
 		Sleep(1);
 }
 
@@ -834,6 +844,13 @@ void CRenderDevice::OnWM_Activate(WPARAM wParam, LPARAM lParam)
 	u16 fActive = LOWORD(wParam);
 	BOOL fMinimized = (BOOL)HIWORD(wParam);
 	BOOL bActive = ((fActive != WA_INACTIVE) && (!fMinimized)) ? TRUE : FALSE;
+
+	// the host is never in front, has no input, and never pauses
+	if (g_coop_headless)
+	{
+		Device.b_is_Active = TRUE;
+		return;
+	}
 
 	if (psDeviceFlags2.test(rsAlwaysActive) && g_screenmode != 2)
 	{

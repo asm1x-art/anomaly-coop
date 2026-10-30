@@ -1,14 +1,14 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 20;
+export const PROTOCOL_VERSION = 21;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
 export const NO_BLOCK = 0xffff;
 
 export const M = {
-  HELLO: 1,   // c->s: u16 protocol version, stringZ name
+  HELLO: 1,   // c->s: u16 protocol version, stringZ name, u8 1 for the world's host (else 0), stringZ the host's secret
   WELCOME: 2, // s->c: u32 client id
   PING: 3,    // c->s: u32 client time (ms), u32 the client's last round trip (ms), for the admin page
   PONG: 4,    // s->c: u32 echoed client time (ms)
@@ -82,9 +82,12 @@ export const M = {
                       // (WORLD_INFO); 0: they gave it up
   LEVELS: 51,         // s->c: u8 count, per level with players on it stringZ level, u32 its authority: the player
                       // there longest (the first to come); to all on every change
+  HOST: 52,           // s->c: u32 the world's host (0: none), stringZ its name; after WELCOME and to all on every change.
+                      // The host (the game the server started with -coop_host) is the sim master whenever it is in the
+                      // world, and no player: no PEER_STATE, no level, no group, no say in votes
 };
 
-export const REFUSED = { FULL: 0, VERSION: 1 };
+export const REFUSED = { FULL: 0, VERSION: 1, HOST: 2 }; // HOST: a wrong secret, or a host is there already
 export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 };
 export const MAX_SAVES_LISTED = 200;
 export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4, STORY: 5 };

@@ -16,7 +16,7 @@ export const CONFIG_FILE = 'server.cfg';
 // section -> key -> default; the default's type is the value's
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4 },
-  host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', autosave_minutes: 5, pause_when_empty: true },
+  host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
 
@@ -45,7 +45,8 @@ max_players = 4        # игроков на сервере одновремен
 
 [host]
 game_dir =             # папка игры для хоста; пусто — без хоста (мир держит игрок, как раньше)
-exe = bin\\AnomalyDX11.exe  # exe игры, путь от game_dir
+exe = bin\\AnomalyDX11.exe  # exe игры, путь от game_dir; своя папка bin, если на этом ПК играют из той же игры
+args =                 # ещё параметры игры хоста, например своя appdata: -fsltx ..\\fsgame_host.ltx
 autosave_minutes = 5   # автосохранение мира хостом, минут; 0 — выключено
 pause_when_empty = 1   # мир стоит, пока в нём нет игроков: 1 — да, 0 — нет
 

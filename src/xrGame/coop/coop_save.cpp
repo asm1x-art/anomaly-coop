@@ -171,7 +171,7 @@ namespace coop
 	// the server has a world we have never been in: a character is made first (Lua, the new game screen)
 	static bool needs_character()
 	{
-		return g_server_has_world && !g_has_record && !is_mine(g_server_owner) && !g_join_requested;
+		return g_server_has_world && !g_has_record && !is_mine(g_server_owner) && !g_join_requested && !is_host();
 	}
 
 	void set_world_seed(LPCSTR save_name)
@@ -638,6 +638,8 @@ namespace coop
 
 	static void send_record()
 	{
+		if (is_host()) // a ghost, not a character
+			return;
 		NET_Packet P;
 		P.w_begin(M_CHARACTER);
 		P.w_stringZ(Level().name());
@@ -818,8 +820,32 @@ namespace coop
 		}
 	}
 
+	// the host's ghost stands on fake_start, Anomaly's empty start level (no smarts, no tasks there)
+	static void put_ghost()
+	{
+		CSE_ALifeCreatureActor* actor = find_actor();
+		const CGameGraph& graph = ai().game_graph();
+		for (GameGraph::_GRAPH_ID gvid = 0; actor && gvid < graph.header().vertex_count(); ++gvid)
+		{
+			const CGameGraph::CVertex* vertex = graph.vertex(gvid);
+			if (xr_strcmp(graph.header().level(vertex->level_id()).name(), "fake_start"))
+				continue;
+			actor->o_Position = vertex->level_point();
+			actor->m_tGraphID = gvid;
+			actor->m_tNodeID = vertex->level_vertex_id();
+			Msg("[coop] the host's ghost stands on fake_start (game vertex %u)", gvid);
+			return;
+		}
+		Msg("! [coop] no fake_start in this world: the host's ghost stays where the save's actor is");
+	}
+
 	void on_world_objects_loaded()
 	{
+		if (g_loading && is_host())
+		{
+			put_ghost();
+			return;
+		}
 		if (!g_loading || is_mine(g_loading_owner) || !(g_has_record || g_join_requested))
 			return;
 
@@ -878,15 +904,30 @@ namespace coop
 			return;
 		}
 
-		// The save's actor is the owner's: their things go to their shadow, ours come out of ours.
+		// The save's actor is the owner's: their things go to their shadow, ours come out of ours. The host's ghost
+		// has none and no shadow.
 		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
-		CSE_ALifeDynamicObject* owner_shadow = ai().alife().objects().object(shadow_of(g_loading_owner), true);
-		if (!actor || !owner_shadow)
+		if (!actor)
 		{
-			Msg("! [coop] can't swap characters: no actor or no shadow for '%s'", g_loading_owner.c_str());
+			Msg("! [coop] can't swap characters: no actor");
 			return;
 		}
-		move_inventory(actor, owner_shadow);
+		if (g_loading_owner != host_name() || !actor->children.empty())
+		{
+			CSE_ALifeDynamicObject* owner_shadow = ai().alife().objects().object(shadow_of(g_loading_owner), true);
+			if (!owner_shadow)
+			{
+				Msg("! [coop] can't swap characters: no shadow for '%s'", g_loading_owner.c_str());
+				return;
+			}
+			move_inventory(actor, owner_shadow);
+		}
+		if (is_host())
+		{
+			actor->m_dwMoney = 0;
+			Msg("[coop] world loaded, the host's ghost in place of '%s'", g_loading_owner.c_str());
+			return;
+		}
 
 		CSE_ALifeDynamicObject* my_shadow = ai().alife().objects().object(find_shadow_of(my_name()), true);
 		if (my_shadow)
