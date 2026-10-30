@@ -154,16 +154,17 @@ function M:chrome(x, y, w, h, title, icon, parent, list, ax, ay, on_close)
 end
 
 -- the hovers of clicks' lists (the first list's on top): only that under the cursor p is lit. One lit before whose
--- click is no longer listed went with its parts: left alone.
+-- click is no longer listed went with its parts: left alone. The lit one is kept as its click's entry: the engine's
+-- statics are not compared (luabind has no == for them).
 function M:hovers(p, lists)
 	local lit, still
 	for _, list in ipairs(lists) do
 		for i = #list, 1, -1 do
 			local c = list[i]
 			if not lit and c.hover and p.x >= c[1] and p.x < c[1] + c[3] and p.y >= c[2] and p.y < c[2] + c[4] then
-				lit = c.hover
+				lit = c
 			end
-			still = still or self.lit and c.hover == self.lit
+			still = still or c == self.lit
 		end
 	end
 	if not still then
@@ -171,10 +172,10 @@ function M:hovers(p, lists)
 	end
 	if lit ~= self.lit then
 		if self.lit then
-			self.lit:Show(false)
+			self.lit.hover:Show(false)
 		end
 		if lit then
-			lit:Show(true)
+			lit.hover:Show(true)
 		end
 		self.lit = lit
 	end
