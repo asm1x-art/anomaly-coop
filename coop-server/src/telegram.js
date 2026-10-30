@@ -44,6 +44,7 @@ const REASONS = {
   auto: () => 'Автосохранение', quick: (s) => `Быстрое · ${s.who}`, named: (s) => `«${s.name}» · ${s.who}`,
   join: (s) => `Вход: ${s.who}`, leave: (s) => `Выход: ${s.who}`, exit: (s) => `Выход мастера: ${s.who}`,
   new: () => 'Новый мир', level: (s) => `Переход: ${s.who}`, rollback: (s) => `Откат к №${s.from}`,
+  admin: () => 'По команде админа',
 };
 
 const COMMANDS = [
@@ -73,13 +74,19 @@ const saveLine = (s) => `№${s.revision} · ${(REASONS[s.reason] ?? (() => s.re
 // an event's details: a name or a reason as such, or in an object
 const detail = (e, key) => (typeof e === 'string' ? e : e?.[key] ?? '');
 
-// status().host, when the server runs one: { running, memory (bytes), uptime (s), ... }; other fields as they are
+// status().host (server.js, host.js): { running, pid, uptime (s), gave_up, connected, in_world, master }
+const HOST_SKIP = ['pid', 'connected', 'in_world'];
 function hostLine(host) {
   const parts = [];
   for (const [key, value] of Object.entries(host)) {
+    if (HOST_SKIP.includes(key)) continue;
     if (key === 'running') parts.push(value ? 'работает' : 'не работает');
     else if (key === 'memory' && typeof value === 'number') parts.push(size(value));
-    else if (key === 'uptime' && typeof value === 'number') parts.push(`работает ${duration(value)}`);
+    else if (key === 'uptime' && typeof value === 'number') {
+      if (value) parts.push(`запущен ${duration(value)} назад`);
+    } else if (key === 'gave_up') {
+      if (value) parts.push('упал 3 раза подряд, ждёт /restart_host');
+    } else if (key === 'master') parts.push(value ? 'держит мир' : host.connected ? 'загружает мир' : 'не подключён');
     else if (value !== null && typeof value !== 'object') parts.push(`${key}: ${value}`);
   }
   return `Хост: ${parts.join(', ') || 'есть'}`;
@@ -199,7 +206,8 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
     const max = coop.settings().rules.max_players;
     const lines = [`Онлайн: ${st.online.length} из ${max}`];
     for (const p of st.online) {
-      const where = [p.level ?? 'в меню', p.ping == null ? '' : `${p.ping} мс`, p.master ? 'мастер' : ''].filter(Boolean);
+      const where = [p.level ?? 'в меню', p.ping == null ? '' : `${p.ping} мс`, p.authority ? 'хозяин локации' : '',
+        p.master ? 'мастер' : ''].filter(Boolean);
       lines.push(`${p.name} — ${where.join(', ')}`);
     }
     lines.push(st.world ? `Мир: ревизия ${st.world.revision}, сейв ${st.world.owner}` : 'Мира ещё нет');

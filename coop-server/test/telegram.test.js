@@ -119,10 +119,11 @@ test('telegram: /status lists players, the world, saves and the host when there 
     assert.match(text, /№11 · Вход: друг/);
     assert.doesNotMatch(text, /Хост/);
 
-    t.coop.host = { running: true, memory: 812 * 1024 * 1024, uptime: 7500, pid: 4242 };
+    t.coop.host = { running: true, memory: 812 * 1024 * 1024, uptime: 7500, pid: 4242, gave_up: false, connected: true,
+      in_world: true, master: true };
     await t.say('/status@coop_bot');
     text = t.sent()[0].body.text;
-    assert.match(text, /Хост: работает, 812\.0 МБ, работает 2 ч 5 мин, pid: 4242/);
+    assert.match(text, /Хост: работает, 812\.0 МБ, запущен 2 ч 5 мин назад, держит мир/);
   } finally {
     await t.bot.stop();
   }
