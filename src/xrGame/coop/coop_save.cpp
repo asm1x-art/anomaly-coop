@@ -287,6 +287,9 @@ namespace coop
 	void on_settings(NET_Packet& P)
 	{
 		P.r_stringZ(g_settings);
+		// the host saves the world as often as the server's config says (coop_sync.script's autosave)
+		if (is_host())
+			autosave_interval = iFloor(world_rule("autosave_minutes", float(autosave_interval)));
 	}
 
 	const xr_string& world_settings()

@@ -7,9 +7,10 @@ import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
 
 // hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
-// journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0)
+// journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0).
+// autosaveMinutes, pauseWhenEmpty: server.cfg's [host] (config.js), for the host
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
-  journalOverlapMs = 60000 } = {}) {
+  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false } = {}) {
   const storage = openStorage(dataDir);
   let nextId = 1;
   const clients = new Map(); // id -> { send, name, state, host, socket }
@@ -45,6 +46,21 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     const all = players().map(([cid]) => cid);
     const inWorld = players().filter(([, c]) => c.inWorld).map(([cid]) => cid);
     return Math.min(...(inWorld.length ? inWorld : all.length ? all : clients.keys()));
+  };
+  // the world's settings for the games; the host also takes its autosave interval from them
+  const settingsPayload = () => stringZ(settingsText(storage.settings()) +
+    (autosaveMinutes === null ? '' : `
+autosave_minutes=${autosaveMinutes}`));
+  // pauseWhenEmpty: the host's world stands while no player is in it (time in the Zone runs many times faster);
+  // only the host is told, the players' games never run an empty world
+  let emptyPaused = false;
+  const updateEmptyPause = () => {
+    const hostClient = hostId === null ? null : clients.get(hostId);
+    const empty = pauseWhenEmpty && !!hostClient?.inWorld && !pausedBy && !players().some(([, c]) => c.inWorld);
+    if (empty === emptyPaused) return;
+    emptyPaused = empty;
+    log(empty ? 'nobody in the world: the host pauses it' : 'a player is in the world: the host lets it go on');
+    hostClient?.send(M.PAUSED, Buffer.concat([Buffer.from([empty ? 1 : 0]), stringZ(empty ? 'server' : '')]));
   };
   const hostPayload = () => Buffer.concat([u32(hostId ?? 0), stringZ(hostId === null ? '' : clients.get(hostId).name)]);
   const announceHost = () => {
@@ -229,6 +245,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     log(by ? `world paused ('${by}' asked)` : 'world goes on');
     const payload = pausedPayload();
     for (const c of clients.values()) c.send(M.PAUSED, payload);
+    emptyPaused = false; // the host was told with the others
+    updateEmptyPause();
   };
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
@@ -325,7 +343,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (record) send(M.CHARACTER, record);
           for (const [block, owner] of idLeases) if (owner === client.name) send(M.ID_BLOCK_GRANT, u16(block));
           announceRoles();
-          send(M.SETTINGS, stringZ(settingsText(storage.settings())));
+          send(M.SETTINGS, settingsPayload());
           send(M.GROUPS, groupsPayload());
           send(M.WORLD_INFO, worldInfo());
           if (pausedBy) send(M.PAUSED, pausedPayload());
@@ -346,6 +364,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
               client.inWorld = true;
               log(`[${id}] the host runs the world: the sim master now`);
               announceRoles();
+              updateEmptyPause();
             }
             break;
           }
@@ -359,6 +378,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (!client.inWorld) {
             client.inWorld = true;
             announceRoles();
+            updateEmptyPause();
           }
           break;
         case M.LEFT_WORLD: {
@@ -368,6 +388,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           log(`[${id}] '${client.name}' went back to the menu`);
           announceRoles();
           if (moveToLevel(id, client, null)) announceLevels();
+          updateEmptyPause();
           break;
         }
         case M.ID_BLOCK_REQUEST: {
@@ -567,6 +588,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       clients.delete(id);
       if (client.host) {
         hostId = null;
+        emptyPaused = false;
         log(`[${id}] the host left: the sim master is a player's game again`);
         announceHost();
         announceRoles();
@@ -585,6 +607,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       if (vote?.proposerId === id) endVote(ROLLBACK.CANCELLED, client.name);
       else if (vote?.waiting.delete(id) && !vote.waiting.size) endVote(ROLLBACK.ACCEPTED);
       if (!players().length && pausedBy) setPaused(''); // nobody left to let it go on
+      updateEmptyPause();
     });
   });
 
@@ -627,7 +650,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     saveSettings(settings) {
       storage.saveSettings(settings);
       log('settings changed on the admin page');
-      const text = stringZ(settingsText(storage.settings()));
+      const text = settingsPayload();
       for (const c of clients.values()) c.send(M.SETTINGS, text);
       return storage.settings();
     },

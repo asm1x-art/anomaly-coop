@@ -464,6 +464,32 @@ test('the host: let in by its secret, the sim master once in the world, never a 
   }
 });
 
+test('the host: its autosave interval with the settings; paused while no player is in the world', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d', autosaveMinutes: 7, pauseWhenEmpty: true });
+  const { port } = server.address();
+  try {
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    await settle(h);
+    assert.match(h.settings.at(-1), /^autosave_minutes=7$/m);
+    h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    assert.deepEqual([...(await until(h, M.PAUSED)).payload], [1, ...Buffer.from('server'), 0]);
+
+    const a = await player(port, 'artem');
+    await settle(a);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    assert.equal((await until(h, M.PAUSED)).payload[0], 0);
+    assert.ok(!(await drain(a)).includes(M.PAUSED)); // the players never hear of it
+    a.send(M.LEFT_WORLD);
+    assert.equal((await until(h, M.PAUSED)).payload[0], 1);
+    h.socket.destroy();
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 test('script events reach others with the sender id', async () => {
   const server = await startServer(options());
   const { port } = server.address();
