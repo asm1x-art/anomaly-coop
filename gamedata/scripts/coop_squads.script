@@ -4,9 +4,12 @@
 -- online is that game's until it goes offline again: the host leaves it be, then goes on with it.
 
 local SEND_MS = 5000
+local FULL_MS = 60000 -- every squad, moved or not, this often: a game that came in since has them all
 local PER_EVENT = 120 -- squads per event: well within a message
 local NO_TARGET = 65535
 local next_send = 0
+local next_full = 0
+local sent = {} -- squad id -> what was sent of it last, "gvid,lvid,target"
 
 local function send_squads()
 	local now = time_global()
@@ -14,6 +17,10 @@ local function send_squads()
 		return
 	end
 	next_send = now + SEND_MS
+	local full = now >= next_full
+	if full then
+		next_full = now + FULL_MS
+	end
 	local part = {}
 	local function flush()
 		if #part > 0 then
@@ -25,11 +32,16 @@ local function send_squads()
 	for id in pairs(SIMBOARD.squads) do
 		local squad = sim:object(id)
 		if squad and not squad.online and not coop.squad_online_elsewhere(id) then
-			local p = squad.position
-			part[#part + 1] = string.format("%d,%d,%d,%.2f,%.2f,%.2f,%d", id, squad.m_game_vertex_id,
-				squad.m_level_vertex_id, p.x, p.y, p.z, squad.assigned_target_id or NO_TARGET)
-			if #part >= PER_EVENT then
-				flush()
+			local target = squad.assigned_target_id or NO_TARGET
+			local key = string.format("%d,%d,%d", squad.m_game_vertex_id, squad.m_level_vertex_id, target)
+			if full or sent[id] ~= key then
+				sent[id] = key
+				local p = squad.position
+				part[#part + 1] = string.format("%d,%d,%d,%.2f,%.2f,%.2f,%d", id, squad.m_game_vertex_id,
+					squad.m_level_vertex_id, p.x, p.y, p.z, target)
+				if #part >= PER_EVENT then
+					flush()
+				end
 			end
 		end
 	end

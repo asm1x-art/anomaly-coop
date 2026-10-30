@@ -526,6 +526,34 @@ test('the admin window: the admin password, then the admin page commands; the st
   }
 });
 
+test('a level NPC stream goes to the players on that level and the host only', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    const c = await player(port, 'третий');
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    c.send(M.ACTOR_STATE, actorState('l05_bar', 0, 0, 0, 0));
+    await settle(a);
+    await settle(b);
+    await settle(c);
+    await settle(h);
+    a.send(M.NPC_STATES, Buffer.concat([encodeText('l01_escape'), Buffer.from([0]), Buffer.from('npcs')]));
+    await settle(a);
+    assert.equal((await until(b, M.NPC_STATES)).payload.readUInt32LE(0), a.roles.at(-1));
+    await until(h, M.NPC_STATES);
+    assert.ok(!(await drain(c)).includes(M.NPC_STATES));
+    for (const x of [a, b, c, h]) x.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 test('script events reach others with the sender id', async () => {
   const server = await startServer(options());
   const { port } = server.address();

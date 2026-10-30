@@ -20,6 +20,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   const clients = new Map(); // id -> { send, name, state, host, socket }
   // what happened, for the Telegram bot (coop.on): joined, left { name }; host_up, host_down; save_failed
   const events = new EventEmitter();
+  const traffic = { in: 0, out: 0, since: Date.now() }; // bytes through the game port, for the admins
   let hostId = null; // the world's host, connected
   const players = () => [...clients].filter(([, c]) => !c.host);
   // id block -> player name. Leases follow the name, so a player who reconnects
@@ -366,7 +367,11 @@ autosave_minutes=${autosaveMinutes}`));
     socket.setNoDelay(true);
     const id = nextId++;
     const addr = `${socket.remoteAddress}:${socket.remotePort}`;
-    const send = (type, payload) => socket.write(encode(type, payload));
+    const send = (type, payload) => {
+      const frame = encode(type, payload);
+      traffic.out += frame.length;
+      socket.write(frame);
+    };
     let client = null; // set after HELLO
     let upload = null; // { files: Buffer[] } while this client sends the world
 
@@ -693,8 +698,14 @@ autosave_minutes=${autosaveMinutes}`));
             record(type, Buffer.concat([u32(id), payload]));
           broadcast(id, type, Buffer.concat([u32(id), payload]));
           break;
+        case M.NPC_STATES: {
+          // a level's NPCs: for the players on it, and the host (it follows which squads are online where)
+          const level = readStringZ(payload, 0);
+          const relayed = Buffer.concat([u32(id), payload]);
+          for (const [cid, c] of clients) if (cid !== id && (c.host || c.level === level)) c.send(type, relayed);
+          break;
+        }
         case M.ACTOR_ACTION:
-        case M.NPC_STATES:
         case M.COOP_HIT:
           // receivers need to know whose actor "the sender's actor" is
           broadcast(id, type, Buffer.concat([u32(id), payload]));
@@ -706,6 +717,7 @@ autosave_minutes=${autosaveMinutes}`));
 
     const decode = createDecoder(handle);
     socket.on('data', (chunk) => {
+      traffic.in += chunk.length;
       try {
         decode(chunk);
       } catch (e) {
@@ -758,6 +770,7 @@ autosave_minutes=${autosaveMinutes}`));
             authority: !!c.level && levels.get(c.level)[0] === cid, ping: c.ping ?? null })),
         world: storage.worldInfo(),
         paused: pausedBy || null,
+        traffic: { ...traffic },
         saves: storage.saves().reverse().slice(0, MAX_SAVES_LISTED),
       };
     },
