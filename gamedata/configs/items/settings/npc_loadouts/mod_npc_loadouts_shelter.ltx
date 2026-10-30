@@ -1,0 +1,18 @@
+; The shelter's occupants (scripts\shelter.script) carry their own guns, not a zombie's: the Brigadier's M4, the
+; Chemist's Vector (xrs_rnd_npc_loadout gives them as they are made; their addons are fitted on the body as it drops
+; its gear, scripts\shelter_brigadier.script)
+![loadouts_per_name]
+shelter_zombie_nosorog = loadout_shelter_brigadier
+shelter_zombie_seva    = loadout_shelter_chemist
+
+[loadout_shelter_brigadier]
+primary = shelter_brigadier_primary
+
+[loadout_shelter_chemist]
+primary = shelter_chemist_primary
+
+[shelter_brigadier_primary]
+wpn_m4_tac_brigadier:0:0:100
+
+[shelter_chemist_primary]
+wpn_krissvektor_chemist:0:0:100

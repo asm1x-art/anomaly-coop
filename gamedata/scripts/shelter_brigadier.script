@@ -357,18 +357,64 @@ end
 
 local fitting = {} -- a weapon's id -> its addons' ids, attached once they're all online
 
--- an occupant's gear to an owner (a game or server object)
+-- the weapon a dying occupant carried (its loadout gives it, items\settings\npc_loadouts\mod_npc_loadouts_shelter.ltx):
+-- still in its inventory, or dropped beside the body as it fell
+local DROPPED = 4 -- m from the body
+local function carried_weapon(gear, npc_id, pos)
+	local npc = level.object_by_id(npc_id)
+	local held = npc and npc:object(gear.weapon)
+	if held then
+		return held
+	end
+	for id = 1, 65534 do
+		local se = alife():object(id)
+		if se and se:section_name() == gear.weapon and se.parent_id == 65535 and se.position:distance_to(pos) < DROPPED then
+			return level.object_by_id(id)
+		end
+	end
+end
+
+-- an occupant dead: a second later (dropped by then) its own weapon in good repair and remembered (the world's
+-- <gear state>_weapon): its body's loot, made when it's first searched (death_manager), gives no other
+local function npc_on_death_callback(npc)
+	local gear = GEAR[npc:section()]
+	if not gear then
+		return
+	end
+	local id, pos = npc:id(), npc:position()
+	CreateTimeEvent("shelter_brigadier", "weapon_" .. id, 1, function()
+		local weapon = carried_weapon(gear, id, pos)
+		if weapon then
+			weapon:set_condition(CONDITION)
+			shelter.set_state(gear.state .. "_weapon", weapon:id())
+		end
+		return true
+	end)
+end
+
+local function fit_on(weapon_id, gear, owner)
+	local addons = {}
+	for _, sec in ipairs(gear.addons) do
+		local se = alife_create_item(sec, owner)
+		addons[#addons + 1] = se and se.id
+	end
+	fitting[weapon_id] = addons
+end
+
+-- an occupant's gear to an owner (its body as it's first searched, or the stash). The weapon: the one the occupant
+-- carried, wherever it is now (beside the body, picked up), its addons fitted on it; a new one only for the stash or an
+-- occupant from before they were armed
 local function give_gear(gear, owner)
 	shelter.set_state(gear.state, true)
 	local outfit = alife_create_item(gear.outfit, owner, { cond = CONDITION })
-	local weapon = alife_create_item(gear.weapon, owner, { cond = CONDITION })
-	if weapon then
-		local addons = {}
-		for _, sec in ipairs(gear.addons) do
-			local se = alife_create_item(sec, owner)
-			addons[#addons + 1] = se and se.id
+	local carried = shelter.state(gear.state .. "_weapon", nil)
+	if carried and alife():object(carried) then
+		fit_on(carried, gear, owner)
+	else
+		local weapon = alife_create_item(gear.weapon, owner, { cond = CONDITION })
+		if weapon then
+			fit_on(weapon.id, gear, owner)
 		end
-		fitting[weapon.id] = addons
 	end
 	for _, sec in ipairs(gear.items) do
 		alife_create_item(sec, owner)
@@ -459,6 +505,7 @@ function on_game_start()
 		return spawn_cosmetics(npc, ...)
 	end
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 	RegisterScriptCallback("actor_on_update", fit_addons)
 	RegisterScriptCallback("actor_on_item_drop", actor_on_item_drop)

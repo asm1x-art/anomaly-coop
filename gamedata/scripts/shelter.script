@@ -947,6 +947,49 @@ local function place_mounds()
 	end
 end
 
+-- The AI map under a mound is walkable, and the occupants walked into point 3's and stuck in it: each standing mound
+-- keeps NPCs out with a default OUT restrictor round it (every NPC's out restriction), gone once it's dug out. Each
+-- game has its own (a restrictor is nothing to see or share), its id in an actor var.
+local KEEP_OUT = { radius = 2.6, up = 1.0, type = 1 } -- the sphere round the mound's spot, raised; 1: OUT by default
+
+local function keep_out()
+	local gvid
+	for _, m in ipairs(MOUNDS) do
+		local section, x, y, z = unpack(m)
+		local var = "shelter_keep_out_" .. section
+		local id = load_var(db.actor, var, nil)
+		local se = id and alife():object(id)
+		if se and se:section_name() ~= "space_restrictor" then
+			se = nil
+		end
+		if mound_dug(section) then
+			if se then
+				alife_release(se)
+			end
+			if id then
+				save_var(db.actor, var, nil)
+			end
+		elseif not se then
+			local pos = vector():set(x, y + KEEP_OUT.up, z)
+			local lvid = level.vertex_id(vector():set(x, y, z))
+			if not lvid or lvid >= 4294967295 then
+				lvid = db.actor:level_vertex_id()
+			end
+			gvid = gvid or db.actor:game_vertex_id()
+			local r = alife_create("space_restrictor", pos, lvid, gvid)
+			local data = r and utils_stpk.get_space_restrictor_data(r)
+			if data then
+				data.shapes = { { shtype = 0, offset = vector():set(0, 0, 0), center = vector():set(0, 0, 0), radius = KEEP_OUT.radius } }
+				data.restrictor_type = KEEP_OUT.type
+				utils_stpk.set_space_restrictor_data(data, r)
+				save_var(db.actor, var, r.id)
+			elseif r then
+				alife_release(r)
+			end
+		end
+	end
+end
+
 ----------------------------------------------------------------------------------------------------
 -- The cleaning: the open rooms' heaps (once, kept in the save and put again on every load) and bodies
 
@@ -1226,6 +1269,9 @@ local function on_update()
 	next_check = now + 1000
 	if level.name() == LEVEL and not has_alife_info("shelter_laptop_installed") then
 		set_laptop()
+	end
+	if level.name() == LEVEL then
+		keep_out()
 	end
 end
 
