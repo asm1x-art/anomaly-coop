@@ -26,3 +26,76 @@ inv_name        = st_raid_gps_beacon_dead
 inv_name_short  = st_raid_gps_beacon_dead
 description     = st_raid_gps_beacon_dead_descr
 cost            = 600
+
+; the Monolith on a raid level (raid_monolith.script): a garrison on every smart terrain, its squads by the smart's
+; depth from where one comes onto the level (a third each: near, mid, far); big garrisons deeper, a rare thing on their
+; commander; patrols of three on routes (chains of smarts), rolled anew each time one comes onto the level
+[raid_monolith]
+refresh_hours   = 168   ; all the smarts held anew with fresh squads
+retake_hours    = 12    ; while one is away, a step each: the free smart nearest to a held one is taken back...
+retake_chance   = 0.6   ; ...with this chance (none held: through the level's entry smart)
+near            = raid_monolith_near
+mid             = raid_monolith_mid
+far             = raid_monolith_far, raid_monolith_sniper
+big             = raid_monolith_alpha, raid_monolith_far   ; a big garrison: these squads together
+big_count       = 2     ; on the deeper half's smarts
+rare_loot       = af_glass, af_fire, af_ice, af_compass, af_gold_fish, af_soul, af_night_star, af_eye
+patrol          = raid_monolith_patrol
+patrol_chance   = 0.4   ; each route's
+patrol_max      = 2
+patrol_stay     = 60, 180   ; seconds at a smart on the way
+
+; Limansk: the depth from the landing (the Red Forest's tunnel); the Monolith's way back in from the Hospital's side
+[raid_limansk_monolith]
+from            = 7.6, -372.0
+entry           = raid_lim_smart_terrain_10
+routes          = raid_lim_route_south, raid_lim_route_centre, raid_lim_route_west, raid_lim_route_north
+
+[raid_lim_route_south]
+smarts          = raid_lim_smart_terrain_1, raid_lim_smart_terrain_3, raid_lim_smart_terrain_4
+
+[raid_lim_route_centre]
+smarts          = raid_lim_smart_terrain_4, raid_lim_smart_terrain_5, raid_lim_smart_terrain_6
+
+[raid_lim_route_west]
+smarts          = raid_lim_smart_terrain_5, raid_lim_smart_terrain_7, raid_lim_smart_terrain_8
+
+[raid_lim_route_north]
+smarts          = raid_lim_smart_terrain_6, raid_lim_smart_terrain_9, raid_lim_smart_terrain_10
+
+; the raid's squads
+[raid_monolith_near]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_0, sim_default_monolith_1, sim_default_monolith_2
+npc_in_squad    = 3, 5
+
+[raid_monolith_mid]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_1, sim_default_monolith_2, sim_default_monolith_3
+npc_in_squad    = 3, 5
+
+[raid_monolith_far]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_2, sim_default_monolith_3, sim_default_monolith_4
+npc_in_squad    = 3, 5
+
+[raid_monolith_sniper]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_3, sim_monolith_sniper, sim_monolith_sniper
+npc_in_squad    = 3, 4
+
+[raid_monolith_alpha]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_3, sim_default_monolith_4
+npc_in_squad    = 4, 5
+
+[raid_monolith_patrol]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_2, sim_default_monolith_3
+npc_in_squad    = 3, 3
+
+; death in a raid (raid.script): one wakes in the shelter with what is in the slots and on the belt; everything found
+; in the raid is lost, each other thing in the backpack with lose_chance
+[raid_death]
+lose_chance     = 0.5
+wake_health     = 0.5

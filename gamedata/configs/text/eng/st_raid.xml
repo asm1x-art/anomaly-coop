@@ -66,4 +66,22 @@
 	<string id="st_raid_gps_beacon_dead_descr">
 		<text>A flat GPS beacon. Charged at a workbench with batteries.</text>
 	</string>
+	<string id="st_raid_busy">
+		<text>In the raid: %s</text>
+	</string>
+	<string id="st_raid_news_title">
+		<text>Raid</text>
+	</string>
+	<string id="st_raid_news_start">
+		<text>%s went on a raid (%s).</text>
+	</string>
+	<string id="st_raid_news_died">
+		<text>%s died on the raid (%s).</text>
+	</string>
+	<string id="st_raid_news_out">
+		<text>%s came back from the raid (%s).</text>
+	</string>
+	<string id="st_raid_woke">
+		<text>You wake up in the shelter. What was found on the raid is lost; %s things gone.</text>
+	</string>
 </string_table>

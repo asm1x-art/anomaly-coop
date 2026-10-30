@@ -713,8 +713,9 @@ end
 
 -------------------------------------------------------------------------------
 -- the raid (raid.script): the raid's levels in a list and the map of the one picked (the PDA's: dragged to move, + and
--- - to zoom; none for a level without one) with the group's marks and the stashes with a running GPS beacon, the
--- landing and the way out, the start. A click on the map (not a drag) opens a card: on a stash what is in it and the
+-- - to zoom; none for a level without one) with the group's marks and the stashes with a running GPS beacon (and in
+-- the debug view the Monolith's smarts, routes and patrols), the landing and the way out, the start (not while another
+-- of the group is in the raid). A click on the map (not a drag) opens a card: on a stash what is in it and the
 -- beacon's charge, on a mark its text to change or remove, elsewhere a new mark's.
 
 local RAID = { list_w = 230, zoom = 1.5, min_scale = 0.25, pin = 22, pick = 12, label_chars = 48, card_rows = 10 }
@@ -750,10 +751,11 @@ function UIShelterOS:open_raid()
 	local ty = TOP + 44 * #levels.order + 12
 	self:text(14, ty, lw, by - 56 - ty, tr("st_raid_landing"), C.dim, win, nil, "s")
 	self:text(14, by - 50, lw, 44, tr("st_raid_map_hint"), C.faint, win, nil, "s")
-	self:button(14, by, lw, 44, tr("st_raid_go"), function()
+	local busy = raid.raider()
+	self:button(14, by, lw, 44, busy and tr("st_raid_busy", busy) or tr("st_raid_go"), function()
 		self:Close()
 		raid.start()
-	end, self.app_clicks, win, self.wx, self.wy, "primary")
+	end, self.app_clicks, win, self.wx, self.wy, busy and "off" or "primary")
 	self.raid_stashes = raid.stashes()
 	self.raid_marks = raid.marks()
 	self.raid_list, self.raid_card_box = nil, nil
@@ -837,7 +839,39 @@ function UIShelterOS:raid_pins()
 			pin("note", m.x, m.z, m)
 		end
 	end
+	if raid.debug() then
+		self:raid_debug_pins()
+	end
 	self:raid_draw()
+end
+
+-- the debug view (raid.debug()): the Monolith's routes as dots, its smarts (number: men alive), its patrols; they follow
+-- the map, take no clicks
+function UIShelterOS:raid_debug_pins()
+	local view = raid_monolith.debug_view(self.raid_level)
+	local function add(x, z, w, h, img)
+		self.raid_pin_list[#self.raid_pin_list + 1] = { kind = "debug", x = x, z = z, w = w, h = h, img = img }
+	end
+	for _, points in ipairs(view.routes) do
+		for i = 1, #points - 1 do
+			local a, b = points[i], points[i + 1]
+			local n = math.max(1, math.floor(math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2) / 6))
+			for k = 0, n do
+				add(a.x + (b.x - a.x) * k / n, a.z + (b.z - a.z) * k / n, 4, 4, self:rect(0, 0, 4, 4, C.warn, self.raid_pins_box))
+			end
+		end
+	end
+	for _, s in ipairs(view.smarts) do
+		local box = self:box(0, 0, 52, 22, self.raid_pins_box)
+		self:round(0, 0, 52, 22, C.black, box, 6, 200)
+		self:text(0, 0, 52, 22, s.label, C.warn, box, CGameFont.alCenter, "s")
+		add(s.x, s.z, 52, 22, box)
+	end
+	for _, p in ipairs(view.patrols) do
+		local box = self:box(0, 0, 14, 14, self.raid_pins_box)
+		self:round(0, 0, 14, 14, C.bad, box, 7)
+		add(p.x, p.z, 14, 14, box)
+	end
 end
 
 -- a world point (x, z) on the map's texture, by the level map's bounds (the PDA's: the texture spans them, north up)
@@ -874,12 +908,12 @@ function UIShelterOS:raid_draw()
 	v.ox, v.oy = (a.w - sw) / 2, (a.h - sh) / 2
 	self:place(self.raid_map, a.x + v.ox, a.y + v.oy, sw, sh)
 	self.raid_map:SetTextureRect(Frect():set(v.u - v.vw / 2, v.v - v.vh / 2, v.u + v.vw / 2, v.v + v.vh / 2))
-	local half = RAID.pin / 2
 	for _, p in ipairs(self.raid_pin_list or {}) do
+		local w, h = p.w or RAID.pin, p.h or RAID.pin
 		p.sx, p.sy = self:raid_area_of(self:raid_tex_of(p.x, p.z))
 		p.seen = p.sx >= v.ox and p.sx <= v.ox + sw and p.sy >= v.oy and p.sy <= v.oy + sh
 		if p.seen then
-			self:place(p.img, p.sx - half, p.sy - half, RAID.pin, RAID.pin)
+			self:place(p.img, p.sx - w / 2, p.sy - h / 2, w, h)
 		end
 		p.img:Show(p.seen)
 	end
@@ -898,7 +932,7 @@ end
 function UIShelterOS:raid_pin_at(sx, sy)
 	local best, best_d
 	for _, p in ipairs(self.raid_pin_list or {}) do
-		local d = p.seen and math.max(math.abs(p.sx - sx), math.abs(p.sy - sy))
+		local d = p.seen and p.kind ~= "debug" and math.max(math.abs(p.sx - sx), math.abs(p.sy - sy))
 		if d and d <= RAID.pick and (not best_d or d < best_d) then
 			best, best_d = p, d
 		end

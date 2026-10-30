@@ -11,6 +11,9 @@ local SHELTER = { level = "bunker_a1", position = vector():set(-6.99, 3.28, -27.
 	look = vector():set(0.978, 0, -0.124) }
 local JAM_MSG_MS = 3000
 
+local TAKE_GRACE_MS = 3000 -- a level's load gives the inventory back as takes: none counts till its first update and a while
+local ready, loaded_at, dying = false, 0, false -- takes count (found in a raid) / since / a death being handled
+
 local levels -- the raid's levels: order = { names }, [name] = { original, map = { texture, x1, z1, x2, z2 } }, landing
 
 local function vector_of(s)
@@ -47,6 +50,18 @@ function is_raid_level(name)
 	return name and string.find(name, "^raid_") ~= nil
 end
 
+-- the one debug switch (the console's coop_debug 1, as for co-op): the raid's debug lines in the log, the Monolith's
+-- smarts, routes and patrols on the raid app's maps
+function debug()
+	return get_console():get_integer("coop_debug") == 1
+end
+
+function dbg(fmt, ...)
+	if debug() then
+		printf("[raid dbg] " .. fmt, ...)
+	end
+end
+
 -- the raid app is there once the Brain Scorcher is off (in the story after the Radar, in free play from the start)
 function available()
 	return has_alife_info("bar_deactivate_radar_done")
@@ -76,20 +91,155 @@ local function go(level_name, position, node, yaw)
 		printf("! raid: level %s has no graph vertices", level_name)
 		return false
 	end
+	ready = false
 	ChangeLevel(position, node, gvid, vector():set(0, yaw, 0))
 	return true
 end
 
+-------------------------------------------------------------------------------
+-- who is in a raid (the world's raid_in: one of the group at a time) and the group's news of it (raid_news_<n> =
+-- "who|what|level", n below raid_news_next; each game shows the new ones of the others, not while in a raid itself)
+
+local NEWS_MS = 5000
+
+function my_name()
+	return (string.gsub(db.actor:character_name() or "", "|", "/"))
+end
+
+-- the one in a raid now, other than oneself (nil: the raid is free to go on)
+function raider()
+	local who = shelter.state("raid_in", nil)
+	return who and who ~= "" and who ~= my_name() and who or nil
+end
+
+local function news(what, level_name)
+	local n = tonumber(shelter.state("raid_news_next", 1)) or 1
+	shelter.set_state("raid_news_" .. n, string.format("%s|%s|%s", my_name(), what, level_name or ""))
+	shelter.set_state("raid_news_next", n + 1)
+end
+
+local function level_caption(name)
+	local l = get_levels()[name]
+	return game.translate_string(l and l.original or name)
+end
+
+local function update_news()
+	if is_raid_level(level.name()) then
+		return
+	end
+	local next_n = tonumber(shelter.state("raid_news_next", 1)) or 1
+	local heard = load_var(db.actor, "raid_news_heard", nil)
+	if heard and heard <= next_n then
+		for n = heard, next_n - 1 do
+			local who, what, where = string.match(tostring(shelter.state("raid_news_" .. n, "") or ""), "^([^|]*)|([^|]*)|(.*)$")
+			if who and who ~= my_name() then
+				db.actor:give_game_news(game.translate_string("st_raid_news_title"),
+					string.format(game.translate_string("st_raid_news_" .. what), who, level_caption(where)),
+					"ui_inGame2_Radiopomehi", 0, 10000)
+			end
+		end
+	end
+	save_var(db.actor, "raid_news_heard", next_n)
+end
+
+-------------------------------------------------------------------------------
+-- found in a raid: what comes into one's inventory on a raid level (picked up, from boxes and bodies) is marked found
+-- (the game's raid_found[id]); out alive, it is one's own. Death in a raid ([raid_death]): one wakes at the shelter's
+-- entrance with what is in the slots and on the belt (the outfit, the helmet, the backpack itself among them);
+-- everything found is lost, each other thing in the backpack with lose_chance.
+
+
+local function found()
+	local m = alife_storage_manager.get_state()
+	m.raid_found = m.raid_found or {}
+	return m.raid_found
+end
+
+local function actor_on_item_take(item)
+	if ready and is_raid_level(level.name()) and time_global() >= loaded_at + TAKE_GRACE_MS then
+		found()[item:id()] = true
+		dbg("found %s (%s)", item:section(), item:id())
+	end
+end
+
+local function kept(item)
+	if db.actor:is_on_belt(item) or ini_sys:r_bool_ex(item:section(), "quest_item", false) then
+		return true
+	end
+	for slot = 1, 16 do
+		local s = db.actor:item_in_slot(slot)
+		if s and s:id() == item:id() then
+			return true
+		end
+	end
+	return false
+end
+
+-- alive again: health to wake_health, every wound closed (bleeding = n takes n off each wound's size: a big hit's
+-- wound outlasts 1 and kills one later, where no raid death is caught), no radiation
+local function patch_up()
+	db.actor:set_health_ex(ini_sys:r_float_ex("raid_death", "wake_health") or 0.5)
+	db.actor.bleeding = 1000
+	db.actor.radiation = 0
+end
+
+local function actor_on_before_death(who, flags)
+	if not is_raid_level(level.name()) then
+		return
+	end
+	flags.ret_value = false
+	patch_up()
+	if dying then
+		return
+	end
+	dying = true
+	level.add_pp_effector("sleep_fade.ppe", 1314, false)
+	local f, lost = found(), {}
+	local chance = ini_sys:r_float_ex("raid_death", "lose_chance") or 0.5
+	db.actor:iterate_inventory(function(_, item)
+		if not kept(item) and (f[item:id()] or math.random() < chance) then
+			lost[#lost + 1] = item
+		end
+	end)
+	for _, item in ipairs(lost) do
+		dbg("lost %s (%s)%s", item:section(), item:id(), f[item:id()] and ", found" or "")
+		alife_release(item)
+	end
+	printf("raid: died on %s, %s things lost", level.name(), #lost)
+	news("died", level.name())
+	save_var(db.actor, "raid_woke", #lost)
+	CreateTimeEvent("raid", "wake", 1, function()
+		dying = false
+		exit_to_shelter(true)
+		return true
+	end)
+end
+
+-------------------------------------------------------------------------------
 -- into the raid: the landing; the way out of the landing level is the transition to where the landing comes from
 function start()
+	if raider() then
+		return
+	end
 	local l = get_levels().landing
 	printf("raid: start, landing on %s", l.level)
+	shelter.set_state("raid_in", my_name())
+	alife_storage_manager.get_state().raid_found = nil
+	news("start", l.level)
 	save_var(db.actor, "raid_came_from", l.came_from)
+	raid_monolith.prepare(l.level)
 	go(l.level, l.position, l.node, l.direction)
 end
 
-function exit_to_shelter()
+-- out of the raid (alive, or dead: died), to the shelter's entrance: what was found is one's own
+function exit_to_shelter(died)
 	printf("raid: out of %s to the shelter", level.name())
+	raid_monolith.left(level.name())
+	if not died then
+		news("out", level.name())
+	end
+	alife_storage_manager.get_state().raid_found = nil
+	shelter.set_state("raid_in", nil)
 	save_var(db.actor, "raid_came_from", nil)
 	save_var(db.actor, "raid_face_shelter", true)
 	go(SHELTER.level, SHELTER.position, SHELTER.node, 0)
@@ -111,6 +261,8 @@ function transition(obj)
 	end
 	printf("raid: %s -> %s", obj:name(), target)
 	save_var(db.actor, "raid_came_from", level.name())
+	raid_monolith.left(level.name())
+	raid_monolith.prepare(target)
 	go(target, vector_of(ini:r_string_ex("raid_transition", "position")), ini:r_u32("raid_transition", "node"),
 		ini:r_float_ex("raid_transition", "direction") or 0)
 end
@@ -286,7 +438,7 @@ local function jammed()
 	end
 end
 
-local checked_at = 0
+local checked_at, news_at = 0, 0
 
 local function actor_on_update()
 	if is_raid_level(level.name()) and db.actor:active_slot() == 8 then
@@ -298,12 +450,23 @@ local function actor_on_update()
 		checked_at = now + (ini_sys:r_float_ex("raid_gps", "check_seconds") or 10) * 1000
 		check_carried()
 	end
+	if now >= news_at then
+		news_at = now + NEWS_MS
+		update_news()
+	end
 end
 
 local function actor_on_first_update()
+	ready, loaded_at = true, time_global()
 	if level.name() == SHELTER.level and load_var(db.actor, "raid_face_shelter") then
 		save_var(db.actor, "raid_face_shelter", nil)
 		db.actor:set_actor_direction(-SHELTER.look:getH())
+	end
+	local lost = load_var(db.actor, "raid_woke", nil)
+	if lost and level.name() == SHELTER.level then
+		save_var(db.actor, "raid_woke", nil)
+		patch_up()
+		actor_menu.set_msg(1, string.format(game.translate_string("st_raid_woke"), lost), 10)
 	end
 end
 
@@ -322,4 +485,6 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("actor_on_item_put_in_box", actor_on_item_put_in_box)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("actor_on_before_death", actor_on_before_death)
 end

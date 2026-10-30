@@ -66,4 +66,22 @@
 	<string id="st_raid_gps_beacon_dead_descr">
 		<text>Севший GPS-маячок. Заряжается на верстаке батарейками.</text>
 	</string>
+	<string id="st_raid_busy">
+		<text>В рейде: %s</text>
+	</string>
+	<string id="st_raid_news_title">
+		<text>Рейд</text>
+	</string>
+	<string id="st_raid_news_start">
+		<text>%s ушёл в рейд (%s).</text>
+	</string>
+	<string id="st_raid_news_died">
+		<text>%s погиб в рейде (%s).</text>
+	</string>
+	<string id="st_raid_news_out">
+		<text>%s вернулся из рейда (%s).</text>
+	</string>
+	<string id="st_raid_woke">
+		<text>Вы очнулись в убежище. Найденное в рейде потеряно, пропало вещей: %s.</text>
+	</string>
 </string_table>
