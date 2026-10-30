@@ -336,6 +336,9 @@
 	<string id="st_shelter_needs_group">
 		<text>Убежище — дело группы: соберите группу с друзьями, тогда записка даст задания.</text>
 	</string>
+	<string id="st_shelter_needs_group_idea">
+		<text>Идея Химика записана, но задания убежища в коопе даются только группе: соберите группу с друзьями и откройте идею ещё раз.</text>
+	</string>
 	<string id="st_shelter_pda_brigadier_name">
 		<text>ПДА Бригадира</text>
 	</string>

@@ -367,6 +367,9 @@ end
 function UIShelterNote:Close()
 	self:HideDialog()
 	GUI = nil
+	if self.after then -- a message for once the note is closed (shown over it, it went unseen)
+		actor_menu.set_msg(1, self.after, 8)
+	end
 end
 function UIShelterNote:OnKeyboard(dik, keyboard_action)
 	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
@@ -431,7 +434,7 @@ function note_read(obj)
 	GUI = UIShelterNote()
 	GUI:ShowDialog(true)
 	if no_group() then
-		actor_menu.set_msg(1, game.translate_string("st_shelter_needs_group"), 6)
+		GUI.after = game.translate_string("st_shelter_needs_group")
 	elseif not has_alife_info("shelter_note_read") then
 		give_info("shelter_note_read")
 		local tm = task_manager.get_task_manager()
@@ -445,10 +448,15 @@ local IDEAS = { synthesis = { info = "shelter_idea_synthesis_read", task = "shel
 
 function idea_read(name)
 	local idea = IDEAS[name]
-	if idea and not has_alife_info(idea.info) and not no_group() then
-		give_info(idea.info)
-		task_manager.get_task_manager():give_task(idea.task)
+	if not idea or has_alife_info(idea.info) then
+		return
+	elseif no_group() then -- read in the PDA: a message would be under it, the news stays in its log
+		db.actor:give_game_news(game.translate_string("st_shelter_pda_base"), game.translate_string("st_shelter_needs_group_idea"),
+			"ui_inGame2_Poslednie_razrabotki", 0, 10000)
+		return
 	end
+	give_info(idea.info)
+	task_manager.get_task_manager():give_task(idea.task)
 end
 
 ----------------------------------------------------------------------------------------------------

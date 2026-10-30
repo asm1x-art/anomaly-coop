@@ -83,8 +83,12 @@ local function give_kit()
 		end
 	end
 	local anomalies = spawn_demo_anomalies() and " В зале, где была вода, — по аномалии каждой природы." or ""
-	msg("Демо-набор: лопаты, инструменты Кардана, две «Вспышки», ноутбук, 4 пустые капсулы, хлам для рецептов, спальник."
-		.. anomalies)
+	local group = coop and coop.connected and coop.connected() and #coop.group() < 2
+		and " Вы не в группе: в коопе задания убежища даются только группе." or ""
+	msg("Демо-набор выдан, что в нём — в сообщениях ПДА.")
+	db.actor:give_game_news("Тест убежища", "Демо-набор: лопаты, инструменты Кардана, две «Вспышки», ноутбук, хлам для"
+		.. " рецептов, спальник, 4 пустые капсулы: наполнить в аномалиях в СЕВА Химика или костюме эколога, или F6 — сразу"
+		.. " наполненные и задания синтеза." .. anomalies .. group, "ui_inGame2_Poslednie_razrabotki", 0, 20000)
 end
 
 -- F6: the synthesis questline pushed on to the chambers, as if the idea were read, Herman's eight capsules filled and
