@@ -1,2 +1,4 @@
 node_modules/
 data/
+# holds the admin password and the Telegram bot's token; `node index.js` writes an example here
+/server.cfg

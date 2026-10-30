@@ -1,12 +1,14 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { isSea, getAsset } from 'node:sea';
 import { FACTIONS } from './settings.js';
 
 // The admin page: world settings, allowed factions, who is online, world reset.
 // HTTP basic auth, any user name, the server's admin password.
 
-const PAGE = fs.readFileSync(new URL('./admin.html', import.meta.url));
+// packaged (tools/server/build.mjs), the page is inside the executable
+const PAGE = isSea() ? Buffer.from(getAsset('admin.html')) : fs.readFileSync(new URL('./admin.html', import.meta.url));
 const BODY_LIMIT = 64 * 1024;
 
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest();
