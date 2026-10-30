@@ -1,8 +1,8 @@
 # Опись: задания и сюжетные флаги Anomaly 1.5.3 (для личного прогресса в коопе)
 
 Только чтение, ничего не менялось. Пути ниже:
-- `scripts/…`, `configs/…` — от `G:\stalker-test\anomaly-unpacked\` (файлы в cp1251);
-- `xrGame/…` — от `G:\stalker-test\xray-monolith\src\`.
+- `scripts/…`, `configs/…` — от `H:\stalker-test\anomaly-unpacked\` (файлы в cp1251);
+- `xrGame/…` — от `H:\stalker-test\xray-monolith\src\`.
 
 Числа посчитаны по конфигам (разбор всех `tm_*.ltx` и `task_manager.ltx`) и grep по скриптам; там, где сказано «≈», это порядок величины.
 
