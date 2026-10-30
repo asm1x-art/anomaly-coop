@@ -1,6 +1,7 @@
 #pragma once
 
 class NET_Packet;
+class CMemoryWriter;
 
 // A player's own progress: the world's save is the sim master's game, so everything it keeps on the actor
 // (rank, info portions, tasks, PDA news and map, statistics, the body's state; in Lua: tasks, needs,
@@ -10,6 +11,7 @@ class NET_Packet;
 namespace coop
 {
 	void send_progress();                 // M_PROGRESS_REQUEST, and on the way out of the world
+	bool write_progress(CMemoryWriter& out); // ours as it is now, as send_progress sends it (a snapshot's part)
 	void on_progress_chunk(NET_Packet& P); // M_PROGRESS: ours, coming with the world
 	void forget_progress();               // a new download of the world begins
 

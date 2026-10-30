@@ -437,7 +437,7 @@ namespace coop
 			Msg("[coop] took %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 	}
 
-	static void send_item_state(CSE_ALifeDynamicObject* object)
+	void write_item_state(NET_Packet& P, CSE_ALifeDynamicObject* object)
 	{
 		NET_Packet spawn;
 		object->Spawn_Write(spawn, FALSE);
@@ -452,14 +452,19 @@ namespace coop
 		if (ai().script_engine().functor("coop_sync.item_lua", item_lua))
 			lua = item_lua(object->ID);
 
-		NET_Packet P;
-		P.w_begin(M_OBJECT_STATE);
 		P.w_u16(u16(spawn.B.count));
 		P.w(spawn.B.data, spawn.B.count);
 		P.w_u16(u16(client_size));
 		if (client_size)
 			P.w(client.B.data + sizeof(u16), client_size);
 		P.w_stringZ(lua ? lua : "");
+	}
+
+	static void send_item_state(CSE_ALifeDynamicObject* object)
+	{
+		NET_Packet P;
+		P.w_begin(M_OBJECT_STATE);
+		write_item_state(P, object);
 		send(P);
 	}
 
@@ -479,6 +484,31 @@ namespace coop
 		}
 		if (debug_mode)
 			Msg("[coop dbg] the state of our %u thing(s) sent", sent);
+	}
+
+	// state's condition, upgrades, ammo...: onto object, which stays where it is
+	static void take_state(CSE_ALifeDynamicObject* object, CSE_Abstract* state, const xr_vector<u8>& client, const xr_string& lua)
+	{
+		const GameGraph::_GRAPH_ID game_vertex = object->m_tGraphID;
+		const u32 level_vertex = object->m_tNodeID;
+		const float distance = object->m_fDistance;
+		NET_Packet packet;
+		packet.write_start(); // NET_Packet() leaves its size as the stack had it
+		state->STATE_Write(packet);
+		packet.r_pos = 0;
+		object->STATE_Read(packet, u16(packet.B.count));
+		packet.write_start();
+		state->UPDATE_Write(packet);
+		packet.r_pos = 0;
+		object->UPDATE_Read(packet);
+		object->m_tGraphID = game_vertex; // where it is stays ours
+		object->m_tNodeID = level_vertex;
+		object->m_fDistance = distance;
+		if (!client.empty())
+			object->client_data = client;
+		::luabind::functor<void> take_lua;
+		if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
+			take_lua(object->ID, lua.c_str());
 	}
 
 	void apply_object_state(NET_Packet& P)
@@ -510,28 +540,7 @@ namespace coop
 		CSE_ALifeDynamicObject* object = local_object(state->ID, section);
 		// online here, its game object has the state; an offline copy (a shadow's) takes it
 		if (object && !object->m_bOnline)
-		{
-			const GameGraph::_GRAPH_ID game_vertex = object->m_tGraphID;
-			const u32 level_vertex = object->m_tNodeID;
-			const float distance = object->m_fDistance;
-			NET_Packet packet;
-			packet.write_start(); // NET_Packet() leaves its size as the stack had it
-			state->STATE_Write(packet);
-			packet.r_pos = 0;
-			object->STATE_Read(packet, u16(packet.B.count));
-			packet.write_start();
-			state->UPDATE_Write(packet);
-			packet.r_pos = 0;
-			object->UPDATE_Read(packet);
-			object->m_tGraphID = game_vertex; // where it is stays ours
-			object->m_tNodeID = level_vertex;
-			object->m_fDistance = distance;
-			if (!client.empty())
-				object->client_data = client;
-			::luabind::functor<void> take_lua;
-			if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
-				take_lua(object->ID, lua.c_str());
-		}
+			take_state(object, state, client, lua);
 		F_entity_Destroy(state);
 	}
 
@@ -983,5 +992,74 @@ namespace coop
 		}
 		g_replaying = false;
 		defer_messages(events);
+	}
+	void restore_things(IReader& things, xr_vector<u16>& made)
+	{
+		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
+		if (!actor)
+			return;
+		u32 restored = 0, elsewhere = 0;
+		for (u16 count = things.r_u16(); count; --count)
+		{
+			const u16 size = things.r_u16();
+			const int next = things.tell() + size;
+			const u16 spawn_size = things.r_u16();
+			NET_Packet spawn;
+			spawn.construct(things.pointer(), spawn_size);
+			spawn.r_pos = 0;
+			things.advance(spawn_size);
+			xr_vector<u8> client(things.r_u16());
+			if (!client.empty())
+				things.r(client.data(), int(client.size()));
+			xr_string lua;
+			things.r_stringZ(lua);
+			things.seek(next);
+
+			u16 type;
+			string256 section;
+			spawn.r_begin(type);
+			spawn.r_stringZ(section);
+			if (!pSettings->section_exist(section))
+				continue;
+			CSE_Abstract* state = F_entity_Create(section);
+			CSE_ALifeDynamicObject* thing = smart_cast<CSE_ALifeDynamicObject*>(state);
+			if (!thing || !smart_cast<CSE_ALifeInventoryItem*>(state))
+			{
+				F_entity_Destroy(state);
+				continue;
+			}
+			state->Spawn_Read(spawn);
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(thing->ID, true);
+			if (object && object->s_name == thing->s_name)
+			{
+				if (object->ID_Parent == actor->ID)
+				{
+					take_state(object, state, client, lua);
+					++restored;
+				}
+				else
+					++elsewhere;
+				F_entity_Destroy(state);
+				continue;
+			}
+			// gone from the world: made again on us, with its id unless something else has it now
+			thing->ID = alife_rw().server().PerformIDgen(object ? u16(-1) : thing->ID);
+			thing->ID_Parent = actor->ID;
+			thing->o_Position = actor->o_Position;
+			thing->m_tGraphID = actor->m_tGraphID;
+			thing->m_tNodeID = actor->m_tNodeID;
+			thing->m_bOnline = false;
+			if (!client.empty())
+				thing->client_data = client;
+			g_applying = true;
+			alife_rw().register_object(thing, true);
+			g_applying = false;
+			::luabind::functor<void> take_lua;
+			if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
+				take_lua(thing->ID, lua.c_str());
+			made.push_back(thing->ID);
+		}
+		Msg("[coop] our things as the save has them: %u back to its state, %u made again, %u elsewhere in the world now",
+		    restored, u32(made.size()), elsewhere);
 	}
 }

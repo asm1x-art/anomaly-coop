@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
+import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -912,10 +912,10 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['menu']);
     assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
 
-    // asked by name
-    menu.send(M.SAVE_REQUEST, Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]));
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: 'Перед Баром', reason: 'named', who: 'menu' });
-    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, 'Перед Баром', 'named', 'menu');
+    // the admin asks (players save their characters, not the world)
+    assert.ok(server.coop.saveWorld());
+    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'admin', who: 'admin' });
+    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, '', 'admin', 'admin');
     await roundTrip(master);
 
     // a player in the world leaving: no save either; the new save started the journal again
@@ -930,11 +930,7 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     for (let msg = await late.next(); msg.type !== M.WORLD_DONE; msg = await late.next()) types.push(msg.type);
     assert.ok(!types.includes(M.JOURNAL));
 
-    menu.send(M.SAVES_REQUEST);
-    const saves = await until(menu, M.SAVES);
-    assert.equal(saves.payload.readUInt16LE(0), 2);
-    assert.equal(saves.payload.readUInt32LE(2), 2); // newest first
-    assert.deepEqual(readStringsZ(saves.payload, 10, 3), ['Перед Баром', 'named', 'menu']);
+    assert.deepEqual(server.coop.status().saves.map((m) => [m.revision, m.reason]), [[2, 'admin'], [1, 'new']]);
     menu.socket.destroy();
     master.socket.destroy();
     late.socket.destroy();
@@ -943,58 +939,114 @@ test('saves: the master saves when asked; a player coming in gets the last save 
   }
 });
 
-test('rollback: everyone must agree; then all reload, characters go back, old games may not upload', async () => {
+function snapshot(record, progress, things) {
+  const sized = (b) => Buffer.concat([u32le(b.length), b]);
+  return Buffer.concat([sized(Buffer.from(record)), sized(Buffer.from(progress)), Buffer.from(things)]);
+}
+
+function sendSnapshot(c, saveId, data) {
+  for (let offset = 0; offset === 0 || offset < data.length; offset += 15000)
+    c.send(M.SNAPSHOT, Buffer.concat([u32le(saveId), u32le(data.length), u32le(offset), data.subarray(offset, offset + 15000)]));
+}
+
+// [{ id, name, reason, who }] of a SAVES
+function charSaves(payload) {
+  const out = [];
+  let at = 2;
+  for (let i = 0; i < payload.readUInt16LE(0); i++) {
+    const id = payload.readUInt32LE(at);
+    const [name, reason, who] = readStringsZ(payload, at + 8, 3);
+    at += 8 + [name, reason, who].reduce((n, t) => n + encodeText(t).length + 1, 0) + 4;
+    out.push({ id, name, reason, who });
+  }
+  return out;
+}
+
+// what a world download brings: the things of a save gone back to, the progress
+async function download(c) {
+  c.send(M.WORLD_REQUEST);
+  let things = null;
+  let progress = null;
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.WORLD_DONE) return { things, progress };
+    if (msg.type === M.SNAPSHOT_THINGS) {
+      things ??= Buffer.alloc(msg.payload.readUInt32LE(0));
+      msg.payload.copy(things, msg.payload.readUInt32LE(4), 8);
+    }
+    if (msg.type === M.PROGRESS && msg.payload.readUInt32LE(0)) {
+      progress ??= Buffer.alloc(msg.payload.readUInt32LE(0));
+      msg.payload.copy(progress, msg.payload.readUInt32LE(4), 8);
+    }
+  }
+}
+
+test('character saves: a snapshot of the character; going back puts it back, with its things, the world stays', async () => {
   const server = await startServer(options());
   const { port } = server.address();
+  const action = (kind, id) => Buffer.concat([Buffer.from([kind]), u32le(id), Buffer.from([0])]);
   try {
     const a = await player(port, 'artem');
     const b = await player(port, 'друг');
+    const idA = a.roles.at(-1) ?? 1;
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
-    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0)); // b votes: in the world
-    a.send(M.CHARACTER, Buffer.from('at the start'));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
-    a.send(M.CHARACTER, Buffer.from('much later'));
-    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1);
     await roundTrip(a);
+    await settle(b);
 
-    // a no ends it
-    a.send(M.ROLLBACK_PROPOSE, u32le(1));
-    const ask = await until(b, M.ROLLBACK_VOTE);
-    assert.equal(ask.payload.readUInt32LE(0), 1); // proposer id
-    b.send(M.ROLLBACK_ANSWER, Buffer.from([0]));
-    const no = await until(a, M.ROLLBACK_RESULT);
-    assert.equal(no.payload[0], ROLLBACK.DECLINED);
-    assert.equal(readStringZ(no.payload, 1), 'друг');
+    // alone: their own game makes it
+    a.send(M.SAVE_REQUEST, Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]));
+    const asked = await until(a, M.SNAPSHOT_REQUEST);
+    const id1 = asked.payload.readUInt32LE(0);
+    sendSnapshot(a, id1, snapshot('record 1', 'progress 1', Buffer.alloc(20000, 3)));
+    a.send(M.CHARACTER, Buffer.from('record later'));
+    await roundTrip(a);
+    a.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(a, M.SAVES)).payload), [{ id: id1, name: 'Перед Баром', reason: 'named', who: 'artem' }]);
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), []);
 
-    // all yes: back to save 1 as save 3
-    a.send(M.ROLLBACK_PROPOSE, u32le(1));
-    await until(b, M.ROLLBACK_VOTE);
-    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
-    await until(b, M.WORLD_RELOAD);
-    const yes = await until(b, M.ROLLBACK_RESULT);
-    assert.equal(yes.payload[0], ROLLBACK.ACCEPTED);
-    assert.equal(yes.payload.readUInt32LE(yes.payload.indexOf(0, 1) + 1), 3);
+    // back to it: the record, a reload, and the things with the next download, once
+    a.send(M.LOAD_REQUEST, u32le(id1));
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record 1');
+    await until(a, M.WORLD_RELOAD);
+    const done = await until(a, M.LOAD_RESULT);
+    assert.equal(done.payload[0], LOAD.DONE);
+    const got = await download(a);
+    assert.deepEqual(got.things, Buffer.alloc(20000, 3));
+    assert.equal(got.progress.toString(), 'progress 1');
+    assert.equal((await download(a)).things, null);
+    assert.equal(server.coop.status().world.revision, 1); // the world didn't go back
+
+    // a group: its leader saves everyone in the world; the others don't, and can't load it
+    a.send(M.GROUP, action(GROUP.INVITE, 2));
+    await until(b, M.GROUP_INVITE);
+    b.send(M.GROUP, action(GROUP.ACCEPT, idA));
+    await settle(b);
+    b.send(M.SAVE_REQUEST, Buffer.from([0]));
+    assert.ok(!(await drain(b)).includes(M.SNAPSHOT_REQUEST));
+    a.send(M.SAVE_REQUEST, Buffer.from([0]));
+    const id2 = (await until(a, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    assert.equal((await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0), id2);
+    sendSnapshot(a, id2, snapshot('record a', '', 'things a'));
+    sendSnapshot(b, id2, snapshot('record b', 'progress b', 'things b'));
+    await roundTrip(a);
     await roundTrip(b);
-    assert.deepEqual(worldInfo(b.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 3, creator: '' });
-    await until(a, M.WORLD_RELOAD); // the one who asked reloads too
-    await until(a, M.ROLLBACK_RESULT);
-
-    // the master's game still runs revision 1's successor: its upload is turned down until it reloads
-    await uploadSave(a, [Buffer.from('stale'), Buffer.from('x')], 1);
-    await roundTrip(a);
-    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 3);
-    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3);
-    await roundTrip(a);
-    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 4);
-
-    // characters went back with the world
-    const c = await connect(port);
-    c.send(M.HELLO, hello('artem'));
-    await c.next();
-    assert.equal((await c.next()).payload.toString(), 'at the start');
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), [{ id: id2, name: '', reason: 'group', who: 'artem' }]);
+    b.send(M.LOAD_REQUEST, u32le(id2));
+    assert.equal((await until(b, M.LOAD_RESULT)).payload[0], LOAD.LEADER_ONLY);
+    a.send(M.LOAD_REQUEST, u32le(999));
+    assert.equal((await until(a, M.LOAD_RESULT)).payload[0], LOAD.NO_SAVE);
+    a.send(M.LOAD_REQUEST, u32le(id2));
+    assert.equal((await until(b, M.CHARACTER)).payload.toString(), 'record b');
+    await until(b, M.WORLD_RELOAD);
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record a');
+    assert.equal((await download(b)).things.toString(), 'things b');
+    assert.equal((await download(a)).progress.toString(), 'progress 1'); // none in the save: theirs stays
     a.socket.destroy();
     b.socket.destroy();
-    c.socket.destroy();
   } finally {
     server.close();
   }
@@ -1031,7 +1083,7 @@ test('progress: asked of everyone in the world with each save, given back with t
     await roundTrip(a);
 
     // a save: everyone in the world is asked for their progress
-    b.send(M.SAVE_REQUEST, Buffer.from([0]));
+    assert.ok(server.coop.saveWorld());
     await until(a, M.PROGRESS_REQUEST); // the master too
     await until(a, M.SAVE_NOW);
     await until(b, M.PROGRESS_REQUEST);

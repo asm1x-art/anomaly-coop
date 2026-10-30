@@ -120,7 +120,7 @@ namespace coop
 	//------------------------------------------------------------------------------------------------
 	// Ours, to the server
 
-	static bool write_progress(CMemoryWriter& out)
+	bool write_progress(CMemoryWriter& out)
 	{
 		CActor* actor = g_actor;
 		if (!actor || !ai().get_alife())

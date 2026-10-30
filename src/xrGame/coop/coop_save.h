@@ -20,10 +20,14 @@ namespace coop
 	void on_character(NET_Packet& P);
 	void on_settings(NET_Packet& P);
 	void on_save_now(NET_Packet& P);        // the server asks us, the sim master, to save the world
-	void on_saves(NET_Packet& P);           // the list of saves: _G.coop_on_saves(text)
-	void on_rollback_vote(NET_Packet& P);   // _G.coop_on_rollback_vote(proposer id, proposer, revision, time, name, reason)
-	void on_rollback_result(NET_Packet& P); // _G.coop_on_rollback_result(result, who, revision)
-	void on_world_reload();                 // the world went back to a save: load it again
+	void on_saves(NET_Packet& P);           // the list of our character's saves: _G.coop_on_saves(text)
+	void on_load_result(NET_Packet& P);     // _G.coop_on_load_result(result, id)
+	void on_world_reload();                 // the world, or our character in it, went back to a save: load it again
+	// Our character's saves (docs/coop/multiplayer.md «Сохранения»): the server asks for a snapshot of it (record,
+	// progress, the things we carry); going back to one, the world loads again with the record and progress put
+	// back, and the things come with it (restored after the journal's replay, coop_world.h restore_things)
+	void on_snapshot_request(NET_Packet& P);
+	void on_snapshot_things(NET_Packet& P);
 
 	// Pausing is the whole world's: a game connected and in it never pauses on its own (the main menu, the
 	// window losing focus, the level change box: as in multiplayer); the Pause key asks everyone in the world
@@ -38,12 +42,12 @@ namespace coop
 	void on_pause_result(NET_Packet& P); // _G.coop_on_pause_result(result, who, pause)
 	void on_paused(NET_Packet& P);       // _G.coop_on_paused(paused, who asked)
 
-	// Lua (coop_saves.script, coop_sync.script): what the next save is (name, reason, who; it goes up with it),
-	// asking the master to save, the list of saves and the vote to go back to one
+	// Lua (ui_coop_saves.script, coop_sync.script): what the master's next save of the world is (name, reason, who;
+	// it goes up with it); our character's saves: saving, the list, going back to one; an answer to a vote (a pause)
 	void set_save_meta(LPCSTR name, LPCSTR reason, LPCSTR who);
 	void request_save(LPCSTR name);
 	void request_saves();
-	void propose_rollback(u32 revision);
+	void load_save(u32 id);
 	void answer_rollback(bool yes);
 
 	const xr_string& world_settings(); // as the server sent them, "" before that

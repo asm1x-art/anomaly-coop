@@ -1,7 +1,7 @@
 import net from 'node:net';
 import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
+import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
@@ -210,6 +210,13 @@ autosave_minutes=${autosaveMinutes}`));
     for (const [key, value] of Object.entries(storage.facts())) send(M.FACT, Buffer.concat([stringZ(key), stringZ(value)]));
     send(M.NAMES, namesPayload());
     for (const entry of journal) send(M.JOURNAL, entry.message);
+    // the things of a save the character was put back to: given once
+    const things = storage.things(name);
+    if (things) {
+      for (let at = 0; at < things.length; at += CHUNK_SIZE)
+        send(M.SNAPSHOT_THINGS, Buffer.concat([u32(things.length), u32(at), things.subarray(at, at + CHUNK_SIZE)]));
+      storage.setThings(name, null);
+    }
     const progress = storage.progress(name) ?? Buffer.alloc(0);
     let offset = 0;
     do {
@@ -228,10 +235,34 @@ autosave_minutes=${autosaveMinutes}`));
     master.send(M.SAVE_NOW, Buffer.concat([stringZ(name), stringZ(reason), stringZ(who)]));
     return true;
   };
-  const savesPayload = () => {
-    const list = storage.saves().reverse().slice(0, MAX_SAVES_LISTED);
-    return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.revision),
-      u32(Math.floor(m.time / 1000)), stringZ(m.name), stringZ(m.reason), stringZ(m.who), u32(m.from ?? 0)]))]);
+  // A character's saves: the game's snapshots (SNAPSHOT), asked of everyone saved together. snapshots: save id ->
+  // { meta, waiting: names }; each game's snapshot is kept as it comes, the save is listed once all are in.
+  const SNAPSHOT_WAIT_MS = 60000;
+  const snapshots = new Map();
+  const savesPayload = (name) => {
+    const list = storage.characterSaves(name).slice(0, MAX_SAVES_LISTED);
+    return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.id), u32(Math.floor(m.time / 1000)),
+      stringZ(m.name), stringZ(m.group ? 'group' : m.name ? 'named' : 'quick'), stringZ(m.by), u32(0)]))]);
+  };
+  // a snapshot: u32 size, the record; u32 size, the progress; the things
+  const splitSnapshot = (data) => {
+    const recordEnd = 4 + data.readUInt32LE(0);
+    const progressEnd = recordEnd + 4 + data.readUInt32LE(recordEnd);
+    return { record: data.subarray(4, recordEnd), progress: data.subarray(recordEnd + 4, progressEnd),
+      things: data.subarray(progressEnd) };
+  };
+  // the character as the save has it: record, progress, and its things for its next download; a game running the
+  // world loads it again
+  const putBack = (name, snapshot) => {
+    const { record, progress, things } = splitSnapshot(snapshot);
+    storage.saveCharacter(name, Buffer.from(record));
+    if (progress.length) storage.saveProgress(name, Buffer.from(progress));
+    storage.setThings(name, Buffer.from(things));
+    const found = players().find(([, c]) => c.name === name);
+    if (!found?.[1].inWorld) return;
+    found[1].send(M.CHARACTER, record);
+    found[1].send(M.WORLD_RELOAD);
+    found[1].send(M.WORLD_INFO, worldInfo());
   };
 
   // Votes: everyone in the world agrees (the one who asks does), within VOTE_MS; those in the menu don't run
@@ -263,16 +294,10 @@ autosave_minutes=${autosaveMinutes}`));
     return now;
   };
   const endVote = (result, who = '') => {
-    const { kind, revision, proposer, timer } = vote;
+    const { kind, proposer, timer } = vote;
     clearTimeout(timer);
     vote = null;
     const accepted = result === ROLLBACK.ACCEPTED;
-    if (kind === 'rollback') {
-      const now = accepted ? rollback(revision, `everyone agreed, '${proposer}' asked`) : 0;
-      const payload = Buffer.concat([Buffer.from([result]), stringZ(who), u32(now)]);
-      for (const c of clients.values()) c.send(M.ROLLBACK_RESULT, payload);
-      return;
-    }
     if (accepted) setPaused(kind === 'pause' ? proposer : '');
     const payload = Buffer.concat([Buffer.from([result]), stringZ(who), Buffer.from([kind === 'pause' ? 1 : 0])]);
     for (const c of clients.values()) c.send(M.PAUSE_RESULT, payload);
@@ -465,24 +490,53 @@ autosave_minutes=${autosaveMinutes}`));
           }
           break;
         case M.SAVE_REQUEST: {
+          // a group's leader saves the group, its other members nothing
           const name = readStringZ(payload, 0);
-          if (!requestSave(name ? 'named' : 'quick', client.name, name))
-            log(`[${id}] '${client.name}' asked for a save, but nobody runs the world`);
+          const g = groupOf(client.name);
+          if (g && g.members[0] !== client.name) break;
+          const members = g ? [...g.members] : [client.name];
+          const saving = players().filter(([, c]) => c.inWorld && members.includes(c.name));
+          if (!saving.length) break;
+          const meta = { id: storage.nextCharacterSaveId(), time: Date.now(), name, by: client.name, group: g ? members : null };
+          snapshots.set(meta.id, { meta, waiting: new Set(saving.map(([, c]) => c.name)) });
+          setTimeout(() => snapshots.delete(meta.id), SNAPSHOT_WAIT_MS).unref();
+          for (const [, c] of saving) c.send(M.SNAPSHOT_REQUEST, u32(meta.id));
+          log(`[${id}] '${client.name}' saves ${g ? `the group (${saving.length} in the world)` : 'their character'}, save ${meta.id}`);
+          break;
+        }
+        case M.SNAPSHOT: {
+          const saveId = payload.readUInt32LE(0);
+          const total = payload.readUInt32LE(4);
+          const offset = payload.readUInt32LE(8);
+          const pending = snapshots.get(saveId);
+          if (!pending?.waiting.has(client.name)) break;
+          if (offset === 0) client.snapshot = { saveId, data: Buffer.alloc(total), got: 0 };
+          if (client.snapshot?.saveId !== saveId || client.snapshot.data.length !== total) break;
+          client.snapshot.got += payload.copy(client.snapshot.data, offset, 12);
+          if (client.snapshot.got < total) break;
+          storage.saveCharacterSave(client.name, pending.meta, client.snapshot.data);
+          client.snapshot = null;
+          pending.waiting.delete(client.name);
+          if (!pending.waiting.size) snapshots.delete(saveId);
+          log(`[${id}] '${client.name}' saved, save ${saveId} (${total} bytes)`);
           break;
         }
         case M.SAVES_REQUEST:
-          send(M.SAVES, savesPayload());
+          send(M.SAVES, savesPayload(client.name));
           break;
-        case M.ROLLBACK_PROPOSE: {
-          const save = storage.saves().find((m) => m.revision === payload.readUInt32LE(0));
-          if (!save) break;
-          if (vote) {
-            send(M.ROLLBACK_RESULT, Buffer.concat([Buffer.from([ROLLBACK.BUSY]), stringZ(vote.proposer), u32(0)]));
-            break;
+        case M.LOAD_REQUEST: {
+          const saveId = payload.readUInt32LE(0);
+          const result = (code) => send(M.LOAD_RESULT, Buffer.concat([Buffer.from([code]), u32(saveId)]));
+          const save = storage.characterSave(client.name, saveId);
+          if (!save) return result(LOAD.NO_SAVE);
+          if (save.meta.group && save.meta.by !== client.name) return result(LOAD.LEADER_ONLY);
+          const names = save.meta.group ?? [client.name];
+          for (const name of names) {
+            const own = name === client.name ? save : storage.characterSave(name, saveId);
+            if (own) putBack(name, own.snapshot);
           }
-          log(`[${id}] '${client.name}' asks to take the world back to revision ${save.revision}`);
-          startVote('rollback', id, client, { revision: save.revision }, M.ROLLBACK_VOTE, Buffer.concat([u32(id),
-            stringZ(client.name), u32(save.revision), u32(Math.floor(save.time / 1000)), stringZ(save.name), stringZ(save.reason)]));
+          log(`[${id}] '${client.name}' went back to save ${saveId}${save.meta.group ? ` with ${names.join(', ')}` : ''}`);
+          result(LOAD.DONE);
           break;
         }
         case M.PAUSE_PROPOSE: {
@@ -633,7 +687,7 @@ autosave_minutes=${autosaveMinutes}`));
     // the world's pause, lifted without a vote (a vote nobody could answer...)
     resume() {
       if (!pausedBy) return false;
-      if (vote && vote.kind !== 'rollback') endVote(ROLLBACK.CANCELLED, 'admin');
+      if (vote) endVote(ROLLBACK.CANCELLED, 'admin');
       setPaused('');
       return true;
     },

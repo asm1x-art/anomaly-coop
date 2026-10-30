@@ -44,17 +44,18 @@ namespace coop
 		M_GROUP_INVITE = 27,    // s->c: u32 inviter id, stringZ inviter name
 		M_GROUPS = 28,          // s->c: u8 count, per group u8 size and the names, leader first; on every change
 		M_GROUP_NOTE = 29,      // s->c: u8 why an invite came to nothing (declined, full, already, expired), stringZ name
-		// the world's saves, kept by the server (coop-server/src/storage.js, coop_save.cpp)
+		// The world's saves are the sim master's uploads (coop-server/src/storage.js, coop_save.cpp). The players save
+		// their characters: a snapshot of ours, made when the server asks; a group's leader saves the whole group
 		M_LEFT_WORLD = 32,      // c->s: our game went back to the main menu, still connected
-		M_SAVE_REQUEST = 33,    // c->s: stringZ name ("" quick): save the world now
-		M_SAVE_NOW = 34,        // s->c, to the sim master: stringZ name, reason, who: save now, the upload carries them
-		M_SAVES_REQUEST = 35,   // c->s: the list of saves
-		M_SAVES = 36,           // s->c: u16 count, newest first: u32 revision, u32 time, stringZ name, reason, who, u32 from
-		M_ROLLBACK_PROPOSE = 37, // c->s: u32 revision to take the world back to, if everyone agrees
-		M_ROLLBACK_VOTE = 38,   // s->c: u32 proposer id, stringZ proposer, u32 revision, u32 time, stringZ name, reason
-		M_ROLLBACK_ANSWER = 39, // c->s: u8 yes
-		M_ROLLBACK_RESULT = 40, // s->c: u8 result (accepted, declined, timeout, cancelled, busy), stringZ who, u32 revision
-		M_WORLD_RELOAD = 41,    // s->c: the world went back to a save: a game running it loads it again
+		M_SAVE_REQUEST = 33,    // c->s: stringZ name ("" quick): save our character (a group's leader: the group)
+		M_SAVE_NOW = 34,        // s->c, to the sim master: stringZ name, reason, who: save the world, the upload carries them
+		M_SAVES_REQUEST = 35,   // c->s: the list of our character's saves
+		M_SAVES = 36,           // s->c: u16 count, newest first: u32 id, u32 time, stringZ name, reason, who, u32 0
+		M_LOAD_REQUEST = 37,    // c->s: u32 id: our character (a group's save: the group, its leader asks) as that save has it
+		M_ROLLBACK_ANSWER = 39, // c->s: u8 yes, to whatever vote is on (a pause)
+		M_LOAD_RESULT = 40,     // s->c: u8 result (0 done, 1 no such save, 2 a group's save: its leader loads it), u32 id
+		M_WORLD_RELOAD = 41,    // s->c: the world, or our character in it, went back to a save: a game running it loads it
+		                        // again
 		// pausing the world: everyone in it agrees (as M_ROLLBACK_*; M_ROLLBACK_ANSWER answers any vote)
 		M_PAUSE_PROPOSE = 42,   // c->s: u8 1 pause, 0 go on
 		M_PAUSE_VOTE = 43,      // s->c: u32 proposer id, stringZ proposer, u8 1 pause, 0 go on
@@ -82,6 +83,12 @@ namespace coop
 		M_JOURNAL = 53,         // s->c: a world change made since the save (u16 type, then as relayed), before M_WORLD_DONE
 		M_NAMES = 54,           // s->c: u16 count, u32 id, stringZ name: every player and host of this server run, before
 		                        // the journal (its changes are by ids, some of players gone)
+		M_SNAPSHOT_REQUEST = 55, // s->c: u32 save id: a snapshot of our character for it (coop_save.cpp)
+		M_SNAPSHOT = 56,        // c->s: u32 save id, u32 total, u32 offset, data: u32 size, our record (as M_CHARACTER);
+		                        // u32 size, our progress (as M_PROGRESS); u16 count, per thing we carry u16 size and its
+		                        // state (as M_OBJECT_STATE)
+		M_SNAPSHOT_THINGS = 57, // s->c: u32 total, u32 offset, data: the things of the save our character went back to,
+		                        // with the world (before M_WORLD_DONE), once
 	};
 
 	enum EGroupAction : u8
@@ -94,7 +101,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 22;
+	const u16 PROTOCOL_VERSION = 23;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook

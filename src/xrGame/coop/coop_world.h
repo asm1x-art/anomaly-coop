@@ -10,6 +10,7 @@ class CSE_ALifeDynamicObject;
 class CSE_Abstract;
 class CEntity;
 class NET_Packet;
+class IReader;
 
 namespace coop
 {
@@ -29,6 +30,13 @@ namespace coop
 	// so the others' copies (our shadow in their worlds, the master's save) kept the state it was shared with.
 	void send_inventory_states(); // all we carry: with our progress, at every save and on the way out
 	void apply_object_state(NET_Packet& P); // M_OBJECT_STATE
+	void write_item_state(NET_Packet& P, CSE_ALifeDynamicObject* object); // as M_OBJECT_STATE carries it
+	// The things of a save our character went back to (M_SNAPSHOT_THINGS: u16 count, u16 size and the state of each),
+	// once the world is loaded and its journal replayed: one on us gets its state back; one somewhere else in the
+	// world now (with a player, on the ground, in a box) stays there, never twice; one the world doesn't have any more
+	// (used up, eaten) is made again, on us. What we picked up since stays with us. made: the ones made again, for
+	// the others once the level runs.
+	void restore_things(IReader& things, xr_vector<u16>& made);
 	// called from CALifeGraphRegistry::attach / detach, which every A-Life parent change goes through
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item);
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id);

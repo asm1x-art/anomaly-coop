@@ -135,10 +135,10 @@ namespace coop
 			def("world_creator", &world_creator),
 			def("claim_world", &claim_world),
 			def("set_save_meta", &set_save_meta),    // (name, reason, who) of the save Lua is about to make
-			def("request_save", &request_save),      // (name): the master saves the world
+			def("request_save", &request_save),      // (name): our character is saved (the leader: the group)
 			def("request_saves", &request_saves),    // the list comes to _G.coop_on_saves
-			def("propose_rollback", &propose_rollback), // (revision): everyone votes
-			def("answer_rollback", &answer_rollback),
+			def("load_save", &load_save),            // (id): our character (the leader: the group) as that save has it
+			def("answer_rollback", &answer_rollback), // (yes) to a vote (a pause)
 			def("propose_pause", &propose_pause),    // (pause): everyone in the world votes
 			def("world_paused", &world_paused),
 			def("join_world", &join_world),

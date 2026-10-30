@@ -278,58 +278,52 @@
 		<text>%s gave you money: %d</text>
 	</string>
 	<string id="ui_mm_coop_saves">
-		<text>World saves</text>
+		<text>Character saves</text>
 	</string>
 	<string id="ui_mm_coop_saves_name">
 		<text>Name:</text>
 	</string>
 	<string id="ui_mm_coop_saves_save">
-		<text>Save the world</text>
+		<text>Save</text>
 	</string>
 	<string id="ui_mm_coop_saves_rollback">
-		<text>Go back to the selected one</text>
+		<text>Load the selected one</text>
 	</string>
 	<string id="st_coop_saves_hint">
-		<text>Newest first. To save, type a name (or leave it empty) and press Save the world. To go back, pick a save: everyone in the game has to agree.</text>
+		<text>Newest first. Your character is saved: where it is, its things, money, tasks, rank; in a group its leader saves and loads everyone at once. The world never goes back: a thing another player has now, or lying in the world, stays there.</text>
 	</string>
 	<string id="st_coop_saves_loading">
 		<text>Loading the list of saves...</text>
 	</string>
 	<string id="st_coop_saves_saving">
-		<text>The master is saving the world...</text>
+		<text>Saving the character...</text>
+	</string>
+	<string id="st_coop_saves_leader">
+		<text>In a group, its leader saves and loads.</text>
+	</string>
+	<string id="st_coop_saves_going_back">
+		<text>Taking the character back to the save...</text>
+	</string>
+	<string id="st_coop_save_group">
+		<text>Group</text>
+	</string>
+	<string id="st_coop_load_0">
+		<text>The character goes back to save #%s: the world loads again.</text>
+	</string>
+	<string id="st_coop_load_1">
+		<text>Save #%s is gone.</text>
+	</string>
+	<string id="st_coop_load_2">
+		<text>The group's save #%s is loaded by its leader.</text>
 	</string>
 	<string id="st_coop_saves_pick">
 		<text>Pick a save in the list.</text>
-	</string>
-	<string id="st_coop_saves_latest">
-		<text>That is the world as it is now: pick an older save.</text>
-	</string>
-	<string id="st_coop_saves_voting">
-		<text>Waiting for the other players to answer (30 seconds at most)...</text>
-	</string>
-	<string id="st_coop_save_auto">
-		<text>Autosave</text>
 	</string>
 	<string id="st_coop_save_quick">
 		<text>Quick save</text>
 	</string>
 	<string id="st_coop_save_named">
 		<text>"%s"</text>
-	</string>
-	<string id="st_coop_save_join">
-		<text>Joined: %s</text>
-	</string>
-	<string id="st_coop_save_leave">
-		<text>Left: %s</text>
-	</string>
-	<string id="st_coop_save_exit">
-		<text>Master left: %s</text>
-	</string>
-	<string id="st_coop_save_new">
-		<text>New world</text>
-	</string>
-	<string id="st_coop_save_rollback">
-		<text>Back to #%s</text>
 	</string>
 	<string id="st_coop_ago_now">
 		<text>just now</text>
@@ -342,24 +336,6 @@
 	</string>
 	<string id="st_coop_ago_days">
 		<text>%s days ago</text>
-	</string>
-	<string id="st_coop_rollback_ask">
-		<text>%s asks to take the world back to save #%s: %s (%s). Everyone in the game loads it again. Agree?</text>
-	</string>
-	<string id="st_coop_rollback_0">
-		<text>The world goes back to the save: everyone loads it again.</text>
-	</string>
-	<string id="st_coop_rollback_1">
-		<text>Not going back: %s said no.</text>
-	</string>
-	<string id="st_coop_rollback_2">
-		<text>Not going back: %s didn't answer.</text>
-	</string>
-	<string id="st_coop_rollback_3">
-		<text>Not going back: %s left the game.</text>
-	</string>
-	<string id="st_coop_rollback_4">
-		<text>A vote to go back is on already, %s started it.</text>
 	</string>
 	<string id="st_coop_pda_group">
 		<text>Group</text>
@@ -471,9 +447,6 @@
 	</string>
 	<string id="st_coop_group_invite_pda">
 		<text>%s invites you to their group: PDA, Group tab.</text>
-	</string>
-	<string id="st_coop_save_level">
-		<text>Level change: %s</text>
 	</string>
 	<string id="st_coop_wheel_story">
 		<text>Share the story</text>

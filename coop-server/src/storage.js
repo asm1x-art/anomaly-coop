@@ -21,6 +21,10 @@ import { normalizeSettings } from './settings.js';
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
 //   groups.json             [{ members: [leader, member...], story }]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
+//   personal/<hex name>/<id>/ a character's own save: snapshot.bin (as its game sent it, protocol.js SNAPSHOT) and
+//                            meta.json { id, time, name, by, group }: group, the members' names of a group's save
+//                            (the same id in every member's folder); personal_next.json, the next id
+//   personal/<hex name>/things.bin  the things of a save the character was put back to, for its next download
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
 
@@ -154,8 +158,54 @@ export function openStorage(dir) {
         fs.rmSync(file(f), { force: true });
       facts = {};
       fs.rmSync(file('progress'), { recursive: true, force: true });
+      fs.rmSync(file('personal'), { recursive: true, force: true }); // the characters' saves are of this world
+      fs.rmSync(file('personal_next.json'), { force: true });
       saves.length = 0;
       characters = {};
+    },
+
+    nextCharacterSaveId() {
+      const id = readJson('personal_next.json', 1);
+      writeAtomic('personal_next.json', JSON.stringify(id + 1));
+      return id;
+    },
+    saveCharacterSave(name, meta, snapshot) {
+      const dir = path.join('personal', playerDir(name), String(meta.id));
+      fs.mkdirSync(file(dir), { recursive: true });
+      writeAtomic(path.join(dir, 'snapshot.bin'), snapshot);
+      writeAtomic(path.join(dir, 'meta.json'), JSON.stringify(meta));
+    },
+    // newest first; a save counts once its meta.json, written last, is there
+    characterSaves(name) {
+      const dir = path.join('personal', playerDir(name));
+      if (!fs.existsSync(file(dir))) return [];
+      return fs.readdirSync(file(dir)).filter((d) => /^\d+$/.test(d))
+        .map((d) => readJson(path.join(dir, d, 'meta.json'), null)).filter(Boolean).sort((a, b) => b.id - a.id);
+    },
+    // { meta, snapshot } or null
+    characterSave(name, id) {
+      const dir = path.join('personal', playerDir(name), String(id));
+      const meta = readJson(path.join(dir, 'meta.json'), null);
+      if (!meta) return null;
+      try {
+        return { meta, snapshot: fs.readFileSync(file(path.join(dir, 'snapshot.bin'))) };
+      } catch {
+        return null;
+      }
+    },
+    things(name) {
+      try {
+        return fs.readFileSync(file(path.join('personal', playerDir(name), 'things.bin')));
+      } catch {
+        return null;
+      }
+    },
+    // null: given, none left
+    setThings(name, data) {
+      const dir = path.join('personal', playerDir(name));
+      if (!data) return fs.rmSync(file(path.join(dir, 'things.bin')), { force: true });
+      fs.mkdirSync(file(dir), { recursive: true });
+      writeAtomic(path.join(dir, 'things.bin'), data);
     },
 
     // [{ members: [leader, ...], story }]; a group was a plain list of names before

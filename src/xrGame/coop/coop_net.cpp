@@ -520,11 +520,14 @@ namespace coop
 		case M_SAVES:
 			on_saves(P);
 			break;
-		case M_ROLLBACK_VOTE:
-			on_rollback_vote(P);
+		case M_LOAD_RESULT:
+			on_load_result(P);
 			break;
-		case M_ROLLBACK_RESULT:
-			on_rollback_result(P);
+		case M_SNAPSHOT_REQUEST:
+			on_snapshot_request(P);
+			break;
+		case M_SNAPSHOT_THINGS:
+			on_snapshot_things(P);
 			break;
 		case M_WORLD_RELOAD:
 			on_world_reload();

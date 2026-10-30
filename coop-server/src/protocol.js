@@ -1,7 +1,7 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 22;
+export const PROTOCOL_VERSION = 23;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
@@ -47,19 +47,21 @@ export const M = {
   GROUPS: 28,         // s->c: u8 count, per group u8 size, the names (leader first), u8 GROUP_FLAG bits; to all on
                       // every change
   GROUP_NOTE: 29,     // s->c: u8 GROUP_NOTE, stringZ the other player's name: why an invite came to nothing
-  // the world's saves (storage.js): every upload is one, the last is the world
+  // The world's saves (storage.js) are the sim master's uploads, the last is the world. The players save their
+  // characters (docs/coop/multiplayer.md «Сохранения»): a character's save is a snapshot its game makes, a group's
+  // leader saves and loads the whole group; the world never goes back for them.
   LEFT_WORLD: 32,     // c->s: our game went back to the main menu, still connected
-  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save the world now
-  SAVE_NOW: 34,       // s->c, to the sim master: stringZ name, reason, who: save now, the upload carries them back
-  SAVES_REQUEST: 35,  // c->s: the list of saves, please
-  SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 revision, u32 time (unix s),
-                      // stringZ name, reason, who, u32 the revision it went back to (rollback) or 0
-  ROLLBACK_PROPOSE: 37, // c->s: u32 revision: take the world back to that save, if everyone agrees
-  ROLLBACK_VOTE: 38,  // s->c, to all: u32 proposer id, stringZ proposer name, u32 revision, u32 time, stringZ name, reason
-  ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a rollback, a pause)
-  ROLLBACK_RESULT: 40, // s->c, to all: u8 ROLLBACK result, stringZ the player it came to (said no, didn't answer, left),
-                      // u32 the world's new revision (ACCEPTED)
-  WORLD_RELOAD: 41,   // s->c: the world went back to a save: a game running it loads it again (WORLD_INFO follows)
+  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save my character (a group's leader: the group's)
+  SAVE_NOW: 34,       // s->c, to the sim master: stringZ name, reason, who: save the world now, the upload carries them
+  SAVES_REQUEST: 35,  // c->s: the list of my character's saves, please
+  SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 id, u32 time (unix s),
+                      // stringZ name, reason ('quick', 'named', 'group'), who (the one who saved it), u32 0
+  LOAD_REQUEST: 37,   // c->s: u32 id: my character (a group's save: the whole group, the leader asks) as that save has it
+  // 38: was a world rollback's vote
+  ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a pause)
+  LOAD_RESULT: 40,    // s->c: u8 LOAD result, u32 the save's id
+  WORLD_RELOAD: 41,   // s->c: the world, or our character in it, went back to a save: a game running it loads it again
+                      // (WORLD_INFO follows)
   // pausing the world: everyone in it agrees, as with a rollback
   PAUSE_PROPOSE: 42,  // c->s: u8 1 pause, 0 go on
   PAUSE_VOTE: 43,     // s->c, to all: u32 proposer id, stringZ proposer name, u8 1 pause, 0 go on
@@ -91,10 +93,16 @@ export const M = {
                       // after the facts, before WORLD_DONE
   NAMES: 54,          // s->c: u16 count, per player u32 id, stringZ name: everyone of this server run (the journal's
                       // changes are by ids, some of players gone), before the journal
+  SNAPSHOT_REQUEST: 55, // s->c: u32 save id: send a snapshot of your character for that save
+  SNAPSHOT: 56,       // c->s: u32 save id, u32 total size, u32 offset, data (offset 0 first): u32 size, the character's
+                      // record (as CHARACTER); u32 size, its progress (as PROGRESS); then its things (the game's own)
+  SNAPSHOT_THINGS: 57, // s->c: u32 total size, u32 offset, data: the things of the save the character was put back to,
+                      // with the world (before WORLD_DONE), once
 };
 
 export const REFUSED = { FULL: 0, VERSION: 1, HOST: 2 }; // HOST: a wrong secret, or a host is there already
-export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 };
+export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 }; // a vote's result (a pause)
+export const LOAD = { DONE: 0, NO_SAVE: 1, LEADER_ONLY: 2 }; // LEADER_ONLY: a group's save, the leader loads it
 export const MAX_SAVES_LISTED = 200;
 export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4, STORY: 5 };
 export const GROUP_FLAG = { STORY: 1 }; // the group shares its story (coop_story.script)

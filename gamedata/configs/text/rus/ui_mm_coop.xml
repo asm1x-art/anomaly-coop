@@ -278,58 +278,52 @@
 		<text>%s передал вам деньги: %d</text>
 	</string>
 	<string id="ui_mm_coop_saves">
-		<text>Сохранения мира</text>
+		<text>Сохранения персонажа</text>
 	</string>
 	<string id="ui_mm_coop_saves_name">
 		<text>Название:</text>
 	</string>
 	<string id="ui_mm_coop_saves_save">
-		<text>Сохранить мир</text>
+		<text>Сохранить</text>
 	</string>
 	<string id="ui_mm_coop_saves_rollback">
-		<text>Откатить мир к выбранному</text>
+		<text>Загрузить выбранное</text>
 	</string>
 	<string id="st_coop_saves_hint">
-		<text>Новые сверху. Сохранить: введите название (можно оставить пустым) и нажмите «Сохранить мир». Откатить: выберите сохранение — согласиться должны все, кто в игре.</text>
+		<text>Сначала новые. Сохраняется ваш персонаж: где он, вещи, деньги, задания, ранг; в группе её лидер сохраняет и загружает всех сразу. Мир не откатывается: вещь, которая сейчас у другого игрока или лежит в мире, там и останется.</text>
 	</string>
 	<string id="st_coop_saves_loading">
 		<text>Список сохранений загружается...</text>
 	</string>
 	<string id="st_coop_saves_saving">
-		<text>Мастер сохраняет мир...</text>
+		<text>Сохраняю персонажа...</text>
+	</string>
+	<string id="st_coop_saves_leader">
+		<text>В группе сохраняет и загружает её лидер.</text>
+	</string>
+	<string id="st_coop_saves_going_back">
+		<text>Возвращаю персонажа к сохранению...</text>
+	</string>
+	<string id="st_coop_save_group">
+		<text>Группа</text>
+	</string>
+	<string id="st_coop_load_0">
+		<text>Персонаж возвращается к сохранению №%s: мир загружается заново.</text>
+	</string>
+	<string id="st_coop_load_1">
+		<text>Сохранения №%s больше нет.</text>
+	</string>
+	<string id="st_coop_load_2">
+		<text>Сохранение группы №%s загружает её лидер.</text>
 	</string>
 	<string id="st_coop_saves_pick">
 		<text>Выберите сохранение в списке.</text>
-	</string>
-	<string id="st_coop_saves_latest">
-		<text>Это и есть мир сейчас: выберите сохранение постарше.</text>
-	</string>
-	<string id="st_coop_saves_voting">
-		<text>Ждём ответа остальных игроков (до 30 секунд)...</text>
-	</string>
-	<string id="st_coop_save_auto">
-		<text>Автосохранение</text>
 	</string>
 	<string id="st_coop_save_quick">
 		<text>Быстрое сохранение</text>
 	</string>
 	<string id="st_coop_save_named">
 		<text>«%s»</text>
-	</string>
-	<string id="st_coop_save_join">
-		<text>Вход: %s</text>
-	</string>
-	<string id="st_coop_save_leave">
-		<text>Выход: %s</text>
-	</string>
-	<string id="st_coop_save_exit">
-		<text>Выход мастера: %s</text>
-	</string>
-	<string id="st_coop_save_new">
-		<text>Новый мир</text>
-	</string>
-	<string id="st_coop_save_rollback">
-		<text>Откат к №%s</text>
 	</string>
 	<string id="st_coop_ago_now">
 		<text>только что</text>
@@ -342,24 +336,6 @@
 	</string>
 	<string id="st_coop_ago_days">
 		<text>%s дн. назад</text>
-	</string>
-	<string id="st_coop_rollback_ask">
-		<text>%s предлагает откатить мир к сохранению №%s: %s (%s). Все, кто в игре, загрузят его заново. Согласны?</text>
-	</string>
-	<string id="st_coop_rollback_0">
-		<text>Мир откатывается к сохранению: все загрузят его заново.</text>
-	</string>
-	<string id="st_coop_rollback_1">
-		<text>Откат отменён: %s против.</text>
-	</string>
-	<string id="st_coop_rollback_2">
-		<text>Откат отменён: не ответил %s.</text>
-	</string>
-	<string id="st_coop_rollback_3">
-		<text>Откат отменён: %s вышел из игры.</text>
-	</string>
-	<string id="st_coop_rollback_4">
-		<text>Уже идёт голосование за откат, его начал %s.</text>
 	</string>
 	<string id="st_coop_pda_group">
 		<text>Группа</text>
@@ -471,9 +447,6 @@
 	</string>
 	<string id="st_coop_group_invite_pda">
 		<text>%s приглашает вас в группу: ПДА, вкладка «Группа».</text>
-	</string>
-	<string id="st_coop_save_level">
-		<text>Переход: %s</text>
 	</string>
 	<string id="st_coop_wheel_story">
 		<text>Поделиться сюжетом</text>
