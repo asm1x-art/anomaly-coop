@@ -1848,3 +1848,59 @@ script_binding          = bind_hf_base.init
 item_section            = shelter_item_prop_door_2
 bounding_box_size       = 2.500, 1.300, 0.164
 bounding_box_origin     = -0.000, 0.082, 0.000
+
+[shelter_item_prop_duct_1]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\props\duct_1.ogf
+description             = st_shelter_prop_duct_descr
+inv_name                = st_shelter_prop_duct
+inv_name_short          = st_shelter_prop_duct
+icons_texture           = ui\ui_decor
+inv_grid_x              = 18
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 3
+cost                    = 20
+inv_weight              = 12
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_prop_duct_1
+
+[shelter_prop_duct_1]:physic_object
+visual                  = dynamics\shelter\props\duct_1.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_prop_duct_1
+bounding_box_size       = 1.019, 1.012, 0.613
+bounding_box_origin     = 0.000, 0.306, 0.000
+
+[shelter_item_prop_duct_2]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\props\duct_2.ogf
+description             = st_shelter_prop_duct_descr
+inv_name                = st_shelter_prop_duct
+inv_name_short          = st_shelter_prop_duct
+icons_texture           = ui\ui_decor
+inv_grid_x              = 18
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 3
+cost                    = 20
+inv_weight              = 12
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_prop_duct_2
+
+[shelter_prop_duct_2]:physic_object
+visual                  = dynamics\shelter\props\duct_2.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_prop_duct_2
+bounding_box_size       = 1.274, 0.600, 0.600
+bounding_box_origin     = -0.000, 0.300, 0.000

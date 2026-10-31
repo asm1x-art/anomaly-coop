@@ -256,7 +256,7 @@
 		<text>Убрано в тайник</text>
 	</string>
 	<string id="st_shelter_build_hint">
-		<text>Колесо — выбор  |  ЛКМ — поставить  |  ПКМ по мебели — в тайник  |  H — выход</text>
+		<text>Колесо: выбор | Стрелки: категория | ЛКМ: поставить | ПКМ по мебели: в тайник | H: выход</text>
 	</string>
 	<string id="st_shelter_build_empty">
 		<text>В тайнике нет мебели</text>
@@ -914,5 +914,53 @@
 	</string>
 	<string id="st_shelter_room_low_tunnel">
 		<text>Тоннель за гермозатвором</text>
+	</string>
+	<string id="st_shelter_room_state_no_lift">
+		<text>Состояние: нет доступа, лифт не починен</text>
+	</string>
+	<string id="st_shelter_room_rename">
+		<text>Своё название:</text>
+	</string>
+	<string id="st_shelter_room_rename_save">
+		<text>Подписать</text>
+	</string>
+	<string id="st_shelter_prop_duct">
+		<text>Вентиляционный короб</text>
+	</string>
+	<string id="st_shelter_prop_duct_descr">
+		<text>Ржавый вентиляционный короб из бункера. Можно поставить куда угодно.</text>
+	</string>
+	<string id="st_shelter_cat_all">
+		<text>Всё</text>
+	</string>
+	<string id="st_shelter_cat_bar">
+		<text>Бар и кухня</text>
+	</string>
+	<string id="st_shelter_cat_furniture">
+		<text>Мебель</text>
+	</string>
+	<string id="st_shelter_cat_storage">
+		<text>Хранение</text>
+	</string>
+	<string id="st_shelter_cat_workshop">
+		<text>Мастерская</text>
+	</string>
+	<string id="st_shelter_cat_medical">
+		<text>Медицина</text>
+	</string>
+	<string id="st_shelter_cat_science">
+		<text>Наука</text>
+	</string>
+	<string id="st_shelter_cat_tech">
+		<text>Техника</text>
+	</string>
+	<string id="st_shelter_cat_light">
+		<text>Свет</text>
+	</string>
+	<string id="st_shelter_cat_walls">
+		<text>Стены и двери</text>
+	</string>
+	<string id="st_shelter_cat_decor">
+		<text>Декор</text>
 	</string>
 </string_table>

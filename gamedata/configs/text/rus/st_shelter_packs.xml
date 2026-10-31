@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_pack_bar_counter">
+		<text>Барная стойка с кухней</text>
+	</string>
+	<string id="st_shelter_pack_bar_counter_2">
+		<text>Барная стойка</text>
+	</string>
+	<string id="st_shelter_pack_bar_table">
+		<text>Столик</text>
+	</string>
+	<string id="st_shelter_pack_bar_chair">
+		<text>Стул</text>
+	</string>
+	<string id="st_shelter_pack_bar_shelf">
+		<text>Настенная полка с консервами</text>
+	</string>
+	<string id="st_shelter_pack_bar_stool">
+		<text>Деревянный табурет</text>
+	</string>
+	<string id="st_shelter_pack_bar_cans">
+		<text>Гора консервов</text>
+	</string>
+	<string id="st_shelter_pack_bar_bottles">
+		<text>Ящик с бутылками</text>
+	</string>
+	<string id="st_shelter_pack_bar_stove">
+		<text>Печка-буржуйка</text>
+	</string>
+	<string id="st_shelter_pack_bar_pot">
+		<text>Большая кастрюля</text>
+	</string>
+	<string id="st_shelter_pack_bar_basin">
+		<text>Таз</text>
+	</string>
+	<string id="st_shelter_pack_bar_tub">
+		<text>Деревянная кадка</text>
+	</string>
+	<string id="st_shelter_pack_sofa">
+		<text>Диван</text>
+	</string>
+	<string id="st_shelter_pack_sofa_2">
+		<text>Потёртый диван</text>
+	</string>
+	<string id="st_shelter_pack_desk">
+		<text>Письменный стол</text>
+	</string>
+	<string id="st_shelter_pack_desk_2">
+		<text>Канцелярский стол</text>
+	</string>
+	<string id="st_shelter_pack_desk_3">
+		<text>Стол из госпиталя</text>
+	</string>
+	<string id="st_shelter_pack_desk_4">
+		<text>Широкий стол</text>
+	</string>
+	<string id="st_shelter_pack_desk_ammo">
+		<text>Стол с ящиком патронов</text>
+	</string>
+	<string id="st_shelter_pack_nightstand">
+		<text>Тумба</text>
+	</string>
+	<string id="st_shelter_pack_wardrobe">
+		<text>Шкаф</text>
+	</string>
+	<string id="st_shelter_pack_wardrobe_2">
+		<text>Шкаф со стеллажом</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf">
+		<text>Стеллаж</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf_2">
+		<text>Высокий стеллаж</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf_3">
+		<text>Узкий стеллаж</text>
+	</string>
+	<string id="st_shelter_pack_cabinet_low">
+		<text>Низкий шкаф</text>
+	</string>
+	<string id="st_shelter_pack_table_small">
+		<text>Маленький стол</text>
+	</string>
+	<string id="st_shelter_pack_bed_iron">
+		<text>Железная кровать</text>
+	</string>
+	<string id="st_shelter_pack_locker">
+		<text>Шкафчик</text>
+	</string>
+	<string id="st_shelter_pack_locker_2">
+		<text>Шкафчик</text>
+	</string>
+	<string id="st_shelter_pack_lockers">
+		<text>Ряд шкафчиков</text>
+	</string>
+	<string id="st_shelter_pack_shelving_green">
+		<text>Зелёный стеллаж</text>
+	</string>
+	<string id="st_shelter_pack_cabinet_green">
+		<text>Зелёный шкаф</text>
+	</string>
+	<string id="st_shelter_pack_barrel_rust">
+		<text>Ржавая бочка</text>
+	</string>
+	<string id="st_shelter_pack_barrel_grey">
+		<text>Серая бочка</text>
+	</string>
+	<string id="st_shelter_pack_mil_box">
+		<text>Армейский ящик</text>
+	</string>
+	<string id="st_shelter_pack_mil_box_2">
+		<text>Армейский ящик</text>
+	</string>
+	<string id="st_shelter_pack_safe">
+		<text>Сейф</text>
+	</string>
+	<string id="st_shelter_pack_toolbox">
+		<text>Ящик для инструмента</text>
+	</string>
+	<string id="st_shelter_pack_carton">
+		<text>Картонная коробка</text>
+	</string>
+	<string id="st_shelter_pack_pallet">
+		<text>Поддон</text>
+	</string>
+	<string id="st_shelter_pack_crates">
+		<text>Штабель ящиков</text>
+	</string>
+	<string id="st_shelter_pack_reel">
+		<text>Кабельная катушка</text>
+	</string>
+	<string id="st_shelter_pack_motor">
+		<text>Электромотор</text>
+	</string>
+	<string id="st_shelter_pack_motors">
+		<text>Пара электромоторов</text>
+	</string>
+	<string id="st_shelter_pack_machine">
+		<text>Станок на поддоне</text>
+	</string>
+	<string id="st_shelter_pack_machine_2">
+		<text>Станок</text>
+	</string>
+	<string id="st_shelter_pack_machine_3">
+		<text>Привод с маховиком</text>
+	</string>
+	<string id="st_shelter_pack_tools_box">
+		<text>Ящик с приборами</text>
+	</string>
+	<string id="st_shelter_pack_sledgehammer">
+		<text>Кувалда</text>
+	</string>
+	<string id="st_shelter_pack_valve">
+		<text>Задвижка с вентилем</text>
+	</string>
+	<string id="st_shelter_pack_hook">
+		<text>Крюк</text>
+	</string>
+	<string id="st_shelter_pack_extinguisher">
+		<text>Огнетушитель</text>
+	</string>
+	<string id="st_shelter_pack_bench_table">
+		<text>Стол мастерской</text>
+	</string>
+	<string id="st_shelter_pack_bench_vise">
+		<text>Тиски с мелочами</text>
+	</string>
+	<string id="st_shelter_pack_vise">
+		<text>Тиски</text>
+	</string>
+	<string id="st_shelter_pack_instruments">
+		<text>Набор инструмента</text>
+	</string>
+	<string id="st_shelter_pack_med_stand">
+		<text>Операционная стойка</text>
+	</string>
+	<string id="st_shelter_pack_med_sink">
+		<text>Раковина</text>
+	</string>
+	<string id="st_shelter_pack_med_sinks">
+		<text>Ряд раковин</text>
+	</string>
+	<string id="st_shelter_pack_med_toilet">
+		<text>Унитаз с бачком</text>
+	</string>
+	<string id="st_shelter_pack_med_table">
+		<text>Медицинский столик</text>
+	</string>
+	<string id="st_shelter_pack_med_litter">
+		<text>Каталка</text>
+	</string>
+	<string id="st_shelter_pack_med_chair">
+		<text>Кресло-коляска</text>
+	</string>
+	<string id="st_shelter_pack_med_flask">
+		<text>Колба</text>
+	</string>
+	<string id="st_shelter_pack_med_flask_2">
+		<text>Круглая колба</text>
+	</string>
+	<string id="st_shelter_pack_sci_microscope">
+		<text>Микроскоп</text>
+	</string>
+	<string id="st_shelter_pack_sci_desk">
+		<text>Рабочее место учёного</text>
+	</string>
+	<string id="st_shelter_pack_sci_bench">
+		<text>Лабораторный стол с приборами</text>
+	</string>
+	<string id="st_shelter_pack_sci_device">
+		<text>Прибор в корпусе</text>
+	</string>
+	<string id="st_shelter_pack_sci_psyradar">
+		<text>Пси-радар</text>
+	</string>
+	<string id="st_shelter_pack_sci_psyradar_2">
+		<text>Пси-радар</text>
+	</string>
+	<string id="st_shelter_pack_sci_console">
+		<text>Пульт с круглым экраном</text>
+	</string>
+	<string id="st_shelter_pack_sci_control">
+		<text>Пульт управления</text>
+	</string>
+	<string id="st_shelter_pack_sci_control_2">
+		<text>Пульт управления</text>
+	</string>
+	<string id="st_shelter_pack_sci_control_3">
+		<text>Длинный пульт</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack">
+		<text>Стойка приборов</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack_2">
+		<text>Блок приборов</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack_3">
+		<text>Шкаф с приборами</text>
+	</string>
+	<string id="st_shelter_pack_sci_scanner">
+		<text>Сканер аномалий</text>
+	</string>
+	<string id="st_shelter_pack_sci_scanner_2">
+		<text>Сканер артефактов</text>
+	</string>
+	<string id="st_shelter_pack_sci_generator">
+		<text>Прибор с катушками</text>
+	</string>
+	<string id="st_shelter_pack_sci_emitter">
+		<text>Пси-излучатель</text>
+	</string>
+	<string id="st_shelter_pack_sci_chair">
+		<text>Лабораторное кресло</text>
+	</string>
+	<string id="st_shelter_pack_sci_cart">
+		<text>Лабораторная тележка</text>
+	</string>
+	<string id="st_shelter_pack_sci_board">
+		<text>Доска с формулами</text>
+	</string>
+	<string id="st_shelter_pack_tech_radio_rack">
+		<text>Радиостойка</text>
+	</string>
+	<string id="st_shelter_pack_tech_tape">
+		<text>Магнитофон</text>
+	</string>
+	<string id="st_shelter_pack_tech_block">
+		<text>Блок электроники</text>
+	</string>
+	<string id="st_shelter_pack_tech_block_2">
+		<text>Блок с индикатором</text>
+	</string>
+	<string id="st_shelter_pack_tech_cabinet">
+		<text>Электрошкаф</text>
+	</string>
+	<string id="st_shelter_pack_tech_cabinet_2">
+		<text>Шкаф управления</text>
+	</string>
+	<string id="st_shelter_pack_tech_transformer">
+		<text>Трансформатор</text>
+	</string>
+	<string id="st_shelter_pack_tech_box">
+		<text>Силовой щит</text>
+	</string>
+	<string id="st_shelter_pack_tech_box_2">
+		<text>Щит высокого напряжения</text>
+	</string>
+	<string id="st_shelter_pack_tech_panel">
+		<text>Панель с приборами</text>
+	</string>
+	<string id="st_shelter_pack_tech_wall_panel">
+		<text>Настенная панель</text>
+	</string>
+	<string id="st_shelter_pack_tech_radio">
+		<text>Рация с антенной</text>
+	</string>
+	<string id="st_shelter_pack_tech_receiver">
+		<text>Приёмник</text>
+	</string>
+	<string id="st_shelter_pack_tech_monitor">
+		<text>Монитор с экраном</text>
+	</string>
+	<string id="st_shelter_pack_tech_pc">
+		<text>Системный блок</text>
+	</string>
+	<string id="st_shelter_pack_tech_diesel">
+		<text>Дизель-генератор</text>
+	</string>
+	<string id="st_shelter_pack_tech_amp">
+		<text>Усилитель</text>
+	</string>
+	<string id="st_shelter_pack_map_zone">
+		<text>Карта Зоны</text>
+	</string>
+	<string id="st_shelter_pack_sign_danger">
+		<text>Плакат «Осторожно»</text>
+	</string>
+	<string id="st_shelter_pack_poster">
+		<text>Плакат</text>
+	</string>
+	<string id="st_shelter_pack_sign_round">
+		<text>Круглый знак</text>
+	</string>
+	<string id="st_shelter_pack_sign_chernobyl">
+		<text>Табличка «Чернобыль»</text>
+	</string>
+	<string id="st_shelter_pack_radiator">
+		<text>Батарея</text>
+	</string>
+	<string id="st_shelter_pack_newspapers">
+		<text>Газеты</text>
+	</string>
+	<string id="st_shelter_pack_fence_yellow">
+		<text>Жёлтое ограждение</text>
+	</string>
+	<string id="st_shelter_pack_descr">
+		<text>Предмет обстановки. Ставится в режиме расстановки (H) из тайника убежища.</text>
+	</string>
+</string_table>

@@ -3,10 +3,10 @@
 ; items: what the cleaning puts into the stash for what it takes away (skipped where the section is missing).
 ; Made from the level files by a script (tools\shelter\cleaning.py); the indices only fit these files.
 
-; the lower hall, the water hall: open from the first visit (the doors lying on the floor are props)
+; the lower hall, the water hall: open from the first visit (the doors lying on the floor are props), the rebar of the hall's broken corner
 [start]
-visuals = 339, 361, 274, 70
-triangles = 36801-37741,81003-81004,81013-81014,83478-84342,88138-88229
+visuals = 339, 361, 274, 70, 344, 345
+triangles = 36801-37741,81003-81004,81013-81014,83478-84342,84405-86453,88138-88229
 
 ; the north corridor and its two southern side rooms (open to it), behind point 3's mound (their furniture is movable props: props.py)
 [corridor]
@@ -32,3 +32,13 @@ triangles = 36727-36800
 [room_12]
 visuals = 266
 triangles = 36594-36667
+
+; the top floor: its rubble, the broken ceiling and its rebar, hoses, cables, rusty sheets (the ducts are props)
+[top]
+visuals = 395, 396, 424, 528, 64, 419, 420, 421, 422, 423, 529, 530
+triangles = 95224-95244,95246,95251,95253-95254,95256-95258,95261,95265-95266,95268,95272-96213,97030-97049,97119-97122,100207-104802,104870-104871,104875-104876,104883-104887,104889,104892,104896,104902,178167-178698
+
+; the lower floor: the tunnel's water and slime
+[low]
+visuals = 49, 557
+triangles = 18916-18999,19032-19047,19104-19119,19168-19175,81883-81885,81894-81898,81907-81908,180957,180960,180962-180965,180969,180974,180976,182518,182527,182625,182641,182829

@@ -256,7 +256,7 @@
 		<text>Put into the stash</text>
 	</string>
 	<string id="st_shelter_build_hint">
-		<text>Wheel: choose  |  LMB: place  |  RMB on furniture: into the stash  |  H: leave</text>
+		<text>Arrows: category  |  Wheel: choose  |  LMB: place  |  RMB on furniture: into the stash  |  H: leave</text>
 	</string>
 	<string id="st_shelter_build_empty">
 		<text>No furniture in the stash</text>
@@ -914,5 +914,53 @@
 	</string>
 	<string id="st_shelter_room_low_tunnel">
 		<text>The tunnel past the gate</text>
+	</string>
+	<string id="st_shelter_room_state_no_lift">
+		<text>State: no way in, the lift is broken</text>
+	</string>
+	<string id="st_shelter_room_rename">
+		<text>Its own name:</text>
+	</string>
+	<string id="st_shelter_room_rename_save">
+		<text>Write it</text>
+	</string>
+	<string id="st_shelter_prop_duct">
+		<text>Ventilation duct</text>
+	</string>
+	<string id="st_shelter_prop_duct_descr">
+		<text>A rusty ventilation duct from the bunker. It can stand anywhere.</text>
+	</string>
+	<string id="st_shelter_cat_all">
+		<text>All</text>
+	</string>
+	<string id="st_shelter_cat_bar">
+		<text>Bar and kitchen</text>
+	</string>
+	<string id="st_shelter_cat_furniture">
+		<text>Furniture</text>
+	</string>
+	<string id="st_shelter_cat_storage">
+		<text>Storage</text>
+	</string>
+	<string id="st_shelter_cat_workshop">
+		<text>Workshop</text>
+	</string>
+	<string id="st_shelter_cat_medical">
+		<text>Medical</text>
+	</string>
+	<string id="st_shelter_cat_science">
+		<text>Science</text>
+	</string>
+	<string id="st_shelter_cat_tech">
+		<text>Technology</text>
+	</string>
+	<string id="st_shelter_cat_light">
+		<text>Light</text>
+	</string>
+	<string id="st_shelter_cat_walls">
+		<text>Walls and doors</text>
+	</string>
+	<string id="st_shelter_cat_decor">
+		<text>Decor</text>
 	</string>
 </string_table>

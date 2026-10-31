@@ -11,7 +11,7 @@ from levelgeom import Geom
 from levelvis import level
 
 ZONES = [
-    ('start', 'the lower hall, the water hall: open from the first visit (the doors lying on the floor are props)', [339, 361, 274, 70]),
+    ('start', "the lower hall, the water hall: open from the first visit (the doors lying on the floor are props), the rebar of the hall's broken corner", [339, 361, 274, 70, 344, 345]),
     ('corridor', "the north corridor and its two southern side rooms (open to it), behind point 3's mound (their "
      "furniture is movable props: props.py)", [57, 200]),
     # the side rooms behind the doorway mounds (8..13): each opens when its mound is dug out
@@ -19,6 +19,11 @@ ZONES = [
     ('room_10', 'the west side room in the middle', [237]),
     ('room_11', 'the east side room in the middle', [273]),
     ('room_12', 'the south-west side room', [266]),
+    # open with their lifts (shelter_lift.script). The east hall's floor (370) and the mound at the tunnel's east end (140)
+    # stay: there's no floor under them. The water (49) is one visual over the whole tunnel, past the gate too
+    ('top', 'the top floor: its rubble, the broken ceiling and its rebar, hoses, cables, rusty sheets (the ducts are props)',
+     [395, 396, 424, 528, 64, 419, 420, 421, 422, 423, 529, 530]),
+    ('low', "the lower floor: the tunnel's water and slime", [49, 557]),
 ]
 
 level_dir, out = sys.argv[1], sys.argv[2]

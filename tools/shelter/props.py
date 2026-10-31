@@ -35,6 +35,8 @@ VISUALS = [
     428, 429, 430, 431, 432, 433, 434, 435, 445, 446, 447, 448, 466, 467, 444, 460, 464, 491,
     # barrels, the doors lying in the hall
     56, 282, 544, 545,
+    # the top floor's ventilation ducts lying about, with their grilles
+    60, 526, 527,
 ]  # not the cabins' desks (518-520): the laptop and the stash are on and under them; not 331, 332 (mtl_bochka_05a: the
 #    bolts of the south hall's frames)
 # textures whose pieces may make one object together
@@ -47,6 +49,7 @@ FAMILIES = [
     {"wood\\wood_collect"},
     {"door\\door_white_02", "door\\door_white_04"},
     {"mtl\\mtl_barrel_01"}, {"mtl\\mtl_bochka_03_r"},
+    {"mtl\\mtl_tubes3b", "prop\\prop_grate_01"},
 ]
 WHOLE = ({"wood\\wood_fence_01", "wood\\wood_jasik"}, 100)  # a crate in one piece: its textures, triangles at least
 SMALL = 0.2  # a piece no bigger than this (m) is a small thing on something
@@ -66,6 +69,7 @@ KINDS = {
     "barrel": ("st_shelter_item_barrel", ("ui\\ui_decor", 5, 2, 1, 2), "objects\\barrel", 30),
     "door": ("st_shelter_prop_door", ("ui\\ui_doors", 2, 0, 2, 3), "objects\\large_furniture", 25),
     "pallet": ("st_shelter_prop_pallet", ("ui\\ui_decor", 3, 0, 4, 2), "objects\\large_furniture", 15),
+    "duct": ("st_shelter_prop_duct", ("ui\\ui_decor", 18, 0, 2, 3), "objects\\large_metal_trash", 12),
 }
 
 
@@ -179,6 +183,8 @@ def kind_of(obj):
         return "barrel"
     if textures & {"door\\door_white_02", "door\\door_white_04"}:
         return "door"
+    if "mtl\\mtl_tubes3b" in textures:
+        return "duct"
     return "boards"
 
 

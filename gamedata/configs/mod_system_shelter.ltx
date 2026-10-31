@@ -508,3 +508,12 @@ script_binding    = shelter_lift.init_use
 visual            = dynamics\shelter\tunnel_gate.ogf
 script_binding    = shelter_lift.init_use
 shelter_tip       = st_shelter_gate_closed
+
+; in place of the debris the top floor's cleaning takes (tools\shelter\top_patch.py)
+[shelter_top_column]:physic_object
+visual            = dynamics\shelter\top_column.ogf
+script_binding    = shelter_lift.init_still
+
+[shelter_top_plate]:physic_object
+visual            = dynamics\shelter\top_plate.ogf
+script_binding    = shelter_lift.init_still

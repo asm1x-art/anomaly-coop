@@ -70,11 +70,18 @@ end
 -----------------------------------------------------------------------------------------------------------------------
 -- The furnishing mode: a panel of the stash's furniture at the bottom of the screen. The wheel picks a piece, the left
 -- button places it (Hideout Furniture's placing: F puts it down, Esc cancels), the right button puts the piece of
--- furniture looked at into the stash; H or Esc leaves the mode.
+-- furniture looked at into the stash; the left and right arrows go through the categories; H or Esc leaves the mode.
 
 local mode = false
-local entries = {} -- the stash's furniture by kind, by name: { section, name, ids }
+local entries = {} -- the stash's furniture of the category shown, by name: { section, name, ids }
 local selected = 1
+-- the categories, in the panel's order; a thing's own (shelter_category: the packs) or by its section ([shelter_categories])
+local CATEGORIES = { "all", "bar", "furniture", "storage", "workshop", "medical", "science", "tech", "light", "walls", "decor" }
+local category = 1
+
+local function category_of(section)
+	return ini_sys:r_string_ex(section, "shelter_category") or ini_sys:r_string_ex("shelter_categories", section) or "decor"
+end
 local was_placing = false
 
 local function stash_furniture()
@@ -97,6 +104,21 @@ local function stash_furniture()
 	end
 	table.sort(list, function(a, b) return a.name < b.name end)
 	return list
+end
+
+-- of a list, what's in the category shown
+local function of_category(list)
+	local cat = CATEGORIES[category]
+	if cat == "all" then
+		return list
+	end
+	local out = {}
+	for _, e in ipairs(list) do
+		if category_of(e.section) == cat then
+			out[#out + 1] = e
+		end
+	end
+	return out
 end
 
 class "UIShelterBuild" (CUIScriptWnd)
@@ -136,7 +158,8 @@ function UIShelterBuild:Refresh()
 		return -- the message stays for its time
 	end
 	local e = entries[selected]
-	self.title:SetText(e and string.format("%s  x%d", e.name, #e.ids) or game.translate_string("st_shelter_build_empty"))
+	local cat = game.translate_string("st_shelter_cat_" .. CATEGORIES[category])
+	self.title:SetText(string.format("%s:  %s", cat, e and string.format("%s  x%d", e.name, #e.ids) or game.translate_string("st_shelter_build_empty")))
 end
 
 function UIShelterBuild:Status(text)
@@ -153,7 +176,7 @@ function UIShelterBuild:Update()
 end
 
 local function refresh()
-	entries = stash_furniture()
+	entries = of_category(stash_furniture())
 	selected = math.max(1, math.min(selected, #entries))
 	if panel then
 		panel:Refresh()
@@ -214,6 +237,19 @@ local function stash_looked_at()
 	end)
 end
 
+-- the next category that has something, this way round; none but "all" if the stash is empty
+local function next_category(step)
+	local all = stash_furniture()
+	for _ = 1, #CATEGORIES do
+		category = (category - 1 + step) % #CATEGORIES + 1
+		if #of_category(all) > 0 then
+			break
+		end
+	end
+	selected = 1
+	refresh()
+end
+
 local function on_key_press(dik)
 	if dik ~= KEY then
 		return
@@ -235,6 +271,11 @@ end
 -- firing with empty hands, which the button's release does); Esc leaves it
 local function on_before_key_press(dik, bind, dis, flags)
 	if not mode or Check_UI() then
+		return
+	end
+	if not placing() and (dik == DIK_keys.DIK_LEFT or dik == DIK_keys.DIK_RIGHT) then
+		flags.ret_value = false
+		next_category(dik == DIK_keys.DIK_RIGHT and 1 or -1)
 		return
 	end
 	if mouse_button(bind) then

@@ -65,6 +65,8 @@ local CLEAN = {
 		room_11 = { { 3.9, 11.5, 3, 7, 18.3, 25.5 } },
 		room_12 = { { -7.5, 0.8, 3, 7, 11, 18.3 } },
 		room_13 = { { 3.9, 11.5, 3, 7, 11, 18.3 } },
+		top = { { -3, 14, 18, 25, 9, 38 } }, -- the top floor and the lower one's science sector: open with their lifts
+		low = { { -42, 2, -24, -15, -13, -3 } },
 	},
 	hours = 24,
 	satiety = 0.6, -- below it the player is too hungry to start

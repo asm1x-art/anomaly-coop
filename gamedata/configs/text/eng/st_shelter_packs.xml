@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_pack_bar_counter">
+		<text>Bar counter with a kitchen</text>
+	</string>
+	<string id="st_shelter_pack_bar_counter_2">
+		<text>Bar counter</text>
+	</string>
+	<string id="st_shelter_pack_bar_table">
+		<text>Small table</text>
+	</string>
+	<string id="st_shelter_pack_bar_chair">
+		<text>Chair</text>
+	</string>
+	<string id="st_shelter_pack_bar_shelf">
+		<text>Wall shelf with tins</text>
+	</string>
+	<string id="st_shelter_pack_bar_stool">
+		<text>Wooden stool</text>
+	</string>
+	<string id="st_shelter_pack_bar_cans">
+		<text>A heap of tins</text>
+	</string>
+	<string id="st_shelter_pack_bar_bottles">
+		<text>A box of bottles</text>
+	</string>
+	<string id="st_shelter_pack_bar_stove">
+		<text>Small stove</text>
+	</string>
+	<string id="st_shelter_pack_bar_pot">
+		<text>Big pot</text>
+	</string>
+	<string id="st_shelter_pack_bar_basin">
+		<text>Basin</text>
+	</string>
+	<string id="st_shelter_pack_bar_tub">
+		<text>Wooden tub</text>
+	</string>
+	<string id="st_shelter_pack_sofa">
+		<text>Sofa</text>
+	</string>
+	<string id="st_shelter_pack_sofa_2">
+		<text>Worn sofa</text>
+	</string>
+	<string id="st_shelter_pack_desk">
+		<text>Desk</text>
+	</string>
+	<string id="st_shelter_pack_desk_2">
+		<text>Office desk</text>
+	</string>
+	<string id="st_shelter_pack_desk_3">
+		<text>Hospital desk</text>
+	</string>
+	<string id="st_shelter_pack_desk_4">
+		<text>Wide desk</text>
+	</string>
+	<string id="st_shelter_pack_desk_ammo">
+		<text>Desk with an ammo box</text>
+	</string>
+	<string id="st_shelter_pack_nightstand">
+		<text>Nightstand</text>
+	</string>
+	<string id="st_shelter_pack_wardrobe">
+		<text>Wardrobe</text>
+	</string>
+	<string id="st_shelter_pack_wardrobe_2">
+		<text>Open wardrobe</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf">
+		<text>Bookshelf</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf_2">
+		<text>Tall shelves</text>
+	</string>
+	<string id="st_shelter_pack_bookshelf_3">
+		<text>Narrow shelves</text>
+	</string>
+	<string id="st_shelter_pack_cabinet_low">
+		<text>Low cabinet</text>
+	</string>
+	<string id="st_shelter_pack_table_small">
+		<text>Small table</text>
+	</string>
+	<string id="st_shelter_pack_bed_iron">
+		<text>Iron bed</text>
+	</string>
+	<string id="st_shelter_pack_locker">
+		<text>Locker</text>
+	</string>
+	<string id="st_shelter_pack_locker_2">
+		<text>Locker</text>
+	</string>
+	<string id="st_shelter_pack_lockers">
+		<text>A row of lockers</text>
+	</string>
+	<string id="st_shelter_pack_shelving_green">
+		<text>Green shelving</text>
+	</string>
+	<string id="st_shelter_pack_cabinet_green">
+		<text>Green cabinet</text>
+	</string>
+	<string id="st_shelter_pack_barrel_rust">
+		<text>Rusty barrel</text>
+	</string>
+	<string id="st_shelter_pack_barrel_grey">
+		<text>Grey barrel</text>
+	</string>
+	<string id="st_shelter_pack_mil_box">
+		<text>Army crate</text>
+	</string>
+	<string id="st_shelter_pack_mil_box_2">
+		<text>Army crate</text>
+	</string>
+	<string id="st_shelter_pack_safe">
+		<text>Safe</text>
+	</string>
+	<string id="st_shelter_pack_toolbox">
+		<text>Toolbox</text>
+	</string>
+	<string id="st_shelter_pack_carton">
+		<text>Carton</text>
+	</string>
+	<string id="st_shelter_pack_pallet">
+		<text>Pallet</text>
+	</string>
+	<string id="st_shelter_pack_crates">
+		<text>A stack of crates</text>
+	</string>
+	<string id="st_shelter_pack_reel">
+		<text>Cable reel</text>
+	</string>
+	<string id="st_shelter_pack_motor">
+		<text>Electric motor</text>
+	</string>
+	<string id="st_shelter_pack_motors">
+		<text>Two electric motors</text>
+	</string>
+	<string id="st_shelter_pack_machine">
+		<text>A machine on a pallet</text>
+	</string>
+	<string id="st_shelter_pack_machine_2">
+		<text>Machine</text>
+	</string>
+	<string id="st_shelter_pack_machine_3">
+		<text>A drive with a flywheel</text>
+	</string>
+	<string id="st_shelter_pack_tools_box">
+		<text>A crate with instruments</text>
+	</string>
+	<string id="st_shelter_pack_sledgehammer">
+		<text>Sledgehammer</text>
+	</string>
+	<string id="st_shelter_pack_valve">
+		<text>Valve</text>
+	</string>
+	<string id="st_shelter_pack_hook">
+		<text>Crane hook</text>
+	</string>
+	<string id="st_shelter_pack_extinguisher">
+		<text>Fire extinguisher</text>
+	</string>
+	<string id="st_shelter_pack_bench_table">
+		<text>Workshop table</text>
+	</string>
+	<string id="st_shelter_pack_bench_vise">
+		<text>A vise and odds and ends</text>
+	</string>
+	<string id="st_shelter_pack_vise">
+		<text>Vise</text>
+	</string>
+	<string id="st_shelter_pack_instruments">
+		<text>Tool set</text>
+	</string>
+	<string id="st_shelter_pack_med_stand">
+		<text>Operating stand</text>
+	</string>
+	<string id="st_shelter_pack_med_sink">
+		<text>Sink</text>
+	</string>
+	<string id="st_shelter_pack_med_sinks">
+		<text>A row of sinks</text>
+	</string>
+	<string id="st_shelter_pack_med_toilet">
+		<text>Toilet with a cistern</text>
+	</string>
+	<string id="st_shelter_pack_med_table">
+		<text>Medical trolley</text>
+	</string>
+	<string id="st_shelter_pack_med_litter">
+		<text>Wheeled stretcher</text>
+	</string>
+	<string id="st_shelter_pack_med_chair">
+		<text>Wheelchair</text>
+	</string>
+	<string id="st_shelter_pack_med_flask">
+		<text>Flask</text>
+	</string>
+	<string id="st_shelter_pack_med_flask_2">
+		<text>Round flask</text>
+	</string>
+	<string id="st_shelter_pack_sci_microscope">
+		<text>Microscope</text>
+	</string>
+	<string id="st_shelter_pack_sci_desk">
+		<text>A scientist's workplace</text>
+	</string>
+	<string id="st_shelter_pack_sci_bench">
+		<text>Lab table with instruments</text>
+	</string>
+	<string id="st_shelter_pack_sci_device">
+		<text>An instrument in a case</text>
+	</string>
+	<string id="st_shelter_pack_sci_psyradar">
+		<text>Psy radar</text>
+	</string>
+	<string id="st_shelter_pack_sci_psyradar_2">
+		<text>Psy radar</text>
+	</string>
+	<string id="st_shelter_pack_sci_console">
+		<text>A console with a round screen</text>
+	</string>
+	<string id="st_shelter_pack_sci_control">
+		<text>Control desk</text>
+	</string>
+	<string id="st_shelter_pack_sci_control_2">
+		<text>Control desk</text>
+	</string>
+	<string id="st_shelter_pack_sci_control_3">
+		<text>Long control desk</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack">
+		<text>An instrument rack</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack_2">
+		<text>An instrument block</text>
+	</string>
+	<string id="st_shelter_pack_sci_rack_3">
+		<text>An instrument cabinet</text>
+	</string>
+	<string id="st_shelter_pack_sci_scanner">
+		<text>Anomaly scanner</text>
+	</string>
+	<string id="st_shelter_pack_sci_scanner_2">
+		<text>Artefact scanner</text>
+	</string>
+	<string id="st_shelter_pack_sci_generator">
+		<text>A device with coils</text>
+	</string>
+	<string id="st_shelter_pack_sci_emitter">
+		<text>Psy emitter</text>
+	</string>
+	<string id="st_shelter_pack_sci_chair">
+		<text>Lab chair</text>
+	</string>
+	<string id="st_shelter_pack_sci_cart">
+		<text>Lab cart</text>
+	</string>
+	<string id="st_shelter_pack_sci_board">
+		<text>Blackboard</text>
+	</string>
+	<string id="st_shelter_pack_tech_radio_rack">
+		<text>Radio rack</text>
+	</string>
+	<string id="st_shelter_pack_tech_tape">
+		<text>Tape recorder</text>
+	</string>
+	<string id="st_shelter_pack_tech_block">
+		<text>Electronics block</text>
+	</string>
+	<string id="st_shelter_pack_tech_block_2">
+		<text>Block with a display</text>
+	</string>
+	<string id="st_shelter_pack_tech_cabinet">
+		<text>Electrical cabinet</text>
+	</string>
+	<string id="st_shelter_pack_tech_cabinet_2">
+		<text>Control cabinet</text>
+	</string>
+	<string id="st_shelter_pack_tech_transformer">
+		<text>Transformer</text>
+	</string>
+	<string id="st_shelter_pack_tech_box">
+		<text>Power box</text>
+	</string>
+	<string id="st_shelter_pack_tech_box_2">
+		<text>High voltage box</text>
+	</string>
+	<string id="st_shelter_pack_tech_panel">
+		<text>Instrument panel</text>
+	</string>
+	<string id="st_shelter_pack_tech_wall_panel">
+		<text>Wall panel</text>
+	</string>
+	<string id="st_shelter_pack_tech_radio">
+		<text>Radio with an antenna</text>
+	</string>
+	<string id="st_shelter_pack_tech_receiver">
+		<text>Receiver</text>
+	</string>
+	<string id="st_shelter_pack_tech_monitor">
+		<text>Monitor with a screen</text>
+	</string>
+	<string id="st_shelter_pack_tech_pc">
+		<text>Computer case</text>
+	</string>
+	<string id="st_shelter_pack_tech_diesel">
+		<text>Diesel generator</text>
+	</string>
+	<string id="st_shelter_pack_tech_amp">
+		<text>Amplifier</text>
+	</string>
+	<string id="st_shelter_pack_map_zone">
+		<text>A map of the Zone</text>
+	</string>
+	<string id="st_shelter_pack_sign_danger">
+		<text>A warning sign</text>
+	</string>
+	<string id="st_shelter_pack_poster">
+		<text>Poster</text>
+	</string>
+	<string id="st_shelter_pack_sign_round">
+		<text>Round sign</text>
+	</string>
+	<string id="st_shelter_pack_sign_chernobyl">
+		<text>A Chernobyl plate</text>
+	</string>
+	<string id="st_shelter_pack_radiator">
+		<text>Radiator</text>
+	</string>
+	<string id="st_shelter_pack_newspapers">
+		<text>Newspapers</text>
+	</string>
+	<string id="st_shelter_pack_fence_yellow">
+		<text>Yellow barrier</text>
+	</string>
+	<string id="st_shelter_pack_descr">
+		<text>A thing to furnish with. Placed in the furnishing mode (H) from the shelter's stash.</text>
+	</string>
+</string_table>

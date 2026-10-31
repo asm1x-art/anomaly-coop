@@ -164,7 +164,30 @@ function clear_rubble()
 	return removed
 end
 
+-- End: one of each pack's things into the shelter's stash, to try them (tools\\shelter\\packs.json)
+function fill_stash()
+	local id = shelter.state("stash_id", nil)
+	local box = id and alife_object(id)
+	if not box then
+		return msg("no stash yet")
+	end
+	local ini = ini_sys
+	local n = 0
+	for i = 0, ini:line_count("shelter_pack_items") - 1 do
+		local _, sec = ini:r_line_ex("shelter_pack_items", i, "", "")
+		if sec and ini:section_exist(sec) then
+			alife_create_item(sec, box)
+			n = n + 1
+		end
+	end
+	msg("packs: " .. n .. " things in the stash; H, the arrows go through the categories")
+	return n
+end
+
 local function on_key_press(dik)
+	if dik == DIK_keys.DIK_END and db.actor then
+		return fill_stash()
+	end
 	if dik == DIK_keys.DIK_INSERT and db.actor then
 		return clear_rubble()
 	end

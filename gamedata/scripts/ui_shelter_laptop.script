@@ -85,6 +85,12 @@ local function load_plan()
 	end
 end
 
+-- a room's name: the one the group gave it, else its own
+local function room_title(room)
+	local own = shelter.state("room_title_" .. room.id, nil)
+	return own and tostring(own) or tr(room.name)
+end
+
 -- a room's state: as its cleaning zone; one with no zone is just open
 local function room_state(room)
 	return room.zone and shelter.zone_state(room.zone) or "open"
@@ -288,6 +294,12 @@ function UIShelterOS:open_plan()
 			local rx, ry, rw, rh = self:room_rect(room)
 			self:rect(rx, ry, rw, rh, { tint[2], tint[3], tint[4] }, win, tint[1])
 		end
+		-- the names the group gave are written on the plan
+		local own = room.floor == self.plan_floor and shelter.state("room_title_" .. room.id, nil)
+		if own then
+			local rx, ry, rw = self:room_rect(room)
+			self:text(rx + 3, ry + 2, rw - 6, 20, tostring(own), C.text, win, nil, "s")
+		end
 	end
 	-- what is where, who is in
 	for _, m in ipairs(MARKS) do
@@ -392,11 +404,12 @@ function UIShelterOS:show_card(room)
 	if not room then
 		self:text(pad, pad, w - 2 * pad, 48, tr("st_shelter_plan_hint"), C.dim, card)
 	else
-		self:text(pad, 12, w - 2 * pad, 34, tr(room.name), C.text, card, nil, "l")
+		self:text(pad, 12, w - 2 * pad, 34, room_title(room), C.text, card, nil, "l")
 		local state = room_state(room)
 		local state_color = state == "blocked" and C.bad or state == "dirty" and C.warn or C.good
 		self:round(pad, 54, 10, 10, state_color, card, 5)
-		self:text(pad + 18, 46, w - 2 * pad - 18, 26, tr("st_shelter_room_state_" .. state), C.text, card)
+		self:text(pad + 18, 46, w - 2 * pad - 18, 26,
+			tr(state == "blocked" and room.floor ~= "mid" and "st_shelter_room_state_no_lift" or "st_shelter_room_state_" .. state), C.text, card)
 		local role = role_of(room)
 		self:text(pad, 74, w - 2 * pad, 26, tr("st_shelter_room_role", tr("st_shelter_role_" .. (role or "none"))), C.dim, card)
 		local by = 112
@@ -418,6 +431,25 @@ function UIShelterOS:show_card(room)
 				by = by + 44
 			end
 		end
+		-- its name: empty gives its own back
+		self:text(pad, by, w - 2 * pad, 24, tr("st_shelter_room_rename"), C.dim, card, nil, "s")
+		by = by + 26
+		self:framed(pad, by, w - 2 * pad, 36, C.field, card, 6)
+		local edit = self.xml:InitEditBox("edit", card)
+		self:place(edit, pad + 8, by + 5, w - 2 * pad - 16, 26)
+		local own = shelter.state("room_title_" .. room.id, nil)
+		if own then
+			edit:SetText(tostring(own))
+		end
+		self:click_at(self.app_clicks, x + pad, y + by, w - 2 * pad, 36, function() edit:CaptureFocus(true) end, nil, "card")
+		by = by + 44
+		self:button(pad, by, w - 2 * pad, 34, tr("st_shelter_room_rename_save"), function()
+			local text = trim(edit:GetText() or "")
+			shelter.set_state("room_title_" .. room.id, text ~= "" and text or nil)
+			self.plan_next = self.plan_floor
+			self:open("plan")
+			self:show_card(room)
+		end, self.app_clicks, card, self.wx + x, self.wy + y).card = true
 	end
 	-- the legend
 	local ly = h - #LEGEND * 26 - 14
@@ -479,7 +511,7 @@ function UIShelterOS:fill_bar()
 	local room = shelter.state("room_store", nil)
 	local name
 	for _, r in ipairs(rooms) do
-		name = r.id == room and tr(r.name) or name
+		name = r.id == room and room_title(r) or name
 	end
 	local goods = shelter_bar.stock()
 	local food, drink = 0, 0

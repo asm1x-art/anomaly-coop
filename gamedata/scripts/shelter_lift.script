@@ -23,9 +23,9 @@ local BOX = { lv = 1850, pos = { -4.55, 3.95, -16.42 } } -- the control box, on 
 local GATE = { lv = 890, pos = { -41.82, -21.9, -7.52 }, along = { -0.96, 0.27 } }
 -- what each repair is: its state, its parts in [shelter_lift], its window's texts
 local REPAIRS = {
-	panel = { state = "lift_repaired", line = "repair", title = "st_shelter_lift_title", broken = "st_shelter_lift_broken",
+	panel = { state = "lift_repaired", zone = "top", line = "repair", title = "st_shelter_lift_title", broken = "st_shelter_lift_broken",
 		done = "st_shelter_lift_repaired" },
-	box = { state = "lift_low_repaired", line = "repair_box", title = "st_shelter_lift_box", broken = "st_shelter_lift_box_broken",
+	box = { state = "lift_low_repaired", zone = "low", line = "repair_box", title = "st_shelter_lift_box", broken = "st_shelter_lift_box_broken",
 		done = "st_shelter_lift_box_repaired" },
 }
 local RIDE = { fade = 1.4, hold = 2.2, black_id = 3010 } -- seconds: the screen going dark, then the dark
@@ -107,6 +107,7 @@ function repair(kind)
 		alife_release(item)
 	end
 	shelter.set_state(REPAIRS[kind].state, true)
+	shelter.set_state("open_" .. REPAIRS[kind].zone, true) -- its floor counts for the cleaning
 	play(SND.repair)
 	msg(REPAIRS[kind].done)
 	return true
@@ -240,6 +241,54 @@ function init_use(obj)
 end
 
 -------------------------------------------------------------------------------
+-- what the top floor's cleaning needs in place of the debris it took: a whole column, a plate under the ceiling's sagging
+-- slab (tools\\shelter\\top_patch.py); once the floor is clean, also in a save cleaned before they were made
+
+local PATCHES = {
+	{ zone = "top", state = "top_patched", lv = STOPS.top.lv, items = {
+		{ section = "shelter_top_column", pos = { 2.215, 19.35, 18.055 } },
+		{ section = "shelter_top_plate", pos = { 2.725, 22.33, 27.0 } },
+	} },
+}
+
+class "still_binder" (object_binder)
+function still_binder:__init(obj) super(obj)
+end
+function still_binder:update(delta)
+	object_binder.update(self, delta)
+	if not self.frozen then
+		local shell = self.object:get_physics_shell()
+		if shell then
+			shell:freeze()
+			self.frozen = true
+		end
+	end
+end
+function init_still(obj)
+	obj:bind_object(still_binder(obj))
+end
+
+local next_patch_check = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < next_patch_check or level.name() ~= LEVEL then
+		return
+	end
+	next_patch_check = now + 2000
+	for _, patch in ipairs(PATCHES) do
+		if shelter.state("clean_" .. patch.zone, false) and not shelter.state(patch.state, false) then
+			shelter.set_state(patch.state, true)
+			shelter.once(patch.state, function()
+				for _, t in ipairs(patch.items) do
+					alife_create(t.section, vec(t.pos), patch.lv, db.actor:game_vertex_id())
+				end
+			end)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
 -- the lifts put in the world; a save from before them loses the rubble that stood at their doors
 
 local function drop_mound(section)
@@ -279,10 +328,44 @@ local function move_low_door()
 	shelter.set_state("lift_low_at_tunnel", true)
 end
 
+-- The AI map knows nothing of the doors and the gate: it still goes through them, and an NPC would walk into them and stick.
+-- Each keeps NPCs out with a default OUT restrictor round it (as the rubble did, scripts\\shelter.script). Each game has
+-- its own, its id in an actor var. The floors stay whole on their own: the bar's visitors on top, the lab's people in the
+-- middle.
+local KEEP_OUT = {
+	{ id = "mid", lv = 2497, pos = { 2.33, 4.4, 30.9 }, radius = 1.8 },
+	{ id = "top", lv = 2494, pos = { 2.09, 20.4, 30.2 }, radius = 1.8 },
+	{ id = "hall", lv = 1850, pos = { -2.91, 4.0, -15.8 }, radius = 1.8 },
+	{ id = "low", lv = 1286, pos = { -20.67, -19.8, -4.9 }, radius = 1.8 },
+	{ id = "gate", lv = 890, pos = { -41.82, -20.4, -7.52 }, radius = 4.6 },
+}
+
+local function keep_out()
+	local sim = alife()
+	for _, k in ipairs(KEEP_OUT) do
+		local var = "shelter_lift_keep_out_" .. k.id
+		local id = load_var(db.actor, var, nil)
+		local se = id and sim:object(id)
+		if not (se and se:section_name() == "space_restrictor") then
+			local r = alife_create("space_restrictor", vec(k.pos), k.lv, db.actor:game_vertex_id())
+			local data = r and utils_stpk.get_space_restrictor_data(r)
+			if data then
+				data.shapes = { { shtype = 0, offset = vector():set(0, 0, 0), center = vector():set(0, 0, 0), radius = k.radius } }
+				data.restrictor_type = 1 -- OUT by default
+				utils_stpk.set_space_restrictor_data(data, r)
+				save_var(db.actor, var, r.id)
+			elseif r then
+				alife_release(r)
+			end
+		end
+	end
+end
+
 local function actor_on_first_update()
 	if level.name() ~= LEVEL then
 		return
 	end
+	keep_out()
 	if not shelter.state("lift_placed", false) then
 		shelter.once("lift", function()
 			drop_mound("shelter_mound_4")
@@ -303,6 +386,11 @@ local function actor_on_first_update()
 	elseif not shelter.state("lift_low_at_tunnel", false) then
 		shelter.once("lift_low_moved", move_low_door)
 	end
+	for kind, r in pairs(REPAIRS) do -- repaired before the cleaning reached its floor
+		if repaired(kind) and not shelter.state("open_" .. r.zone, false) then
+			shelter.set_state("open_" .. r.zone, true)
+		end
+	end
 	if not shelter.state("gate_placed", false) then
 		shelter.once("tunnel_gate", function()
 			local se = alife_create("shelter_tunnel_gate", vec(GATE.pos), GATE.lv, db.actor:game_vertex_id())
@@ -316,4 +404,5 @@ end
 
 function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
 end
