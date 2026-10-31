@@ -131,6 +131,7 @@ public:
 		u32 isWater : 1;
 
 		u32 iScopeLense : 2; //  Redotix99: for 3D Shader Based Scopes 		
+		u32 bOverHeat : 1; // a HUD sight's mark drawn over the heat vision (r__dsgraph_build.cpp)
 	};
 
 public:

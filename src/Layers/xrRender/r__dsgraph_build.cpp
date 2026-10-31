@@ -125,6 +125,20 @@ void R_dsgraph_structure::r_dsgraph_insert_dynamic(dxRender_Visual* pVisual, Fve
 	// HUD rendering
 	if (RI.val_bHUD)
 	{
+#if defined(USE_DX11)
+		// the heat vision draws the picture anew from the G-buffer, and what the forward pass drew under it is gone: a
+		// sight's mark is drawn after it instead, with the 3D scopes' reticles (r4_rendertarget_phase_combine.cpp)
+		if (sh->flags.bOverHeat && ps_r2_heatvision > 0 && scope_3D_fake_enabled && !RI.val_bCamAttached)
+		{
+			mapSorted_Node* N = mapScopeHUDSorted.insertInAnyWay(distSQ);
+			N->val.ssa = SSA;
+			N->val.pObject = RI.val_pObject;
+			N->val.pVisual = pVisual;
+			N->val.Matrix = *RI.val_pTransform;
+			N->val.se = sh;
+			return;
+		}
+#endif
 		if (sh->flags.bStrictB2F)
 		{
 #if RENDER!=R_R1

@@ -516,7 +516,9 @@ void CRenderTarget::phase_combine()
 		phase_ssfx_motion_blur();
 	}
 
-	if (scope_3D_fake_enabled)
+	// the heat vision draws the picture anew from the G-buffer: the 3D scopes and the sights' marks go after it then
+	const bool reticle_over_heat = ps_r2_heatvision > 0;
+	if (scope_3D_fake_enabled && !reticle_over_heat)
 	{
 		phase_3DSSReticle(); // Redotix99: for 3D Shader Based Scopes
 	}
@@ -561,6 +563,9 @@ void CRenderTarget::phase_combine()
 	if (ps_r2_heatvision > 0)
 		phase_heatvision();
 	//--DSR-- HeatVision_end
+
+	if (scope_3D_fake_enabled && reticle_over_heat)
+		phase_3DSSReticle();
 
 	if (scope_fake_enabled)
 	{

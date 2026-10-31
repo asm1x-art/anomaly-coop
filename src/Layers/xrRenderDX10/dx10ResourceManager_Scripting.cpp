@@ -126,6 +126,13 @@ public:
 		return *this;
 	}
 
+	// a HUD sight's mark (a reflex sight's dot) drawn over the heat vision, with the 3D scopes' reticles
+	adopt_compiler& _o_over_heat(bool E)
+	{
+		C->SH->flags.bOverHeat = E;
+		return *this;
+	}
+
 	adopt_compiler& _o_distort(bool E)
 	{
 		C->SH->flags.bDistort = E;
@@ -407,6 +414,7 @@ void CResourceManager::LS_Load()
 		.def("aref", &adopt_compiler::_aref, return_reference_to<1>())
 
 		.def("scopelense", &adopt_compiler::_o_scopelense, return_reference_to<1>()) //  Redotix99: for 3D Shader Based Scopes
+		.def("over_heat", &adopt_compiler::_o_over_heat, return_reference_to<1>())
 
 		//	For compatibility only
 		.def("dx10color_write_enable", &adopt_compiler::_dx10color_write_enable, return_reference_to<1>())
