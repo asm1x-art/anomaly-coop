@@ -39,7 +39,7 @@ visual          = dynamics\box\box_wood_02.ogf
 
 ; the bar (shelter_bar.script): what it sells from the store room's boxes (items' kinds: food; drink, which has the
 ; smokes too), one thing every sell_hours game hours at the item's cost times the markup (set on the laptop: from
-; markup_min to markup_max by markup_step); the till it puts the money into: a safe under the laptop's desk
+; markup_min to markup_max by markup_step); the money goes into the till, a sum taken on the laptop
 [shelter_bar]
 kinds           = i_food, i_drink
 sell_hours      = 1
@@ -47,10 +47,9 @@ markup          = 1.1
 markup_min      = 1
 markup_max      = 3
 markup_step     = 0.05
-till            = shelter_till
-till_pos        = -2.0, 2.95, -5.0
-till_yaw        = 1.5708
 
+; the till of the saves before 2026-10-30, a safe under the laptop's desk: kept for them to load (shelter_bar takes
+; its money into the sum and removes it)
 [shelter_till]:inventory_box
 visual          = dynamics\equipment_cache\equipment_seif_01_case.ogf
 

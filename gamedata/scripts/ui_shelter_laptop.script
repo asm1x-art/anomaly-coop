@@ -449,9 +449,13 @@ function UIShelterOS:fill_bar()
 	local mx = pad * 2 + cw
 	self:framed(mx, TOP, cw, 150, C.raised, body, 8)
 	self:text(mx + 14, TOP + 8, cw - 28, 26, tr("st_shelter_bar_money_title"), C.dim, body, nil, "s")
-	self:text(mx + 14, TOP + 32, cw - 28, 34, shelter.state("till_id", nil) and tr("st_shelter_bar_till", shelter_bar.till_money())
-		or tr("st_shelter_bar_no_till"), C.text, body)
-	self:text(mx + 14, TOP + 70, cw - 28, 30, tr("st_shelter_bar_total", shelter.state("bar_total", 0) or 0), C.good, body, nil, "s")
+	local till = shelter_bar.till_money()
+	self:text(mx + 14, TOP + 32, cw - 28, 34, tr("st_shelter_bar_till", till), C.text, body)
+	self:text(mx + 14, TOP + 66, cw - 28, 30, tr("st_shelter_bar_total", shelter.state("bar_total", 0) or 0), C.good, body, nil, "s")
+	self:button(mx + 14, TOP + 102, cw - 28, 34, tr("st_shelter_bar_take"), function()
+		shelter_bar.take_till()
+		self:fill_bar()
+	end, self.app_clicks, body, self.wx, self.wy, till > 0 and "primary" or "off").bar = true
 	-- the markup, its - and + beside it; when it sells
 	local my = TOP + 168
 	self:text(pad, my, 260, 34, tr("st_shelter_bar_markup", string.format("%.2f", shelter_bar.markup())), C.text, body)

@@ -1,13 +1,12 @@
 -- The shelter's bar (docs/coop/shelter.md, "План развития", phase 2): it sells from the store, the room given that role
 -- on the laptop's plan: whatever lies in the boxes there and is drink, food or smokes ([shelter_bar] kinds). One thing
 -- every sell_hours game hours, picked at random, at its price times the markup set on the laptop; the money goes into
--- the till, a safe under the laptop's desk, as the game's money items (a wallet takes them as money). It sells while
--- nobody is in the shelter too: the boxes and the till are seen as the server keeps them. In co-op the world's
--- simulation master runs it; the time of the last sale, the till, the log and the takings are the world's.
+-- the till, a sum taken on the laptop. It sells while nobody is in the shelter too: the boxes are seen as the server
+-- keeps them. In co-op the world's simulation master runs it; the time of the last sale, the till, the log and the
+-- takings are the world's.
 
 local SETTINGS = "shelter_bar"
 local LEVEL = "bunker_a1"
-local DENOMINATIONS = { 5000, 1000, 500, 100, 50, 10 } -- money_<n>: a wallet takes each for exactly that much
 local LOG_SIZE = 12
 local CHECK_MS = 5000
 local MOST_AT_ONCE = 48 -- sales caught up at most, after a long sleep or a time away
@@ -20,12 +19,9 @@ local function settings()
 		for _, k in ipairs(str_explode(ini_sys:r_string_ex(SETTINGS, "kinds") or "i_food, i_drink", ",")) do
 			kinds[k] = true
 		end
-		local till = str_explode(ini_sys:r_string_ex(SETTINGS, "till_pos"), ",")
 		cfg = { kinds = kinds, sell_hours = ini_sys:r_float_ex(SETTINGS, "sell_hours") or 1,
 			markup = ini_sys:r_float_ex(SETTINGS, "markup") or 1.1, markup_min = ini_sys:r_float_ex(SETTINGS, "markup_min") or 1,
-			markup_max = ini_sys:r_float_ex(SETTINGS, "markup_max") or 3, markup_step = ini_sys:r_float_ex(SETTINGS, "markup_step") or 0.05,
-			till = ini_sys:r_string_ex(SETTINGS, "till"), till_yaw = ini_sys:r_float_ex(SETTINGS, "till_yaw") or 0,
-			till_pos = vector():set(tonumber(till[1]), tonumber(till[2]), tonumber(till[3])) }
+			markup_max = ini_sys:r_float_ex(SETTINGS, "markup_max") or 3, markup_step = ini_sys:r_float_ex(SETTINGS, "markup_step") or 0.05 }
 	end
 	return cfg
 end
@@ -111,34 +107,53 @@ function price(section)
 	return math.floor((SYS_GetParam(2, section, "cost") or 0) * markup() + 0.5)
 end
 
-local function till()
-	return alife_object(shelter.state("till_id", 65535))
-end
-
 -- the money in the till
 function till_money()
-	local t, sum = till(), 0
-	if not t then
-		return 0
-	end
-	local sim = alife()
-	for id = 1, 65534 do
-		local se = sim:object(id)
-		if se and se.parent_id == t.id then
-			sum = sum + (tonumber(string.match(se:section_name(), "^money_(%d+)$")) or 0)
-		end
-	end
-	return sum
+	return shelter.state("till", 0) or 0
 end
 
-local function spawn_till()
-	local c = settings()
-	local lv = level.vertex_id(c.till_pos)
-	local se = alife_create(c.till, c.till_pos, lv < 4294967295 and lv or db.actor:level_vertex_id(), db.actor:game_vertex_id())
-	if se then
-		se.angle = vector():set(0, c.till_yaw, 0)
-		shelter.set_state("till_id", se.id)
+-- the till's money into the player's pocket (the laptop's button); how much
+function take_till()
+	local n = till_money()
+	if n > 0 then
+		shelter.set_state("till", nil)
+		db.actor:give_money(n)
+		news_manager.relocate_money(db.actor, "in", n)
 	end
+	return n
+end
+
+-- until 2026-10-30 the till was a safe under the laptop's desk, the money in it as money items (and what fell short of
+-- the smallest in till_pending): that money into the sum; the safe gone unless something else lies in it
+local function old_till_gone()
+	local id = shelter.state("till_id", nil)
+	if not id then
+		return
+	end
+	shelter.once("till_gone", function()
+		local sim, sum, money, other = alife(), shelter.state("till_pending", 0) or 0, {}, false
+		for i = 1, 65534 do
+			local se = sim:object(i)
+			if se and se.parent_id == id then
+				local n = tonumber(string.match(se:section_name(), "^money_(%d+)$"))
+				if n then
+					sum, money[#money + 1] = sum + n, se
+				else
+					other = true
+				end
+			end
+		end
+		for _, se in ipairs(money) do
+			alife_release(se)
+		end
+		local box = sim:object(id)
+		if box and not other then
+			alife_release(box)
+		end
+		shelter.set_state("till", till_money() + sum)
+		shelter.set_state("till_pending", nil)
+		shelter.set_state("till_id", nil)
+	end)
 end
 
 -------------------------------------------------------------------------------
@@ -164,19 +179,9 @@ local function log_sale(t, section, p)
 	shelter.set_state("bar_log", table.concat(parts, ";"))
 end
 
--- the money into the till: as much as the money items make, the rest kept for the next sale
+-- the money into the till
 local function deposit(amount)
-	local t = till()
-	local pending = (shelter.state("till_pending", 0) or 0) + amount
-	if t then
-		for _, d in ipairs(DENOMINATIONS) do
-			while pending >= d do
-				alife_create_item("money_" .. d, t)
-				pending = pending - d
-			end
-		end
-	end
-	shelter.set_state("till_pending", pending)
+	shelter.set_state("till", till_money() + amount)
 end
 
 -- n sales, the n-th at game second t_last (the earlier ones an interval apart before it)
@@ -229,14 +234,14 @@ local function actor_on_update()
 		return
 	end
 	shelter.set_state("bar_last", last + n * step)
-	if store_box() and till() then
+	if store_box() then
 		sell(math.min(n, MOST_AT_ONCE), last + n * step)
 	end
 end
 
 local function actor_on_first_update()
-	if level.name() == LEVEL and not shelter.state("till_id", nil) then
-		shelter.once("till", spawn_till)
+	if level.name() == LEVEL then
+		old_till_gone()
 	end
 end
 

@@ -781,10 +781,10 @@
 		<text>Продаёт раз в %s ч; следующая продажа через %d мин.</text>
 	</string>
 	<string id="st_shelter_bar_till">
-		<text>В кассе: %d руб. (сейф под столом с ноутбуком)</text>
+		<text>В кассе: %d руб.</text>
 	</string>
-	<string id="st_shelter_bar_no_till">
-		<text>Кассы ещё нет: сейф появится под столом с ноутбуком.</text>
+	<string id="st_shelter_bar_take">
+		<text>Забрать выручку</text>
 	</string>
 	<string id="st_shelter_bar_total">
 		<text>Выручка за всё время: %d руб.</text>

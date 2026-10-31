@@ -781,10 +781,10 @@
 		<text>Sells once in %s h; the next sale in %d min.</text>
 	</string>
 	<string id="st_shelter_bar_till">
-		<text>In the till: %d RU (a safe under the laptop's desk)</text>
+		<text>In the till: %d RU</text>
 	</string>
-	<string id="st_shelter_bar_no_till">
-		<text>No till yet: a safe will be under the laptop's desk.</text>
+	<string id="st_shelter_bar_take">
+		<text>Take the takings</text>
 	</string>
 	<string id="st_shelter_bar_total">
 		<text>Takings so far: %d RU</text>
