@@ -496,12 +496,14 @@ end
 
 -------------------------------------------------------------------------------
 -- the synthesis (shelter_synthesis.script): each chamber's state (since when it works and on what, or what lies in its
--- cell; how long it has left, never), and the journal of every load made with the Chemist's recipes, newest first: all
--- of it, the artefacts made or the stones (each load once), found by a word of a thing's, a chamber's or a name
+-- cell; how long it has left, never), and two tabs: the journal of every load made, newest first (all of it, the
+-- artefacts made or the stones, each load once), and the recipes (the Chemist's, then each load that made an artefact,
+-- as first made); either found by a word of a thing's, a chamber's or a name
 
 local SYNTH = { natures = { "gravi", "thermo", "chem", "electro" }, card_h = 124, row_h = 38, search_y = TOP + 172,
 	head_y = TOP + 214, list_y = TOP + 240 }
 local FILTERS = { "all", "made", "stone" }
+local TABS = { "journal", "recipes" }
 
 -- cp1251's letters to lower case, for the search
 local function lower(s)
@@ -519,7 +521,7 @@ function UIShelterOS:open_synth()
 	local W, x = self:fit(960)
 	local H = 712
 	local win = self:window(x, 6, W, H, "synth")
-	self.synth = { w = W, h = H, filter = "all", page = 1, word = "" }
+	self.synth = { w = W, h = H, tab = "journal", filter = "all", page = 1, word = "" }
 	-- the search: a field with its glyph, the edit box over it (kept while the body below is drawn again)
 	local sy = SYNTH.search_y
 	self:framed(18, sy, 330, 34, C.field, win, 6)
@@ -547,14 +549,18 @@ function UIShelterOS:update_synth()
 	self:fill_synth(true)
 end
 
--- the journal as shown: filtered, found, each load once but in "all"
+-- the tab as shown, found: the journal filtered, each load once but in "all"; the recipes: the Chemist's, then the
+-- loads that made an artefact, each once, oldest first (who made it first)
 function UIShelterOS:synth_rows()
 	local rows, seen = {}, {}
-	local list = shelter_synthesis.journal()
-	for _, rc in ipairs(shelter_synthesis.chemist_recipes()) do
-		list[#list + 1] = rc
+	local list, f, word = shelter_synthesis.journal(), self.synth.filter, self.synth.word
+	if self.synth.tab == "recipes" then
+		local journal = list
+		list, f = shelter_synthesis.chemist_recipes(), "made"
+		for i = #journal, 1, -1 do
+			list[#list + 1] = journal[i]
+		end
 	end
-	local f, word = self.synth.filter, self.synth.word
 	for _, e in ipairs(list) do
 		local stone = e.result == shelter_synthesis.STONE
 		local k = e.nature .. ":" .. shelter_synthesis.key(e.parts)
@@ -640,19 +646,27 @@ function UIShelterOS:fill_synth(only_if_changed)
 			self:icon(st.result, cx + 16, TOP + 72, 40, body)
 		end
 	end
-	self:text(pad, TOP + SYNTH.card_h + 10, 400, 36, tr("st_shelter_synth_journal"), C.text, body, nil, "l")
-	-- the filters: a row of tabs right of the search
-	for i, f in ipairs(FILTERS) do
+	local recipes = s.tab == "recipes"
+	-- the tabs: the journal, the recipes
+	for i, t in ipairs(TABS) do
+		self:button(pad + (i - 1) * 150, TOP + SYNTH.card_h + 10, 142, 34, tr("st_shelter_synth_tab_" .. t), function()
+			s.tab, s.page = t, 1
+			self:fill_synth()
+		end, self.app_clicks, body, self.wx, self.wy, t == s.tab and "on" or "normal").synth = true
+	end
+	-- the journal's filters: a row of tabs right of the search
+	for i, f in ipairs(recipes and {} or FILTERS) do
 		self:button(366 + (i - 1) * 140, SYNTH.search_y, 132, 34, tr("st_shelter_synth_filter_" .. f), function()
 			s.filter, s.page = f, 1
 			self:fill_synth()
 		end, self.app_clicks, body, self.wx, self.wy, f == s.filter and "on" or "normal").synth = true
 	end
-	-- the journal's columns
+	-- the columns
 	local col = { when = pad + 10, chamber = pad + 128, parts = pad + 262, names = pad + 372, result = W - pad - 330,
 		who = W - pad - 104 }
-	for k, id in pairs({ when = "st_shelter_synth_col_when", chamber = "st_shelter_synth_col_chamber",
-		parts = "st_shelter_synth_col_load", result = "st_shelter_synth_col_result", who = "st_shelter_synth_col_who" }) do
+	for k, id in pairs({ when = recipes and "st_shelter_synth_col_found" or "st_shelter_synth_col_when",
+		chamber = "st_shelter_synth_col_chamber", parts = "st_shelter_synth_col_load", result = "st_shelter_synth_col_result",
+		who = recipes and "st_shelter_synth_col_finder" or "st_shelter_synth_col_who" }) do
 		self:text(col[k], SYNTH.head_y, 200, 22, tr(id), C.faint, body, nil, "s")
 	end
 	self:rect(pad, SYNTH.head_y + 24, W - 2 * pad, 1, C.line, body)
@@ -665,8 +679,9 @@ function UIShelterOS:fill_synth(only_if_changed)
 	local clock = level.get_time_hours() * 3600 + level.get_time_minutes() * 60
 	local now = game.get_game_time():diffSec(game.CTime())
 	if #rows == 0 then
-		self:text(pad + 10, SYNTH.list_y + 6, W - 2 * pad, 30, tr(#journal == 0 and "st_shelter_synth_journal_empty"
-			or "st_shelter_synth_found_none"), C.faint, body)
+		self:text(pad + 10, SYNTH.list_y + 6, W - 2 * pad, 30, tr(recipes and (s.word == "" and "st_shelter_synth_recipes_empty"
+			or "st_shelter_synth_found_none") or #journal == 0 and "st_shelter_synth_journal_empty" or "st_shelter_synth_found_none"),
+			C.faint, body)
 	end
 	for r = 1, per_page do
 		local e = rows[(s.page - 1) * per_page + r]
@@ -712,7 +727,8 @@ function UIShelterOS:fill_synth(only_if_changed)
 		self:button(pad + 134, fy, 36, 30, ">", function() s.page = math.min(pages, s.page + 1) self:fill_synth() end,
 			self.app_clicks, body, self.wx, self.wy, s.page == pages and "off" or "normal").synth = true
 	end
-	self:text(W - pad - 300, fy, 300, 30, tr("st_shelter_synth_count", #rows), C.faint, body, CGameFont.alRight, "s")
+	self:text(W - pad - 300, fy, 300, 30, tr(recipes and "st_shelter_synth_recipes_count" or "st_shelter_synth_count", #rows),
+		C.faint, body, CGameFont.alRight, "s")
 end
 
 -------------------------------------------------------------------------------

@@ -597,8 +597,11 @@
 	<string id="st_shelter_app_synth">
 		<text>Synthesis</text>
 	</string>
-	<string id="st_shelter_synth_journal">
-		<text>Synthesis journal</text>
+	<string id="st_shelter_synth_tab_journal">
+		<text>Journal</text>
+	</string>
+	<string id="st_shelter_synth_tab_recipes">
+		<text>Recipes</text>
 	</string>
 	<string id="st_shelter_synth_filter_all">
 		<text>All loads</text>
@@ -653,6 +656,12 @@
 	</string>
 	<string id="st_shelter_synth_count">
 		<text>Entries: %d</text>
+	</string>
+	<string id="st_shelter_synth_recipes_count">
+		<text>Recipes: %d</text>
+	</string>
+	<string id="st_shelter_synth_recipes_empty">
+		<text>No recipes yet: the Chemist's recipes and every load that made an artefact will be here.</text>
 	</string>
 	<string id="st_shelter_os_shutdown">
 		<text>Shut down</text>
@@ -821,5 +830,11 @@
 	</string>
 	<string id="st_shelter_synth_col_who">
 		<text>Who</text>
+	</string>
+	<string id="st_shelter_synth_col_found">
+		<text>Found</text>
+	</string>
+	<string id="st_shelter_synth_col_finder">
+		<text>Found by</text>
 	</string>
 </string_table>

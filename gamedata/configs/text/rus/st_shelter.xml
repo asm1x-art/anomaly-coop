@@ -597,8 +597,11 @@
 	<string id="st_shelter_app_synth">
 		<text>Синтез</text>
 	</string>
-	<string id="st_shelter_synth_journal">
-		<text>Журнал синтеза</text>
+	<string id="st_shelter_synth_tab_journal">
+		<text>Журнал</text>
+	</string>
+	<string id="st_shelter_synth_tab_recipes">
+		<text>Рецепты</text>
 	</string>
 	<string id="st_shelter_synth_filter_all">
 		<text>Все закладки</text>
@@ -653,6 +656,12 @@
 	</string>
 	<string id="st_shelter_synth_count">
 		<text>Записей: %d</text>
+	</string>
+	<string id="st_shelter_synth_recipes_count">
+		<text>Рецептов: %d</text>
+	</string>
+	<string id="st_shelter_synth_recipes_empty">
+		<text>Рецептов пока нет: здесь будут рецепты Химика и каждая закладка, давшая артефакт.</text>
 	</string>
 	<string id="st_shelter_os_shutdown">
 		<text>Завершение работы</text>
@@ -821,5 +830,11 @@
 	</string>
 	<string id="st_shelter_synth_col_who">
 		<text>Кто</text>
+	</string>
+	<string id="st_shelter_synth_col_found">
+		<text>Найден</text>
+	</string>
+	<string id="st_shelter_synth_col_finder">
+		<text>Нашёл</text>
 	</string>
 </string_table>
