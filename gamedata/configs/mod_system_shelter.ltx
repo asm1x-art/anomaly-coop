@@ -474,3 +474,37 @@ item_section            = shelter_item_chair
 ui_texture              = ui_efp_prop_chair
 bounding_box_size       = 0.5, 0.539, 1.029
 bounding_box_origin     = 0, 0.514, 0
+
+; the lifts (shelter_lift.script): repair, repair_box = what the panel's repair and the control box's take, section:count.
+; Their doors never open.
+[shelter_lift]
+repair          = prt_i_textolite:2, prt_i_copper:2, prt_i_resistors:2
+repair_box      = prt_i_capacitors:2, prt_i_transistors:2, prt_i_copper:1
+
+[shelter_lift_door_mid]:physic_object
+visual            = dynamics\door\door_lift_01.ogf
+startup_animation = idle_close
+fixed_bones       = link
+script_binding    = shelter_lift.init_use
+shelter_stop      = mid
+
+[shelter_lift_door_top]:shelter_lift_door_mid
+shelter_stop      = top
+
+[shelter_lift_door_hall]:shelter_lift_door_mid
+shelter_stop      = hall
+
+[shelter_lift_door_low]:shelter_lift_door_mid
+shelter_stop      = low
+
+[shelter_lift_box]:physic_object
+visual            = dynamics\el_tehnika\el_control_unit_1.ogf
+startup_animation = idle_close
+fixed_bones       = link
+script_binding    = shelter_lift.init_use
+
+; the hermetic gate across the lower tunnel (tools\shelter\gate_model.py)
+[shelter_tunnel_gate]:physic_object
+visual            = dynamics\shelter\tunnel_gate.ogf
+script_binding    = shelter_lift.init_use
+shelter_tip       = st_shelter_gate_closed

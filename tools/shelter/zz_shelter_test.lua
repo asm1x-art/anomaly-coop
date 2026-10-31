@@ -38,6 +38,8 @@ local KIT = {
 	"shelter_capsule_gravi", "shelter_capsule_thermo", "shelter_capsule_chem", "shelter_capsule_electro",
 	"ball_hammer", "steel_wool", "grease", "tarpaulin", "e_syringe", "jar", "radio2", "duct_tape",
 	"itm_sleepbag",
+	"prt_i_textolite", "prt_i_textolite", "prt_i_copper", "prt_i_copper", "prt_i_resistors", "prt_i_resistors", -- the lift
+	"prt_i_capacitors", "prt_i_capacitors", "prt_i_transistors", "prt_i_transistors", "prt_i_copper", -- its control box
 }
 -- and in the bunker an anomaly of each nature in a row across the hall where the water was (point 5), for the capsules
 -- (once a game), made as the synthesis chambers' are: the shape set before it's online, as a zone with none crashes
@@ -128,7 +130,44 @@ local function push_synthesis()
 	msg("—интез: капсулы наполнены, √ерману отдано. ќсталось поставить 4 наполненные капсулы в камеры у входа.")
 end
 
+-- INSERT: every rubble of the bunker gone in this save, the ones not meant for digging too (the stairs' mounds 2 and 4):
+-- counted as dug out, so they don't come back and their rooms open for the cleaning. Kept only in the save made after.
+local RUBBLE = { 2, 3, 4, 8, 9, 10, 11, 12, 13 }
+
+function clear_rubble()
+	local sim = alife()
+	local removed = 0
+	for _, n in ipairs(RUBBLE) do
+		local section = "shelter_mound_" .. n
+		shelter.set_state("dug_" .. section, true)
+		local zone = ini_sys:r_string_ex(section, "shelter_zone")
+		if zone then
+			shelter.set_state("open_" .. zone, true)
+		end
+		local var = "shelter_keep_out_" .. section
+		local keep_out = load_var(db.actor, var, nil)
+		local se = keep_out and sim:object(keep_out)
+		if se and se:section_name() == "space_restrictor" then
+			alife_release(se)
+		end
+		save_var(db.actor, var, nil)
+	end
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		local section = se and se:section_name()
+		if section and (string.find(section, "^shelter_mound_") or string.find(section, "^shelter_rubble_")) then
+			alife_release(se)
+			removed = removed + 1
+		end
+	end
+	msg("«авалы убраны: " .. removed .. ". ќстанетс€ в сохранении, сделанном после этого.")
+	return removed
+end
+
 local function on_key_press(dik)
+	if dik == DIK_keys.DIK_INSERT and db.actor then
+		return clear_rubble()
+	end
 	if dik == DIK_keys.DIK_F10 and db.actor then
 		return give_kit()
 	elseif dik == DIK_keys.DIK_F6 and db.actor then
@@ -196,9 +235,9 @@ function on_game_start()
 				save_var(db.actor, "shelter_test_arriving", nil)
 				db.actor:set_actor_direction(-ENTRANCE.look:getH())
 			end
-			msg("Ѕункер. F8 Ч обратно")
+			msg("Ѕункер. F8 Ч обратно, INSERT Ч убрать все завалы")
 		else
-			msg("“ест убежища: F8 Ч в бункер и обратно, F10 Ч демо-набор, F6 Ч капсулы наполнены и отданы √ерману")
+			msg("“ест убежища: F8 Ч в бункер и обратно, F10 Ч демо-набор, INSERT Ч убрать все завалы, F6 Ч капсулы наполнены и отданы √ерману")
 		end
 	end)
 end

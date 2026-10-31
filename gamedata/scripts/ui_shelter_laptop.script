@@ -26,7 +26,16 @@ local MARKS = { -- the shelter's things on the plan: the state keeping its objec
 	{ state = "chamber_panel_chem", mark = "chamber" },
 	{ state = "chamber_panel_electro", mark = "chamber" },
 }
-local LEGEND = { "generator", "laptop", "stash", "chamber", "me", "friend" }
+local LEGEND = { "generator", "laptop", "stash", "chamber", "lift", "gate", "me", "friend" }
+-- the plan's floors, top down: each with its plan's section; what stands on a floor for good, where
+local FLOORS = { { id = "top", plan = "plan_top" }, { id = "mid", plan = "plan_main" }, { id = "low", plan = "plan_low" } }
+local FIXED_MARKS = {
+	{ floor = "top", x = 2.09, z = 30.7, mark = "lift" },
+	{ floor = "mid", x = 2.33, z = 31.4, mark = "lift" },
+	{ floor = "mid", x = -2.91, z = -16.3, mark = "lift" },
+	{ floor = "low", x = -20.67, z = -4.4, mark = "lift" },
+	{ floor = "low", x = -41.82, z = -7.52, mark = "gate" },
+}
 local ROLES = { "store" } -- what a room can be made, in its card's order
 local BUNKER = "bunker_a1"
 
@@ -43,16 +52,24 @@ end
 -------------------------------------------------------------------------------
 -- the plan's data: the texture and the world's box on it (tools\shelter\plan.py), the rooms
 
-local plan, rooms
+local plans, rooms
+
+-- the floor a height in the bunker is on
+local function floor_of(y)
+	return y > 11 and "top" or y < -12 and "low" or "mid"
+end
 
 local function load_plan()
-	if plan then
+	if plans then
 		return
 	end
 	local ini = ini_file("scripts\\shelter\\plan.ltx")
-	plan = { texture = ini:r_string_ex("plan_main", "texture"), w = ini:r_float_ex("plan_main", "width"),
-		h = ini:r_float_ex("plan_main", "height"), x0 = ini:r_float_ex("plan_main", "x0"), x1 = ini:r_float_ex("plan_main", "x1"),
-		z0 = ini:r_float_ex("plan_main", "z0"), z1 = ini:r_float_ex("plan_main", "z1") }
+	plans = {}
+	for _, f in ipairs(FLOORS) do
+		local s = f.plan
+		plans[f.id] = { texture = ini:r_string_ex(s, "texture"), w = ini:r_float_ex(s, "width"), h = ini:r_float_ex(s, "height"),
+			x0 = ini:r_float_ex(s, "x0"), x1 = ini:r_float_ex(s, "x1"), z0 = ini:r_float_ex(s, "z0"), z1 = ini:r_float_ex(s, "z1") }
+	end
 	rooms = {}
 	ini = ini_file("scripts\\shelter\\rooms.ltx")
 	for i = 0, ini:line_count("rooms") - 1 do
@@ -63,8 +80,14 @@ local function load_plan()
 			roles[role] = true
 		end
 		rooms[#rooms + 1] = { id = id, name = ini:r_string_ex(id, "name"), zone = ini:r_string_ex(id, "zone"), roles = roles,
+			floor = ini:r_string_ex(id, "floor") or "mid",
 			box = { tonumber(box[1]), tonumber(box[2]), tonumber(box[3]), tonumber(box[4]) } }
 	end
+end
+
+-- a room's state: as its cleaning zone; one with no zone is just open
+local function room_state(room)
+	return room.zone and shelter.zone_state(room.zone) or "open"
 end
 
 -- a room's role, the world's: the room each role is given to
@@ -219,7 +242,7 @@ end
 -- the shelter's plan
 
 function UIShelterOS:to_plan(x, z)
-	local p = self.plan_area
+	local p, plan = self.plan_area, plans[self.plan_floor]
 	return p.x + (x - plan.x0) / (plan.x1 - plan.x0) * p.w, p.y + (plan.z1 - z) / (plan.z1 - plan.z0) * p.h
 end
 
@@ -239,14 +262,28 @@ function UIShelterOS:open_plan()
 	local W, x = self:fit(900)
 	local H = 704
 	local win = self:window(x, 8, W, H, "plan")
-	local ph = H - TOP - 14
-	self.plan_area = { x = 14, y = TOP, w = math.floor(ph * plan.w / plan.h), h = ph }
+	-- the floor: as asked by its button, else the one one stands on
+	local here = level.name() == BUNKER and floor_of(db.actor:position().y) or nil
+	self.plan_floor = self.plan_next or here or "mid"
+	self.plan_next = nil
+	local plan = plans[self.plan_floor]
+	for i, f in ipairs(FLOORS) do
+		self:button(14 + (i - 1) * 128, TOP, 120, 34, tr("st_shelter_floor_" .. f.id), function()
+			self.plan_next = f.id
+			self:open("plan")
+		end, self.app_clicks, win, x, 8, f.id == self.plan_floor and "primary" or "normal")
+	end
+	-- the plan fills its place, its shape kept: the tall middle floor by the height, the long lower one by the width
+	local py = TOP + 42
+	local ph, pw = H - py - 14, W - 14 - 16 - 14 - 250
+	local k = math.min(ph / plan.h, pw / plan.w)
+	self.plan_area = { x = 14, y = py, w = math.floor(plan.w * k), h = math.floor(plan.h * k) }
 	local a = self.plan_area
 	self:round(a.x - 1, a.y - 1, a.w + 2, a.h + 2, C.border, win, 4)
 	self:image(a.x, a.y, a.w, a.h, plan.texture, win)
 	-- the rooms by state
 	for _, room in ipairs(rooms) do
-		local tint = ROOM_TINT[shelter.zone_state(room.zone)]
+		local tint = room.floor == self.plan_floor and ROOM_TINT[room_state(room)]
 		if tint then
 			local rx, ry, rw, rh = self:room_rect(room)
 			self:rect(rx, ry, rw, rh, { tint[2], tint[3], tint[4] }, win, tint[1])
@@ -255,11 +292,16 @@ function UIShelterOS:open_plan()
 	-- what is where, who is in
 	for _, m in ipairs(MARKS) do
 		local se = alife_object(shelter.state(m.state, 65535))
-		if se then
+		if se and floor_of(se.position.y) == self.plan_floor then
 			self:mark(se.position.x, se.position.z, m.mark, win)
 		end
 	end
-	if level.name() == BUNKER then
+	for _, m in ipairs(FIXED_MARKS) do
+		if m.floor == self.plan_floor then
+			self:mark(m.x, m.z, m.mark, win)
+		end
+	end
+	if here == self.plan_floor then
 		self:mark(db.actor:position().x, db.actor:position().z, "me", win)
 	end
 	if coop and coop.connected and coop.connected() then
@@ -268,7 +310,7 @@ function UIShelterOS:open_plan()
 			group[name] = true
 		end
 		for _, peer in ipairs(coop.peers()) do
-			if group[peer.name] and peer.level == BUNKER then
+			if group[peer.name] and peer.level == BUNKER and floor_of(peer.position.y) == self.plan_floor then
 				self:mark(peer.position.x, peer.position.z, "friend", win)
 				local u, v = self:to_plan(peer.position.x, peer.position.z)
 				self:text(u + 10, v - 10, 120, 20, peer.name, C.text, win, nil, "s")
@@ -285,6 +327,7 @@ function UIShelterOS:open_plan()
 	end
 	self.card_x = a.x + a.w + 16
 	self.card_w = W - self.card_x - 14
+	self.card_y, self.card_h = py, H - py - 14
 	self.card = nil
 	self:show_card(nil)
 	self.app_update = self.update_plan
@@ -297,9 +340,11 @@ function UIShelterOS:room_at(p)
 		return nil
 	end
 	for _, room in ipairs(rooms) do
-		local x, y, w, h = self:room_rect(room)
-		if inside(p, { self.wx + x, self.wy + y, w, h }) then
-			return room
+		if room.floor == self.plan_floor then
+			local x, y, w, h = self:room_rect(room)
+			if inside(p, { self.wx + x, self.wy + y, w, h }) then
+				return room
+			end
 		end
 	end
 end
@@ -339,7 +384,7 @@ function UIShelterOS:show_card(room)
 			table.remove(self.app_clicks, i)
 		end
 	end
-	local x, y, w, h = self.card_x, TOP, self.card_w, self.plan_area.h
+	local x, y, w, h = self.card_x, self.card_y, self.card_w, self.card_h
 	local card = self:box(x, y, w, h, self.win)
 	self.card = card
 	self:framed(0, 0, w, h, C.raised, card, 8)
@@ -348,7 +393,7 @@ function UIShelterOS:show_card(room)
 		self:text(pad, pad, w - 2 * pad, 48, tr("st_shelter_plan_hint"), C.dim, card)
 	else
 		self:text(pad, 12, w - 2 * pad, 34, tr(room.name), C.text, card, nil, "l")
-		local state = shelter.zone_state(room.zone)
+		local state = room_state(room)
 		local state_color = state == "blocked" and C.bad or state == "dirty" and C.warn or C.good
 		self:round(pad, 54, 10, 10, state_color, card, 5)
 		self:text(pad + 18, 46, w - 2 * pad - 18, 26, tr("st_shelter_room_state_" .. state), C.text, card)

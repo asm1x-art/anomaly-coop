@@ -3,6 +3,11 @@
 ; whose state it shows (shelter.zone_state: blocked by rubble, open and dirty, cleaned) and what it can be made.
 ; Listed in the order they're tried under the cursor: the small rooms before the halls they sit in.
 [rooms]
+top_hall
+top_north
+top_east
+low_science
+low_tunnel
 laptop_room
 stash_room
 cells_north
@@ -113,3 +118,29 @@ roles   = store
 name    = st_shelter_room_corridor
 box     = 0.6, 4.4, -0.4, 32.5
 zone    = corridor
+
+; the other floors: no cleaning there yet, so no zone: only open
+[top_hall]
+name    = st_shelter_room_top_hall
+floor   = top
+box     = -2.4, 11.7, 10.5, 22.0
+
+[top_north]
+name    = st_shelter_room_top_north
+floor   = top
+box     = -2.4, 4.3, 22.0, 31.0
+
+[top_east]
+name    = st_shelter_room_top_east
+floor   = top
+box     = 6.3, 13.0, 22.3, 37.7
+
+[low_science]
+name    = st_shelter_room_low_science
+floor   = low
+box     = -41.5, -1.0, -12.5, -3.5
+
+[low_tunnel]
+name    = st_shelter_room_low_tunnel
+floor   = low
+box     = -101.5, -42.2, -12.0, 35.0

@@ -1,0 +1,94 @@
+-- A repair of the lifts (shelter_lift.script): what it takes, what one has, the button. In the look of the shelter's
+-- computers (ui_shelter_style.script).
+
+local XML = "ui_shelter_laptop.xml"
+local C = ui_shelter_style.C
+local TOP = ui_shelter_style.TITLE_H + 12
+local W, H = 460, 290
+
+local gui
+
+local function tr(id)
+	return game.translate_string(id)
+end
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+class "UIShelterLift" (CUIScriptWnd)
+ui_shelter_style.apply(UIShelterLift)
+
+function UIShelterLift:__init(kind) super()
+	self.kind = kind
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self.x0 = math.floor((math.floor(1024 / self.k + 0.5) - W) / 2)
+	self.y0 = math.floor((768 - H) / 2)
+	self:draw()
+end
+
+function UIShelterLift:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k - self.x0, p.y - self.y0)
+end
+
+function UIShelterLift:draw()
+	local t = shelter_lift.texts(self.kind)
+	self.clicks = {}
+	local win = self:chrome(self.x0, self.y0, W, H, tr(t.title), nil, self, self.clicks, 0, 0, function() self:Close() end)
+	local y = TOP
+	self:text(18, y, W - 36, 30, tr(t.broken), C.warn, win)
+	y = y + 34
+	for _, p in ipairs(shelter_lift.repair_parts(self.kind)) do
+		self:icon(p.sec, 18, y, 26, win)
+		self:text(52, y, W - 150, 26, ui_item.get_sec_name(p.sec), C.text, win, nil, "s")
+		self:text(W - 98, y, 80, 26, p.have .. " / " .. p.count, p.have >= p.count and C.good or C.bad, win, CGameFont.alRight, "s")
+		y = y + 30
+	end
+	self:button(18, H - 56, W - 36, 40, tr("st_shelter_lift_repair"), function()
+		if shelter_lift.repair(self.kind) then
+			self:Close()
+		end
+	end, self.clicks, win, 0, 0, shelter_lift.can_repair(self.kind) and "primary" or "off")
+end
+
+function UIShelterLift:Update()
+	CUIScriptWnd.Update(self)
+	self:hovers(self:cursor(), { self.clicks })
+end
+
+function UIShelterLift:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			local p = self:cursor()
+			for i = #self.clicks, 1, -1 do
+				if inside(p, self.clicks[i]) then
+					self.clicks[i][5]()
+					return true
+				end
+			end
+			return true
+		elseif dik_to_bind(dik) == key_bindings.kQUIT or dik_to_bind(dik) == key_bindings.kUSE then
+			self:Close()
+			return true
+		end
+	end
+	return res
+end
+
+function UIShelterLift:Close()
+	self:HideDialog()
+	gui = nil
+end
+
+function open(kind)
+	if not (gui and gui:IsShown()) then
+		gui = UIShelterLift(kind)
+		gui:ShowDialog(true)
+	end
+end

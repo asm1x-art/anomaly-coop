@@ -837,4 +837,82 @@
 	<string id="st_shelter_synth_col_finder">
 		<text>Found by</text>
 	</string>
+	<string id="st_shelter_lift_title">
+		<text>Lift</text>
+	</string>
+	<string id="st_shelter_lift_broken">
+		<text>The panel is broken. It takes:</text>
+	</string>
+	<string id="st_shelter_lift_repair">
+		<text>Repair</text>
+	</string>
+	<string id="st_shelter_lift_repaired">
+		<text>The lift's panel is repaired</text>
+	</string>
+	<string id="st_shelter_lift_dead">
+		<text>The lift is dead</text>
+	</string>
+	<string id="st_shelter_lift_inspect">
+		<text>Inspect the lift</text>
+	</string>
+	<string id="st_shelter_lift_go_up">
+		<text>Go up</text>
+	</string>
+	<string id="st_shelter_lift_go_down">
+		<text>Go down</text>
+	</string>
+	<string id="st_shelter_lift_box">
+		<text>The lift's control box</text>
+	</string>
+	<string id="st_shelter_lift_box_broken">
+		<text>The control box is broken. It takes:</text>
+	</string>
+	<string id="st_shelter_lift_box_repaired">
+		<text>The control box is repaired: the lift down works</text>
+	</string>
+	<string id="st_shelter_lift_box_dead">
+		<text>The lift's control box: no power</text>
+	</string>
+	<string id="st_shelter_lift_box_inspect">
+		<text>Inspect the lift's control box</text>
+	</string>
+	<string id="st_shelter_lift_box_ok">
+		<text>The lift's control box works</text>
+	</string>
+	<string id="st_shelter_gate_closed">
+		<text>The hermetic gate is shut</text>
+	</string>
+	<string id="st_shelter_floor_top">
+		<text>Top</text>
+	</string>
+	<string id="st_shelter_floor_mid">
+		<text>Middle</text>
+	</string>
+	<string id="st_shelter_floor_low">
+		<text>Lower</text>
+	</string>
+	<string id="st_shelter_mark_lift">
+		<text>Lift</text>
+	</string>
+	<string id="st_shelter_mark_gate">
+		<text>Hermetic gate</text>
+	</string>
+	<string id="st_shelter_room_state_open">
+		<text>Open</text>
+	</string>
+	<string id="st_shelter_room_top_hall">
+		<text>The top floor's hall</text>
+	</string>
+	<string id="st_shelter_room_top_north">
+		<text>The way to the lift</text>
+	</string>
+	<string id="st_shelter_room_top_east">
+		<text>The east hall</text>
+	</string>
+	<string id="st_shelter_room_low_science">
+		<text>The science sector</text>
+	</string>
+	<string id="st_shelter_room_low_tunnel">
+		<text>The tunnel past the gate</text>
+	</string>
 </string_table>

@@ -1,0 +1,319 @@
+-- The shelter's lifts (docs/coop/shelter.md, "Lift"): they replace the long stairs, from the middle floor up and down. Their
+-- doors never open, the walls leave them no room: use on one is the ride itself, a fade and a move to the other door.
+-- Dead until the generator runs. The way up comes back with the repair of its panel, at its lower door; the way down with
+-- the repair of a control box by its upper door; each takes parts in a window (ui_shelter_lift.script, [shelter_lift]).
+-- All of its state is the world's (shelter.state).
+
+local LEVEL = "bunker_a1"
+-- each door: lv, an AI vertex of its floor (level.vertex_id finds another floor's); the door (its model's corner: it stands
+-- along +x from there); where one arrives, looking away from the door (yaw); the door at the other end; what it needs;
+-- which way it goes; whether its repair is done from here
+local STOPS = {
+	mid = { lv = 2497, door = { 1.295, 3.38, 31.33 }, arrive = { 2.33, 3.40, 30.45 }, yaw = math.pi, other = "top",
+		repair = "panel", tip = "st_shelter_lift_go_up", inspect = true },
+	top = { lv = 2494, door = { 1.055, 19.36, 30.65 }, arrive = { 2.09, 19.38, 29.85 }, yaw = math.pi, other = "mid",
+		repair = "panel", tip = "st_shelter_lift_go_down" },
+	hall = { lv = 1850, door = { -3.945, 2.95, -16.34 }, arrive = { -2.91, 3.00, -15.45 }, yaw = 0, other = "low",
+		repair = "box", tip = "st_shelter_lift_go_down" },
+	low = { lv = 1286, door = { -21.705, -20.78, -4.40 }, arrive = { -20.67, -20.82, -5.30 }, yaw = math.pi, other = "hall",
+		repair = "box", tip = "st_shelter_lift_go_up" },
+}
+local BOX = { lv = 1850, pos = { -4.55, 3.95, -16.42 } } -- the control box, on the hall's wall beside the door
+-- the hermetic gate across the lower tunnel, its middle on the floor; its model's +z along the tunnel
+local GATE = { lv = 890, pos = { -41.82, -21.9, -7.52 }, along = { -0.96, 0.27 } }
+-- what each repair is: its state, its parts in [shelter_lift], its window's texts
+local REPAIRS = {
+	panel = { state = "lift_repaired", line = "repair", title = "st_shelter_lift_title", broken = "st_shelter_lift_broken",
+		done = "st_shelter_lift_repaired" },
+	box = { state = "lift_low_repaired", line = "repair_box", title = "st_shelter_lift_box", broken = "st_shelter_lift_box_broken",
+		done = "st_shelter_lift_box_repaired" },
+}
+local RIDE = { fade = 1.4, hold = 2.2, black_id = 3010 } -- seconds: the screen going dark, then the dark
+local SND = {
+	locked = [[device\door_locked]], run = [[ambient\x16\x16_engine1_run]], stop = [[ambient\x16\x16_engine1_stop]],
+	repair = [[interface\inv_repair_kit_use_fast_2p8]],
+}
+
+local function vec(t)
+	return vector():set(t[1], t[2], t[3])
+end
+
+local function msg(id)
+	actor_menu.set_msg(1, game.translate_string(id), 5)
+end
+
+local function play(path)
+	local s = sound_object(path)
+	s:play(db.actor, 0, sound_object.s2d)
+	return s
+end
+
+function repaired(kind)
+	return shelter.state(REPAIRS[kind].state, false) == true
+end
+
+function powered()
+	return shelter.generator_on()
+end
+
+function texts(kind)
+	return REPAIRS[kind]
+end
+
+-------------------------------------------------------------------------------
+-- a repair: its parts { sec, count, have }
+
+function repair_parts(kind)
+	local parts = {}
+	local line = ini_sys:r_string_ex("shelter_lift", REPAIRS[kind].line) or ""
+	for sec, n in string.gmatch(line, "([%w_]+):(%d+)") do
+		parts[#parts + 1] = { sec = sec, count = tonumber(n), have = 0 }
+	end
+	db.actor:iterate_inventory(function(_, item)
+		for _, p in ipairs(parts) do
+			if item:section() == p.sec then
+				p.have = p.have + 1
+			end
+		end
+	end, db.actor)
+	return parts
+end
+
+function can_repair(kind)
+	for _, p in ipairs(repair_parts(kind)) do
+		if p.have < p.count then
+			return false
+		end
+	end
+	return true
+end
+
+function repair(kind)
+	if repaired(kind) or not can_repair(kind) then
+		return false
+	end
+	local left, items = {}, {}
+	for _, p in ipairs(repair_parts(kind)) do
+		left[p.sec] = p.count
+	end
+	db.actor:iterate_inventory(function(_, item)
+		local sec = item:section()
+		if (left[sec] or 0) > 0 then
+			left[sec] = left[sec] - 1
+			items[#items + 1] = item
+		end
+	end, db.actor)
+	for _, item in ipairs(items) do
+		alife_release(item)
+	end
+	shelter.set_state(REPAIRS[kind].state, true)
+	play(SND.repair)
+	msg(REPAIRS[kind].done)
+	return true
+end
+
+-------------------------------------------------------------------------------
+-- a ride
+
+local riding = false
+
+function ride(to)
+	if riding or not db.actor or not STOPS[to] then
+		return
+	end
+	riding = true
+	xr_effects.disable_ui_only(db.actor, nil)
+	level.add_pp_effector("fade_in.ppe", RIDE.black_id + 1, false)
+	local run = play(SND.run)
+	CreateTimeEvent("shelter_lift", "dark", RIDE.fade, function()
+		local ok, err = pcall(function()
+			level.add_pp_effector("black.ppe", RIDE.black_id, true)
+			db.actor:set_actor_position(vec(STOPS[to].arrive))
+			db.actor:set_actor_direction(STOPS[to].yaw)
+		end)
+		if not ok then
+			printf("! [shelter_lift] %s", tostring(err))
+		end
+		return true
+	end)
+	CreateTimeEvent("shelter_lift", "there", RIDE.fade + RIDE.hold, function()
+		local ok, err = pcall(function()
+			if run:playing() then
+				run:stop()
+			end
+			level.remove_pp_effector(RIDE.black_id)
+			xr_effects.enable_ui(db.actor, nil)
+			play(SND.stop)
+		end)
+		if not ok then
+			printf("! [shelter_lift] %s", tostring(err))
+		end
+		riding = false
+		return true
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- what stands and is used: a door, the control box
+
+local function door_tip(s)
+	if not powered() then
+		return "st_shelter_lift_dead"
+	elseif not repaired(s.repair) then
+		return s.inspect and "st_shelter_lift_inspect" or "st_shelter_lift_dead"
+	end
+	return s.tip
+end
+
+local function door_use(s)
+	if powered() and repaired(s.repair) then
+		ride(s.other)
+	elseif powered() and s.inspect then
+		ui_shelter_lift.open(s.repair)
+	else
+		play(SND.locked)
+		msg("st_shelter_lift_dead")
+	end
+end
+
+local function box_tip()
+	if not powered() then
+		return "st_shelter_lift_box_dead"
+	end
+	return repaired("box") and "st_shelter_lift_box_ok" or "st_shelter_lift_box_inspect"
+end
+
+local function box_use()
+	if not powered() then
+		play(SND.locked)
+		msg("st_shelter_lift_box_dead")
+	elseif not repaired("box") then
+		ui_shelter_lift.open("box")
+	end
+end
+
+class "use_binder" (object_binder)
+function use_binder:__init(obj) super(obj)
+	self.next = 0
+	local stop = ini_sys:r_string_ex(obj:section(), "shelter_stop")
+	self.stop = stop and STOPS[stop]
+	self.tip_only = ini_sys:r_string_ex(obj:section(), "shelter_tip") -- only stands and says so
+end
+function use_binder:update(delta)
+	object_binder.update(self, delta)
+	local now = time_global()
+	if now < self.next or not db.actor then
+		return
+	end
+	self.next = now + 300
+	local obj = self.object
+	if not self.ready then
+		local shell = obj:get_physics_shell()
+		if not shell then
+			return
+		end
+		shell:freeze()
+		self.ready = true
+		obj:set_callback(callback.use_object, use_binder.use, self)
+	end
+	local tip = self.tip_only or self.stop and door_tip(self.stop) or box_tip()
+	if tip ~= self.tip then
+		self.tip = tip
+		obj:set_tip_text(tip)
+	end
+end
+function use_binder:use()
+	if self.tip_only then
+		play(SND.locked)
+	elseif self.stop then
+		door_use(self.stop)
+	else
+		box_use()
+	end
+end
+function use_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	object_binder.net_destroy(self)
+end
+function init_use(obj)
+	obj:bind_object(use_binder(obj))
+end
+
+-------------------------------------------------------------------------------
+-- the lifts put in the world; a save from before them loses the rubble that stood at their doors
+
+local function drop_mound(section)
+	local sim = alife()
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		if se and se:section_name() == section then
+			alife_release(se)
+			break
+		end
+	end
+	local var = "shelter_keep_out_" .. section
+	local keep_out = load_var(db.actor, var, nil)
+	local se = keep_out and sim:object(keep_out)
+	if se and se:section_name() == "space_restrictor" then
+		alife_release(se)
+	end
+	save_var(db.actor, var, nil)
+end
+
+local function spawn_door(stop)
+	local s = STOPS[stop]
+	alife_create("shelter_lift_door_" .. stop, vec(s.door), s.lv, db.actor:game_vertex_id())
+end
+
+-- the lower door stood for a day at the stairs' landing at y -7, not at the tunnel
+local function move_low_door()
+	local sim = alife()
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		if se and se:section_name() == "shelter_lift_door_low" then
+			alife_release(se)
+			break
+		end
+	end
+	spawn_door("low")
+	shelter.set_state("lift_low_at_tunnel", true)
+end
+
+local function actor_on_first_update()
+	if level.name() ~= LEVEL then
+		return
+	end
+	if not shelter.state("lift_placed", false) then
+		shelter.once("lift", function()
+			drop_mound("shelter_mound_4")
+			spawn_door("mid")
+			spawn_door("top")
+			shelter.set_state("lift_placed", true)
+		end)
+	end
+	if not shelter.state("lift_low_placed", false) then
+		shelter.once("lift_low", function()
+			drop_mound("shelter_mound_2")
+			spawn_door("hall")
+			spawn_door("low")
+			alife_create("shelter_lift_box", vec(BOX.pos), BOX.lv, db.actor:game_vertex_id())
+			shelter.set_state("lift_low_placed", true)
+			shelter.set_state("lift_low_at_tunnel", true)
+		end)
+	elseif not shelter.state("lift_low_at_tunnel", false) then
+		shelter.once("lift_low_moved", move_low_door)
+	end
+	if not shelter.state("gate_placed", false) then
+		shelter.once("tunnel_gate", function()
+			local se = alife_create("shelter_tunnel_gate", vec(GATE.pos), GATE.lv, db.actor:game_vertex_id())
+			if se then
+				se.angle = vector():set(0, vector():set(GATE.along[1], 0, GATE.along[2]):getH(), 0)
+			end
+			shelter.set_state("gate_placed", true)
+		end)
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end

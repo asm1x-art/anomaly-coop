@@ -164,6 +164,11 @@ local function is_electric(section)
 	return electric[section] == true
 end
 
+-- the generator runs now (shelter_lift.script)
+function generator_on()
+	return power
+end
+
 local function repaired()
 	return state("generator_repaired", false)
 end
@@ -756,9 +761,7 @@ end
 
 -- section, the floor at the opening's face (x, y, z), facing into the closed side (x, z)
 local MOUNDS = {
-	{ "shelter_mound_2", -2.911, 2.95, -16.43, 0, -1 }, -- the stairs down
 	{ "shelter_mound_3", 2.335, 2.95, -0.515, 0, 1 }, -- the north corridor's mouth
-	{ "shelter_mound_4", 2.34, 3.38, 31.405, 0, 1 }, -- the corridor's end, the stairs up
 	{ "shelter_mound_8", 0.81, 3.38, 28.83, -1, 0 }, -- the corridor's side doorways, in pairs face to face
 	{ "shelter_mound_9", 3.86, 3.38, 28.83, 1, 0 },
 	{ "shelter_mound_10", 0.81, 3.38, 21.75, -1, 0 },
@@ -766,7 +769,7 @@ local MOUNDS = {
 	{ "shelter_mound_12", 0.81, 3.38, 14.61, -1, 0 },
 	{ "shelter_mound_13", 3.86, 3.38, 14.61, 1, 0 },
 }
-local EARLY_MOUNDS = { shelter_mound_2 = true, shelter_mound_3 = true, shelter_mound_4 = true } -- put by the test copy
+local EARLY_MOUNDS = { shelter_mound_3 = true } -- put by the test copy
 -- before the side doorways had theirs (the save's shelter_test_blocks)
 DIG = { -- global: the test copy speeds it up
 	stroke = 1300, -- ms

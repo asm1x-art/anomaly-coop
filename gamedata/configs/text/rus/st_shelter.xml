@@ -837,4 +837,82 @@
 	<string id="st_shelter_synth_col_finder">
 		<text>Нашёл</text>
 	</string>
+	<string id="st_shelter_lift_title">
+		<text>Лифт</text>
+	</string>
+	<string id="st_shelter_lift_broken">
+		<text>Панель неисправна. Нужны детали:</text>
+	</string>
+	<string id="st_shelter_lift_repair">
+		<text>Ремонтировать</text>
+	</string>
+	<string id="st_shelter_lift_repaired">
+		<text>Панель лифта починена</text>
+	</string>
+	<string id="st_shelter_lift_dead">
+		<text>Лифт не работает</text>
+	</string>
+	<string id="st_shelter_lift_inspect">
+		<text>Осмотреть лифт</text>
+	</string>
+	<string id="st_shelter_lift_go_up">
+		<text>Поехать наверх</text>
+	</string>
+	<string id="st_shelter_lift_go_down">
+		<text>Поехать вниз</text>
+	</string>
+	<string id="st_shelter_lift_box">
+		<text>Щиток лифта</text>
+	</string>
+	<string id="st_shelter_lift_box_broken">
+		<text>Щиток неисправен. Нужны детали:</text>
+	</string>
+	<string id="st_shelter_lift_box_repaired">
+		<text>Щиток починен: лифт вниз работает</text>
+	</string>
+	<string id="st_shelter_lift_box_dead">
+		<text>Щиток лифта: нет питания</text>
+	</string>
+	<string id="st_shelter_lift_box_inspect">
+		<text>Осмотреть щиток лифта</text>
+	</string>
+	<string id="st_shelter_lift_box_ok">
+		<text>Щиток лифта исправен</text>
+	</string>
+	<string id="st_shelter_gate_closed">
+		<text>Гермозатвор закрыт</text>
+	</string>
+	<string id="st_shelter_floor_top">
+		<text>Верхний</text>
+	</string>
+	<string id="st_shelter_floor_mid">
+		<text>Средний</text>
+	</string>
+	<string id="st_shelter_floor_low">
+		<text>Нижний</text>
+	</string>
+	<string id="st_shelter_mark_lift">
+		<text>Лифт</text>
+	</string>
+	<string id="st_shelter_mark_gate">
+		<text>Гермозатвор</text>
+	</string>
+	<string id="st_shelter_room_state_open">
+		<text>Открыто</text>
+	</string>
+	<string id="st_shelter_room_top_hall">
+		<text>Зал верхнего яруса</text>
+	</string>
+	<string id="st_shelter_room_top_north">
+		<text>Проход к лифту</text>
+	</string>
+	<string id="st_shelter_room_top_east">
+		<text>Восточный зал</text>
+	</string>
+	<string id="st_shelter_room_low_science">
+		<text>Научный сектор</text>
+	</string>
+	<string id="st_shelter_room_low_tunnel">
+		<text>Тоннель за гермозатвором</text>
+	</string>
 </string_table>
