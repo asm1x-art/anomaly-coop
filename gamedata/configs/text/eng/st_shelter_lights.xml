@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_craft_lights">
+		<text>Lighting</text>
+	</string>
+	<string id="st_shelter_item_lamp">
+		<text>The shelter's ceiling lamp</text>
+	</string>
+	<string id="st_shelter_item_lamp_descr">
+		<text>The same as in the shelter's rooms. Goes on the ceiling, runs on the generator; F turns it off.</text>
+	</string>
+</string_table>

@@ -1,0 +1,51 @@
+; The shelter's own ceiling lamp: written by tools\shelter\lights_set.py. Its light is that of the shelter's lamps (a corridor's
+; one, read in the game), set as it's placed (shelter_furniture.script); it needs the generator (shelter_power), F turns it off,
+; it goes on the ceiling (hang_offset: how far its origin is under it; placeable_furniture.script turns it over).
+[shelter_item_lamp]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\light\light_galogen_1_glass.ogf
+description             = st_shelter_item_lamp_descr
+inv_name                = st_shelter_item_lamp
+inv_name_short          = st_shelter_item_lamp
+icons_texture           = ui\shelter\lamp_icon
+inv_grid_x              = 0
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 300
+inv_weight              = 1.5
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = light
+placeable_section       = placeable_shelter_lamp
+shelter_category        = light
+
+[placeable_shelter_lamp]
+class                   = SO_HLAMP
+visual                  = dynamics\light\light_galogen_1_glass
+script_binding          = bind_light_furniture.init
+ui_on_interaction       = ui_furniture_light.start_dialog
+ui_on_simple_interaction = ui_furniture_light.toggle_light
+fuel_duration           = 336
+fuel_section            = batteries_dead
+item_section            = shelter_item_lamp
+light_section           = definition_shelter_lamp
+placeable_type          = light
+base_rotation           = 0
+bounding_box_size       = 0.32, 1.24, 0.32
+bounding_box_origin     = 0, 0.16, 0
+snd_turn_on             = ambient\special\light_buzz_1
+snd_turn_off            = ambient\special\light_sizzles_1
+shelter_power           = true
+hang_offset             = 0.08
+ui_texture              = ui_inGame2_placeable_metal_torch
+
+[definition_shelter_lamp]
+type                    = 2
+color                   = 1, 1, 1, 1
+range                   = 8
+cone_angle              = 2.0943949
+main_bone               = bone_lamp
+color_animator          = light\light_galogen_idle
+has_shadows             = true

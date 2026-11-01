@@ -691,10 +691,10 @@
 		<text>none</text>
 	</string>
 	<string id="st_shelter_role_store">
-		<text>the bar's store</text>
+		<text>the trade's store</text>
 	</string>
 	<string id="st_shelter_room_make_store">
-		<text>Make it the bar's store</text>
+		<text>Make it the trade's store</text>
 	</string>
 	<string id="st_shelter_room_unassign">
 		<text>Take the role off</text>
@@ -771,37 +771,28 @@
 	<string id="st_shelter_room_9">
 		<text>Room 8</text>
 	</string>
-	<string id="st_shelter_app_bar">
-		<text>Bar</text>
+	<string id="st_shelter_app_trade">
+		<text>Trade</text>
 	</string>
-	<string id="st_shelter_bar_store">
-		<text>%s</text>
-	</string>
-	<string id="st_shelter_bar_no_store">
+	<string id="st_shelter_tr_no_store">
 		<text>No store: make a room the store in the Shelter plan.</text>
 	</string>
-	<string id="st_shelter_bar_stock">
-		<text>Goods in the store: %d (food %d, drink and smokes %d)</text>
-	</string>
-	<string id="st_shelter_bar_markup">
+	<string id="st_shelter_tr_markup">
 		<text>Markup: x%s</text>
 	</string>
-	<string id="st_shelter_bar_next">
-		<text>Sells once in %s h; the next sale in %d min.</text>
-	</string>
-	<string id="st_shelter_bar_till">
+	<string id="st_shelter_tr_till">
 		<text>In the till: %d RU</text>
 	</string>
-	<string id="st_shelter_bar_take">
+	<string id="st_shelter_tr_take_till">
 		<text>Take the takings</text>
 	</string>
-	<string id="st_shelter_bar_total">
+	<string id="st_shelter_tr_total">
 		<text>Takings so far: %d RU</text>
 	</string>
-	<string id="st_shelter_bar_log">
+	<string id="st_shelter_tr_log">
 		<text>Last sales:</text>
 	</string>
-	<string id="st_shelter_bar_log_empty">
+	<string id="st_shelter_tr_log_empty">
 		<text>No sales yet.</text>
 	</string>
 	<string id="st_shelter_os_user">
@@ -810,10 +801,7 @@
 	<string id="st_shelter_os_name">
 		<text>Chemist OS</text>
 	</string>
-	<string id="st_shelter_bar_store_title">
-		<text>The bar's store</text>
-	</string>
-	<string id="st_shelter_bar_money_title">
+	<string id="st_shelter_tr_money_title">
 		<text>The till</text>
 	</string>
 	<string id="st_shelter_synth_col_when">
@@ -962,5 +950,440 @@
 	</string>
 	<string id="st_shelter_cat_decor">
 		<text>Decor</text>
+	</string>
+	<string id="st_shelter_tr_tab_overview">
+		<text>Overview</text>
+	</string>
+	<string id="st_shelter_tr_tab_stock">
+		<text>Store</text>
+	</string>
+	<string id="st_shelter_tr_tab_supply">
+		<text>Supply</text>
+	</string>
+	<string id="st_shelter_tr_tab_ways">
+		<text>Deliveries</text>
+	</string>
+	<string id="st_shelter_tr_tab_contracts">
+		<text>Contracts</text>
+	</string>
+	<string id="st_shelter_tr_tab_journal">
+		<text>Journal</text>
+	</string>
+	<string id="st_shelter_tr_tab_settings">
+		<text>Settings</text>
+	</string>
+	<string id="st_shelter_tr_store">
+		<text>Store</text>
+	</string>
+	<string id="st_shelter_tr_store_positions">
+		<text>Positions: %d, off sale: %d</text>
+	</string>
+	<string id="st_shelter_tr_store_units">
+		<text>Units in all: %s</text>
+	</string>
+	<string id="st_shelter_tr_store_worth">
+		<text>At base cost: %s RU</text>
+	</string>
+	<string id="st_shelter_tr_visitors">
+		<text>Visitors</text>
+	</string>
+	<string id="st_shelter_tr_traffic">
+		<text>A day: about %d</text>
+	</string>
+	<string id="st_shelter_tr_rep">
+		<text>The trade's name: %s of 100</text>
+	</string>
+	<string id="st_shelter_tr_served">
+		<text>Left with a purchase: %d</text>
+	</string>
+	<string id="st_shelter_tr_left">
+		<text>Left with nothing: %d</text>
+	</string>
+	<string id="st_shelter_tr_crisis">
+		<text>Situation</text>
+	</string>
+	<string id="st_shelter_tr_crisis_none">
+		<text>All quiet</text>
+	</string>
+	<string id="st_shelter_tr_left_hours">
+		<text>Left: %d h</text>
+	</string>
+	<string id="st_shelter_tr_news">
+		<text>News:</text>
+	</string>
+	<string id="st_shelter_tr_crisis_dry">
+		<text>Dry law at the Warehouses</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_dry">
+		<text>Skryaga is under pressure: no supply from him, drink fetches far more.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_psi">
+		<text>A psi surge</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_psi">
+		<text>The Scorcher gave a harmonic: medicine is swept off the shelves at higher prices.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_dump">
+		<text>Sidorovich's dumping</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_dump">
+		<text>Fewer guests while the general markup is above x1.10.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_rats">
+		<text>Rats in the store</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_rats">
+		<text>Part of the food in the store is spoiled.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_end">
+		<text>Over: %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_dry">
+		<text>Dry law at the Warehouses: no supply from Skryaga, drink is dear.</text>
+	</string>
+	<string id="st_shelter_tr_news_psi">
+		<text>A psi surge: demand for medicine is up.</text>
+	</string>
+	<string id="st_shelter_tr_news_dump">
+		<text>Sidorovich sent a cheap caravan: fewer guests till the markup goes down.</text>
+	</string>
+	<string id="st_shelter_tr_news_rats">
+		<text>Rats in the store: part of the food is spoiled.</text>
+	</string>
+	<string id="st_shelter_tr_news_arrived">
+		<text>Delivered to the store: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_sos">
+		<text>The courier is silent: %s, %s. The cargo is marked on the map for %s h, then it is looted.</text>
+	</string>
+	<string id="st_shelter_tr_news_looted">
+		<text>The cargo is looted: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_recovered">
+		<text>The cargo is recovered and in the store's books: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_failed">
+		<text>A contract missed: %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_handed">
+		<text>A contract handed in: %s, %s RU in the till.</text>
+	</string>
+	<string id="st_shelter_tr_cargo_mark">
+		<text>Intercepted cargo</text>
+	</string>
+	<string id="st_shelter_tr_cargo_name">
+		<text>Courier's cargo</text>
+	</string>
+	<string id="st_shelter_tr_cargo_descr">
+		<text>A case with a lot for the shelter. Once you have it, the lot is in the store's books.</text>
+	</string>
+	<string id="st_shelter_tr_rounds">
+		<text>%s rds</text>
+	</string>
+	<string id="st_shelter_tr_pieces">
+		<text>%s pcs</text>
+	</string>
+	<string id="st_shelter_tr_prev">
+		<text>Back</text>
+	</string>
+	<string id="st_shelter_tr_next">
+		<text>Next</text>
+	</string>
+	<string id="st_shelter_tr_page">
+		<text>%d of %d</text>
+	</string>
+	<string id="st_shelter_tr_cat_all">
+		<text>All</text>
+	</string>
+	<string id="st_shelter_tr_cat_food">
+		<text>Food</text>
+	</string>
+	<string id="st_shelter_tr_cat_drink">
+		<text>Drink, smokes</text>
+	</string>
+	<string id="st_shelter_tr_cat_medical">
+		<text>Medicine</text>
+	</string>
+	<string id="st_shelter_tr_cat_ammo">
+		<text>Ammo</text>
+	</string>
+	<string id="st_shelter_tr_cat_weapon">
+		<text>Weapons</text>
+	</string>
+	<string id="st_shelter_tr_cat_armour">
+		<text>Armour</text>
+	</string>
+	<string id="st_shelter_tr_cat_artefact">
+		<text>Artefacts</text>
+	</string>
+	<string id="st_shelter_tr_cat_gear">
+		<text>Gear</text>
+	</string>
+	<string id="st_shelter_tr_state_all">
+		<text>All</text>
+	</string>
+	<string id="st_shelter_tr_state_on">
+		<text>On sale</text>
+	</string>
+	<string id="st_shelter_tr_state_off">
+		<text>Off sale</text>
+	</string>
+	<string id="st_shelter_tr_state_own">
+		<text>Own markup</text>
+	</string>
+	<string id="st_shelter_tr_state_crates">
+		<text>In boxes</text>
+	</string>
+	<string id="st_shelter_tr_state_ledger">
+		<text>In books</text>
+	</string>
+	<string id="st_shelter_tr_state_low">
+		<text>Running low</text>
+	</string>
+	<string id="st_shelter_tr_col_name">
+		<text>Position</text>
+	</string>
+	<string id="st_shelter_tr_col_crates">
+		<text>Boxes</text>
+	</string>
+	<string id="st_shelter_tr_col_ledger">
+		<text>Books</text>
+	</string>
+	<string id="st_shelter_tr_col_cond">
+		<text>Cond.</text>
+	</string>
+	<string id="st_shelter_tr_col_base">
+		<text>Base</text>
+	</string>
+	<string id="st_shelter_tr_col_markup">
+		<text>Markup</text>
+	</string>
+	<string id="st_shelter_tr_col_price">
+		<text>Price</text>
+	</string>
+	<string id="st_shelter_tr_col_worth">
+		<text>Worth</text>
+	</string>
+	<string id="st_shelter_tr_col_retail">
+		<text>Retail</text>
+	</string>
+	<string id="st_shelter_tr_col_lots">
+		<text>Lot: units and price</text>
+	</string>
+	<string id="st_shelter_tr_col_cat">
+		<text>Category</text>
+	</string>
+	<string id="st_shelter_tr_col_sale">
+		<text>Sale</text>
+	</string>
+	<string id="st_shelter_tr_col_sold">
+		<text>Sold, RU</text>
+	</string>
+	<string id="st_shelter_tr_stock_empty">
+		<text>Empty: put goods into the store room's boxes or buy a lot.</text>
+	</string>
+	<string id="st_shelter_tr_stock_none">
+		<text>Nothing found.</text>
+	</string>
+	<string id="st_shelter_tr_on_sale">
+		<text>On sale</text>
+	</string>
+	<string id="st_shelter_tr_off_sale">
+		<text>Off sale</text>
+	</string>
+	<string id="st_shelter_tr_take">
+		<text>Take %d</text>
+	</string>
+	<string id="st_shelter_tr_all_on">
+		<text>Put shown on sale</text>
+	</string>
+	<string id="st_shelter_tr_all_off">
+		<text>Take shown off</text>
+	</string>
+	<string id="st_shelter_tr_all_markup">
+		<text>markup</text>
+	</string>
+	<string id="st_shelter_tr_all_reset">
+		<text>As category</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_barman">
+		<text>Barman, 100 Rads</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_sakharov">
+		<text>Sakharov, Yantar</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_petrenko">
+		<text>Petrenko, Duty</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_skryaga">
+		<text>Skryaga, Freedom</text>
+	</string>
+	<string id="st_shelter_tr_sup_dead">
+		<text>The supplier is dead: no orders.</text>
+	</string>
+	<string id="st_shelter_tr_sup_hostile">
+		<text>You are not welcome: no orders.</text>
+	</string>
+	<string id="st_shelter_tr_sup_stopped">
+		<text>Supply is frozen: no orders.</text>
+	</string>
+	<string id="st_shelter_tr_sup_discount">
+		<text>Your discount: %d%%</text>
+	</string>
+	<string id="st_shelter_tr_sup_way">
+		<text>Way %d-%d h, risk %d%%</text>
+	</string>
+	<string id="st_shelter_tr_pay_line">
+		<text>%s, %s: %s RU</text>
+	</string>
+	<string id="st_shelter_tr_pay_till">
+		<text>From the till (%s)</text>
+	</string>
+	<string id="st_shelter_tr_pay_pocket">
+		<text>From the pocket (%s)</text>
+	</string>
+	<string id="st_shelter_tr_pick_lot">
+		<text>Pick a lot: always under retail, the larger the cheaper.</text>
+	</string>
+	<string id="st_shelter_tr_way_name">
+		<text>Lot</text>
+	</string>
+	<string id="st_shelter_tr_way_qty">
+		<text>Units</text>
+	</string>
+	<string id="st_shelter_tr_way_sup">
+		<text>From</text>
+	</string>
+	<string id="st_shelter_tr_way_state">
+		<text>State</text>
+	</string>
+	<string id="st_shelter_tr_way_none">
+		<text>No deliveries on the way.</text>
+	</string>
+	<string id="st_shelter_tr_way_due">
+		<text>On the way, up to %d h</text>
+	</string>
+	<string id="st_shelter_tr_way_sos">
+		<text>Intercepted! On the map, %d h more</text>
+	</string>
+	<string id="st_shelter_tr_contracts_all">
+		<text>All</text>
+	</string>
+	<string id="st_shelter_tr_contracts_free">
+		<text>Offers</text>
+	</string>
+	<string id="st_shelter_tr_contracts_taken">
+		<text>Taken</text>
+	</string>
+	<string id="st_shelter_tr_contracts_none">
+		<text>No contracts now, new ones come twice a day.</text>
+	</string>
+	<string id="st_shelter_tr_reward">
+		<text>Reward: %s RU</text>
+	</string>
+	<string id="st_shelter_tr_min_cond">
+		<text>Condition at least %d%%</text>
+	</string>
+	<string id="st_shelter_tr_hand_in">
+		<text>Hand in</text>
+	</string>
+	<string id="st_shelter_tr_term_hours">
+		<text>Term: %d h</text>
+	</string>
+	<string id="st_shelter_tr_take_contract">
+		<text>Take it</text>
+	</string>
+	<string id="st_shelter_tr_refuse">
+		<text>Refuse</text>
+	</string>
+	<string id="st_shelter_tr_giver_sakharov">
+		<text>Prof. Sakharov</text>
+	</string>
+	<string id="st_shelter_tr_giver_lab">
+		<text>The Yantar lab</text>
+	</string>
+	<string id="st_shelter_tr_giver_shustry">
+		<text>Veteran Shustry</text>
+	</string>
+	<string id="st_shelter_tr_giver_veteran">
+		<text>A veteran visitor</text>
+	</string>
+	<string id="st_shelter_tr_giver_transit">
+		<text>A stalker passing by</text>
+	</string>
+	<string id="st_shelter_tr_giver_duty">
+		<text>A Duty checkpoint</text>
+	</string>
+	<string id="st_shelter_tr_giver_freedom">
+		<text>A Freedom squad</text>
+	</string>
+	<string id="st_shelter_tr_giver_barman">
+		<text>Barman</text>
+	</string>
+	<string id="st_shelter_tr_giver_loners">
+		<text>Loners at a campfire</text>
+	</string>
+	<string id="st_shelter_tr_journal_sales">
+		<text>Sales</text>
+	</string>
+	<string id="st_shelter_tr_journal_news">
+		<text>News</text>
+	</string>
+	<string id="st_shelter_tr_low">
+		<text>Running low: under %d</text>
+	</string>
+	<string id="st_shelter_tr_settings_cats">
+		<text>Categories</text>
+	</string>
+	<string id="st_shelter_tr_reset">
+		<text>As general</text>
+	</string>
+	<string id="st_shelter_tr_orders_box">
+		<text>Orders box: %s</text>
+	</string>
+	<string id="st_shelter_tr_orders_no_box">
+		<text>No orders box assigned: orders are handed in through it.</text>
+	</string>
+	<string id="st_shelter_tr_box_choose">
+		<text>Choose a box</text>
+	</string>
+	<string id="st_shelter_tr_box_pick">
+		<text>Which box takes the orders? Put all that's for orders in it; it isn't part of the store.</text>
+	</string>
+	<string id="st_shelter_tr_box_set">
+		<text>Assign</text>
+	</string>
+	<string id="st_shelter_tr_box_is_set">
+		<text>Assigned</text>
+	</string>
+	<string id="st_shelter_tr_box_row">
+		<text>things: %d</text>
+	</string>
+	<string id="st_shelter_tr_box_none">
+		<text>There's no box in the shelter.</text>
+	</string>
+	<string id="st_shelter_tr_box_no_room">
+		<text>outside the rooms</text>
+	</string>
+	<string id="st_shelter_tr_back">
+		<text>Back</text>
+	</string>
+	<string id="st_shelter_tr_no_barman">
+		<text>No barman</text>
+	</string>
+	<string id="st_shelter_tr_no_barman_text">
+		<text>Trade has stopped: no visitors, no new orders.</text>
+	</string>
+	<string id="st_shelter_tr_hire">
+		<text>Hire: %s RU</text>
+	</string>
+	<string id="st_shelter_tr_stopped">
+		<text>Trade has stopped: no barman.</text>
+	</string>
+	<string id="st_shelter_tr_factors">
+		<text>Range %d%%, prices %d%%</text>
+	</string>
+	<string id="st_shelter_furniture_box_full">
+		<text>Empty the box first.</text>
 	</string>
 </string_table>

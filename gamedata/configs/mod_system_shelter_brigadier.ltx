@@ -34,6 +34,11 @@ upgrades                  = up_gr_firsta_m4_brigadier, up_gr_secona_m4_brigadier
 installed_upgrades        = up_firsta_m4_brigadier, up_firstc_m4_brigadier, up_firste_m4_brigadier, up_firstf_m4_brigadier, up_secona_m4_brigadier, up_seconc_m4_brigadier, up_second_m4_brigadier, up_secone_m4_brigadier, up_thirda_m4_brigadier, up_thirdc_m4_brigadier, up_thirde_m4_brigadier, up_thirdf_m4_brigadier, up_fourta_m4_brigadier, up_fourtc_m4_brigadier, up_fourte_m4_brigadier, up_fourtf_m4_brigadier
 
 ; the helmet module: in the headlamp slot while the outfit is worn, its charge is the outfit's accumulator
+; the engine hangs a lamp on the actor's head only if its section is listed here: else its light stays inside the body
+; (mod_system_heatvision.ltx's list and the module; loaded after it, this one counts)
+![actor]
+attachable_items = device_torch,device_torch_dummy,device_torch_nv_1,device_torch_nv_2,device_torch_nv_3,device_torch_nv_4,attachable_item,hand_radio,shelter_brigadier_module
+
 [shelter_brigadier_module]:device_torch_nv_3
 inv_name                  = st_shelter_brigadier_module_name
 inv_name_short            = st_shelter_brigadier_module_name

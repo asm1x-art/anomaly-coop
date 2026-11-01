@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_craft_bar">
+		<text>Мебель бара</text>
+	</string>
+	<string id="st_shelter_bar_descr">
+		<text>Мебель для бара, как в «100 рентген». Ставится прямо из рюкзака; колесо поворачивает. Секции стоят встык: собирайте стойку нужной длины.</text>
+	</string>
+	<string id="st_shelter_item_bar_counter">
+		<text>Секция барной стойки</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_short">
+		<text>Короткая секция стойки</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_kitchen">
+		<text>Секция стойки с посудой</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_sink">
+		<text>Кухонная секция с мойкой</text>
+	</string>
+	<string id="st_shelter_item_bar_fridge">
+		<text>Холодильник бара</text>
+	</string>
+	<string id="st_shelter_item_bar_buffet">
+		<text>Буфет с полками</text>
+	</string>
+	<string id="st_shelter_item_bar_cabinet">
+		<text>Тумба за стойку</text>
+	</string>
+	<string id="st_shelter_item_bar_table">
+		<text>Стол из бара</text>
+	</string>
+	<string id="st_shelter_item_bar_table_small">
+		<text>Столик из бара</text>
+	</string>
+	<string id="st_shelter_item_bar_chair">
+		<text>Стул из бара</text>
+	</string>
+</string_table>

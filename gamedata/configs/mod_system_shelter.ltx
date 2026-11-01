@@ -36,19 +36,9 @@ script_binding    = shelter.init_generator
 ; nobody walks under a desk)
 [shelter_stash]:inventory_box
 visual          = dynamics\box\box_wood_02.ogf
+inv_name        = st_shelter_mark_stash
 
-; the bar (shelter_bar.script): what it sells from the store room's boxes (items' kinds: food; drink, which has the
-; smokes too), one thing every sell_hours game hours at the item's cost times the markup (set on the laptop: from
-; markup_min to markup_max by markup_step); the money goes into the till, a sum taken on the laptop
-[shelter_bar]
-kinds           = i_food, i_drink
-sell_hours      = 1
-markup          = 1.1
-markup_min      = 1
-markup_max      = 3
-markup_step     = 0.05
-
-; the till of the saves before 2026-10-30, a safe under the laptop's desk: kept for them to load (shelter_bar takes
+; the till of the saves before 2026-10-30, a safe under the laptop's desk: kept for them to load (shelter_trade takes
 ; its money into the sum and removes it)
 [shelter_till]:inventory_box
 visual          = dynamics\equipment_cache\equipment_seif_01_case.ogf
@@ -517,3 +507,42 @@ script_binding    = shelter_lift.init_still
 [shelter_top_plate]:physic_object
 visual            = dynamics\shelter\top_plate.ogf
 script_binding    = shelter_lift.init_still
+
+; HF's boxes have HF's binder, for its menu on a held F (shelter_furniture.script); the rack, the shelf and the display
+; keep theirs: they work by the use callback of bind_physic_object
+![placeable_blue_box]
+script_binding = bind_hf_base.init
+![placeable_case]
+script_binding = bind_hf_base.init
+![placeable_cans_tuna]
+script_binding = bind_hf_base.init
+![placeable_exo_repair_kit]
+script_binding = bind_hf_base.init
+![placeable_prop_ammo_box]
+script_binding = bind_hf_base.init
+![placeable_prop_med_case_1]
+script_binding = bind_hf_base.init
+![placeable_sumka6]
+script_binding = bind_hf_base.init
+![placeable_fridge]
+script_binding = bind_hf_base.init
+![placeable_storage01]
+script_binding = bind_hf_base.init
+![placeable_storage02]
+script_binding = bind_hf_base.init
+![placeable_storage03]
+script_binding = bind_hf_base.init
+![placeable_storage04]
+script_binding = bind_hf_base.init
+![placeable_storage05]
+script_binding = bind_hf_base.init
+![placeable_storage06]
+script_binding = bind_hf_base.init
+![placeable_storage07]
+script_binding = bind_hf_base.init
+![placeable_storage08]
+script_binding = bind_hf_base.init
+
+; a workbench: F opens its menu (its box, the crafting), not the crafting at once: the box is how materials get in
+![placeable_workshop]
+ui_on_simple_interaction = ui_furniture_workshop.start_dialog

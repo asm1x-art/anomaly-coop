@@ -1,7 +1,7 @@
 ; The shelter's rooms for the laptop's plan (ui_shelter_laptop.script; docs/coop/shelter.md, "План развития"): each
 ; one's name, its box on the main floor (x0, x1, z0, z1, read off tools\shelter\plan.py's walls), the cleaning zone
 ; whose state it shows (shelter.zone_state: blocked by rubble, open and dirty, cleaned) and what it can be made.
-; Listed in the order they're tried under the cursor: the small rooms before the halls they sit in.
+; Under the cursor the small rooms are tried before the halls they sit in (the plan sorts them by their boxes' size).
 [rooms]
 top_hall
 top_north

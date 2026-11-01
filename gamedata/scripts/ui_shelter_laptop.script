@@ -4,7 +4,7 @@
 -- are found by the cursor. Laid out in square units: the screen is that many wide (1024 on 4:3, more on a wide one)
 -- and 768 high, squeezed into the interface's 1024 across, so the plan, the icons and the marks keep their shape.
 -- Programs: the shelter's plan (the rooms by state, what is where, who is in; a room picked shows its card, where it
--- can be given a role, the world's), the bar (shelter_bar.script: its store, markup, till and sales), the synthesis
+-- can be given a role, the world's), the trade (ui_shelter_trade.script: the trade, its store, the supply, the contracts), the synthesis
 -- chambers and their journal (shelter_synthesis.script), the cleaning and, once the Brain Scorcher is off, the raid
 -- (raid.script: the raid's maps, the landing, the start).
 
@@ -14,7 +14,7 @@ local TASKBAR = 48
 local C = ui_shelter_style.C
 local TOP = ui_shelter_style.TITLE_H + 12 -- a window's content from here down
 local LEFT = 128 -- the windows keep right of the shortcuts
-local APPS = { { "plan", "st_shelter_app_plan" }, { "bar", "st_shelter_app_bar" }, { "synth", "st_shelter_app_synth" },
+local APPS = { { "plan", "st_shelter_app_plan" }, { "trade", "st_shelter_app_trade" }, { "synth", "st_shelter_app_synth" },
 	{ "clean", "st_shelter_app_clean" }, { "raid", "st_shelter_app_raid", when = function() return raid.available() end } }
 local ROOM_TINT = { blocked = { 150, 0, 0, 0 }, dirty = { 46, 240, 180, 70 } } -- alpha, r, g, b; a clean one: none
 local MARKS = { -- the shelter's things on the plan: the state keeping its object's id, its mark
@@ -39,7 +39,7 @@ local FIXED_MARKS = {
 local ROLES = { "store" } -- what a room can be made, in its card's order
 local BUNKER = "bunker_a1"
 
-local gui -- the laptop open
+GUI = nil -- the laptop open (the game's hide_hud_all closes it by this name)
 
 local function tr(id, ...)
 	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
@@ -83,6 +83,11 @@ local function load_plan()
 			floor = ini:r_string_ex(id, "floor") or "mid",
 			box = { tonumber(box[1]), tonumber(box[2]), tonumber(box[3]), tonumber(box[4]) } }
 	end
+	-- the small rooms before the halls they sit in (the ini's lines don't come in the file's order)
+	local function area(r)
+		return (r.box[2] - r.box[1]) * (r.box[4] - r.box[3])
+	end
+	table.sort(rooms, function(a, b) return area(a) < area(b) end)
 end
 
 -- a room's name: the one the group gave it, else its own
@@ -424,6 +429,11 @@ function UIShelterOS:show_card(room)
 					self:text(pad, by, w - 2 * pad, 34, tr("st_shelter_room_blocked_" .. r), C.faint, card)
 				else
 					self:button(pad, by, w - 2 * pad, 34, tr("st_shelter_room_make_" .. r), function()
+						for _, other in ipairs(ROLES) do -- a room has one role
+							if shelter.state("room_" .. other, nil) == room.id then
+								shelter.set_state("room_" .. other, nil)
+							end
+						end
 						shelter.set_state("room_" .. r, room.id)
 						self:show_card(room)
 					end, self.app_clicks, card, self.wx + x, self.wy + y, "primary").card = true
@@ -441,7 +451,7 @@ function UIShelterOS:show_card(room)
 		if own then
 			edit:SetText(tostring(own))
 		end
-		self:click_at(self.app_clicks, x + pad, y + by, w - 2 * pad, 36, function() edit:CaptureFocus(true) end, nil, "card")
+		self:click_at(self.app_clicks, x + pad, y + by, w - 2 * pad, 36, function() edit:CaptureFocus(true) end, nil, "card").edit = edit
 		by = by + 44
 		self:button(pad, by, w - 2 * pad, 34, tr("st_shelter_room_rename_save"), function()
 			local text = trim(edit:GetText() or "")
@@ -461,114 +471,31 @@ function UIShelterOS:show_card(room)
 end
 
 -------------------------------------------------------------------------------
--- the bar: the store and its goods, the markup (set here, the world's), when it sells, the till, the takings, the last
--- sales; drawn again when the bar has sold (counting the store takes a pass over all the objects: too long for every
--- second), the time till the next sale each second
+-- the trade: a full-screen program of its own (ui_shelter_trade.script)
 
-local function next_sale_text()
-	return tr("st_shelter_bar_next", tostring(ini_sys:r_float_ex("shelter_bar", "sell_hours") or 1),
-		math.ceil((shelter_bar.next_sale_in() or 0) / 60))
-end
-
-function UIShelterOS:open_bar()
+-- a room's name by its id, for the program
+function UIShelterOS:room_name(id)
 	load_plan()
-	local W, x = self:fit(660)
-	self:window(x, 40, W, 620, "bar")
-	self.bar_w, self.bar_h = W, 620
-	self.bar_body = nil
-	self:fill_bar()
-	self.app_update = self.update_bar
-end
-
-function UIShelterOS:update_bar()
-	local now = time_global()
-	if now < (self.bar_at or 0) then
-		return
-	end
-	self.bar_at = now + 1000
-	if shelter.state("bar_last", nil) ~= self.bar_last then
-		self:fill_bar()
-	else
-		self.bar_next:SetText(next_sale_text())
-	end
-end
-
-function UIShelterOS:fill_bar()
-	self.bar_last = shelter.state("bar_last", nil)
-	if self.bar_body then
-		self.win:DetachChild(self.bar_body)
-	end
-	for i = #self.app_clicks, 1, -1 do -- the old body's buttons
-		if self.app_clicks[i].bar then
-			table.remove(self.app_clicks, i)
-		end
-	end
-	local W, pad = self.bar_w, 18
-	local body = self:box(0, 0, W, self.bar_h, self.win)
-	self.bar_body = body
-	-- the store and the money: two cards side by side
-	local cw = math.floor((W - 3 * pad) / 2)
-	local room = shelter.state("room_store", nil)
-	local name
 	for _, r in ipairs(rooms) do
-		name = r.id == room and room_title(r) or name
-	end
-	local goods = shelter_bar.stock()
-	local food, drink = 0, 0
-	for _, g in ipairs(goods) do
-		food, drink = food + (g.kind == "i_food" and 1 or 0), drink + (g.kind == "i_food" and 0 or 1)
-	end
-	self:framed(pad, TOP, cw, 150, C.raised, body, 8)
-	self:text(pad + 14, TOP + 8, cw - 28, 26, tr("st_shelter_bar_store_title"), C.dim, body, nil, "s")
-	self:text(pad + 14, TOP + 32, cw - 28, 50, name and tr("st_shelter_bar_store", name) or tr("st_shelter_bar_no_store"),
-		name and C.text or C.warn, body)
-	self:text(pad + 14, TOP + 86, cw - 28, 50, tr("st_shelter_bar_stock", #goods, food, drink), C.text, body, nil, "s")
-	local mx = pad * 2 + cw
-	self:framed(mx, TOP, cw, 150, C.raised, body, 8)
-	self:text(mx + 14, TOP + 8, cw - 28, 26, tr("st_shelter_bar_money_title"), C.dim, body, nil, "s")
-	local till = shelter_bar.till_money()
-	self:text(mx + 14, TOP + 32, cw - 28, 34, tr("st_shelter_bar_till", till), C.text, body)
-	self:text(mx + 14, TOP + 66, cw - 28, 30, tr("st_shelter_bar_total", shelter.state("bar_total", 0) or 0), C.good, body, nil, "s")
-	self:button(mx + 14, TOP + 102, cw - 28, 34, tr("st_shelter_bar_take"), function()
-		shelter_bar.take_till()
-		self:fill_bar()
-	end, self.app_clicks, body, self.wx, self.wy, till > 0 and "primary" or "off").bar = true
-	-- the markup, its - and + beside it; when it sells
-	local my = TOP + 168
-	self:text(pad, my, 260, 34, tr("st_shelter_bar_markup", string.format("%.2f", shelter_bar.markup())), C.text, body)
-	local step = ini_sys:r_float_ex("shelter_bar", "markup_step") or 0.05
-	for i, d in ipairs({ -step, step }) do
-		self:button(270 + (i - 1) * 44, my, 38, 34, d < 0 and "-" or "+", function()
-			shelter_bar.set_markup(shelter_bar.markup() + d)
-			self:fill_bar()
-		end, self.app_clicks, body, self.wx, self.wy).bar = true
-	end
-	self.bar_next = self:text(pad, my + 40, W - 2 * pad, 26, next_sale_text(), C.dim, body, nil, "s")
-	-- the last sales
-	local ly = my + 84
-	self:text(pad, ly, W - 2 * pad, 30, tr("st_shelter_bar_log"), C.text, body, nil, "l")
-	ly = ly + 38
-	local list = shelter_bar.sales()
-	if #list == 0 then
-		self:text(pad, ly, W - 2 * pad, 26, tr("st_shelter_bar_log_empty"), C.faint, body)
-	end
-	-- a sale's time of day by the clock: so long before now
-	local clock = level.get_time_hours() * 3600 + level.get_time_minutes() * 60
-	local now = shelter_bar.now()
-	for i, s in ipairs(list) do
-		if ly + 28 > self.bar_h - 12 then
-			break
+		if r.id == id then
+			return room_title(r)
 		end
-		if i % 2 == 0 then
-			self:round(pad, ly, W - 2 * pad, 28, C.white, body, 4, 8)
-		end
-		local day = (clock - (now - s.t)) % 86400
-		self:text(pad + 10, ly, 70, 28, string.format("%02d:%02d", math.floor(day / 3600), math.floor(day % 3600 / 60)), C.dim,
-			body, nil, "s")
-		self:text(pad + 84, ly, W - 2 * pad - 220, 28, ui_item.get_sec_name(s.section), C.text, body, nil, "s")
-		self:text(W - pad - 130, ly, 120, 28, "+" .. s.price, C.good, body, CGameFont.alRight, "s")
-		ly = ly + 30
 	end
+end
+
+-- the name of the room a point is in, nil outside them all
+function UIShelterOS:room_name_at(pos)
+	load_plan()
+	local floor = pos.y > 12 and "top" or pos.y < -10 and "low" or "mid"
+	for _, r in ipairs(rooms) do
+		if r.floor == floor and pos.x >= r.box[1] and pos.x <= r.box[2] and pos.z >= r.box[3] and pos.z <= r.box[4] then
+			return room_title(r)
+		end
+	end
+end
+
+function UIShelterOS:open_trade()
+	ui_shelter_trade.open(self, SCREEN.w, SCREEN.h - TASKBAR)
 end
 
 -------------------------------------------------------------------------------
@@ -1244,6 +1171,16 @@ end
 
 function UIShelterOS:OnKeyboard(dik, keyboard_action)
 	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	-- a click on a field takes the keys whatever the engine's own focus did with that click
+	if dik == DIK_keys.MOUSE_1 and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		local p = self:cursor()
+		for _, c in ipairs(self.app_clicks) do
+			if c.edit and inside(p, c) then
+				c.edit:CaptureFocus(true)
+				return true
+			end
+		end
+	end
 	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
 		if dik == DIK_keys.MOUSE_1 then
 			self:click(self:cursor())
@@ -1272,13 +1209,15 @@ end
 
 function UIShelterOS:Close()
 	self:HideDialog()
-	gui = nil
+	GUI = nil
+	Unregister_UI("UIShelterOS")
 end
 
 -- the laptop opened (shelter.script's laptop_binder)
 function open()
-	if not (gui and gui:IsShown()) then
-		gui = UIShelterOS()
-		gui:ShowDialog(true)
+	if not (GUI and GUI:IsShown()) then
+		GUI = UIShelterOS()
+		GUI:ShowDialog(true)
+		Register_UI("UIShelterOS", "ui_shelter_laptop")
 	end
 end

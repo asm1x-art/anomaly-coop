@@ -10,6 +10,8 @@
 #   props.py build <level dir>                          the models (meshes\dynamics\shelter\props), their sections
 #                                                      (configs\mod_system_shelter_props.ltx) and where they stand,
 #                                                      what of the level they replace (configs\scripts\shelter\props.ltx)
+#   props.py racks <level dir>                          only the racks' models again, a collision box for each post and
+#                                                      shelf: with one box round all of it nothing can go on a shelf
 import math
 import os
 import struct
@@ -314,6 +316,45 @@ def cmd_plan(level_dir, out, box):
     img.save(out)
 
 
+def part_boxes(meshes, mass):
+    """a box for each long connected part of a model: (centre, half sizes, mass), the biggest first (the root). Left out:
+    a part solid-looking in all three sizes (several parts welded: it would close the shelves), the small brackets, and
+    what lies inside a box kept (a shelf's planks in its frame)"""
+    parts = []
+    for _, P, N, UV, I in meshes:
+        for Q, *_ in pieces_of(P, N, UV, I):
+            lo, hi = Q.min(0), Q.max(0)
+            size = hi - lo
+            if size.max() >= 0.5 and size.min() < 0.3:
+                parts.append(((lo + hi) / 2, np.maximum(size / 2, 0.01)))
+    parts.sort(key=lambda b: -float(np.prod(b[1])))
+    kept = []
+    for c, h in parts:
+        if not any(np.all(np.abs(c - c2) + h <= h2 + 0.03) for c2, h2 in kept):
+            kept.append((c, h))
+    return [(c, h, mass / len(kept)) for c, h in kept]
+
+
+def cmd_racks(level_dir):
+    pieces, _ = load(level_dir, VISUALS)
+    made = []  # (kind, name, signature)
+    for obj in assemble(pieces):
+        kind = kind_of(obj)
+        h, origin = frame(obj)
+        meshes = meshes_of(obj, h, origin)
+        sig, sig_turned = signature(meshes), signature(turned(meshes))
+        if any(k == kind and s in (sig, sig_turned) for k, _, s in made):
+            continue
+        name = f"{kind}_{sum(1 for k, _, _ in made if k == kind) + 1}"
+        made.append((kind, name, sig))
+        if kind == "rack":
+            _, _, material, mass = KINDS[kind]
+            boxes = part_boxes(meshes, mass)
+            path = os.path.join(GAMEDATA, "meshes", "dynamics", "shelter", "props", name + ".ogf")
+            ogf.write(path, meshes, boxes, f"shelter prop {name}", material)
+            print(name, len(boxes), "boxes:", " ".join("%.2fx%.2fx%.2f@%.2f" % (*(2 * b[1]), b[0][1]) for b in boxes))
+
+
 def cmd_build(level_dir):
     pieces, (d, visuals, g) = load(level_dir, VISUALS)
     objects = assemble(pieces)
@@ -401,3 +442,5 @@ if __name__ == "__main__":
         cmd_plan(sys.argv[2], sys.argv[3], [float(v) for v in sys.argv[4:8]])
     elif sys.argv[1] == "build":
         cmd_build(sys.argv[2])
+    elif sys.argv[1] == "racks":
+        cmd_racks(sys.argv[2])

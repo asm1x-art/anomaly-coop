@@ -691,10 +691,10 @@
 		<text>нет</text>
 	</string>
 	<string id="st_shelter_role_store">
-		<text>склад бара</text>
+		<text>склад торговли</text>
 	</string>
 	<string id="st_shelter_room_make_store">
-		<text>Сделать складом бара</text>
+		<text>Сделать складом торговли</text>
 	</string>
 	<string id="st_shelter_room_unassign">
 		<text>Снять назначение</text>
@@ -771,37 +771,28 @@
 	<string id="st_shelter_room_9">
 		<text>Комната 8</text>
 	</string>
-	<string id="st_shelter_app_bar">
-		<text>Бар</text>
+	<string id="st_shelter_app_trade">
+		<text>Торговля</text>
 	</string>
-	<string id="st_shelter_bar_store">
-		<text>%s</text>
-	</string>
-	<string id="st_shelter_bar_no_store">
+	<string id="st_shelter_tr_no_store">
 		<text>Склад не назначен: назначьте комнату в «Плане убежища».</text>
 	</string>
-	<string id="st_shelter_bar_stock">
-		<text>Товар на складе: %d (еда — %d, выпивка и курево — %d)</text>
-	</string>
-	<string id="st_shelter_bar_markup">
+	<string id="st_shelter_tr_markup">
 		<text>Наценка: x%s</text>
 	</string>
-	<string id="st_shelter_bar_next">
-		<text>Продаёт раз в %s ч; следующая продажа через %d мин.</text>
-	</string>
-	<string id="st_shelter_bar_till">
+	<string id="st_shelter_tr_till">
 		<text>В кассе: %d руб.</text>
 	</string>
-	<string id="st_shelter_bar_take">
+	<string id="st_shelter_tr_take_till">
 		<text>Забрать выручку</text>
 	</string>
-	<string id="st_shelter_bar_total">
+	<string id="st_shelter_tr_total">
 		<text>Выручка за всё время: %d руб.</text>
 	</string>
-	<string id="st_shelter_bar_log">
+	<string id="st_shelter_tr_log">
 		<text>Последние продажи:</text>
 	</string>
-	<string id="st_shelter_bar_log_empty">
+	<string id="st_shelter_tr_log_empty">
 		<text>Продаж пока не было.</text>
 	</string>
 	<string id="st_shelter_os_user">
@@ -810,10 +801,7 @@
 	<string id="st_shelter_os_name">
 		<text>Химик OS</text>
 	</string>
-	<string id="st_shelter_bar_store_title">
-		<text>Склад бара</text>
-	</string>
-	<string id="st_shelter_bar_money_title">
+	<string id="st_shelter_tr_money_title">
 		<text>Касса</text>
 	</string>
 	<string id="st_shelter_synth_col_when">
@@ -962,5 +950,440 @@
 	</string>
 	<string id="st_shelter_cat_decor">
 		<text>Декор</text>
+	</string>
+	<string id="st_shelter_tr_tab_overview">
+		<text>Обзор</text>
+	</string>
+	<string id="st_shelter_tr_tab_stock">
+		<text>Склад</text>
+	</string>
+	<string id="st_shelter_tr_tab_supply">
+		<text>Закупка</text>
+	</string>
+	<string id="st_shelter_tr_tab_ways">
+		<text>Доставки</text>
+	</string>
+	<string id="st_shelter_tr_tab_contracts">
+		<text>Заказы</text>
+	</string>
+	<string id="st_shelter_tr_tab_journal">
+		<text>Журнал</text>
+	</string>
+	<string id="st_shelter_tr_tab_settings">
+		<text>Настройки</text>
+	</string>
+	<string id="st_shelter_tr_store">
+		<text>Склад</text>
+	</string>
+	<string id="st_shelter_tr_store_positions">
+		<text>Позиций: %d, снято с продажи: %d</text>
+	</string>
+	<string id="st_shelter_tr_store_units">
+		<text>Всего единиц: %s</text>
+	</string>
+	<string id="st_shelter_tr_store_worth">
+		<text>По базовой цене: %s руб.</text>
+	</string>
+	<string id="st_shelter_tr_visitors">
+		<text>Посетители</text>
+	</string>
+	<string id="st_shelter_tr_traffic">
+		<text>В сутки: около %d</text>
+	</string>
+	<string id="st_shelter_tr_rep">
+		<text>Репутация торговли: %s из 100</text>
+	</string>
+	<string id="st_shelter_tr_served">
+		<text>Ушли с покупкой: %d</text>
+	</string>
+	<string id="st_shelter_tr_left">
+		<text>Ушли ни с чем: %d</text>
+	</string>
+	<string id="st_shelter_tr_crisis">
+		<text>Обстановка</text>
+	</string>
+	<string id="st_shelter_tr_crisis_none">
+		<text>Всё спокойно</text>
+	</string>
+	<string id="st_shelter_tr_left_hours">
+		<text>Осталось: %d ч</text>
+	</string>
+	<string id="st_shelter_tr_news">
+		<text>Новости:</text>
+	</string>
+	<string id="st_shelter_tr_crisis_dry">
+		<text>Сухой закон на Складах</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_dry">
+		<text>Скрягу прижали: поставок от него нет, за выпивку платят намного дороже.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_psi">
+		<text>Всплеск пси-активности</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_psi">
+		<text>Выжигатель выдал гармонику: медицину сметают и платят за неё дороже.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_dump">
+		<text>Демпинг Сидоровича</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_dump">
+		<text>Гостей меньше, пока общая наценка выше x1.10.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_rats">
+		<text>Крысы на складе</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_rats">
+		<text>Часть еды на складе испорчена.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_end">
+		<text>Закончилось: %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_dry">
+		<text>Сухой закон на Складах: поставок от Скряги нет, выпивка в цене.</text>
+	</string>
+	<string id="st_shelter_tr_news_psi">
+		<text>Всплеск пси-активности: растёт спрос на медицину.</text>
+	</string>
+	<string id="st_shelter_tr_news_dump">
+		<text>Сидорович пустил дешёвый караван: гостей меньше, пока не снизите наценку.</text>
+	</string>
+	<string id="st_shelter_tr_news_rats">
+		<text>Крысы на складе: часть еды испорчена.</text>
+	</string>
+	<string id="st_shelter_tr_news_arrived">
+		<text>Доставка на склад: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_sos">
+		<text>Курьер не вышел на связь: %s, %s. Груз отмечен на карте, %s ч, потом его разграбят.</text>
+	</string>
+	<string id="st_shelter_tr_news_looted">
+		<text>Груз разграблен: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_recovered">
+		<text>Груз отбит и записан на склад: %s, %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_failed">
+		<text>Заказ сорван: %s.</text>
+	</string>
+	<string id="st_shelter_tr_news_handed">
+		<text>Заказ сдан: %s, в кассу %s руб.</text>
+	</string>
+	<string id="st_shelter_tr_cargo_mark">
+		<text>Перехваченный груз</text>
+	</string>
+	<string id="st_shelter_tr_cargo_name">
+		<text>Груз курьера</text>
+	</string>
+	<string id="st_shelter_tr_cargo_descr">
+		<text>Контейнер с партией для убежища. Как только он у вас, партия записана на склад.</text>
+	</string>
+	<string id="st_shelter_tr_rounds">
+		<text>%s патр.</text>
+	</string>
+	<string id="st_shelter_tr_pieces">
+		<text>%s шт.</text>
+	</string>
+	<string id="st_shelter_tr_prev">
+		<text>Назад</text>
+	</string>
+	<string id="st_shelter_tr_next">
+		<text>Вперёд</text>
+	</string>
+	<string id="st_shelter_tr_page">
+		<text>%d из %d</text>
+	</string>
+	<string id="st_shelter_tr_cat_all">
+		<text>Все</text>
+	</string>
+	<string id="st_shelter_tr_cat_food">
+		<text>Еда</text>
+	</string>
+	<string id="st_shelter_tr_cat_drink">
+		<text>Выпивка, курево</text>
+	</string>
+	<string id="st_shelter_tr_cat_medical">
+		<text>Медицина</text>
+	</string>
+	<string id="st_shelter_tr_cat_ammo">
+		<text>Патроны</text>
+	</string>
+	<string id="st_shelter_tr_cat_weapon">
+		<text>Оружие</text>
+	</string>
+	<string id="st_shelter_tr_cat_armour">
+		<text>Броня</text>
+	</string>
+	<string id="st_shelter_tr_cat_artefact">
+		<text>Артефакты</text>
+	</string>
+	<string id="st_shelter_tr_cat_gear">
+		<text>Снаряжение</text>
+	</string>
+	<string id="st_shelter_tr_state_all">
+		<text>Все</text>
+	</string>
+	<string id="st_shelter_tr_state_on">
+		<text>В продаже</text>
+	</string>
+	<string id="st_shelter_tr_state_off">
+		<text>Сняты</text>
+	</string>
+	<string id="st_shelter_tr_state_own">
+		<text>Своя наценка</text>
+	</string>
+	<string id="st_shelter_tr_state_crates">
+		<text>В ящиках</text>
+	</string>
+	<string id="st_shelter_tr_state_ledger">
+		<text>По записи</text>
+	</string>
+	<string id="st_shelter_tr_state_low">
+		<text>Заканчиваются</text>
+	</string>
+	<string id="st_shelter_tr_col_name">
+		<text>Позиция</text>
+	</string>
+	<string id="st_shelter_tr_col_crates">
+		<text>Ящики</text>
+	</string>
+	<string id="st_shelter_tr_col_ledger">
+		<text>Запись</text>
+	</string>
+	<string id="st_shelter_tr_col_cond">
+		<text>Сост.</text>
+	</string>
+	<string id="st_shelter_tr_col_base">
+		<text>База</text>
+	</string>
+	<string id="st_shelter_tr_col_markup">
+		<text>Наценка</text>
+	</string>
+	<string id="st_shelter_tr_col_price">
+		<text>Цена</text>
+	</string>
+	<string id="st_shelter_tr_col_worth">
+		<text>Сумма</text>
+	</string>
+	<string id="st_shelter_tr_col_retail">
+		<text>Розница</text>
+	</string>
+	<string id="st_shelter_tr_col_lots">
+		<text>Партия: единиц и цена</text>
+	</string>
+	<string id="st_shelter_tr_col_cat">
+		<text>Категория</text>
+	</string>
+	<string id="st_shelter_tr_col_sale">
+		<text>Продажа</text>
+	</string>
+	<string id="st_shelter_tr_col_sold">
+		<text>Продано на, руб.</text>
+	</string>
+	<string id="st_shelter_tr_stock_empty">
+		<text>Пусто: положите товар в ящики комнаты-склада или закупите партию.</text>
+	</string>
+	<string id="st_shelter_tr_stock_none">
+		<text>Ничего не найдено.</text>
+	</string>
+	<string id="st_shelter_tr_on_sale">
+		<text>В продаже</text>
+	</string>
+	<string id="st_shelter_tr_off_sale">
+		<text>Снято</text>
+	</string>
+	<string id="st_shelter_tr_take">
+		<text>Взять %d</text>
+	</string>
+	<string id="st_shelter_tr_all_on">
+		<text>Выставить показанные</text>
+	</string>
+	<string id="st_shelter_tr_all_off">
+		<text>Снять показанные</text>
+	</string>
+	<string id="st_shelter_tr_all_markup">
+		<text>наценка</text>
+	</string>
+	<string id="st_shelter_tr_all_reset">
+		<text>Как у категории</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_barman">
+		<text>Бармен, «100 рентген»</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_sakharov">
+		<text>Сахаров, Янтарь</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_petrenko">
+		<text>Петренко, «Долг»</text>
+	</string>
+	<string id="st_shelter_tr_sup_name_skryaga">
+		<text>Скряга, «Свобода»</text>
+	</string>
+	<string id="st_shelter_tr_sup_dead">
+		<text>Поставщик мёртв: заказы не принимаются.</text>
+	</string>
+	<string id="st_shelter_tr_sup_hostile">
+		<text>Вам здесь не рады: заказы не принимаются.</text>
+	</string>
+	<string id="st_shelter_tr_sup_stopped">
+		<text>Поставки заморожены: заказы не принимаются.</text>
+	</string>
+	<string id="st_shelter_tr_sup_discount">
+		<text>Ваша скидка: %d%%</text>
+	</string>
+	<string id="st_shelter_tr_sup_way">
+		<text>Путь %d-%d ч, риск %d%%</text>
+	</string>
+	<string id="st_shelter_tr_pay_line">
+		<text>%s, %s: %s руб.</text>
+	</string>
+	<string id="st_shelter_tr_pay_till">
+		<text>Из кассы (%s)</text>
+	</string>
+	<string id="st_shelter_tr_pay_pocket">
+		<text>Из кармана (%s)</text>
+	</string>
+	<string id="st_shelter_tr_pick_lot">
+		<text>Выберите партию: дешевле розницы всегда, больше партия, меньше цена.</text>
+	</string>
+	<string id="st_shelter_tr_way_name">
+		<text>Партия</text>
+	</string>
+	<string id="st_shelter_tr_way_qty">
+		<text>Единиц</text>
+	</string>
+	<string id="st_shelter_tr_way_sup">
+		<text>От кого</text>
+	</string>
+	<string id="st_shelter_tr_way_state">
+		<text>Состояние</text>
+	</string>
+	<string id="st_shelter_tr_way_none">
+		<text>Доставок в пути нет.</text>
+	</string>
+	<string id="st_shelter_tr_way_due">
+		<text>В пути, ещё до %d ч</text>
+	</string>
+	<string id="st_shelter_tr_way_sos">
+		<text>Перехвачен! На карте, ещё %d ч</text>
+	</string>
+	<string id="st_shelter_tr_contracts_all">
+		<text>Все</text>
+	</string>
+	<string id="st_shelter_tr_contracts_free">
+		<text>Предложения</text>
+	</string>
+	<string id="st_shelter_tr_contracts_taken">
+		<text>В работе</text>
+	</string>
+	<string id="st_shelter_tr_contracts_none">
+		<text>Заказов сейчас нет, новые приходят раз в полсуток.</text>
+	</string>
+	<string id="st_shelter_tr_reward">
+		<text>Награда: %s руб.</text>
+	</string>
+	<string id="st_shelter_tr_min_cond">
+		<text>Состояние не ниже %d%%</text>
+	</string>
+	<string id="st_shelter_tr_hand_in">
+		<text>Сдать</text>
+	</string>
+	<string id="st_shelter_tr_term_hours">
+		<text>Срок: %d ч</text>
+	</string>
+	<string id="st_shelter_tr_take_contract">
+		<text>Взять в работу</text>
+	</string>
+	<string id="st_shelter_tr_refuse">
+		<text>Отклонить</text>
+	</string>
+	<string id="st_shelter_tr_giver_sakharov">
+		<text>Проф. Сахаров</text>
+	</string>
+	<string id="st_shelter_tr_giver_lab">
+		<text>Лаборатория на Янтаре</text>
+	</string>
+	<string id="st_shelter_tr_giver_shustry">
+		<text>Ветеран Шустрый</text>
+	</string>
+	<string id="st_shelter_tr_giver_veteran">
+		<text>Ветеран из гостей</text>
+	</string>
+	<string id="st_shelter_tr_giver_transit">
+		<text>Сталкер проездом</text>
+	</string>
+	<string id="st_shelter_tr_giver_duty">
+		<text>Блокпост «Долга»</text>
+	</string>
+	<string id="st_shelter_tr_giver_freedom">
+		<text>Отряд «Свободы»</text>
+	</string>
+	<string id="st_shelter_tr_giver_barman">
+		<text>Бармен</text>
+	</string>
+	<string id="st_shelter_tr_giver_loners">
+		<text>Вольные у костра</text>
+	</string>
+	<string id="st_shelter_tr_journal_sales">
+		<text>Продажи</text>
+	</string>
+	<string id="st_shelter_tr_journal_news">
+		<text>Новости</text>
+	</string>
+	<string id="st_shelter_tr_low">
+		<text>Заканчивается: меньше %d</text>
+	</string>
+	<string id="st_shelter_tr_settings_cats">
+		<text>Категории</text>
+	</string>
+	<string id="st_shelter_tr_reset">
+		<text>Как общая</text>
+	</string>
+	<string id="st_shelter_tr_orders_box">
+		<text>Ящик заказов: %s</text>
+	</string>
+	<string id="st_shelter_tr_orders_no_box">
+		<text>Ящик заказов не назначен: заказ сдаётся через него.</text>
+	</string>
+	<string id="st_shelter_tr_box_choose">
+		<text>Выбрать ящик</text>
+	</string>
+	<string id="st_shelter_tr_box_pick">
+		<text>Какой ящик принимает заказы? В него и складывайте всё для заказов; он не считается складом.</text>
+	</string>
+	<string id="st_shelter_tr_box_set">
+		<text>Назначить</text>
+	</string>
+	<string id="st_shelter_tr_box_is_set">
+		<text>Назначен</text>
+	</string>
+	<string id="st_shelter_tr_box_row">
+		<text>вещей: %d</text>
+	</string>
+	<string id="st_shelter_tr_box_none">
+		<text>В убежище нет ни одного ящика.</text>
+	</string>
+	<string id="st_shelter_tr_box_no_room">
+		<text>вне комнат</text>
+	</string>
+	<string id="st_shelter_tr_back">
+		<text>Назад</text>
+	</string>
+	<string id="st_shelter_tr_no_barman">
+		<text>Нет бармена</text>
+	</string>
+	<string id="st_shelter_tr_no_barman_text">
+		<text>Торговля стоит: гости не приходят, новых заказов нет.</text>
+	</string>
+	<string id="st_shelter_tr_hire">
+		<text>Нанять: %s руб.</text>
+	</string>
+	<string id="st_shelter_tr_stopped">
+		<text>Торговля стоит: нет бармена.</text>
+	</string>
+	<string id="st_shelter_tr_factors">
+		<text>Ассортимент %d%%, цены %d%%</text>
+	</string>
+	<string id="st_shelter_furniture_box_full">
+		<text>Сначала опустошите ящик.</text>
 	</string>
 </string_table>

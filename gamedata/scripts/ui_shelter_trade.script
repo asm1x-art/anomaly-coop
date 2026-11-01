@@ -1,0 +1,755 @@
+-- The laptop's Trade app (ui_shelter_laptop.script opens it, a full-screen window; docs/coop/shelter.md, "Economy"): tabs
+-- for the overview, the store's positions (filters, search, sorting, a markup and a sale switch for each), the supply
+-- from the traders, the deliveries on their way, the contract board, the journal and the settings. The logic is
+-- shelter_trade.script's and shelter_orders.script's. os: the laptop's window (its parts and clicks, ui_shelter_style).
+
+local C = ui_shelter_style.C
+local TABS = { "overview", "stock", "supply", "ways", "contracts", "journal", "settings" }
+local TABS_Y = 50
+local BODY_Y = 94
+local PAD = 18
+local STATES = { "all", "on", "off", "own", "crates", "ledger", "low" }
+local ROW = 38
+
+local function tr(id, ...)
+	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
+end
+
+-- cp1251's letters to lower case, for the search
+local function lower(s)
+	return (string.gsub(string.lower(s), "[\192-\223\168]", function(c)
+		local b = string.byte(c)
+		return string.char(b == 168 and 184 or b + 32)
+	end))
+end
+
+local function money(n)
+	local s, out = tostring(math.floor(n + 0.5)), ""
+	while #s > 3 do
+		out = " " .. string.sub(s, -3) .. out
+		s = string.sub(s, 1, -4)
+	end
+	return s .. out
+end
+
+local function units_text(cat, n)
+	return tr(cat and cat.rounds and "st_shelter_tr_rounds" or "st_shelter_tr_pieces", money(n))
+end
+
+-- a button of the current body
+local function btn(os, x, y, w, h, label, f, kind)
+	local t = os.trade
+	local c = os:button(x, y, w, h, label, f, os.app_clicks, t.body, os.wx, os.wy, kind)
+	c.tr = true
+	return c
+end
+
+local fill
+
+-------------------------------------------------------------------------------
+-- pages
+
+local function pager(os, y, page, pages, set)
+	local t = os.trade
+	if pages <= 1 then
+		return
+	end
+	btn(os, t.w - PAD - 216, y, 100, 34, tr("st_shelter_tr_prev"), function() set(page - 1) end, page > 1 and "normal" or "off")
+	btn(os, t.w - PAD - 100, y, 100, 34, tr("st_shelter_tr_next"), function() set(page + 1) end, page < pages and "normal" or "off")
+	os:text(t.w - PAD - 330, y, 104, 34, tr("st_shelter_tr_page", page, pages), C.dim, t.body, CGameFont.alRight, "s")
+end
+
+local function stripes(os, y, h, i)
+	if i % 2 == 0 then
+		os:round(PAD, y, os.trade.w - 2 * PAD, h - 2, C.white, os.trade.body, 5, 7)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the overview
+
+local function card(os, x, y, w, h, title)
+	os:framed(x, y, w, h, C.raised, os.trade.body, 8)
+	os:text(x + 14, y + 8, w - 28, 24, tr(title), C.dim, os.trade.body, nil, "s")
+end
+
+local function fill_overview(os)
+	local t = os.trade
+	local body = t.body
+	local cw = math.floor((t.w - 5 * PAD) / 4)
+	local y, h = BODY_Y, 170
+	local list = t.positions
+	local worth, units, offs = 0, 0, 0
+	for _, p in ipairs(list) do
+		worth, units = worth + p.count * shelter_trade.unit_cost(p.section) * p.cond, units + p.count
+		offs = offs + (p.on and 0 or 1)
+	end
+	-- the store
+	local x = PAD
+	card(os, x, y, cw, h, "st_shelter_tr_store")
+	local room = shelter.state("room_store", nil)
+	local name = room and os:room_name(room)
+	os:text(x + 14, y + 34, cw - 28, 28, name or tr("st_shelter_tr_no_store"), name and C.text or C.warn, body)
+	os:text(x + 14, y + 72, cw - 28, 24, tr("st_shelter_tr_store_positions", #list, offs), C.text, body, nil, "s")
+	os:text(x + 14, y + 96, cw - 28, 24, tr("st_shelter_tr_store_units", money(units)), C.text, body, nil, "s")
+	os:text(x + 14, y + 120, cw - 28, 24, tr("st_shelter_tr_store_worth", money(worth)), C.good, body, nil, "s")
+	-- the till
+	x = x + cw + PAD
+	card(os, x, y, cw, h, "st_shelter_tr_money_title")
+	local till = shelter_trade.till_money()
+	os:text(x + 14, y + 34, cw - 28, 30, tr("st_shelter_tr_till", till), C.text, body)
+	os:text(x + 14, y + 66, cw - 28, 26, tr("st_shelter_tr_total", shelter.state("bar_total", 0) or 0), C.good, body, nil, "s")
+	btn(os, x + 14, y + 112, cw - 28, 40, tr("st_shelter_tr_take_till"), function()
+		shelter_trade.take_till()
+		fill(os)
+	end, till > 0 and "primary" or "off")
+	-- the visitors
+	x = x + cw + PAD
+	card(os, x, y, cw, h, "st_shelter_tr_visitors")
+	if shelter_trade.barman() then
+		local f = shelter_trade.traffic_factors(list)
+		os:text(x + 14, y + 34, cw - 28, 26, tr("st_shelter_tr_traffic", math.floor(shelter_trade.traffic(list) + 0.5)), C.text, body)
+		os:text(x + 14, y + 66, cw - 28, 24, tr("st_shelter_tr_rep", tostring(shelter_trade.reputation())), C.text, body, nil, "s")
+		os:text(x + 14, y + 90, cw - 28, 24, tr("st_shelter_tr_factors", f.range * 100, f.prices * 100), C.text, body, nil, "s")
+		os:text(x + 14, y + 114, cw - 28, 24, tr("st_shelter_tr_served", shelter.state("bar_served", 0) or 0), C.good, body, nil, "s")
+		os:text(x + 14, y + 138, cw - 28, 24, tr("st_shelter_tr_left", shelter.state("bar_left", 0) or 0), C.dim, body, nil, "s")
+	else
+		os:text(x + 14, y + 34, cw - 28, 28, tr("st_shelter_tr_no_barman"), C.warn, body)
+		os:text(x + 14, y + 62, cw - 28, 46, tr("st_shelter_tr_no_barman_text"), C.text, body, nil, "s")
+		local cost = shelter_trade.barman_cost()
+		btn(os, x + 14, y + 112, cw - 28, 40, tr("st_shelter_tr_hire", money(cost)), function()
+			shelter_trade.hire_barman()
+			fill(os)
+		end, db.actor:money() >= cost and "primary" or "off")
+	end
+	-- the crisis
+	x = x + cw + PAD
+	card(os, x, y, cw, h, "st_shelter_tr_crisis")
+	local cr = shelter_trade.crisis_info()
+	if cr then
+		os:text(x + 14, y + 34, cw - 28, 28, tr("st_shelter_tr_crisis_" .. cr.id), C.warn, body)
+		os:text(x + 14, y + 66, cw - 28, 66, tr("st_shelter_tr_crisis_text_" .. cr.id), C.text, body, nil, "s")
+		os:text(x + 14, y + 136, cw - 28, 24, tr("st_shelter_tr_left_hours", math.ceil(cr.left)), C.dim, body, nil, "s")
+	else
+		os:text(x + 14, y + 34, cw - 28, 28, tr("st_shelter_tr_crisis_none"), C.good, body)
+	end
+	-- the general markup; the two lists under it
+	y = y + h + 14
+	os:text(PAD, y, 300, 34, tr("st_shelter_tr_markup", string.format("%.2f", shelter_trade.markup())), C.text, body)
+	local step = ini_sys:r_float_ex("shelter_trade", "markup_step") or 0.05
+	for i, d in ipairs({ -step, step }) do
+		btn(os, 310 + (i - 1) * 44, y, 38, 34, d < 0 and "-" or "+", function()
+			shelter_trade.set_markup(shelter_trade.markup() + d)
+			t.positions = shelter_trade.positions(t.goods)
+			fill(os)
+		end)
+	end
+	if not shelter_trade.barman() then
+		os:text(420, y, t.w - 440, 34, tr("st_shelter_tr_stopped"), C.warn, body, nil, "s")
+	end
+	y = y + 44
+	local half = math.floor((t.w - 3 * PAD) / 2)
+	os:text(PAD, y, half, 30, tr("st_shelter_tr_log"), C.text, body, nil, "l")
+	os:text(PAD * 2 + half, y, half, 30, tr("st_shelter_tr_news"), C.text, body, nil, "l")
+	y = y + 36
+	local rows = math.floor((t.h - y - 12) / 30)
+	local sales = shelter_trade.sales()
+	for i = 1, math.min(rows, #sales) do
+		local s = sales[i]
+		local ry = y + (i - 1) * 30
+		os:text(PAD + 4, ry, half - 150, 28, string.format("%s  x%d", ui_item.get_sec_name(s.section), s.units or 1), C.text, body, nil, "s")
+		os:text(PAD + half - 140, ry, 136, 28, "+" .. money(s.price), C.good, body, CGameFont.alRight, "s")
+	end
+	if #sales == 0 then
+		os:text(PAD + 4, y, half, 26, tr("st_shelter_tr_log_empty"), C.faint, body)
+	end
+	local news = shelter_trade.news()
+	for i = 1, math.min(rows, #news) do
+		os:text(PAD * 2 + half + 4, y + (i - 1) * 30, half - 8, 28, news[i].text, C.dim, body, nil, "s")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the store's positions
+
+local function position_rows(t)
+	local s = t.stock
+	local out = {}
+	local low = shelter_trade.low_stock()
+	for _, p in ipairs(t.positions) do
+		local keep = s.cat == "all" or p.cat.id == s.cat
+		keep = keep and (s.state == "all" or s.state == "on" and p.on or s.state == "off" and not p.on
+			or s.state == "own" and shelter_trade.own_markup(p.section) ~= nil
+			or s.state == "crates" and p.crates > 0 or s.state == "ledger" and p.ledger > 0 or s.state == "low" and p.count < low)
+		if keep and s.word ~= "" then
+			keep = string.find(lower(ui_item.get_sec_name(p.section)), s.word, 1, true) ~= nil
+		end
+		if keep then
+			out[#out + 1] = p
+		end
+	end
+	local function key(p)
+		local one = shelter_trade.price_of(p.section, p.cond, p.cat)
+		return s.sort == "count" and p.count or s.sort == "price" and one or s.sort == "worth" and one * p.count or nil
+	end
+	table.sort(out, function(a, b)
+		if s.sort == "name" then
+			local na, nb = lower(ui_item.get_sec_name(a.section)), lower(ui_item.get_sec_name(b.section))
+			if s.desc then
+				return na > nb
+			end
+			return na < nb
+		end
+		local ka, kb = key(a), key(b)
+		if ka == kb then
+			return a.section < b.section
+		end
+		if s.desc then
+			return ka > kb
+		end
+		return ka < kb
+	end)
+	return out
+end
+
+local function fill_stock(os)
+	local t = os.trade
+	local s, body, W = t.stock, t.body, t.w
+	local y = BODY_Y
+	-- the categories
+	local cats = shelter_trade.categories()
+	local cw = math.floor((W - 2 * PAD - #cats * 4) / (#cats + 1))
+	btn(os, PAD, y, cw, 32, tr("st_shelter_tr_cat_all"), function() s.cat, s.page = "all", 1; fill(os) end, s.cat == "all" and "on" or "normal")
+	for i, c in ipairs(cats) do
+		btn(os, PAD + i * (cw + 4), y, cw, 32, tr("st_shelter_tr_cat_" .. c.id), function() s.cat, s.page = c.id, 1; fill(os) end,
+			s.cat == c.id and "on" or "normal")
+	end
+	y = y + 38
+	-- the search (kept in its holder under the body); the states
+	t.search:Show(true)
+	os:place(t.search, PAD, y, 260, 34)
+	os:click_at(os.app_clicks, PAD, y, 260, 34, function() t.edit:CaptureFocus(true) end, nil, "tr")
+	local sx = PAD + 268
+	local sw = math.floor((W - PAD - sx - (#STATES - 1) * 4) / #STATES)
+	for i, st in ipairs(STATES) do
+		btn(os, sx + (i - 1) * (sw + 4), y, sw, 34, tr("st_shelter_tr_state_" .. st), function() s.state, s.page = st, 1; fill(os) end,
+			s.state == st and "on" or "normal")
+	end
+	y = y + 40
+	-- the columns; a click on a sortable one sorts by it, again turns it round
+	local wide = W >= 1200 and 96 or 0 -- room for the position's worth
+	local col = { name = PAD + 44, crates = W - PAD - 756 - wide, ledger = W - PAD - 676 - wide, cond = W - PAD - 586 - wide,
+		base = W - PAD - 530 - wide, markup = W - PAD - 448 - wide, price = W - PAD - 318 - wide, worth = W - PAD - 318,
+		sale = W - PAD - 236, take = W - PAD - 82 }
+	local function head(k, x, w, sort, align)
+		local mark = sort and s.sort == sort and (s.desc and " v" or " ^") or ""
+		os:text(x, y, w, 22, tr("st_shelter_tr_col_" .. k) .. mark, sort and C.dim or C.faint, body, align, "s")
+		if sort then
+			os:click_at(os.app_clicks, x, y, w, 22, function()
+				if s.sort == sort then
+					s.desc = not s.desc
+				else
+					s.sort, s.desc = sort, sort ~= "name"
+				end
+				fill(os)
+			end, nil, "tr")
+		end
+	end
+	head("name", col.name, 240, "name")
+	head("crates", col.crates, 76, "count")
+	head("ledger", col.ledger, 86)
+	head("cond", col.cond, 52)
+	head("base", col.base, 76)
+	head("markup", col.markup, 126)
+	head("price", col.price, 76, "price")
+	if wide > 0 then
+		head("worth", col.worth, 90, "worth")
+	end
+	y = y + 24
+	os:rect(PAD, y, W - 2 * PAD, 1, C.line, body)
+	y = y + 4
+	local rows = position_rows(t)
+	local per_page = math.max(1, math.floor((t.h - y - 54) / ROW))
+	local pages = math.max(1, math.ceil(#rows / per_page))
+	s.page = math.min(s.page, pages)
+	if #rows == 0 then
+		os:text(PAD + 10, y + 6, W - 2 * PAD, 30, tr(#t.positions == 0 and "st_shelter_tr_stock_empty" or "st_shelter_tr_stock_none"), C.faint, body)
+	end
+	local low = shelter_trade.low_stock()
+	local step = ini_sys:r_float_ex("shelter_trade", "markup_step") or 0.05
+	for r = 1, per_page do
+		local p = rows[(s.page - 1) * per_page + r]
+		if not p then
+			break
+		end
+		local ry, th = y + (r - 1) * ROW, ROW - 2
+		stripes(os, ry, ROW, r)
+		os:icon(p.section, PAD + 6, ry + 2, 32, body)
+		os:text(col.name, ry, col.crates - col.name - 6, th, ui_item.get_sec_name(p.section), p.on and C.text or C.faint, body, nil, "s")
+		local crates_color = p.count < low and C.warn or C.text
+		os:text(col.crates, ry, 76, th, money(p.crates), crates_color, body, nil, "s")
+		os:text(col.ledger, ry, 86, th, money(p.ledger), p.ledger > 0 and C.accent or C.faint, body, nil, "s")
+		os:text(col.cond, ry, 52, th, p.cat.worn and p.crates > 0 and string.format("%d%%", p.cond * 100) or "-", C.dim, body, nil, "s")
+		os:text(col.base, ry, 76, th, money(shelter_trade.unit_cost(p.section)), C.dim, body, nil, "s")
+		-- the markup: - x +, its own in the accent's colour; a click on the number gives it back to the category's
+		local own = shelter_trade.own_markup(p.section)
+		local function change(d)
+			return function()
+				shelter_trade.set_own_markup(p.section, p.markup + d)
+				p.markup = shelter_trade.markup_of(p.section, p.cat)
+				fill(os)
+			end
+		end
+		btn(os, col.markup, ry + 2, 30, th - 4, "-", change(-step), "flat")
+		os:text(col.markup + 30, ry, 62, th, string.format("x%.2f", p.markup), own and C.accent or C.text, body, CGameFont.alCenter, "s")
+		if own then
+			os:click_at(os.app_clicks, col.markup + 30, ry, 62, th, function()
+				shelter_trade.set_own_markup(p.section, nil)
+				p.markup = shelter_trade.markup_of(p.section, p.cat)
+				fill(os)
+			end, nil, "tr")
+		end
+		btn(os, col.markup + 92, ry + 2, 30, th - 4, "+", change(step), "flat")
+		os:text(col.price, ry, 76, th, money(shelter_trade.price_of(p.section, p.cond, p.cat)), C.good, body, nil, "s")
+		if wide > 0 then
+			os:text(col.worth, ry, 90, th, money(shelter_trade.price_of(p.section, p.cond, p.cat) * p.count), C.dim, body, nil, "s")
+		end
+		btn(os, col.sale, ry + 3, 148, th - 6, tr(p.on and "st_shelter_tr_on_sale" or "st_shelter_tr_off_sale"), function()
+			shelter_trade.set_own_sale(p.section, p.on and "off" or "on")
+			p.on = not p.on
+			fill(os)
+		end, p.on and "on" or "normal")
+		-- from the ledger into the pocket: a box of rounds, or one thing
+		local pack = p.cat.rounds and math.max(1, SYS_GetParam(2, p.section, "box_size") or 1) or 1
+		if p.ledger > 0 then
+			btn(os, col.take, ry + 3, 82, th - 6, tr("st_shelter_tr_take", pack), function()
+				shelter_trade.withdraw(p.section, pack)
+				t.positions = shelter_trade.positions(t.goods)
+				fill(os)
+			end)
+		end
+	end
+	-- on all that's shown
+	local by = t.h - 48
+	local function all_shown(f)
+		return function()
+			for _, p in ipairs(rows) do
+				f(p)
+			end
+			t.positions = shelter_trade.positions(t.goods)
+			fill(os)
+		end
+	end
+	btn(os, PAD, by, 170, 34, tr("st_shelter_tr_all_on"), all_shown(function(p) shelter_trade.set_own_sale(p.section, "on") end))
+	btn(os, PAD + 176, by, 170, 34, tr("st_shelter_tr_all_off"), all_shown(function(p) shelter_trade.set_own_sale(p.section, "off") end))
+	btn(os, PAD + 352, by, 40, 34, "-", all_shown(function(p) shelter_trade.set_own_markup(p.section, p.markup - step) end))
+	os:text(PAD + 396, by, 90, 34, tr("st_shelter_tr_all_markup"), C.dim, body, CGameFont.alCenter, "s")
+	btn(os, PAD + 490, by, 40, 34, "+", all_shown(function(p) shelter_trade.set_own_markup(p.section, p.markup + step) end))
+	btn(os, PAD + 536, by, 140, 34, tr("st_shelter_tr_all_reset"), all_shown(function(p)
+		shelter_trade.set_own_markup(p.section, nil)
+		shelter_trade.set_own_sale(p.section, nil)
+	end))
+	pager(os, by, s.page, pages, function(n) s.page = n; fill(os) end)
+end
+
+-------------------------------------------------------------------------------
+-- the supply
+
+local function fill_supply(os)
+	local t = os.trade
+	local s, body, W = t.supply, t.body, t.w
+	local sups = shelter_orders.suppliers()
+	s.sup = s.sup or (sups[1] and sups[1].id)
+	-- the suppliers, a column on the left
+	local lw, y0 = 260, BODY_Y
+	for i, sup in ipairs(sups) do
+		local why = shelter_orders.why_closed(sup)
+		local y = y0 + (i - 1) * 74
+		btn(os, PAD, y, lw, 68, "", function() s.sup, s.page, s.pick = sup.id, 1, nil; fill(os) end, s.sup == sup.id and "on" or "normal")
+		os:text(PAD + 12, y + 4, lw - 24, 26, tr(sup.name), C.text, body)
+		local d = shelter_orders.discount(sup.id)
+		local line = why and tr("st_shelter_tr_sup_" .. why) or d > 0 and tr("st_shelter_tr_sup_discount", math.floor(d * 100 + 0.5))
+			or tr("st_shelter_tr_sup_way", sup.hours_min, sup.hours_max, math.floor(sup.intercept * 100 + 0.5))
+		os:text(PAD + 12, y + 32, lw - 24, 26, line, why and C.bad or C.dim, body, nil, "s")
+	end
+	local sup = shelter_orders.supplier(s.sup)
+	if not sup then
+		return
+	end
+	-- its goods
+	local x = PAD * 2 + lw
+	local rw = W - PAD - x
+	local why = shelter_orders.why_closed(sup)
+	local lot_w = math.min(176, math.floor((rw - 300) / 3))
+	local lots_x = x + rw - 3 * lot_w
+	os:text(x + 44, y0, 240, 22, tr("st_shelter_tr_col_name"), C.faint, body, nil, "s")
+	os:text(lots_x - 110, y0, 104, 22, tr("st_shelter_tr_col_retail"), C.faint, body, CGameFont.alRight, "s")
+	os:text(lots_x, y0, 3 * lot_w, 22, tr("st_shelter_tr_col_lots"), C.faint, body, nil, "s")
+	os:rect(x, y0 + 24, rw, 1, C.line, body)
+	local y = y0 + 28
+	local bottom = 66 -- the payment's strip
+	local per_page = math.max(1, math.floor((t.h - y - bottom - 46) / ROW))
+	local pages = math.max(1, math.ceil(#sup.goods / per_page))
+	s.page = math.min(s.page or 1, pages)
+	for r = 1, per_page do
+		local sec = sup.goods[(s.page - 1) * per_page + r]
+		if not sec then
+			break
+		end
+		local ry, th = y + (r - 1) * ROW, ROW - 2
+		os:icon(sec, x + 4, ry + 2, 32, body)
+		os:text(x + 44, ry, lots_x - x - 160, th, ui_item.get_sec_name(sec), C.text, body, nil, "s")
+		os:text(lots_x - 110, ry, 104, th, string.format("%.1f", shelter_orders.retail(sup, sec)), C.dim, body, CGameFont.alRight, "s")
+		for i, lot in ipairs(shelter_orders.lots(sup, sec)) do
+			local picked = s.pick and s.pick.section == sec and s.pick.i == i
+			btn(os, lots_x + (i - 1) * lot_w, ry + 2, lot_w - 6, th - 4, string.format("%s: %s", money(lot.units), money(lot.total)), function()
+				s.pick = { section = sec, i = i, lot = lot }
+				fill(os)
+			end, why and "off" or picked and "on" or "normal")
+		end
+	end
+	pager(os, t.h - bottom - 42, s.page, pages, function(n) s.page = n; fill(os) end)
+	-- the payment
+	local py = t.h - bottom
+	os:framed(x, py, rw, 54, C.raised, body, 8)
+	if s.pick and not why then
+		local lot = s.pick.lot
+		os:text(x + 14, py, rw - 480, 54, tr("st_shelter_tr_pay_line", ui_item.get_sec_name(s.pick.section), money(lot.units), money(lot.total)), C.text, body, nil, "s")
+		local function pay(how)
+			return function()
+				if shelter_orders.order(sup, s.pick.section, lot, how) then
+					s.pick = nil
+					t.tab = "ways"
+				end
+				fill(os)
+			end
+		end
+		btn(os, x + rw - 460, py + 8, 224, 38, tr("st_shelter_tr_pay_till", money(shelter_trade.till_money())), pay("till"),
+			shelter_trade.till_money() >= lot.total and "primary" or "off")
+		btn(os, x + rw - 230, py + 8, 224, 38, tr("st_shelter_tr_pay_pocket", money(db.actor:money())), pay("pocket"),
+			db.actor:money() >= lot.total and "primary" or "off")
+	else
+		os:text(x + 14, py, rw - 28, 54, tr(why and "st_shelter_tr_sup_" .. why or "st_shelter_tr_pick_lot"), C.dim, body, nil, "s")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the deliveries
+
+local function fill_ways(os)
+	local t = os.trade
+	local body, W = t.body, t.w
+	local col = { name = PAD + 44, qty = W - PAD - 620, sup = W - PAD - 500, state = W - PAD - 300 }
+	local y = BODY_Y
+	for k, x in pairs(col) do
+		os:text(x, y, 200, 22, tr("st_shelter_tr_way_" .. k), C.faint, body, nil, "s")
+	end
+	y = y + 24
+	os:rect(PAD, y, W - 2 * PAD, 1, C.line, body)
+	y = y + 4
+	local list = shelter_orders.deliveries()
+	if #list == 0 then
+		os:text(PAD + 10, y + 6, W - 2 * PAD, 30, tr("st_shelter_tr_way_none"), C.faint, body)
+	end
+	local now = shelter_trade.hours()
+	for i, d in ipairs(list) do
+		local ry = y + (i - 1) * ROW
+		if ry + ROW > t.h - 12 then
+			break
+		end
+		stripes(os, ry, ROW, i)
+		os:icon(d.section, PAD + 6, ry + 2, 32, body)
+		os:text(col.name, ry, col.qty - col.name - 6, ROW - 2, ui_item.get_sec_name(d.section), C.text, body, nil, "s")
+		os:text(col.qty, ry, 110, ROW - 2, money(d.qty), C.text, body, nil, "s")
+		local sup = shelter_orders.supplier(d.sup)
+		os:text(col.sup, ry, 190, ROW - 2, sup and tr(sup.name) or "", C.dim, body, nil, "s")
+		if d.state == "sos" then
+			os:text(col.state, ry, 300, ROW - 2, tr("st_shelter_tr_way_sos", math.ceil(math.max(0, d.until_h - now))), C.bad, body, nil, "s")
+		else
+			os:text(col.state, ry, 300, ROW - 2, tr("st_shelter_tr_way_due", math.ceil(math.max(0, d.due - now))), C.good, body, nil, "s")
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the contracts
+
+-- a box's name: the thing it was placed from, or its own
+local function box_name(section)
+	local item = ini_sys:r_string_ex(section, "item_section") or section
+	local name = ini_sys:r_string_ex(item, "inv_name")
+	return name and tr(name) or section
+end
+
+-- which box takes the orders
+local function fill_box_pick(os)
+	local t = os.trade
+	local s, body, W = t.contracts, t.body, t.w
+	local y = BODY_Y
+	os:text(PAD, y, W - 2 * PAD - 170, 32, tr("st_shelter_tr_box_pick"), C.text, body, nil, "s")
+	btn(os, W - PAD - 160, y, 160, 32, tr("st_shelter_tr_back"), function() s.picking = false; fill(os) end)
+	y = y + 42
+	local list = shelter_trade.boxes()
+	if #list == 0 then
+		os:text(PAD + 10, y + 6, W - 2 * PAD, 30, tr("st_shelter_tr_box_none"), C.faint, body)
+	end
+	local per_page = math.max(1, math.floor((t.h - y - 54) / ROW))
+	local pages = math.max(1, math.ceil(#list / per_page))
+	s.box_page = math.min(s.box_page or 1, pages)
+	local cur = shelter.state("orders_box", nil)
+	for r = 1, per_page do
+		local b = list[(s.box_page - 1) * per_page + r]
+		if not b then
+			break
+		end
+		local ry, th = y + (r - 1) * ROW, ROW - 2
+		stripes(os, ry, ROW, r)
+		os:text(PAD + 10, ry, W - PAD * 2 - 620, th, box_name(b.section), C.text, body, nil, "s")
+		os:text(W - PAD - 600, ry, 300, th, os:room_name_at(b.position) or tr("st_shelter_tr_box_no_room"), C.dim, body, nil, "s")
+		os:text(W - PAD - 290, ry, 110, th, tr("st_shelter_tr_box_row", b.count), C.dim, body, nil, "s")
+		btn(os, W - PAD - 170, ry + 3, 160, th - 6, tr(cur == b.id and "st_shelter_tr_box_is_set" or "st_shelter_tr_box_set"), function()
+			shelter_trade.set_orders_box(b.id)
+			t.goods = shelter_trade.stock()
+			t.positions = shelter_trade.positions(t.goods)
+			s.picking = false
+			fill(os)
+		end, cur == b.id and "on" or "primary")
+	end
+	pager(os, t.h - 48, s.box_page, pages, function(n) s.box_page = n; fill(os) end)
+end
+
+local function fill_contracts(os)
+	local t = os.trade
+	local s, body, W = t.contracts, t.body, t.w
+	if s.picking then
+		return fill_box_pick(os)
+	end
+	local y = BODY_Y
+	for i, f in ipairs({ "all", "free", "taken" }) do
+		btn(os, PAD + (i - 1) * 150, y, 142, 32, tr("st_shelter_tr_contracts_" .. f), function() s.filter = f; fill(os) end, s.filter == f and "on" or "normal")
+	end
+	local box = shelter_trade.orders_box()
+	local where = box and string.format("%s, %s", box_name(box:section_name()), os:room_name_at(box.position) or tr("st_shelter_tr_box_no_room"))
+	os:text(PAD + 470, y, W - PAD * 2 - 640, 32, box and tr("st_shelter_tr_orders_box", where) or tr("st_shelter_tr_orders_no_box"),
+		box and C.dim or C.warn, body, nil, "s")
+	btn(os, W - PAD - 160, y, 160, 32, tr("st_shelter_tr_box_choose"), function() s.picking = true; fill(os) end, box and "normal" or "primary")
+	y = y + 42
+	local items = shelter_trade.orders_items()
+	local now = shelter_trade.hours()
+	local shown = 0
+	local h = 112
+	for _, c in ipairs(shelter_orders.contracts()) do
+		local taken = c.taken == 1
+		if (s.filter == "all" or s.filter == "taken" and taken or s.filter == "free" and not taken) and y + h <= t.h - 10 then
+			shown = shown + 1
+			local tp = shelter_orders.template(c)
+			os:framed(PAD, y, W - 2 * PAD, h, C.raised, body, 8)
+			os:text(PAD + 14, y + 6, 420, 26, tr(tp.giver), C.text, body)
+			local line = {}
+			local rows, ready = shelter_orders.progress(c, items)
+			for i, r in ipairs(rows) do
+				os:icon(r.section, PAD + 14 + (i - 1) * 300, y + 36, 32, body)
+				local cat = shelter_trade.category(r.section)
+				os:text(PAD + 50 + (i - 1) * 300, y + 34, 254, 36, string.format("%s\\n%s / %s", ui_item.get_sec_name(r.section), money(math.min(r.have, r.qty)), units_text(cat, r.qty)),
+					r.have >= r.qty and C.good or C.dim, body, nil, "s")
+				line[i] = r.section
+			end
+			local rx = W - PAD - 340
+			os:text(rx, y + 6, 326, 24, tr("st_shelter_tr_reward", money(c.reward)), C.good, body, CGameFont.alRight)
+			local terms = tp.min_cond > 0 and tr("st_shelter_tr_min_cond", math.floor(tp.min_cond * 100 + 0.5)) or ""
+			os:text(PAD + 14, y + 78, rx - PAD - 20, 26, terms, C.dim, body, nil, "s")
+			if taken then
+				os:text(rx, y + 32, 326, 24, tr("st_shelter_tr_left_hours", math.ceil(math.max(0, c.due - now))), C.warn, body, CGameFont.alRight, "s")
+				btn(os, W - PAD - 200, y + 66, 186, 36, tr("st_shelter_tr_hand_in"), function()
+					shelter_orders.hand_in(c.id)
+					t.goods = shelter_trade.stock()
+					t.positions = shelter_trade.positions(t.goods)
+					fill(os)
+				end, ready and "primary" or "off")
+			else
+				os:text(rx, y + 32, 326, 24, tr("st_shelter_tr_term_hours", tp.hours), C.dim, body, CGameFont.alRight, "s")
+				btn(os, W - PAD - 200, y + 66, 186, 36, tr("st_shelter_tr_take_contract"), function() shelter_orders.take(c.id); fill(os) end, "primary")
+				btn(os, W - PAD - 340, y + 66, 134, 36, tr("st_shelter_tr_refuse"), function() shelter_orders.refuse(c.id); fill(os) end)
+			end
+			y = y + h + 8
+		end
+	end
+	if shown == 0 then
+		os:text(PAD + 10, y + 6, W - 2 * PAD, 30, tr("st_shelter_tr_contracts_none"), C.faint, body)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the journal
+
+local function fill_journal(os)
+	local t = os.trade
+	local s, body, W = t.journal, t.body, t.w
+	local y = BODY_Y
+	for i, f in ipairs({ "sales", "news" }) do
+		btn(os, PAD + (i - 1) * 150, y, 142, 32, tr("st_shelter_tr_journal_" .. f), function() s.tab = f; s.page = 1; fill(os) end, s.tab == f and "on" or "normal")
+	end
+	y = y + 42
+	local per_page = math.max(1, math.floor((t.h - y - 54) / 32))
+	if s.tab == "news" then
+		local list = shelter_trade.news()
+		local pages = math.max(1, math.ceil(#list / per_page))
+		s.page = math.min(s.page, pages)
+		for r = 1, per_page do
+			local e = list[(s.page - 1) * per_page + r]
+			if not e then
+				break
+			end
+			stripes(os, y + (r - 1) * 32, 32, r)
+			os:text(PAD + 10, y + (r - 1) * 32, W - 2 * PAD - 20, 30, e.text, C.text, body, nil, "s")
+		end
+		pager(os, t.h - 48, s.page, pages, function(n) s.page = n; fill(os) end)
+		return
+	end
+	local list = shelter_trade.sales()
+	local pages = math.max(1, math.ceil(#list / per_page))
+	s.page = math.min(s.page, pages)
+	if #list == 0 then
+		os:text(PAD + 10, y + 6, W - 2 * PAD, 30, tr("st_shelter_tr_log_empty"), C.faint, body)
+	end
+	local clock = level.get_time_hours() * 3600 + level.get_time_minutes() * 60
+	local now = shelter_trade.now()
+	for r = 1, per_page do
+		local e = list[(s.page - 1) * per_page + r]
+		if not e then
+			break
+		end
+		local ry = y + (r - 1) * 32
+		stripes(os, ry, 32, r)
+		local day = (clock - (now - e.t)) % 86400
+		os:text(PAD + 10, ry, 70, 30, string.format("%02d:%02d", math.floor(day / 3600), math.floor(day % 3600 / 60)), C.dim, body, nil, "s")
+		os:icon(e.section, PAD + 84, ry, 30, body)
+		os:text(PAD + 122, ry, W - 2 * PAD - 360, 30, ui_item.get_sec_name(e.section), C.text, body, nil, "s")
+		os:text(W - PAD - 230, ry, 90, 30, "x" .. money(e.units or 1), C.dim, body, CGameFont.alRight, "s")
+		os:text(W - PAD - 134, ry, 124, 30, "+" .. money(e.price), C.good, body, CGameFont.alRight, "s")
+	end
+	pager(os, t.h - 48, s.page, pages, function(n) s.page = n; fill(os) end)
+end
+
+-------------------------------------------------------------------------------
+-- the settings: the general markup, each category's sale switch and markup, the "running low" limit
+
+local function fill_settings(os)
+	local t = os.trade
+	local body, W = t.body, t.w
+	local y = BODY_Y
+	local step = ini_sys:r_float_ex("shelter_trade", "markup_step") or 0.05
+	local function refresh()
+		t.positions = shelter_trade.positions(t.goods)
+		fill(os)
+	end
+	os:text(PAD, y, 360, 34, tr("st_shelter_tr_markup", string.format("%.2f", shelter_trade.markup())), C.text, body)
+	btn(os, 380, y, 38, 34, "-", function() shelter_trade.set_markup(shelter_trade.markup() - step); refresh() end)
+	btn(os, 424, y, 38, 34, "+", function() shelter_trade.set_markup(shelter_trade.markup() + step); refresh() end)
+	y = y + 44
+	local low = shelter_trade.low_stock()
+	os:text(PAD, y, 360, 34, tr("st_shelter_tr_low", low), C.text, body)
+	btn(os, 380, y, 38, 34, "-", function() shelter_trade.set_low_stock(low - 5); fill(os) end)
+	btn(os, 424, y, 38, 34, "+", function() shelter_trade.set_low_stock(low + 5); fill(os) end)
+	y = y + 54
+	os:text(PAD, y, 300, 30, tr("st_shelter_tr_settings_cats"), C.text, body, nil, "l")
+	y = y + 38
+	local col = { sale = PAD + 260, markup = PAD + 440, reset = PAD + 620, sold = W - PAD - 220 }
+	os:text(PAD + 10, y, 240, 22, tr("st_shelter_tr_col_cat"), C.faint, body, nil, "s")
+	os:text(col.sale, y, 170, 22, tr("st_shelter_tr_col_sale"), C.faint, body, nil, "s")
+	os:text(col.markup, y, 170, 22, tr("st_shelter_tr_col_markup"), C.faint, body, nil, "s")
+	os:text(col.sold, y, 210, 22, tr("st_shelter_tr_col_sold"), C.faint, body, CGameFont.alRight, "s")
+	y = y + 24
+	os:rect(PAD, y, W - 2 * PAD, 1, C.line, body)
+	y = y + 4
+	for i, c in ipairs(shelter_trade.categories()) do
+		local ry = y + (i - 1) * ROW
+		stripes(os, ry, ROW, i)
+		os:text(PAD + 10, ry, 240, ROW - 2, tr("st_shelter_tr_cat_" .. c.id), C.text, body)
+		local on = shelter_trade.category_on(c)
+		btn(os, col.sale, ry + 3, 160, ROW - 8, tr(on and "st_shelter_tr_on_sale" or "st_shelter_tr_off_sale"), function()
+			shelter_trade.set_category_on(c.id, not on)
+			refresh()
+		end, on and "on" or "normal")
+		local own = shelter_trade.category_markup(c.id)
+		local m = own or shelter_trade.markup()
+		btn(os, col.markup, ry + 3, 34, ROW - 8, "-", function() shelter_trade.set_category_markup(c.id, m - step); refresh() end, "flat")
+		os:text(col.markup + 36, ry, 70, ROW - 2, string.format("x%.2f", m), own and C.accent or C.dim, body, CGameFont.alCenter, "s")
+		btn(os, col.markup + 108, ry + 3, 34, ROW - 8, "+", function() shelter_trade.set_category_markup(c.id, m + step); refresh() end, "flat")
+		if own then
+			btn(os, col.reset, ry + 3, 130, ROW - 8, tr("st_shelter_tr_reset"), function() shelter_trade.set_category_markup(c.id, nil); refresh() end)
+		end
+		os:text(col.sold, ry, 210, ROW - 2, money(shelter.state("bar_sold_" .. c.id, 0) or 0), C.good, body, CGameFont.alRight, "s")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the window
+
+local FILL = { overview = fill_overview, stock = fill_stock, supply = fill_supply, ways = fill_ways, contracts = fill_contracts,
+	journal = fill_journal, settings = fill_settings }
+
+fill = function(os)
+	local t = os.trade
+	if t.body then
+		os.win:DetachChild(t.body)
+	end
+	for i = #os.app_clicks, 1, -1 do
+		if os.app_clicks[i].tr then
+			table.remove(os.app_clicks, i)
+		end
+	end
+	os.lit = nil
+	t.body = os:box(0, 0, t.w, t.h, os.win)
+	t.search:Show(false)
+	t.seen_last = shelter.state("bar_last", nil)
+	for i, id in ipairs(TABS) do
+		btn(os, PAD + (i - 1) * 150, TABS_Y, 144, 36, tr("st_shelter_tr_tab_" .. id), function()
+			t.tab = id
+			fill(os)
+		end, t.tab == id and "on" or "normal")
+	end
+	FILL[t.tab](os)
+end
+
+-- the laptop's window, w x h: the screen over its taskbar
+function open(os, w, h)
+	os:window(0, 0, w, h, "trade")
+	table.insert(os.app_clicks, 1, { 0, 0, w, h, function() end }) -- the shortcuts under the window take no clicks
+	local goods = shelter_trade.stock()
+	os.trade = { w = w, h = h, tab = "overview", goods = goods, positions = shelter_trade.positions(goods),
+		stock = { cat = "all", state = "all", sort = "name", page = 1, word = "" }, supply = { page = 1 },
+		contracts = { filter = "all" }, journal = { tab = "sales", page = 1 } }
+	local t = os.trade
+	t.search = os:box(PAD, BODY_Y + 38, 260, 34, os.win)
+	os:framed(0, 0, 260, 34, C.field, t.search, 6)
+	os:image(10, 9, 16, 16, "ui\\shelter\\os_search", t.search, C.dim)
+	t.edit = os.xml:InitEditBox("edit", t.search)
+	os:place(t.edit, 34, 4, 218, 26)
+	fill(os)
+	os.app_update = update
+end
+
+-- when the trade has sold, drawn again (counting the store takes a pass over all
+-- the objects: not more often); the search's word as typed
+function update(os)
+	local t = os.trade
+	if t.tab == "stock" then
+		local word = lower(t.edit:GetText() or "")
+		if word ~= t.stock.word then
+			t.stock.word, t.stock.page = word, 1
+			fill(os)
+			return
+		end
+	end
+	local ms = time_global()
+	if ms < (t.at or 0) then
+		return
+	end
+	t.at = ms + 1000
+	if shelter.state("bar_last", nil) ~= t.seen_last then
+		t.goods = shelter_trade.stock()
+		t.positions = shelter_trade.positions(t.goods)
+		fill(os)
+	end
+end

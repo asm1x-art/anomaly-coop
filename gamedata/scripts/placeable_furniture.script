@@ -214,11 +214,12 @@ local function lifted_free(pos)
     return vector():set(pos.x, pos.y + high, pos.z)
 end
 
--- This project: aimed at an object (a table, a crate, a barrel), the piece goes on top of it: onto the highest object
--- surface under its footprint (its corners, the middles of its sides, its centre), found by rays down from above
--- (objects only: the level's shelves above don't stop them). HF's own check casts rays along the frame's edges, which
--- pass between a table's legs under its top. Aimed at the floor or a wall it stays where aimed (under a table too)
-local SUPPORT_REACH = 2
+-- This project: aimed at an object (a table, a crate, a barrel, a rack's shelf), the piece goes on top of it: under each
+-- point of its footprint (its corners, the middles of its sides, its centre) the lowest object surface not below the
+-- point aimed at, found by rays down from above (objects only), and the highest of those: so the shelf aimed at, not the
+-- rack's top. HF's own check casts rays along the frame's edges, which pass between a table's legs under its top. Aimed
+-- at the floor or a wall it stays where aimed (under a table too)
+local SUPPORT_REACH, SUPPORT_BELOW = 2, 0.05
 
 local function supported(pos)
     if not level.get_target_obj() then
@@ -236,14 +237,22 @@ local function supported(pos)
     points[#points + 1] = centre:div(4)
     local best = pos.y
     for _, p in ipairs(points) do
-        local rq = ray_pick()
-        rq:set_position(vector():set(p.x, top, p.z))
-        rq:set_direction(vector():set(0, -1, 0))
-        rq:set_range(SUPPORT_REACH + 0.5)
-        rq:set_flags(rq_target.rqtObject)
-        rq:set_ignore_object(db.actor)
-        if rq:query() then
-            best = math.max(best, top - rq:get_distance())
+        local y, under = top, nil
+        for _ = 1, 8 do
+            local rq = ray_pick()
+            rq:set_position(vector():set(p.x, y, p.z))
+            rq:set_direction(vector():set(0, -1, 0))
+            rq:set_range(y - pos.y + SUPPORT_BELOW)
+            rq:set_flags(rq_target.rqtObject)
+            rq:set_ignore_object(db.actor)
+            if not rq:query() then
+                break
+            end
+            under = y - rq:get_distance()
+            y = under - 0.02
+        end
+        if under then
+            best = math.max(best, under)
         end
     end
     return vector():set(pos.x, best, pos.z)
@@ -325,6 +334,17 @@ local function actor_on_update()
 
     -- Update position of vertices in bounding box
     bbox:UpdateBBox()
+    -- This project: a lamp goes under what's aimed at above, no check of what it touches (the ceiling it hangs from)
+    local hang = phy_obj_section and ini_sys:r_float_ex(phy_obj_section, "hang_offset")
+    if hang then
+        pos = vector():set(pos.x, pos.y - hang, pos.z)
+        bbox:SetWorldOrigin(vector():set(pos))
+        bbox:UpdateBBox()
+        bbox.is_colliding = cam_dir.y < 0.15
+        bbox_drawer:DrawBShapeCollider(bbox)
+        place_coordinates = pos
+        return
+    end
     local rest = supported(pos)
     if rest.y > pos.y + 0.005 then
         pos = rest
@@ -407,7 +427,8 @@ local function on_key_press(dik)
     if dik == key_place then
         if in_placing_state() then
             -- Prevent placement if target pos is too far away
-            if level.get_target_dist() > 5 and not DEV_DEBUG then
+            local hanging = ini_sys:r_float_ex(phy_obj_section, "hang_offset")
+            if level.get_target_dist() > (hanging and 8 or 5) and not DEV_DEBUG then
                 print_msg("st_far_popup")
                 pr("Cannot place object that far away - max range of 5 units")
                 return
@@ -426,7 +447,9 @@ local function on_key_press(dik)
 				return 
 			end
 			
-            local obj_id = create_object(phy_obj_section, place_coordinates, bbox.rotation)
+            -- a lamp under the ceiling hangs turned over, as the level's do
+            local rotation = hanging and vector():set(0, device().cam_dir:getH() + rotation_offset * math.pi / 180, -math.pi) or bbox.rotation
+            local obj_id = create_object(phy_obj_section, place_coordinates, rotation)
             if obj_id then transfer_item_data(item_id, obj_id) end
 
             SendScriptCallback("hf_on_furniture_place", obj_id)

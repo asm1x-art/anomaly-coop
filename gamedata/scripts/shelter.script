@@ -199,6 +199,10 @@ local function set_lamps(on)
 		if not lamp then
 			return
 		end
+		local binder = obj:binded_object()
+		if binder and binder.wrapper then -- placed furniture: it sees to itself (bind_light_furniture)
+			return
+		end
 		if not on then
 			if lamp:is_on() then
 				lamp:reset_color_animator()

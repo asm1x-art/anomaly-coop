@@ -55,6 +55,10 @@ end
 -- picked up in the shelter: the item into the stash (bind_hf_base's pickup otherwise, which gives it to the actor)
 local pickup = bind_hf_base.hf_binder_wrapper.pickup
 bind_hf_base.hf_binder_wrapper.pickup = function(self)
+	if IsInvbox(self.object) and not self.object:is_inv_box_empty() then -- what's in it would go with it
+		msg("st_shelter_furniture_box_full")
+		return false
+	end
 	local box = level.name() == LEVEL and stash()
 	if not box then
 		return pickup(self)
@@ -413,6 +417,101 @@ local function actor_on_first_update()
 	end
 end
 
+-- The racks got a collision box for each post and shelf (2026-11-01): one saved with its one box sinks into the floor as
+-- it loads, so each is made anew where it stands, once
+local function racks_anew()
+	if level.name() ~= LEVEL or shelter.state("racks_parts", false) then
+		return
+	end
+	shelter.once("racks_parts", function()
+		shelter.set_state("racks_parts", true)
+		local sim, old = alife(), {}
+		for id = 1, 65534 do
+			local se = sim:object(id)
+			if se and se.parent_id == 65535 and string.find(se:section_name(), "^shelter_prop_rack_%d+$") then
+				old[#old + 1] = se
+			end
+		end
+		for _, se in ipairs(old) do
+			local section, pos, angle, lv, gv = se:section_name(), vector():set(se.position), vector():set(se.angle), se.m_level_vertex_id, se.m_game_vertex_id
+			hf_obj_manager.cleanup_data(se.id)
+			alife_release(se)
+			placeable_furniture.create_object(section, pos, angle, lv, gv)
+		end
+	end)
+end
+
+-----------------------------------------------------------------------------------------------------------------------
+-- A box of furniture: F tapped opens it, held opens HF's menu (placeable_furniture's on_key_hold). The engine opens a box
+-- as the key goes down, so the press is kept from it and the box opened as the key comes up, unless the menu came.
+
+local box_press -- the box's id while F is down on it
+
+local function box_looked_at()
+	if Check_UI() or placeable_furniture.in_placing_state() then
+		return
+	end
+	local obj = level.get_target_obj()
+	if not (obj and IsInvbox(obj) and level.get_target_dist() <= (ini_sys:r_float_ex("inventory", "take_dist") or 3)) then
+		return
+	end
+	local binder = obj:binded_object()
+	return binder and binder.wrapper and obj
+end
+
+local function box_key_press(dik, bind, dis, flags)
+	if bind == key_bindings.kUSE then
+		local box = box_looked_at()
+		if box then
+			flags.ret_value = false
+			box_press = box:id()
+		end
+	end
+end
+
+local function box_key_hold(dik, bind)
+	if bind == key_bindings.kUSE and box_press and Check_UI("UIRadialMenu") then
+		box_press = nil
+	end
+end
+
+local function box_key_release(dik, bind)
+	if bind == key_bindings.kUSE and box_press then
+		local box = level.object_by_id(box_press)
+		box_press = nil
+		if box and not Check_UI() then
+			ui_inventory.start("loot", box)
+		end
+	end
+end
+
+-- The Chemist's workbench by the generator, there from the first visit (HF's: its box's things are at hand for the crafting,
+-- ui_furniture_workshop.script); placed once: moved or picked up it stays so
+local WORKBENCH = { pos = vector():set(3.3, 2.95, -15.35), yaw = 0 }
+
+local function workbench_placed()
+	if level.name() ~= LEVEL or shelter.state("workbench_id", nil) then
+		return
+	end
+	shelter.once("workbench", function()
+		local id = placeable_furniture.create_object("placeable_workshop", vector():set(WORKBENCH.pos), vector():set(0, WORKBENCH.yaw, 0),
+			level.vertex_id(WORKBENCH.pos), db.actor:game_vertex_id())
+		shelter.set_state("workbench_id", id)
+	end)
+end
+
+-- The shelter's own lamp as it's placed: lit, and the light of the level's lamps, which a lamp's section can't all say
+local function lamp_placed(id)
+	local se = alife_object(id)
+	if se and ini_sys:r_bool_ex(se:section_name(), "shelter_power", false) then
+		local d = utils_stpk.get_lamp_data(se)
+		d.light_flags, d.main_brightness, d.ambient_bone, d.ambient_radius, d.ambient_power = 26, 0.7, "bone_omni", 3, 0.5
+		d.lamp_fixed_bones, d.glow_radius, d.main_virtual_size = "link", 0.7, 0.1
+		utils_stpk.set_lamp_data(d, se)
+		hf_obj_manager.update_data(id, { is_on = true })
+	end
+end
+
 function on_game_start()
 	-- in co-op the furniture a player places is everyone's
 	local create_object = placeable_furniture.create_object
@@ -422,6 +521,17 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("on_key_press", on_key_press)
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)
+	RegisterScriptCallback("actor_on_first_update", function()
+		CreateTimeEvent("shelter_furniture", "racks_anew", 1, function() -- shelter.once counts in co-op only after a moment
+			racks_anew()
+			workbench_placed()
+			return true
+		end)
+	end)
+	RegisterScriptCallback("hf_on_furniture_spawn", lamp_placed)
+	RegisterScriptCallback("on_before_key_press", box_key_press)
+	RegisterScriptCallback("on_before_key_hold", box_key_hold)
+	RegisterScriptCallback("on_before_key_release", box_key_release)
 	RegisterScriptCallback("on_before_key_hold", on_before_key_other)
 	RegisterScriptCallback("on_before_key_release", on_before_key_other)
 	RegisterScriptCallback("on_mouse_wheel", on_mouse_wheel)

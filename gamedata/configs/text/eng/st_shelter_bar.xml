@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_craft_bar">
+		<text>Bar furniture</text>
+	</string>
+	<string id="st_shelter_bar_descr">
+		<text>Bar furniture, as in the 100 Rentgen. Placed right from the backpack, the wheel turns it. Sections stand side by side: build a counter of the length you need.</text>
+	</string>
+	<string id="st_shelter_item_bar_counter">
+		<text>Bar counter section</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_short">
+		<text>Short bar counter section</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_kitchen">
+		<text>Bar counter section with cookware</text>
+	</string>
+	<string id="st_shelter_item_bar_counter_sink">
+		<text>Kitchen section with a sink</text>
+	</string>
+	<string id="st_shelter_item_bar_fridge">
+		<text>The bar's fridge</text>
+	</string>
+	<string id="st_shelter_item_bar_buffet">
+		<text>A buffet with shelves</text>
+	</string>
+	<string id="st_shelter_item_bar_cabinet">
+		<text>A cabinet behind the counter</text>
+	</string>
+	<string id="st_shelter_item_bar_table">
+		<text>A table from the bar</text>
+	</string>
+	<string id="st_shelter_item_bar_table_small">
+		<text>A small table from the bar</text>
+	</string>
+	<string id="st_shelter_item_bar_chair">
+		<text>A chair from the bar</text>
+	</string>
+</string_table>

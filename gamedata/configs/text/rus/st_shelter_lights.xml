@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<string_table>
+	<string id="st_shelter_craft_lights">
+		<text>Освещение</text>
+	</string>
+	<string id="st_shelter_item_lamp">
+		<text>Потолочная лампа убежища</text>
+	</string>
+	<string id="st_shelter_item_lamp_descr">
+		<text>Такая же, как в комнатах убежища. Вешается на потолок, горит от генератора; F выключает.</text>
+	</string>
+</string_table>

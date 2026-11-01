@@ -1,0 +1,291 @@
+; The shelter's bar furniture: written by tools\shelter\bar_set.py.
+
+[shelter_item_bar_counter]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\counter.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_counter
+inv_name_short          = st_shelter_item_bar_counter
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 0
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_counter
+shelter_category        = bar
+
+[shelter_bar_counter]:physic_object
+visual                  = dynamics\shelter\bar\counter.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_counter
+bounding_box_size       = 1.806, 0.825, 1.008
+bounding_box_origin     = 0.000, 0.504, 0.000
+
+[shelter_item_bar_counter_short]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\counter_short.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_counter_short
+inv_name_short          = st_shelter_item_bar_counter_short
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 2
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 25.3
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_counter_short
+shelter_category        = bar
+
+[shelter_bar_counter_short]:physic_object
+visual                  = dynamics\shelter\bar\counter_short.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_counter_short
+bounding_box_size       = 0.497, 0.843, 1.008
+bounding_box_origin     = 0.000, 0.504, 0.000
+
+[shelter_item_bar_counter_kitchen]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\counter_kitchen.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_counter_kitchen
+inv_name_short          = st_shelter_item_bar_counter_kitchen
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 4
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_counter_kitchen
+shelter_category        = bar
+
+[shelter_bar_counter_kitchen]:physic_object
+visual                  = dynamics\shelter\bar\counter_kitchen.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_counter_kitchen
+bounding_box_size       = 1.806, 0.825, 1.492
+bounding_box_origin     = 0.000, 0.746, 0.000
+
+[shelter_item_bar_counter_sink]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\counter_sink.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_counter_sink
+inv_name_short          = st_shelter_item_bar_counter_sink
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 6
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_counter_sink
+shelter_category        = bar
+
+[shelter_bar_counter_sink]:physic_object
+visual                  = dynamics\shelter\bar\counter_sink.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_counter_sink
+bounding_box_size       = 3.492, 0.785, 1.250
+bounding_box_origin     = 0.000, 0.625, 0.000
+
+[shelter_item_bar_fridge]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\fridge.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_fridge
+inv_name_short          = st_shelter_item_bar_fridge
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 8
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_fridge
+shelter_category        = bar
+
+[shelter_bar_fridge]:physic_object
+visual                  = dynamics\shelter\bar\fridge.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_fridge
+bounding_box_size       = 1.072, 0.966, 1.878
+bounding_box_origin     = 0.000, 0.939, 0.000
+
+[shelter_item_bar_buffet]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\buffet.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_buffet
+inv_name_short          = st_shelter_item_bar_buffet
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 10
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_buffet
+shelter_category        = bar
+
+[shelter_bar_buffet]:physic_object
+visual                  = dynamics\shelter\bar\buffet.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_buffet
+bounding_box_size       = 1.806, 0.625, 1.452
+bounding_box_origin     = 0.000, 0.726, 0.000
+
+[shelter_item_bar_cabinet]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\cabinet.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_cabinet
+inv_name_short          = st_shelter_item_bar_cabinet
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 12
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_cabinet
+shelter_category        = bar
+
+[shelter_bar_cabinet]:physic_object
+visual                  = dynamics\shelter\bar\cabinet.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_cabinet
+bounding_box_size       = 0.921, 0.551, 1.104
+bounding_box_origin     = 0.000, 0.552, 0.000
+
+[shelter_item_bar_table]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\table.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_table
+inv_name_short          = st_shelter_item_bar_table
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 14
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 30.0
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_table
+shelter_category        = bar
+
+[shelter_bar_table]:physic_object
+visual                  = dynamics\shelter\bar\table.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_table
+bounding_box_size       = 1.608, 0.805, 0.911
+bounding_box_origin     = 0.000, 0.455, 0.000
+
+[shelter_item_bar_table_small]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\table_small.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_table_small
+inv_name_short          = st_shelter_item_bar_table_small
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 16
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 6.4
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_table_small
+shelter_category        = bar
+
+[shelter_bar_table_small]:physic_object
+visual                  = dynamics\shelter\bar\table_small.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_table_small
+bounding_box_size       = 0.448, 0.448, 0.534
+bounding_box_origin     = 0.000, 0.267, 0.000
+
+[shelter_item_bar_chair]:tch_junk
+class                   = II_ATTCH
+kind                    = i_tool
+visual                  = dynamics\shelter\bar\chair.ogf
+description             = st_shelter_bar_descr
+inv_name                = st_shelter_item_bar_chair
+inv_name_short          = st_shelter_item_bar_chair
+icons_texture           = ui\shelter\bar_icons
+inv_grid_x              = 18
+inv_grid_y              = 0
+inv_grid_width          = 2
+inv_grid_height         = 2
+cost                    = 200
+inv_weight              = 16.7
+use1_functor            = placeable_furniture.place_item
+use1_action_functor     = placeable_furniture.func_place_item
+placeable_type          = prop
+placeable_section       = shelter_bar_chair
+shelter_category        = bar
+
+[shelter_bar_chair]:physic_object
+visual                  = dynamics\shelter\bar\chair.ogf
+placeable_type          = prop
+base_rotation           = 0
+script_binding          = bind_hf_base.init
+item_section            = shelter_item_bar_chair
+bounding_box_size       = 0.541, 0.500, 1.029
+bounding_box_origin     = 0.000, 0.514, 0.000

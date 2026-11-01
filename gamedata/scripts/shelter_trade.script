@@ -1,0 +1,925 @@
+-- The shelter's trade (docs/coop/shelter.md, "Economy"): the trade sells all kinds of goods from the store, the room given
+-- that role on the laptop's plan, and from the ledger, the bulk stock kept as counts ("section = how many": thousands of
+-- rounds would be thousands of objects). Each position has a markup of its own, of its category or the general one, and
+-- can be taken off sale while it lies there. Visitors are simulated, none a rookie (they don't get to the Radar): each
+-- has a wallet and needs, buys what fits them at a price they accept. Money goes into the till, a sum taken on the
+-- laptop. It runs while nobody is in the shelter too: the boxes are seen as the server keeps them. In co-op the world's
+-- simulation master runs it; everything is the world's. Each game has its own clock, so deadlines are in the world's
+-- hours, hours() (counted by whoever runs the world, never going back). The state's keys stay bar_*: saved worlds hold them.
+
+local SETTINGS = "shelter_trade"
+local LEVEL = "bunker_a1"
+local LOG_SIZE = 40
+local NEWS_SIZE = 16
+local CHECK_MS = 5000
+local MOST_AT_ONCE = 48 -- hours of sales caught up at most, after a long sleep or a time away
+
+local cfg
+
+local function list_of(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function settings()
+	if cfg then
+		return cfg
+	end
+	local function num(k, d)
+		return ini_sys:r_float_ex(SETTINGS, k) or d
+	end
+	cfg = { sell_hours = num("sell_hours", 1), markup = num("markup", 1.1), markup_min = num("markup_min", 0.8),
+		markup_max = num("markup_max", 2.5), markup_step = num("markup_step", 0.05), low = num("traffic_low", 4), high = num("traffic_high", 13), spread = num("traffic_spread", 1),
+		w_rep = num("weight_rep", 0.4), w_range = num("weight_range", 0.3), w_prices = num("weight_prices", 0.3),
+		range_full = num("range_full", 5), dear_at = num("dear_at", 1.5), barman_cost = num("barman_cost", 30000),
+		
+		rep_start = num("rep_start", 50), low_stock = num("low_stock", 10), cats = {}, by_kind = {}, by_id = {}, ranks = {},
+		skip = list_of(ini_sys:r_string_ex(SETTINGS, "not_goods")), not_boxes = {} }
+	for _, sec in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "not_boxes"))) do
+		cfg.not_boxes[sec] = true
+	end
+	for _, id in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "categories"))) do
+		local s = "shelter_trade_cat_" .. id
+		local c = { id = id, need = ini_sys:r_float_ex(s, "need") or 0.1, min = ini_sys:r_float_ex(s, "min") or 1,
+			max = ini_sys:r_float_ex(s, "max") or 1, fair = ini_sys:r_float_ex(s, "fair") or 1.3,
+			elastic = ini_sys:r_float_ex(s, "elastic") or 1, off = ini_sys:r_bool_ex(s, "default_off", false),
+			worn = ini_sys:r_bool_ex(s, "worn", false), rounds = ini_sys:r_bool_ex(s, "rounds", false) }
+		cfg.cats[#cfg.cats + 1], cfg.by_id[id] = c, c
+		for _, k in ipairs(list_of(ini_sys:r_string_ex(s, "kinds"))) do
+			cfg.by_kind[k] = c
+		end
+	end
+	for _, id in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "ranks"))) do
+		local s = "shelter_trade_rank_" .. id
+		cfg.ranks[#cfg.ranks + 1] = { id = id, weight = ini_sys:r_float_ex(s, "weight") or 1,
+			wallet_min = ini_sys:r_float_ex(s, "wallet_min") or 10000, wallet_max = ini_sys:r_float_ex(s, "wallet_max") or 20000 }
+	end
+	return cfg
+end
+
+function categories()
+	return settings().cats
+end
+
+-- the game's time in seconds from the game's start (counted from year 0, a float can't tell one hour from the next);
+-- in co-op each game has its own time
+function now()
+	return game.get_game_time():diffSec(level.get_start_time())
+end
+
+-- the world's hours
+function hours()
+	return shelter.state("eco_hours", 0) or 0
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function master()
+	return not in_coop() or coop.is_sim_master()
+end
+
+-------------------------------------------------------------------------------
+-- news, heard by every game: { seq, text's id, its args ("@section": the thing's name, "#id": a text) }; an effect is
+-- for the one named in it: who's goodwill with a faction changes
+
+local function news_list()
+	local out = {}
+	for line in string.gmatch(shelter.state("eco_news", "") or "", "[^;]+") do
+		local seq, id, args, who, faction, delta = string.match(line, "^(%d+)|([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)$")
+		if seq then
+			out[#out + 1] = { seq = tonumber(seq), id = id, args = str_explode(args, "^", true), who = who, faction = faction,
+				delta = tonumber(delta) }
+		end
+	end
+	return out
+end
+
+-- args of a news entry as text
+local function news_text(e)
+	local args = {}
+	for i, a in ipairs(e.args) do
+		local kind, rest = string.sub(a, 1, 1), string.sub(a, 2)
+		args[i] = kind == "@" and ui_item.get_sec_name(rest) or kind == "#" and game.translate_string(rest) or a
+	end
+	local text = game.translate_string(e.id)
+	return #args > 0 and string.format(text, unpack(args)) or text
+end
+
+-- the news of the world, the newest first, as { seq, text }
+function news()
+	local out, list = {}, news_list()
+	for i = #list, 1, -1 do
+		out[#out + 1] = { seq = list[i].seq, text = news_text(list[i]) }
+	end
+	return out
+end
+
+function announce(id, args, effect)
+	local seq = (shelter.state("eco_news_seq", 0) or 0) + 1
+	local parts = {}
+	local list = news_list()
+	for i = math.max(1, #list - NEWS_SIZE + 2), #list do
+		local e = list[i]
+		parts[#parts + 1] = table.concat({ e.seq, e.id, table.concat(e.args, "^"), e.who or "", e.faction or "", e.delta or "" }, "|")
+	end
+	effect = effect or {}
+	local a = {}
+	for i, v in ipairs(args or {}) do
+		a[i] = tostring(v)
+	end
+	parts[#parts + 1] = table.concat({ seq, id, table.concat(a, "^"), effect.who or "", effect.faction or "", effect.delta or "" }, "|")
+	shelter.set_state("eco_news", table.concat(parts, ";"))
+	shelter.set_state("eco_news_seq", seq)
+end
+
+local function my_name()
+	return in_coop() and coop.my_name and coop.my_name() or ""
+end
+
+local function hear_news()
+	local seq, heard = shelter.state("eco_news_seq", 0) or 0, load_var(db.actor, "shelter_eco_heard", nil)
+	if not heard or heard > seq then
+		save_var(db.actor, "shelter_eco_heard", seq)
+	elseif heard < seq then
+		save_var(db.actor, "shelter_eco_heard", seq)
+		for _, e in ipairs(news_list()) do
+			if e.seq > heard then
+				db.actor:give_game_news(game.translate_string("st_shelter_app_trade"), news_text(e),
+					"ui_inGame2_Poslednie_razrabotki", 0, 8000)
+				if e.faction and e.faction ~= "" and e.delta and (e.who == "" or e.who == my_name()) then
+					relation_registry.change_community_goodwill(e.faction, AC_ID, e.delta)
+				end
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- what things are: goods or not, the category, the price of one (a round for ammo)
+
+function category(section)
+	local c = settings()
+	for _, prefix in ipairs(c.skip) do
+		if string.sub(section, 1, #prefix) == prefix then
+			return nil
+		end
+	end
+	if SYS_GetParam(0, section, "use1_functor") == "placeable_furniture.place_item" then -- furniture
+		return nil
+	end
+	local cat = c.by_kind[SYS_GetParam(0, section, "kind") or ""]
+	if not cat or SYS_GetParam(1, section, "quest_item", false) or (SYS_GetParam(2, section, "cost") or 0) <= 0 then
+		return nil
+	end
+	return cat
+end
+
+function unit_cost(section)
+	local cost = SYS_GetParam(2, section, "cost") or 0
+	local cat = category(section)
+	if cat and cat.rounds then
+		cost = cost / math.max(1, SYS_GetParam(2, section, "box_size") or 1)
+	end
+	return cost
+end
+
+-------------------------------------------------------------------------------
+-- the ledger: section -> count
+
+local ledger_raw, ledger_map
+
+function ledger()
+	local raw = shelter.state("bar_ledger", "") or ""
+	if raw ~= ledger_raw then
+		ledger_raw, ledger_map = raw, {}
+		for sec, n in string.gmatch(raw, "([^=;]+)=(%d+)") do
+			ledger_map[sec] = tonumber(n)
+		end
+	end
+	return ledger_map
+end
+
+local function ledger_write(map)
+	local keys, parts = {}, {}
+	for sec, n in pairs(map) do
+		if n > 0 then
+			keys[#keys + 1] = sec
+		end
+	end
+	table.sort(keys)
+	for i, sec in ipairs(keys) do
+		parts[i] = sec .. "=" .. map[sec]
+	end
+	shelter.set_state("bar_ledger", #parts > 0 and table.concat(parts, ";") or nil)
+end
+
+function ledger_add(section, n)
+	local map = ledger()
+	map[section] = (map[section] or 0) + n
+	ledger_write(map)
+end
+
+-- things from the ledger into the actor's pocket, as many as are there; how many
+function withdraw(section, n)
+	local map = ledger()
+	n = math.min(n, map[section] or 0)
+	if n <= 0 then
+		return 0
+	end
+	map[section] = map[section] - n
+	ledger_write(map)
+	local cat = category(section)
+	shelter.everyones(function()
+		if cat and cat.rounds then
+			create_ammo(section, db.actor:position(), db.actor:level_vertex_id(), db.actor:game_vertex_id(), db.actor:id(), n)
+		else
+			for _ = 1, n do
+				alife_create_item(section, db.actor)
+			end
+		end
+	end)
+	news_manager.relocate_item(db.actor, "in", section, n)
+	return n
+end
+
+-------------------------------------------------------------------------------
+-- the rooms' boxes and the till
+
+-- a role's room box (x0, x1, z0, z1), nil while no room has the role; the room's id
+local function role_box(role)
+	local room = shelter.state("room_" .. role, nil)
+	if not room then
+		return nil
+	end
+	local box = str_explode(ini_file("scripts\\shelter\\rooms.ltx"):r_string_ex(room, "box") or "", ",")
+	return #box == 4 and { tonumber(box[1]), tonumber(box[2]), tonumber(box[3]), tonumber(box[4]) } or nil, room
+end
+
+local function on_level(se)
+	local sim, gg = alife(), game_graph()
+	return sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == LEVEL
+end
+
+-- one item as goods: { se, section, cat, units, cond }
+local function good_of(se, cat)
+	local sec = se:section_name()
+	local g = { se = se, section = sec, cat = cat, units = 1, cond = 1 }
+	if cat and cat.rounds then
+		local data = utils_stpk.get_ammo_data(se)
+		g.units = data and data.ammo_left or 1
+	elseif cat and cat.worn then
+		local data = utils_stpk.get_item_data(se)
+		g.cond = data and data.condition or 1
+	end
+	return g
+end
+
+-- what lies in the boxes that pass a test, each item once (one pass over the objects, ~30 ms: the boxes, and everything
+-- held by something, as an item can come before its box). goods_only: only what can be sold.
+local function items_in(test, goods_only)
+	local sim, items = alife(), {}
+	local boxes, held = {}, {}
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		if se then
+			if se.parent_id ~= 65535 then
+				held[#held + 1] = se
+			elseif IsInvbox(nil, se:clsid()) and test(se) then
+				boxes[id] = true
+			end
+		end
+	end
+	for _, se in ipairs(held) do
+		if boxes[se.parent_id] then
+			local cat = category(se:section_name())
+			if cat or not goods_only then
+				items[#items + 1] = good_of(se, cat)
+			end
+		end
+	end
+	return items
+end
+
+-- the box picked on the laptop for the orders, while it exists
+function orders_box()
+	local id = shelter.state("orders_box", nil)
+	local se = id and alife_object(id)
+	return se and IsInvbox(nil, se:clsid()) and se or nil
+end
+
+function set_orders_box(id)
+	shelter.set_state("orders_box", id)
+end
+
+-- what lies in the orders' box
+function orders_items()
+	local box = orders_box()
+	if not box then
+		return {}
+	end
+	return items_in(function(se) return se.id == box.id end, false)
+end
+
+-- the store's goods: all in its room's boxes but the orders' box
+function stock()
+	local box = role_box("store")
+	if not box then
+		return {}
+	end
+	local orders_id = shelter.state("orders_box", nil)
+	return items_in(function(se)
+		local p = se.position
+		return se.id ~= orders_id and p.x >= box[1] and p.x <= box[2] and p.z >= box[3] and p.z <= box[4] and on_level(se)
+	end, true)
+end
+
+-- the shelter's boxes for picking, the working ones left out: { id, section, position, count }
+function boxes()
+	local sim, out, held, skip = alife(), {}, {}, settings().not_boxes
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		if se then
+			if se.parent_id ~= 65535 then
+				held[se.parent_id] = (held[se.parent_id] or 0) + 1
+			elseif IsInvbox(nil, se:clsid()) and not skip[se:section_name()] and on_level(se) then
+				out[#out + 1] = { id = id, section = se:section_name(), position = se.position }
+			end
+		end
+	end
+	for _, b in ipairs(out) do
+		b.count = held[b.id] or 0
+	end
+	return out
+end
+
+-- the money in the till
+function till_money()
+	return shelter.state("till", 0) or 0
+end
+
+local function deposit(amount)
+	shelter.set_state("till", till_money() + amount)
+end
+
+-- money out of the till, if it is there
+function pay_from_till(amount)
+	if till_money() < amount then
+		return false
+	end
+	shelter.set_state("till", till_money() - amount)
+	return true
+end
+
+function deposit_till(amount)
+	deposit(amount)
+end
+
+-- the till's money into the player's pocket (the laptop's button); how much
+function take_till()
+	local n = till_money()
+	if n > 0 then
+		shelter.set_state("till", nil)
+		db.actor:give_money(n)
+		news_manager.relocate_money(db.actor, "in", n)
+	end
+	return n
+end
+
+-- until 2026-10-30 the till was a safe under the laptop's desk, the money in it as money items (and what fell short of
+-- the smallest in till_pending): that money into the sum; the safe gone unless something else lies in it
+local function old_till_gone()
+	local id = shelter.state("till_id", nil)
+	if not id then
+		return
+	end
+	shelter.once("till_gone", function()
+		local sim, sum, money, other = alife(), shelter.state("till_pending", 0) or 0, {}, false
+		for i = 1, 65534 do
+			local se = sim:object(i)
+			if se and se.parent_id == id then
+				local n = tonumber(string.match(se:section_name(), "^money_(%d+)$"))
+				if n then
+					sum, money[#money + 1] = sum + n, se
+				else
+					other = true
+				end
+			end
+		end
+		for _, se in ipairs(money) do
+			alife_release(se)
+		end
+		local box = sim:object(id)
+		if box and not other then
+			alife_release(box)
+		end
+		shelter.set_state("till", till_money() + sum)
+		shelter.set_state("till_pending", nil)
+		shelter.set_state("till_id", nil)
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- markups and what's on sale: a position's own, else its category's, else the general one
+
+local function clamp_markup(v)
+	local c = settings()
+	return math.floor(math.min(c.markup_max, math.max(c.markup_min, v)) * 100 + 0.5) / 100
+end
+
+function markup()
+	return shelter.state("bar_markup", nil) or settings().markup
+end
+
+function set_markup(v)
+	v = clamp_markup(v)
+	shelter.set_state("bar_markup", v)
+	return v
+end
+
+function category_markup(id)
+	return shelter.state("bar_cat_m_" .. id, nil)
+end
+
+function set_category_markup(id, v)
+	shelter.set_state("bar_cat_m_" .. id, v and clamp_markup(v) or nil)
+end
+
+function own_markup(section)
+	return shelter.state("bar_m_" .. section, nil)
+end
+
+function set_own_markup(section, v)
+	shelter.set_state("bar_m_" .. section, v and clamp_markup(v) or nil)
+end
+
+function markup_of(section, cat)
+	cat = cat or category(section)
+	return own_markup(section) or cat and category_markup(cat.id) or markup()
+end
+
+function category_on(cat)
+	local v = shelter.state("bar_cat_sale_" .. cat.id, nil)
+	if v == nil then
+		return not cat.off
+	end
+	return v == "on"
+end
+
+function set_category_on(id, on)
+	shelter.set_state("bar_cat_sale_" .. id, on and "on" or "off")
+end
+
+-- a position's own word on being sold: "on", "off" or nil (as its category)
+function own_sale(section)
+	return shelter.state("bar_sale_" .. section, nil)
+end
+
+function set_own_sale(section, v)
+	shelter.set_state("bar_sale_" .. section, v)
+end
+
+function on_sale(section, cat)
+	local own = own_sale(section)
+	if own then
+		return own == "on"
+	end
+	cat = cat or category(section)
+	return cat ~= nil and category_on(cat)
+end
+
+-- the price of one at a condition
+function price_of(section, cond, cat)
+	return math.max(1, math.floor(unit_cost(section) * markup_of(section, cat) * (cond or 1) + 0.5))
+end
+
+function low_stock()
+	return shelter.state("bar_low", nil) or settings().low_stock
+end
+
+function set_low_stock(v)
+	shelter.set_state("bar_low", math.max(0, v))
+end
+
+-- the positions: the store's goods and the ledger by section, each { section, cat, crates, ledger, count, goods, cond,
+-- markup, on }, sorted by name's section. goods: a list as stock() gives it.
+function positions(goods)
+	local by, list = {}, {}
+	local function pos_of(sec, cat)
+		local p = by[sec]
+		if not p then
+			p = { section = sec, cat = cat, crates = 0, ledger = 0, goods = {}, cond_sum = 0, cond_n = 0 }
+			by[sec], list[#list + 1] = p, p
+		end
+		return p
+	end
+	for _, g in ipairs(goods) do
+		local p = pos_of(g.section, g.cat)
+		p.crates = p.crates + g.units
+		p.goods[#p.goods + 1] = g
+		p.cond_sum, p.cond_n = p.cond_sum + g.cond, p.cond_n + 1
+	end
+	for sec, n in pairs(ledger()) do
+		if n > 0 then
+			local cat = category(sec)
+			if cat then
+				pos_of(sec, cat).ledger = n
+			end
+		end
+	end
+	for _, p in ipairs(list) do
+		p.count = p.crates + p.ledger
+		p.cond = p.cond_n > 0 and p.cond_sum / p.cond_n or 1
+		p.markup = markup_of(p.section, p.cat)
+		p.on = on_sale(p.section, p.cat)
+	end
+	table.sort(list, function(a, b) return a.section < b.section end)
+	return list
+end
+
+-------------------------------------------------------------------------------
+-- crises: every few days something moves the demand or the supply for a while ([shelter_crises])
+
+function crisis()
+	local id = shelter.state("crisis", nil)
+	return id and tostring(id) or nil
+end
+
+local function crisis_num(key, default)
+	local id = crisis()
+	if not id then
+		return default
+	end
+	return ini_sys:r_float_ex("shelter_crisis_" .. id, key) or default
+end
+
+-- the crisis' id, the text and the hours left, nil without one
+function crisis_info()
+	local id = crisis()
+	if not id then
+		return nil
+	end
+	return { id = id, left = math.max(0, (shelter.state("crisis_until", 0) or 0) - hours()) }
+end
+
+-- a supplier the crisis has stopped?
+function supplier_stopped(id)
+	local cur = crisis()
+	return cur ~= nil and ini_sys:r_string_ex("shelter_crisis_" .. cur, "stops") == id
+end
+
+-- the crisis' spoilage: a share of a category gone, from the ledger and the boxes
+local function spoil(cat_id, share)
+	local map = ledger()
+	for sec, n in pairs(map) do
+		local cat = category(sec)
+		if cat and cat.id == cat_id then
+			map[sec] = n - math.floor(n * share + 0.5)
+		end
+	end
+	ledger_write(map)
+	local goods = {}
+	for _, g in ipairs(stock()) do
+		if g.cat.id == cat_id then
+			goods[#goods + 1] = g
+		end
+	end
+	shelter.everyones(function()
+		for _ = 1, math.floor(#goods * share + 0.5) do
+			alife_release(table.remove(goods, math.random(#goods)).se)
+		end
+	end)
+end
+
+local function crisis_tick()
+	local t = hours()
+	local cur = crisis()
+	local gap = function()
+		local a = ini_sys:r_float_ex("shelter_crises", "gap_min") or 72
+		local b = ini_sys:r_float_ex("shelter_crises", "gap_max") or 120
+		return t + a + math.random() * (b - a)
+	end
+	if cur then
+		if t >= (shelter.state("crisis_until", 0) or 0) then
+			announce("st_shelter_tr_crisis_end", { "#st_shelter_tr_crisis_" .. cur })
+			shelter.set_state("crisis", nil)
+			shelter.set_state("crisis_next", gap())
+		end
+		return
+	end
+	local nxt = shelter.state("crisis_next", nil)
+	if not nxt then
+		shelter.set_state("crisis_next", gap())
+	elseif t >= nxt then
+		local list = list_of(ini_sys:r_string_ex("shelter_crises", "list"))
+		if #list == 0 then
+			return
+		end
+		local id = list[math.random(#list)]
+		local s = "shelter_crisis_" .. id
+		shelter.set_state("crisis", id)
+		shelter.set_state("crisis_until", t + (ini_sys:r_float_ex(s, "hours") or 48))
+		local share = ini_sys:r_float_ex(s, "spoil")
+		if share then
+			spoil(ini_sys:r_string_ex(s, "spoil_cat") or "food", share)
+		end
+		announce("st_shelter_tr_news_" .. id)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the visitors
+
+function reputation()
+	return shelter.state("bar_rep", nil) or settings().rep_start
+end
+
+-- the barman: "hired" (the laptop's button); without one there are no visitors and no new offers. Anything else that
+-- gives the shelter a barman (the plan's quest) sets it.
+function barman()
+	return shelter.state("barman", nil)
+end
+
+function set_barman(who)
+	shelter.set_state("barman", who)
+end
+
+function barman_cost()
+	return settings().barman_cost
+end
+
+-- hired out of the pocket, if the money is there
+function hire_barman()
+	local cost = barman_cost()
+	if db.actor:money() < cost then
+		return false
+	end
+	db.actor:give_money(-cost)
+	news_manager.relocate_money(db.actor, "out", cost)
+	set_barman("hired")
+	return true
+end
+
+-- what draws the visitors, each from 0 to 1: the trade's name; the range on sale (the categories, each full from
+-- range_full positions; those off sale at first don't count against it); the prices (1 at no markup, 0 from dear_at
+-- times the category's fair one). list: as positions() gives it
+function traffic_factors(list)
+	local c = settings()
+	local seen, prices, n = {}, 0, 0
+	for _, p in ipairs(list) do
+		if p.on and p.count > 0 then
+			seen[p.cat.id] = (seen[p.cat.id] or 0) + 1
+			local dear = p.cat.fair * crisis_num("fair_" .. p.cat.id, 1) * c.dear_at
+			prices, n = prices + math.max(0, math.min(1, (dear - p.markup) / (dear - 1))), n + 1
+		end
+	end
+	local range, cats = 0, 0
+	for _, cat in ipairs(c.cats) do
+		if not cat.off then
+			range, cats = range + math.min(1, (seen[cat.id] or 0) / c.range_full), cats + 1
+		end
+	end
+	return { rep = reputation() / 100, range = range / math.max(1, cats), prices = n > 0 and prices / n or 0 }
+end
+
+-- how many come in a day as things are now: from traffic_low to traffic_high by all of that and the crisis (a price war
+-- is lost by keeping prices high); none without a barman
+function traffic(list)
+	if not barman() then
+		return 0
+	end
+	local c, f = settings(), traffic_factors(list)
+	local k = crisis_num("traffic", 1)
+	if k < 1 and markup() <= crisis_num("traffic_fixed_at", 0) then
+		k = 1
+	end
+	return c.low + (c.high - c.low) * (f.rep * c.w_rep + f.range * c.w_range + f.prices * c.w_prices) * k
+end
+
+-- the chance one takes a thing at a markup
+function accept_chance(cat, m)
+	local fair = cat.fair * crisis_num("fair_" .. cat.id, 1)
+	return m <= fair and 1 or math.max(0, 1 - (m - fair) * cat.elastic)
+end
+
+local function pick_rank()
+	local ranks = settings().ranks
+	local sum = 0
+	for _, r in ipairs(ranks) do
+		sum = sum + r.weight
+	end
+	local roll = math.random() * sum
+	for _, r in ipairs(ranks) do
+		roll = roll - r.weight
+		if roll <= 0 then
+			return r
+		end
+	end
+	return ranks[#ranks]
+end
+
+-- up to want units of a position for a wallet: the boxes' first; { units, money }. Boxes of rounds go whole.
+local function take_units(p, want, wallet, sold)
+	local units, money = 0, 0
+	while units < want and #p.goods > 0 do
+		local g = p.goods[#p.goods]
+		local cost = math.max(1, math.floor(unit_cost(p.section) * p.markup * g.cond + 0.5)) * g.units
+		if cost > wallet - money then
+			break
+		end
+		table.remove(p.goods)
+		p.crates, units, money = p.crates - g.units, units + g.units, money + cost
+		sold[#sold + 1] = g.se
+	end
+	if units < want and p.ledger > 0 then
+		local each = math.max(1, unit_cost(p.section) * p.markup)
+		local n = math.min(want - units, p.ledger, math.floor((wallet - money) / each))
+		if n > 0 then
+			p.ledger, units, money = p.ledger - n, units + n, money + math.floor(n * each + 0.5)
+		end
+	end
+	return units, money
+end
+
+-- one visitor: returns what they bought ({ section, units, money }...) and how the visit went: "good" (fair prices),
+-- "dear" (left things for the price), "empty" (nothing they needed)
+function visit(by_cat)
+	local rank = pick_rank()
+	local wallet = math.random(rank.wallet_min, rank.wallet_max)
+	local bought, dear, sold = {}, false, {}
+	for _, cat in ipairs(settings().cats) do
+		local list = by_cat[cat.id]
+		if list and #list > 0 and math.random() < math.min(1, cat.need * crisis_num("demand_" .. cat.id, 1)) then
+			local p = list[math.random(#list)]
+			if p.crates + p.ledger > 0 then
+				if math.random() < accept_chance(cat, p.markup) then
+					local units, money = take_units(p, math.random(cat.min, cat.max), wallet, sold)
+					if units > 0 then
+						wallet = wallet - money
+						bought[#bought + 1] = { section = p.section, units = units, money = money, cat = cat.id }
+					end
+				else
+					dear = true
+				end
+			end
+		end
+	end
+	return bought, #bought > 0 and (dear and "dear" or "good") or dear and "dear" or "empty", sold
+end
+
+-------------------------------------------------------------------------------
+-- the sales
+
+-- the log: the newest first, { t = game second, section, price, units }
+function sales()
+	local list = {}
+	for t, sec, p, u in string.gmatch(shelter.state("bar_log", "") or "", "([%d%.]+)|([^|;]+)|(%d+)|?(%d*);?") do
+		list[#list + 1] = { t = tonumber(t), section = sec, price = tonumber(p), units = tonumber(u) or 1 }
+	end
+	return list
+end
+
+local function log_sales(entries)
+	local parts = {}
+	for i = #entries, 1, -1 do
+		local e = entries[i]
+		parts[#parts + 1] = string.format("%d|%s|%d|%d", e.t, e.section, e.price, e.units)
+	end
+	for _, s in ipairs(sales()) do
+		if #parts >= LOG_SIZE then
+			break
+		end
+		parts[#parts + 1] = string.format("%d|%s|%d|%d", s.t, s.section, s.price, s.units)
+	end
+	shelter.set_state("bar_log", table.concat(parts, ";"))
+end
+
+-- the hours' visitors, the last hour ending at game second t_last
+local function sell(n, t_last)
+	local list = positions(stock())
+	local by_cat, ledger_before = {}, {}
+	for _, p in ipairs(list) do
+		ledger_before[p.section] = p.ledger
+		if p.on and p.count > 0 then
+			local c = by_cat[p.cat.id] or {}
+			by_cat[p.cat.id], c[#c + 1] = c, p
+		end
+	end
+	local hour_s = settings().sell_hours * 3600
+	local takings, entries, released = 0, {}, {}
+	local rep, served, left = reputation(), 0, 0
+	local by_cat_money = {}
+	-- a day's visitors are drawn as it starts (traffic_spread round traffic()), then come through its hours
+	local step = settings().sell_hours
+	local day, due = shelter.state("visitors_day", nil), shelter.state("visitors_due", 0) or 0
+	for h = 1, n do
+		local hour = hours() - (n - h) * step
+		local rest = math.ceil((24 - hour % 24) / step)
+		if math.floor(hour / 24) ~= day then
+			day = math.floor(hour / 24)
+			local spread = settings().spread
+			due = math.floor((traffic(list) + (2 * math.random() - 1) * spread) * rest * step / 24 + 0.5)
+		end
+		local share = due / rest
+		local visitors = math.floor(share) + (math.random() < share % 1 and 1 or 0)
+		due = due - visitors
+		for _ = 1, visitors do
+			local bought, how, sold = visit(by_cat)
+			for _, se in ipairs(sold) do
+				released[#released + 1] = se
+			end
+			for _, b in ipairs(bought) do
+				takings = takings + b.money
+				by_cat_money[b.cat] = (by_cat_money[b.cat] or 0) + b.money
+				entries[#entries + 1] = { t = t_last - (n - h) * hour_s, section = b.section, price = b.money, units = b.units }
+			end
+			if how == "good" then
+				rep, served = math.min(100, rep + 0.2), served + 1
+			elseif how == "dear" then
+				rep, left = math.max(0, rep - 0.3), left + 1
+			else
+				rep, left = math.max(0, rep - 0.1), left + 1
+			end
+		end
+	end
+	shelter.set_state("visitors_day", day)
+	shelter.set_state("visitors_due", due)
+	shelter.set_state("bar_rep", math.floor(rep * 10 + 0.5) / 10)
+	shelter.set_state("bar_served", (shelter.state("bar_served", 0) or 0) + served)
+	shelter.set_state("bar_left", (shelter.state("bar_left", 0) or 0) + left)
+	if #entries == 0 then
+		return
+	end
+	shelter.everyones(function()
+		for _, se in ipairs(released) do
+			alife_release(se)
+		end
+	end)
+	local map, changed = ledger(), false
+	for _, p in ipairs(list) do
+		if p.ledger ~= ledger_before[p.section] then
+			map[p.section], changed = p.ledger, true
+		end
+	end
+	if changed then
+		ledger_write(map)
+	end
+	local kept = {}
+	for i = math.max(1, #entries - LOG_SIZE + 1), #entries do
+		kept[#kept + 1] = entries[i]
+	end
+	log_sales(kept)
+	deposit(takings)
+	shelter.set_state("bar_total", (shelter.state("bar_total", 0) or 0) + takings)
+	for id, money in pairs(by_cat_money) do
+		shelter.set_state("bar_sold_" .. id, (shelter.state("bar_sold_" .. id, 0) or 0) + money)
+	end
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local ms = time_global()
+	if ms < check_at then
+		return
+	end
+	check_at = ms + CHECK_MS
+	hear_news()
+	if not master() then
+		return
+	end
+	local t, last = now(), shelter.state("bar_last", nil)
+	local step = settings().sell_hours * 3600
+	if not last or last > t then -- the first time; or (in co-op) this game's clock behind the one of the last sale
+		shelter.set_state("bar_last", t)
+		return
+	end
+	local n = math.floor((t - last) / step)
+	if n < 1 then
+		return
+	end
+	shelter.set_state("bar_last", last + n * step)
+	shelter.set_state("eco_hours", hours() + n * settings().sell_hours)
+	if barman() and (role_box("store") or next(ledger())) then
+		sell(math.min(n, MOST_AT_ONCE), last + n * step)
+	end
+	crisis_tick()
+	shelter_orders.on_hours()
+end
+
+local function actor_on_first_update()
+	if level.name() == LEVEL then
+		old_till_gone()
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end

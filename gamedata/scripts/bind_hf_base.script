@@ -132,7 +132,7 @@ end
 class "base_binder" (object_binder)
 -- Class constructor
 function base_binder:__init(obj) super(obj)
-    self.object:set_tip_text(gc("st_interact"))
+    self.object:set_tip_text(IsInvbox(obj) and "inventory_box_use" or gc("st_interact")) -- this project: a box is searched
     ---@type bind_hf_base.hf_binder_wrapper
     self.wrapper = nil
 end

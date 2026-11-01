@@ -80,6 +80,7 @@ function placeable_light_wrapper:__init(obj) super(obj)
 	
 	self.time_last = get_time_elapsed() -- used to keep track of time difference in between updates
 	self.max_duration = ini_sys:r_string_ex(section,"fuel_duration")*3600
+	self.needs_power = ini_sys:r_bool_ex(section, "shelter_power", false) -- this project: burns on the shelter's generator
 	
 	-- get data
 	local data = hf_obj_manager.get_data(obj:id())
@@ -100,7 +101,7 @@ function placeable_light_wrapper:update(delta)
 	
 	local is_flickering = lamp_obj:is_flickering()
 	local is_on = hf_obj_manager.get_data(self.object:id()).is_on
-	if (self.fuel <= 0.0 or not is_on) then
+	if (self.fuel <= 0.0 or not is_on or (self.needs_power and not shelter.generator_on())) then
 		if lamp_obj:is_on() then lamp_obj:turn_off() end
 	else
 		if not lamp_obj:is_on() then

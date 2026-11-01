@@ -1,0 +1,504 @@
+-- The shelter's supply and contracts (docs/coop/shelter.md, "Economy"), on the laptop's Trade app.
+-- Supply: lots ordered from a supplier ([shelter_orders] suppliers), paid from the till or the pocket; always cheaper
+-- than that trader's retail; they come after some hours as ledger counts (shelter_trade). A lot can be intercepted: then a
+-- cargo case lies at a point on the map with a squad over it, for sos_hours: whoever takes it gets the lot to the ledger.
+-- Contracts: a board of offers from visitors and traders ([shelter_contracts]), none new without a barman; taken, they
+-- are handed in through the box picked on the laptop (shelter_trade.orders_box); paid into the till, with goodwill and a supplier's discount; a missed
+-- one costs goodwill. Everything is the world's, deadlines in shelter_trade.hours().
+
+local SETTINGS = "shelter_orders"
+local CARGO = "shelter_cargo"
+
+local cfg
+
+local function list_of(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function exists(section)
+	return section and ini_sys:section_exist(section)
+end
+
+local function settings()
+	if cfg then
+		return cfg
+	end
+	local function num(k, d)
+		return ini_sys:r_float_ex(SETTINGS, k) or d
+	end
+	cfg = { board = num("board_size", 5), offer_every = num("offer_every", 12), offer_hours = num("offer_hours", 48),
+		sos_hours = num("sos_hours", 6), discount_max = num("discount_max", 0.15), lots = {}, lots_ammo = {}, bulk = {},
+		suppliers = {}, by_id = {}, squads = list_of(ini_sys:r_string_ex(SETTINGS, "squads")), rep_low = num("rep_low", 500),
+		rep_high = num("rep_high", 1500), k_low = num("rep_k_low", 1.05), k_high = num("rep_k_high", 0.9),
+		hostile = num("rep_hostile", -500), contracts = list_of(ini_sys:r_string_ex("shelter_contracts", "list")) }
+	for i, v in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "lots"))) do
+		cfg.lots[i] = tonumber(v)
+	end
+	for i, v in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "lots_ammo"))) do
+		cfg.lots_ammo[i] = tonumber(v)
+	end
+	for i, v in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "bulk"))) do
+		cfg.bulk[i] = tonumber(v)
+	end
+	for _, id in ipairs(list_of(ini_sys:r_string_ex(SETTINGS, "suppliers"))) do
+		local s = "shelter_supplier_" .. id
+		local sup = { id = id, name = ini_sys:r_string_ex(s, "name"), story = ini_sys:r_string_ex(s, "story"),
+			faction = ini_sys:r_string_ex(s, "faction"), retail = ini_sys:r_float_ex(s, "retail") or 1,
+			hours_min = ini_sys:r_float_ex(s, "hours_min") or 12, hours_max = ini_sys:r_float_ex(s, "hours_max") or 36,
+			intercept = ini_sys:r_float_ex(s, "intercept") or 0.15, points = list_of(ini_sys:r_string_ex(s, "points")), goods = {} }
+		for _, sec in ipairs(list_of(ini_sys:r_string_ex(s, "goods"))) do
+			if exists(sec) and shelter_trade.category(sec) then
+				sup.goods[#sup.goods + 1] = sec
+			end
+		end
+		cfg.suppliers[#cfg.suppliers + 1], cfg.by_id[id] = sup, sup
+	end
+	return cfg
+end
+
+function suppliers()
+	return settings().suppliers
+end
+
+function supplier(id)
+	return settings().by_id[id]
+end
+
+-- records as a world's string: fields by FIELDS, ";" between records, "|" between fields
+local function pack(list, fields)
+	local parts = {}
+	for i, e in ipairs(list) do
+		local vals = {}
+		for j, f in ipairs(fields) do
+			vals[j] = tostring(e[f] == nil and "" or e[f])
+		end
+		parts[i] = table.concat(vals, "|")
+	end
+	return #parts > 0 and table.concat(parts, ";") or nil
+end
+
+local function unpack_records(raw, fields)
+	local list = {}
+	for line in string.gmatch(raw or "", "[^;]+") do
+		local e, i = {}, 0
+		for val in string.gmatch(line .. "|", "([^|]*)|") do
+			i = i + 1
+			if fields[i] then
+				e[fields[i]] = tonumber(val) or val
+			end
+		end
+		list[#list + 1] = e
+	end
+	return list
+end
+
+-------------------------------------------------------------------------------
+-- supply
+
+local DELIVERY = { "id", "sup", "section", "qty", "due", "state", "cost", "cargo", "until_h", "point" }
+
+function deliveries()
+	return unpack_records(shelter.state("deliveries", ""), DELIVERY)
+end
+
+local function save_deliveries(list)
+	shelter.set_state("deliveries", pack(list, DELIVERY))
+end
+
+local function goodwill(sup)
+	return sup.faction and relation_registry.community_goodwill(sup.faction, AC_ID) or 0
+end
+
+-- the price factor of goodwill
+local function rep_k(sup)
+	local c, g = settings(), goodwill(sup)
+	return g < c.rep_low and c.k_low or g < c.rep_high and 1 or c.k_high
+end
+
+function discount(id)
+	return shelter.state("discount_" .. id, 0) or 0
+end
+
+-- can it be ordered now: nil, or why not: "dead", "hostile", "stopped"
+function why_closed(sup)
+	if shelter_trade.supplier_stopped(sup.id) then
+		return "stopped"
+	end
+	local se = sup.story and get_story_se_object(sup.story)
+	if se and se.alive and not se:alive() then
+		return "dead"
+	end
+	if goodwill(sup) < settings().hostile then
+		return "hostile"
+	end
+end
+
+-- the lots of a thing: { units, price of one, total }
+function lots(sup, section)
+	local c, cat = settings(), shelter_trade.category(section)
+	local sizes = cat and cat.rounds and c.lots_ammo or c.lots
+	local out = {}
+	for i, units in ipairs(sizes) do
+		local one = shelter_trade.unit_cost(section) * sup.retail * (c.bulk[i] or 1) * rep_k(sup) * (1 - discount(sup.id))
+		out[i] = { units = units, one = one, total = math.max(1, math.floor(one * units + 0.5)) }
+	end
+	return out
+end
+
+-- the retail price of one at this trader, for comparing
+function retail(sup, section)
+	return shelter_trade.unit_cost(section) * sup.retail
+end
+
+-- a lot ordered, paid "till" or "pocket"; false if the money isn't there
+function order(sup, section, lot, pay)
+	if pay == "till" then
+		if not shelter_trade.pay_from_till(lot.total) then
+			return false
+		end
+	else
+		if db.actor:money() < lot.total then
+			return false
+		end
+		db.actor:give_money(-lot.total)
+		news_manager.relocate_money(db.actor, "out", lot.total)
+	end
+	local list = deliveries()
+	local id = (shelter.state("delivery_seq", 0) or 0) + 1
+	shelter.set_state("delivery_seq", id)
+	list[#list + 1] = { id = id, sup = sup.id, section = section, qty = lot.units, cost = lot.total, state = "way",
+		due = shelter_trade.hours() + sup.hours_min + math.random() * (sup.hours_max - sup.hours_min) }
+	save_deliveries(list)
+	return true
+end
+
+-- the lot intercepted: the case at a point with a squad; false if there is nowhere to put it (then it just arrives)
+local function intercept(d, sup)
+	local c = settings()
+	local point = sup.points[math.random(math.max(1, #sup.points))]
+	local smart = point and SIMBOARD and SIMBOARD.smarts_by_names[point]
+	if not smart then
+		return false
+	end
+	shelter.everyones(function()
+		local se = alife_create(CARGO, smart.position, smart.m_level_vertex_id, smart.m_game_vertex_id)
+		if se then
+			d.cargo = se.id
+		end
+	end)
+	if not d.cargo or d.cargo == "" then
+		return false
+	end
+	if #c.squads > 0 then
+		SIMBOARD:create_squad(smart, c.squads[math.random(#c.squads)])
+	end
+	d.state, d.until_h, d.point = "sos", shelter_trade.hours() + c.sos_hours, point
+	shelter_trade.announce("st_shelter_tr_news_sos", { "@" .. d.section, d.qty, c.sos_hours })
+	return true
+end
+
+local function deliveries_tick()
+	local list, keep, changed = deliveries(), {}, false
+	local t = shelter_trade.hours()
+	for _, d in ipairs(list) do
+		local sup = supplier(d.sup)
+		if d.state == "way" and t >= d.due then
+			changed = true
+			if sup and math.random() < sup.intercept and intercept(d, sup) then
+				keep[#keep + 1] = d
+			else
+				shelter_trade.ledger_add(d.section, d.qty)
+				shelter_trade.announce("st_shelter_tr_news_arrived", { "@" .. d.section, d.qty })
+			end
+		elseif d.state == "sos" and t >= d.until_h then
+			changed = true
+			local se = alife_object(d.cargo)
+			if se then
+				shelter.everyones(function() alife_release(se) end)
+			end
+			shelter_trade.announce("st_shelter_tr_news_looted", { "@" .. d.section, d.qty })
+		else
+			keep[#keep + 1] = d
+		end
+	end
+	if changed then
+		save_deliveries(keep)
+	end
+end
+
+-- the cases' marks on this game's map
+local function mark_cargo()
+	for _, d in ipairs(deliveries()) do
+		if d.state == "sos" and tonumber(d.cargo) and level.map_has_object_spot(d.cargo, "treasure") == 0 then
+			level.map_add_object_spot_ser(d.cargo, "treasure", game.translate_string("st_shelter_tr_cargo_mark"))
+		end
+	end
+end
+
+local function actor_on_item_take(obj)
+	if obj:section() ~= CARGO then
+		return
+	end
+	local id, list, keep = obj:id(), deliveries(), {}
+	for _, d in ipairs(list) do
+		if d.cargo == id then
+			shelter_trade.ledger_add(d.section, d.qty)
+			shelter_trade.announce("st_shelter_tr_news_recovered", { "@" .. d.section, d.qty })
+		else
+			keep[#keep + 1] = d
+		end
+	end
+	save_deliveries(keep)
+	CreateTimeEvent("shelter_orders", "cargo_" .. id, 0, function()
+		local se = alife_object(id)
+		if se then
+			shelter.everyones(function() alife_release(se) end)
+		end
+		return true
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- contracts
+
+local CONTRACT = { "id", "tmpl", "items", "reward", "expires", "taken", "due", "who" }
+
+function contracts()
+	return unpack_records(shelter.state("contracts", ""), CONTRACT)
+end
+
+local function save_contracts(list)
+	shelter.set_state("contracts", pack(list, CONTRACT))
+end
+
+-- a contract's items: { section, qty }...
+function items_of(c)
+	local out = {}
+	for sec, qty in string.gmatch(tostring(c.items), "([^*,]+)%*(%d+)") do
+		out[#out + 1] = { section = sec, qty = tonumber(qty) }
+	end
+	return out
+end
+
+-- from the template's section: its text fields, min condition etc.
+function template(c)
+	local s = "shelter_contract_" .. c.tmpl
+	return { giver = ini_sys:r_string_ex(s, "giver"), faction = ini_sys:r_string_ex(s, "faction"),
+		min_cond = ini_sys:r_float_ex(s, "min_cond") or 0, rep = ini_sys:r_float_ex(s, "rep") or 0,
+		penalty = ini_sys:r_float_ex(s, "penalty") or 50, supplier = ini_sys:r_string_ex(s, "supplier"),
+		discount = ini_sys:r_float_ex(s, "discount") or 0, hours = ini_sys:r_float_ex(s, "hours") or 48 }
+end
+
+-- a variant of a template: its sections all known, as the contract's items string and their worth
+local function pick_variant(s)
+	local variants = {}
+	for v in string.gmatch(ini_sys:r_string_ex(s, "variants") or "", "[^/]+") do
+		local parts, worth, ok = {}, 0, true
+		for sec, qty in string.gmatch(v, "([%w_%.%-]+)%s*=%s*(%d+)") do
+			if exists(sec) and shelter_trade.category(sec) then
+				parts[#parts + 1] = sec .. "*" .. qty
+				worth = worth + shelter_trade.unit_cost(sec) * tonumber(qty)
+			else
+				ok = false
+			end
+		end
+		if ok and #parts > 0 then
+			variants[#variants + 1] = { items = table.concat(parts, ","), worth = worth }
+		end
+	end
+	return #variants > 0 and variants[math.random(#variants)] or nil
+end
+
+local function new_offer(list)
+	local c = settings()
+	if #c.contracts == 0 then
+		return
+	end
+	local used = {}
+	for _, o in ipairs(list) do
+		used[o.tmpl] = true
+	end
+	local free = {}
+	for _, id in ipairs(c.contracts) do
+		if not used[id] then
+			free[#free + 1] = id
+		end
+	end
+	if #free == 0 then
+		return
+	end
+	local tmpl = free[math.random(#free)]
+	local s = "shelter_contract_" .. tmpl
+	local v = pick_variant(s)
+	if not v then
+		return
+	end
+	local id = (shelter.state("contract_seq", 0) or 0) + 1
+	shelter.set_state("contract_seq", id)
+	local reward = math.floor(v.worth * (ini_sys:r_float_ex(s, "pay") or 1.5) / 100 + 0.5) * 100
+	list[#list + 1] = { id = id, tmpl = tmpl, items = v.items, reward = reward, expires = shelter_trade.hours() + c.offer_hours,
+		taken = 0, due = 0, who = "" }
+	return true
+end
+
+local function contracts_tick()
+	local c, t, list, keep, changed = settings(), shelter_trade.hours(), contracts(), {}, false
+	for _, o in ipairs(list) do
+		if o.taken == 1 and t >= o.due then
+			local tp = template(o)
+			changed = true
+			shelter_trade.announce("st_shelter_tr_news_failed", { "#" .. tostring(tp.giver) },
+				{ who = o.who, faction = tp.faction, delta = -tp.penalty })
+		elseif o.taken ~= 1 and t >= o.expires then
+			changed = true
+		else
+			keep[#keep + 1] = o
+		end
+	end
+	local nxt = shelter.state("offer_next", 0) or 0
+	if t >= nxt and #keep < c.board and shelter_trade.barman() then
+		if new_offer(keep) then
+			changed = true
+		end
+		shelter.set_state("offer_next", t + c.offer_every)
+	end
+	if changed then
+		save_contracts(keep)
+	end
+end
+
+local function who_am_i()
+	return coop and coop.connected and coop.connected() and coop.my_name and coop.my_name() or ""
+end
+
+function take(id)
+	local list = contracts()
+	for _, o in ipairs(list) do
+		if o.id == id and o.taken ~= 1 then
+			o.taken, o.due, o.who = 1, shelter_trade.hours() + template(o).hours, who_am_i()
+		end
+	end
+	save_contracts(list)
+end
+
+-- an offer refused: gone, no fine
+function refuse(id)
+	local list, keep = contracts(), {}
+	for _, o in ipairs(list) do
+		if o.id ~= id then
+			keep[#keep + 1] = o
+		end
+	end
+	save_contracts(keep)
+end
+
+-- what lies in the orders' box for a contract: for each of its items { section, qty, have, goods }
+function progress(c, items)
+	local tp = template(c)
+	items = items or shelter_trade.orders_items()
+	local out, ready = {}, true
+	for _, want in ipairs(items_of(c)) do
+		local have, goods = 0, {}
+		for _, g in ipairs(items) do
+			if g.section == want.section and not g.used then
+				local cond = g.cat and g.cat.worn and g.cond or 1
+				if cond >= tp.min_cond then
+					have, goods[#goods + 1] = have + g.units, g
+				end
+			end
+		end
+		out[#out + 1] = { section = want.section, qty = want.qty, have = have, goods = goods }
+		ready = ready and have >= want.qty
+	end
+	return out, ready
+end
+
+-- a contract handed in: the things go from the orders' box, the rest of a pack of rounds back; paid
+function hand_in(id)
+	local list, keep, done = contracts(), {}, nil
+	for _, o in ipairs(list) do
+		if o.id == id and o.taken == 1 then
+			done = o
+		else
+			keep[#keep + 1] = o
+		end
+	end
+	if not done then
+		return false
+	end
+	local rows, ready = progress(done)
+	if not ready then
+		return false
+	end
+	local sim = alife()
+	shelter.everyones(function()
+		for _, r in ipairs(rows) do
+			local left = r.qty
+			for _, g in ipairs(r.goods) do
+				if left <= 0 then
+					break
+				end
+				local parent, over = g.se.parent_id, g.units - left
+				left = left - g.units
+				alife_release(g.se)
+				local box = over > 0 and sim:object(parent)
+				if box then
+					create_ammo(r.section, box.position, box.m_level_vertex_id, box.m_game_vertex_id, parent, over)
+				end
+			end
+		end
+	end)
+	save_contracts(keep)
+	local tp = template(done)
+	shelter_trade.deposit_till(done.reward)
+	if tp.faction and tp.rep ~= 0 then
+		relation_registry.change_community_goodwill(tp.faction, AC_ID, tp.rep)
+	end
+	if tp.supplier and tp.discount > 0 then
+		shelter.set_state("discount_" .. tp.supplier, math.min(settings().discount_max, discount(tp.supplier) + tp.discount))
+	end
+	shelter_trade.announce("st_shelter_tr_news_handed", { "#" .. tostring(tp.giver), done.reward })
+	return true
+end
+
+-- what the taken contracts want, for the raid's loot: section -> true
+function wanted()
+	local out = {}
+	for _, o in ipairs(contracts()) do
+		if o.taken == 1 then
+			for _, it in ipairs(items_of(o)) do
+				out[it.section] = true
+			end
+		end
+	end
+	return out
+end
+
+-------------------------------------------------------------------------------
+
+-- each world's hour or so, by whoever runs the world (shelter_trade)
+function on_hours()
+	deliveries_tick()
+	contracts_tick()
+end
+
+local mark_at = 0
+
+local function actor_on_update()
+	local ms = time_global()
+	if ms >= mark_at then
+		mark_at = ms + 5000
+		mark_cargo()
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+end

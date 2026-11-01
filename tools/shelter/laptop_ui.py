@@ -153,7 +153,7 @@ def raid_icon(d, s, im):
     d.ellipse([29 * s, 29 * s, 35 * s, 35 * s], fill=WHITE)
 
 
-for name, fn in (("plan", plan_icon), ("bar", bar_icon), ("synth", synth_icon), ("clean", clean_icon), ("map", map_icon),
+for name, fn in (("plan", plan_icon), ("trade", bar_icon), ("synth", synth_icon), ("clean", clean_icon), ("map", map_icon),
                  ("raid", raid_icon)):
     drawn(64, fn, "laptop_icon_" + name)
 

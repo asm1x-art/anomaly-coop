@@ -1,0 +1,363 @@
+; The shelter's trade (shelter_trade.script, shelter_orders.script, ui_shelter_trade.script; docs/coop/shelter.md, "Economy").
+
+; the trade: visitors come every sell_hours game hours; the markup: general, set on the laptop from markup_min to
+; markup_max by markup_step. Visitors in a game day: from traffic_low to traffic_high by weight_rep * the trade's name +
+; weight_range * the range on sale (each category full from range_full positions) + weight_prices * the prices (1 at no
+; markup, 0 from dear_at times the category's fair one), times a crisis' traffic; then traffic_spread either way, drawn
+; each day: so 3-5 at the worst, 12-14 at the best. barman_cost: hiring one on the laptop; without one trade stops.
+[shelter_trade]
+sell_hours      = 1
+markup          = 1.1
+markup_min      = 0.8
+markup_max      = 2.5
+markup_step     = 0.05
+traffic_low     = 4
+traffic_high    = 13
+traffic_spread  = 1
+weight_rep      = 0.4
+weight_range    = 0.3
+weight_prices   = 0.3
+range_full      = 5
+dear_at         = 1.5
+barman_cost     = 30000
+rep_start       = 50
+low_stock       = 10
+categories      = food, drink, medical, ammo, weapon, armour, artefact, gear
+ranks           = experienced, veteran, master
+not_goods       = shelter_, prop_, wpn_m4_tac_brigadier, wpn_krissvektor_chemist
+not_boxes       = shelter_stash, shelter_generator_box, shelter_till, coop_shadow_box
+
+; who comes: no rookies, they don't get to the Radar
+[shelter_trade_rank_experienced]
+weight          = 5
+wallet_min      = 15000
+wallet_max      = 40000
+
+[shelter_trade_rank_veteran]
+weight          = 3
+wallet_min      = 30000
+wallet_max      = 80000
+
+[shelter_trade_rank_master]
+weight          = 1
+wallet_min      = 60000
+wallet_max      = 150000
+
+; a category: the items' kinds; need: the chance a visitor wants it; min, max: how many (rounds for ammo); fair: the
+; markup taken without a thought; above it the chance falls by elastic for each 1.0 of markup; worn: the price follows
+; the condition; rounds: counted by the round; default_off: not sold till put on sale on the laptop
+[shelter_trade_cat_food]
+kinds           = i_food
+need            = 0.5
+min             = 1
+max             = 2
+fair            = 1.4
+elastic         = 1.2
+
+[shelter_trade_cat_drink]
+kinds           = i_drink
+need            = 0.5
+min             = 1
+max             = 2
+fair            = 1.4
+elastic         = 1.2
+
+[shelter_trade_cat_medical]
+kinds           = i_medical
+need            = 0.4
+min             = 1
+max             = 2
+fair            = 1.6
+elastic         = 0.25
+
+[shelter_trade_cat_ammo]
+kinds           = w_ammo
+need            = 0.5
+min             = 30
+max             = 90
+fair            = 1.4
+elastic         = 0.9
+rounds          = true
+
+[shelter_trade_cat_weapon]
+kinds           = w_pistol, w_rifle, w_sniper, w_smg, w_shotgun
+need            = 0.03
+min             = 1
+max             = 1
+fair            = 1.3
+elastic         = 0.6
+worn            = true
+
+[shelter_trade_cat_armour]
+kinds           = o_light, o_medium, o_heavy, o_sci, o_helmet
+need            = 0.02
+min             = 1
+max             = 1
+fair            = 1.3
+elastic         = 0.6
+worn            = true
+
+[shelter_trade_cat_artefact]
+kinds           = i_arty
+need            = 0.02
+min             = 1
+max             = 1
+fair            = 1.2
+elastic         = 0.8
+worn            = true
+default_off     = true
+
+[shelter_trade_cat_gear]
+kinds           = i_tool, i_repair, i_kit, i_attach, i_device, i_arty_junk, i_mutant_part, i_mutant_raw, i_mutant_cooked, i_mutant_belt, w_explosive, w_misc
+need            = 0.1
+min             = 1
+max             = 1
+fair            = 1.3
+elastic         = 1
+
+; crises: one every gap_min..gap_max world hours, each for its hours. traffic: visitors times this (traffic_fixed_at: not
+; if the general markup is this or lower); demand_<cat>: the need times this; fair_<cat>: the fair markup times this;
+; stops: a supplier taking no orders; spoil, spoil_cat: a share of a category gone at the start
+[shelter_crises]
+list            = dry, psi, dump, rats
+gap_min         = 72
+gap_max         = 120
+
+[shelter_crisis_dry]
+hours           = 72
+stops           = skryaga
+demand_drink    = 1.5
+fair_drink      = 2.5
+fair_ammo       = 1.5
+
+[shelter_crisis_psi]
+hours           = 48
+demand_medical  = 2.5
+fair_medical    = 2
+
+[shelter_crisis_dump]
+hours           = 48
+traffic         = 0.6
+traffic_fixed_at = 1.1
+
+[shelter_crisis_rats]
+hours           = 24
+spoil           = 0.15
+spoil_cat       = food
+
+; the supply. lots: pieces of the three lot sizes, lots_ammo: rounds, bulk: the price against that trader's retail for
+; each size. A trader's price: retail * bulk * goodwill's factor (below rep_low: rep_k_low, from rep_high: rep_k_high)
+; * (1 - the discount won by contracts, at most discount_max): with these numbers never above 0.945 of retail. A trader
+; dead or below rep_hostile takes no orders. sos_hours: how long an intercepted case lies; squads: who is on it.
+[shelter_orders]
+suppliers       = barman, sakharov, petrenko, skryaga
+lots            = 20, 50, 100
+lots_ammo       = 300, 1000, 3000
+bulk            = 0.9, 0.8, 0.7
+rep_low         = 500
+rep_high        = 1500
+rep_k_low       = 1.05
+rep_k_high      = 0.9
+rep_hostile     = -500
+discount_max    = 0.15
+sos_hours       = 6
+squads          = merc_sim_squad_advanced, merc_sim_squad_veteran, monolith_sim_squad_advanced, monolith_sim_squad_veteran
+board_size      = 5
+offer_every     = 12
+offer_hours     = 48
+
+; retail: as the trader's sell factor (configs/items/trade/presets/trade_discounts.ltx); the risk is the way's: the time
+; and the chance of interception. points: smart terrains outside the Radar's lethal zone
+[shelter_supplier_barman]
+name            = st_shelter_tr_sup_name_barman
+story           = bar_visitors_barman_stalker_trader
+faction         = stalker
+retail          = 1
+hours_min       = 18
+hours_max       = 30
+intercept       = 0.15
+points          = rad_entrance, mil_smart_terrain_8_3
+goods           = vodka, vodka_quality, beer, cigarettes, cigarettes_lucky, tushonka, conserva, bread, kolbasa, energy_drink, mineral_water, ammo_9x18_fmj, ammo_9x19_fmj, ammo_5.45x39_fmj, bandage, medkit
+
+[shelter_supplier_sakharov]
+name            = st_shelter_tr_sup_name_sakharov
+story           = yan_stalker_sakharov
+faction         = ecolog
+retail          = 0.8
+hours_min       = 24
+hours_max       = 36
+intercept       = 0.25
+points          = rad_entrance, mil_smart_terrain_8_3
+goods           = medkit_scientic, medkit_army, stimpack_scientic, antirad, drug_radioprotector, drug_psy_blockade, drug_antidot, drug_anabiotic, drug_booster, drug_coagulant, glucose, morphine, rebirth
+
+[shelter_supplier_petrenko]
+name            = st_shelter_tr_sup_name_petrenko
+story           = bar_dolg_general_petrenko_stalker
+faction         = dolg
+retail          = 1.1
+hours_min       = 18
+hours_max       = 30
+intercept       = 0.15
+points          = rad_entrance, mil_smart_terrain_8_3
+goods           = ammo_7.62x54_7h1, ammo_9x39_pab9, ammo_9x39_ap, ammo_5.45x39_ap, ammo_vog-25, grenade_f1, grenade_rgd5, medkit_army, medium_repair_kit, heavy_repair_kit
+
+[shelter_supplier_skryaga]
+name            = st_shelter_tr_sup_name_skryaga
+story           = mil_smart_terrain_7_10_freedom_trader_stalker
+faction         = freedom
+retail          = 1.1
+hours_min       = 12
+hours_max       = 20
+intercept       = 0.1
+points          = mil_smart_terrain_8_3, mil_smart_terrain_4_3
+goods           = ammo_5.56x45_fmj, ammo_5.56x45_ss190, ammo_7.62x51_fmj, ammo_7.62x51_ap, ammo_12x70_buck, ammo_11.43x23_fmj, gun_oil, cleaning_kit_r5, light_repair_kit, stimpack, medkit, bandage
+
+; an intercepted lot's case: taken, the lot goes to the ledger
+[shelter_cargo]:tch_quest
+visual          = dynamics\equipments\quest\safe_container.ogf
+inv_name        = st_shelter_tr_cargo_name
+inv_name_short  = st_shelter_tr_cargo_name
+description     = st_shelter_tr_cargo_descr
+inv_grid_x      = 4
+inv_grid_y      = 11
+inv_grid_width  = 2
+inv_grid_height = 2
+inv_weight      = 1
+quest_item      = true
+
+; the contracts. variants: what is wanted, "/" between the variants (one is drawn; one naming an unknown section is
+; skipped); hours: the time once taken; pay: the reward against the things' base cost; min_cond: for worn things; rep:
+; goodwill with faction when handed in, penalty: lost when missed; supplier, discount: a lasting discount won.
+[shelter_contracts]
+list            = sakharov_electra, sakharov_gravi, sakharov_meds, veteran_sniper, veteran_rifle, stalker_pistol, duty_post, duty_armour, freedom_nato, freedom_rest, barman_party, loners_ration
+
+[shelter_contract_sakharov_electra]
+giver           = st_shelter_tr_giver_sakharov
+faction         = ecolog
+variants        = af_electra_flash=3, af_dummy_battery=2 / af_electra_moonlight=2, af_electra_sparkler=3
+hours           = 48
+pay             = 1.6
+rep             = 50
+penalty         = 50
+supplier        = sakharov
+discount        = 0.02
+
+[shelter_contract_sakharov_gravi]
+giver           = st_shelter_tr_giver_sakharov
+faction         = ecolog
+variants        = af_blood=2, af_cristall=2 / af_fireball=1, af_fire=1 / af_compass=1
+hours           = 72
+pay             = 1.6
+rep             = 50
+penalty         = 50
+supplier        = sakharov
+discount        = 0.02
+
+[shelter_contract_sakharov_meds]
+giver           = st_shelter_tr_giver_lab
+faction         = ecolog
+variants        = antirad=30, drug_psy_blockade=10 / medkit_scientic=15 / drug_radioprotector=30
+hours           = 36
+pay             = 1.3
+rep             = 30
+penalty         = 30
+supplier        = sakharov
+discount        = 0.01
+
+[shelter_contract_veteran_sniper]
+giver           = st_shelter_tr_giver_shustry
+faction         = stalker
+variants        = wpn_sr25=1 / wpn_remington700=1 / wpn_m24=1 / wpn_svd=1
+min_cond        = 0.85
+hours           = 24
+pay             = 1.5
+rep             = 30
+penalty         = 50
+supplier        = barman
+discount        = 0.01
+
+[shelter_contract_veteran_rifle]
+giver           = st_shelter_tr_giver_veteran
+faction         = stalker
+variants        = wpn_abakan=1 / wpn_ak74m=1 / wpn_m4_tac_eot=1 / wpn_aek=1
+min_cond        = 0.8
+hours           = 36
+pay             = 1.5
+rep             = 30
+penalty         = 50
+supplier        = barman
+discount        = 0.01
+
+[shelter_contract_stalker_pistol]
+giver           = st_shelter_tr_giver_transit
+faction         = stalker
+variants        = wpn_colt1911=1, ammo_11.43x23_fmj=60 / wpn_pm=1, ammo_9x18_fmj=90 / wpn_beretta=1, ammo_9x19_fmj=90
+min_cond        = 0.7
+hours           = 24
+pay             = 1.5
+rep             = 20
+penalty         = 30
+
+[shelter_contract_duty_post]
+giver           = st_shelter_tr_giver_duty
+faction         = dolg
+variants        = ammo_9x39_pab9=150, medkit_army=5 / ammo_5.45x39_ap=300, grenade_f1=6 / ammo_7.62x54_7h1=120, bandage=20
+hours           = 18
+pay             = 1.4
+rep             = 50
+penalty         = 50
+supplier        = petrenko
+discount        = 0.02
+
+[shelter_contract_duty_armour]
+giver           = st_shelter_tr_giver_duty
+faction         = dolg
+variants        = heavy_repair_kit=1, medium_repair_kit=2 / medium_repair_kit=3
+hours           = 48
+pay             = 1.3
+rep             = 30
+penalty         = 30
+supplier        = petrenko
+discount        = 0.01
+
+[shelter_contract_freedom_nato]
+giver           = st_shelter_tr_giver_freedom
+faction         = freedom
+variants        = ammo_5.56x45_ss190=300 / ammo_7.62x51_fmj=200 / ammo_5.56x45_fmj=450, gun_oil=5
+hours           = 36
+pay             = 1.4
+rep             = 40
+penalty         = 40
+supplier        = skryaga
+discount        = 0.02
+
+[shelter_contract_freedom_rest]
+giver           = st_shelter_tr_giver_freedom
+faction         = freedom
+variants        = vodka=30, cigarettes=20 / beer=40, marijuana=10
+hours           = 24
+pay             = 1.4
+rep             = 30
+penalty         = 30
+supplier        = skryaga
+discount        = 0.01
+
+[shelter_contract_barman_party]
+giver           = st_shelter_tr_giver_barman
+faction         = stalker
+variants        = vodka=50, tushonka=30 / vodka_quality=20, kolbasa=30
+hours           = 36
+pay             = 1.3
+rep             = 30
+penalty         = 30
+supplier        = barman
+discount        = 0.02
+
+[shelter_contract_loners_ration]
+giver           = st_shelter_tr_giver_loners
+faction         = stalker
+variants        = conserva=20, bread=20, mineral_water=20 / mre=10 / ration_ru=5
+hours           = 24
+pay             = 1.3
+rep             = 20
+penalty         = 20
