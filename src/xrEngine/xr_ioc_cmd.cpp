@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "../xrCore/prof_stats.h"
+namespace prof_stats { XRCORE_API extern float spike_ms; } // xrCore/prof_stats.cpp: prof_spikes
 #include "igame_level.h"
 
 //#include "xr_effgamma.h"
@@ -1051,6 +1052,8 @@ void CCC_Register()
 	CMD1(CCC_Help, "help");
 	CMD1(CCC_Quit, "quit");
 	CMD1(CCC_ProfStats, "prof_stats");
+	// frames longer than this many ms go into the log with their marks (prof_stats.h), 0 = off; kept in user.ltx
+	CMD4(CCC_Float, "prof_spikes", &prof_stats::spike_ms, 0.f, 10000.f);
 	CMD1(CCC_Start, "start");
 	CMD1(CCC_Disconnect, "disconnect");
 	CMD1(CCC_SaveCFG, "cfg_save");

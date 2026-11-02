@@ -21,6 +21,13 @@ namespace prof_stats
 	static xr_vector<std::pair<const char*, u64>> g_worst_marks;
 	static bool g_pending = false;
 	static float g_seconds = 0;
+	static bool g_collecting = false; // a prof_stats collection runs (on may also be set by the spike watch)
+
+	// console prof_spikes <ms> (kept in user.ltx, 0 = off): the marks count all the time, and every frame longer than
+	// this goes into the log with its main thread marks ("* [prof] spike" lines), to catch rare stalls while playing
+	XRCORE_API float spike_ms = 0;
+	static u64 g_spike_last = 0;
+	static u32 g_spikes = 0;
 
 	slot* register_slot(const char* function, const char* name)
 	{
@@ -151,9 +158,15 @@ namespace prof_stats
 		}
 	}
 
+	static bool by_time(const std::pair<const char*, u64>& a, const std::pair<const char*, u64>& b)
+	{
+		return a.second > b.second;
+	}
+
 	void frame()
 	{
 		const u64 now = CPU::QPC();
+		const bool watch = spike_ms > 0;
 		if (g_pending)
 		{
 			g_pending = false;
@@ -165,41 +178,85 @@ namespace prof_stats
 			g_worst_marks.clear();
 			g_begin = g_last_frame = now;
 			g_end = now + u64(double(g_seconds) * double(CPU::qpc_freq));
-			on = true;
+			g_collecting = on = true;
 			Msg("* [prof] collecting for %.0f s", g_seconds);
+			return;
+		}
+		if (watch && !on)
+		{
+			// the spike watch starts: this frame is not timed whole
+			g_main_thread = GetCurrentThreadId();
+			reset_all();
+			g_spike_last = now;
+			on = true;
+			Msg("* [prof] watching for frames over %.0f ms", spike_ms);
 			return;
 		}
 		if (!on)
 			return;
 
 		// the frame that just ended
-		const u64 ft = now - g_last_frame;
-		g_last_frame = now;
-		g_frames++;
-		g_frame_times.push_back(ft);
-		const bool worst = ft > g_worst;
-		if (worst)
+		const u64 spike_ft = now - g_spike_last;
+		g_spike_last = now;
+		const bool spike = watch && ms(spike_ft) > spike_ms;
+		u64 ft = 0;
+		bool worst = false;
+		if (g_collecting)
 		{
-			g_worst = ft;
-			g_worst_marks.clear();
+			ft = now - g_last_frame;
+			g_last_frame = now;
+			g_frames++;
+			g_frame_times.push_back(ft);
+			worst = ft > g_worst;
+			if (worst)
+			{
+				g_worst = ft;
+				g_worst_marks.clear();
+			}
 		}
+		static xr_vector<std::pair<const char*, u64>> spike_marks;
+		spike_marks.clear();
 		{
 			std::lock_guard<std::mutex> l(g_lock);
 			for (slot* s = g_slots; s; s = s->next)
 			{
 				const u64 t = s->frame_t.exchange(0, std::memory_order_relaxed);
-				if (worst && t)
+				if (!t)
+					continue;
+				if (worst)
 					g_worst_marks.emplace_back(s->name, t);
+				if (spike)
+					spike_marks.emplace_back(s->name, t);
 			}
 		}
 		if (worst)
-			std::sort(g_worst_marks.begin(), g_worst_marks.end(),
-				[](const std::pair<const char*, u64>& a, const std::pair<const char*, u64>& b) { return a.second > b.second; });
-
-		if (now >= g_end)
+			std::sort(g_worst_marks.begin(), g_worst_marks.end(), by_time);
+		if (spike)
 		{
-			on = false;
+			std::sort(spike_marks.begin(), spike_marks.end(), by_time);
+			SYSTEMTIME st;
+			GetLocalTime(&st);
+			Msg("* [prof] spike #%u at %02u:%02u:%02u: a frame of %.1f ms, main thread marks:", ++g_spikes, st.wHour, st.wMinute,
+				st.wSecond, ms(spike_ft));
+			u32 shown = 0;
+			for (auto& m : spike_marks)
+			{
+				if (shown++ >= 20)
+					break;
+				Msg("* [prof] spike   %8.3f  %s", ms(m.second), m.first);
+			}
+			// the marks cover the frame's work (the outermost is on_idle); what they miss went between the frames:
+			// window messages, the log written to the disk, the OS
+			const double marked = spike_marks.empty() ? 0.0 : ms(spike_marks.front().second);
+			if (ms(spike_ft) - marked > 20.0)
+				Msg("* [prof] spike   %8.3f  (outside the marks: between frames)", ms(spike_ft) - marked);
+		}
+
+		if (g_collecting && now >= g_end)
+		{
+			g_collecting = false;
 			report();
 		}
+		on = g_collecting || watch;
 	}
 }
