@@ -50,6 +50,7 @@ public:
 
 public:
 	virtual float feel_vision_mtl_transp(CObject* object, u32 element);
+	virtual float feel_vision_env_transp(const Fvector& from, const Fvector& to);
 
 public:
 	virtual bool feel_vision_isRelevant(CObject* object) = 0;

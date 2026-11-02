@@ -74,5 +74,7 @@ namespace Feel
 
 		virtual bool feel_vision_isRelevant(CObject* O) = 0;
 		virtual float feel_vision_mtl_transp(CObject* O, u32 element) = 0;
+		// sight lost to what has no collision (grass) between the eye and the point looked at; 1 = none
+		virtual float feel_vision_env_transp(const Fvector& from, const Fvector& to) { return 1.f; }
 	};
 };

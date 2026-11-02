@@ -294,6 +294,9 @@ namespace Feel
 				if (collision_found)
 					feel_params.vis = 0.f;
 
+				if (feel_params.vis >= feel_params.vis_threshold)
+					feel_params.vis *= feel_vision_env_transp(P, OP);
+
 				if (feel_params.vis < feel_params.vis_threshold)
 				{
 					// INVISIBLE, choose next point

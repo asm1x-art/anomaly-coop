@@ -9,6 +9,7 @@
 #include "pch_script.h"
 #include "level.h"
 #include "actor.h"
+#include "grass_occlusion.h"
 #include "script_game_object.h"
 #include "patrol_path_storage.h"
 #include "xrServer.h"
@@ -797,6 +798,12 @@ void spawn_phantom(const Fvector& position)
 Fbox get_bounding_volume()
 {
 	return Level().ObjectSpace.GetBoundingVolume();
+}
+
+// the share of AI sight the grass leaves between two points (grass_occlusion.h), 1 = none hidden
+float grass_transparency(const Fvector& from, const Fvector& to)
+{
+	return grass_occlusion::transparency(from, to);
 }
 
 void iterate_sounds(LPCSTR prefix, u32 max_count, const CScriptCallbackEx<void>& callback)
@@ -2827,6 +2834,7 @@ void CLevel::script_register(lua_State* L)
 			def("spawn_phantom", spawn_phantom),
 
 			def("get_bounding_volume", get_bounding_volume),
+			def("grass_transparency", grass_transparency),
 
 			def("iterate_sounds", &iterate_sounds1),
 			def("iterate_sounds", &iterate_sounds2),

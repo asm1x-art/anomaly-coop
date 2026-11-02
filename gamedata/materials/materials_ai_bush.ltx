@@ -1,0 +1,9 @@
+; Bushes block an NPC's sight (scripts\ai_tuning.script, docs/coop/ai.md). vis_transparency_factor: how much of the
+; sight a ray keeps through one face of the material; an NPC sees a target when the product along the ray stays above
+; its transparency_threshold (m_stalker.ltx: 0.73 calm, 0.6 in a fight). The same test decides whether it may shoot.
+; Vanilla gamemtl.xr: bush 0.70 (seen through in a fight), bush_sux 0.35.
+[materials\bush]
+vis_transparency_factor = 0.4
+
+[materials\bush_sux]
+vis_transparency_factor = 0.2
