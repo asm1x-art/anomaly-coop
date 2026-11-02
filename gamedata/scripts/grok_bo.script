@@ -6,8 +6,56 @@ ini_capture	 = ini_file("creatures\\grok_bo_models_capture.ltx")
 ini_bones		 = ini_file("creatures\\grok_bo_bone_profiles.ltx")
 ini_damage		= ini_file("creatures\\damages.ltx")
 
-leg_meta_sniper_null = 1
-sniper_bad_bone_shit_reduce = 1
+local EXPLOSIVES = {
+	explosive_barrel = true, explosive_barrel_low = true, explosive_tank = true, explosive_grenade = true,
+	explosive_hide = true, explosive_particle = true, explosive_fuelcan = true, explosive_mobiltank = true,
+	explosive_dinamit = true,
+}
+
+-- co-op: another player's shot hits here through their stand-in, which holds no gun; the engine keeps the weapon and
+-- cartridge of the bullets that player's game sent just before the hit (coop.last_shot)
+local COOP_SHOT_MAX_AGE = 3000
+
+-- the shot behind a hit: weapon section, ammo section and the weapon object (nil for another player's shot); nil when
+-- the hit is not a bullet of a player
+local function shot_of(shit)
+	local who = shit.draftsman
+	if not who then
+		return
+	end
+	if who:id() == db.actor:id() then
+		local wpn = level.object_by_id(shit.weapon_id)
+		if not wpn or EXPLOSIVES[wpn:section()] or IsGrenade(wpn) or not IsWeapon(wpn) or IsMelee(wpn) then
+			return
+		end
+		local sec = wpn:section()
+		local ammo_list = utils_item.get_ammo(sec, wpn:id())
+		return sec, ammo_list[wpn:get_ammo_type() + 1], wpn
+	end
+	if coop and coop.connected and coop.connected() and coop.last_shot and who:section() == "coop_proxy"
+		and shit.type == hit.fire_wound then
+		local s = coop.last_shot(who:id())
+		if s and s.age < COOP_SHOT_MAX_AGE and ini_sys:section_exist(s.weapon) and ini_sys:section_exist(s.ammo) then
+			return s.weapon, s.ammo, nil
+		end
+	end
+end
+
+-- the barrel's state from the weapon's parts (1 for another player's gun, which isn't here)
+local function barrel_of(wpn)
+	if not wpn then
+		return 1
+	end
+	local parts = se_load_var(wpn:id(), wpn:name(), "parts")
+	if parts ~= nil then
+		for k, v in pairs(parts) do
+			if string.find(k, "barrel") then
+				return v / 100
+			end
+		end
+	end
+	return 1
+end
 
 Bone_IDs = {
 [2]  =	"bip01_pelvis",
@@ -177,10 +225,6 @@ monster_ammo_damage_mult = {
 	
 function monster_on_before_hit(monster,shit,bone_id)
 
-	if shit.draftsman:id() ~= db.actor:id() then
-		return
-	end
-
 	if bone_id == 65535 then
 		return
 	end
@@ -190,32 +234,16 @@ function monster_on_before_hit(monster,shit,bone_id)
 	end
 
 	local shooter = shit.draftsman
-	wpn = level.object_by_id(shit.weapon_id)
-
-	if wpn == nil then 
-		return 
-	end
-
-	if IsGrenade(wpn) then
+	local sec, ammo_section, wpn = shot_of(shit)
+	if not sec then
 		return
 	end
 
-	if not IsWeapon(wpn) or IsMelee(wpn) then
-		return
-	end
-
-	sec = wpn:section()
-
-	if sec == "explosive_barrel" or sec == "explosive_barrel_low" or sec == "explosive_tank" or sec == "explosive_grenade" or sec == "explosive_hide" or sec == "explosive_particle" or sec == "explosive_fuelcan" 
-	or sec == "explosive_mobiltank" or sec == "explosive_dinamit" then
-		return
-	end
-	
-	cqc_mult = 1
-	mutant_mult		= 0.90
-	ammo_mult		= 0.85
-	spec_monster_mult	= 1.00
-	bone_mult		= 1.00
+	local cqc_mult = 1
+	local mutant_mult		= 0.90
+	local ammo_mult		= 0.85
+	local spec_monster_mult	= 1.00
+	local bone_mult		= 1.00
 
 	printf("///////////   Mutant Hit registered: GBO v1.7.0 no barrel cond   //////////////////")
 	printf('%s about to be hit by %s in bone %s', monster and monster:name(), shit and shit.draftsman and shit.draftsman:name(), bone_id)
@@ -225,10 +253,6 @@ function monster_on_before_hit(monster,shit,bone_id)
 		printf('Close quarter combat hit detected')
 	end
 
-	local wpn_id = wpn:id()
-	local ammo_type_number = wpn:get_ammo_type()
-	local ammo_list = utils_item.get_ammo(sec, wpn_id)
-	local ammo_section = ammo_list[ammo_type_number+1]
 	local wpn_hit_power = ui_wpn_params.read_float(sec, "", "hit_power")
 
 	if string.find(sec, "wpn_toz106") then
@@ -248,32 +272,7 @@ function monster_on_before_hit(monster,shit,bone_id)
 	end
 
 	-- /// save gun barrel data ///
-	if (IsWeapon(wpn) and (not IsItem("fake_ammo_wpn",wpn:section()))) or (wpn:parent() and wpn:parent():id() ~= 0) then
-		barrel_condition = nil
-		local parts = se_load_var(wpn:id(), wpn:name(), "parts")
-		if parts ~= nil then
-			for k,v in pairs(parts) do
-				if string.find(k, "barrel") then
-					barrel_condition = v / 100
-				end
-			end
-
-			if barrel_condition == nil then
-				barrel_condition = 1
-			end
-		else
-			barrel_condition = 1
-		end
-
-		barrel_condition_corrected = barrel_condition * 1.5
-
-		if barrel_condition_corrected > 1 then
-			barrel_condition_corrected = 1
-		end
-	else
-		barrel_condition = 1
-		barrel_condition_corrected = 1
-	end
+	local barrel_condition = barrel_of(wpn)
 
 	-- /// mutants body parts multipliers ///
 	if string.find(monster:name(), "giant") then
@@ -364,10 +363,6 @@ end
 
 function npc_on_before_hit(npc,shit,bone_id)
 
-	if shit.draftsman:id() ~= db.actor:id() then
-		return
-	end
-
 	if bone_id == 65535 then
 		return
 	end
@@ -377,28 +372,13 @@ function npc_on_before_hit(npc,shit,bone_id)
 	end
 
 	local shooter = shit.draftsman
-	wpn = level.object_by_id(shit.weapon_id)
-	if not wpn then
-		return
-	end	
-	sec = wpn:section()
-
-	if sec == "explosive_barrel" or sec == "explosive_barrel_low" or sec == "explosive_tank" or sec == "explosive_grenade" or sec == "explosive_hide" or sec == "explosive_particle" or sec == "explosive_fuelcan" 
-	or sec == "explosive_mobiltank" or sec == "explosive_dinamit" then
+	local sec, ammo_section, wpn = shot_of(shit)
+	if not sec then
 		return
 	end
-
-	if IsGrenade(wpn) then
-		return
-	end
-
-	if wpn == nil then 
-		return 
-	end
-
-	if not IsWeapon(wpn) or IsMelee(wpn) then
-		return
-	end
+	-- these were globals and never reset: after one sniper shot every bullet lost the leg bonus for good
+	local leg_meta_sniper_null = 1
+	local sniper_bad_bone_shit_reduce = 1
 
 	printf("///////////   Stalker Hit registered: GBO v1.7.0 no barrel cond  //////////////////")
 	printf('%s about to be hit by %s in bone %s', npc and npc:name(), shit and shit.draftsman and shit.draftsman:name(), bone_id)
@@ -407,10 +387,6 @@ function npc_on_before_hit(npc,shit,bone_id)
 
 --	/////// BOOLETS //////
 
-	local wpn_id = wpn:id()
-	local ammo_type_number = wpn:get_ammo_type()
-	local ammo_list = utils_item.get_ammo(sec, wpn_id)
-	local ammo_section = ammo_list[ammo_type_number+1]
 	local wpn_hit_power = ui_wpn_params.read_float(sec, "", "hit_power")
 
 	if string.find(sec, "wpn_toz106") then
@@ -427,33 +403,7 @@ function npc_on_before_hit(npc,shit,bone_id)
 
 
 	-- /// save gun barrel data ///
-
-	if (IsWeapon(wpn) and (not IsItem("fake_ammo_wpn",wpn:section()))) or (wpn:parent() and wpn:parent():id() ~= 0) then
-		barrel_condition = nil
-		local parts = se_load_var(wpn:id(), wpn:name(), "parts")
-		if parts ~= nil then
-			for k,v in pairs(parts) do
-				if string.find(k, "barrel") then
-					barrel_condition = v / 100
-				end
-			end
-
-			if barrel_condition == nil then
-				barrel_condition = 1
-			end
-		else
-			barrel_condition = 1
-		end
-
-		barrel_condition_corrected = barrel_condition * 1.12
-
-		if barrel_condition_corrected > 1 then
-			barrel_condition_corrected = 1
-		end
-	else
-		barrel_condition = 1
-		barrel_condition_corrected = 1
-	end
+	local barrel_condition = barrel_of(wpn)
 
 --	/////// AMMO SPECIFIC BONES REDIRECTION //////
 

@@ -57,6 +57,10 @@ namespace coop
 	void on_fire_trace(const CWeapon& weapon, const Fvector& position, float speed, const CCartridge& cartridge,
 	                   const xr_vector<SBlank>& bullets);
 	void play_bullets(u32 sender, NET_Packet& P); // M_ACTOR_ACTION eBullets
+	// the last shot another game's shooter fired here (a player's stand-in, an NPC puppet): its weapon and
+	// cartridge sections and ms since. Its hit comes after its bullets, on the same stream, so Lua damage
+	// mods see what the shot was (grok_bo, armor_inserts): the shooter here holds no such gun or ammo
+	bool last_shot(u16 shooter, shared_str& weapon, shared_str& ammo, u32& age);
 
 	// CActor::ActorUse: F on a player's stand-in opens the interaction with that player (Lua), never a talk
 	bool use_player(CInventoryOwner* person);

@@ -119,6 +119,21 @@ namespace coop
 	}
 
 	static u32 script_stand_in_peer(u16 object) { return peer_of_stand_in(object); }
+
+	// coop.last_shot(id) -> { weapon, ammo, age = ms } of the last shot that shooter (a stand-in, an NPC puppet) fired
+	// here from another game, nil for none
+	static ::luabind::object script_last_shot(u16 shooter)
+	{
+		shared_str weapon, ammo;
+		u32 age;
+		if (!last_shot(shooter, weapon, ammo, age))
+			return ::luabind::object();
+		::luabind::object result = ::luabind::newtable(ai().script_engine().lua());
+		result["weapon"] = weapon.c_str();
+		result["ammo"] = ammo.c_str();
+		result["age"] = age;
+		return result;
+	}
 	static LPCSTR script_settings() { return world_settings().c_str(); }
 
 	void script_register(lua_State* L)
@@ -175,7 +190,8 @@ namespace coop
 			def("set_downed", &set_downed),              // our player lies wounded (coop_death.script)
 			def("fell", &on_player_fell),               // our player fell: squads that turned on them calm down
 			def("downed", &is_downed),                   // (peer id) a player lying wounded
-			def("stand_in_peer", &script_stand_in_peer)  // (object id) whose stand-in it is, 0 for none
+			def("stand_in_peer", &script_stand_in_peer), // (object id) whose stand-in it is, 0 for none
+			def("last_shot", &script_last_shot)          // (shooter id) { weapon, ammo, age } fired here from another game
 		];
 	}
 }
