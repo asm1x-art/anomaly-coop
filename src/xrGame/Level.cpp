@@ -1239,7 +1239,10 @@ void CLevel::OnFrame()
 }
 
 int psLUA_GCSTEP = 300;
-int psLua_ParallelGCStep = 75;
+// 25, not 75: the GC steps on the second thread run while the frame renders, and a big step there makes the main thread
+// wait for it at the frame's end (Suspend threads 0.77 -> 0.4 ms); an 8 vs 8 fight got 0.7-1.5 ms a frame faster, and
+// the Lua heap kept level (45-54 MB), so the smaller steps keep up
+int psLua_ParallelGCStep = 25;
 extern BOOL psLua_ParallelGC;
 extern BOOL psLua_ParallelGC_debug;
 
