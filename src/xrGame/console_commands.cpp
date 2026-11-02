@@ -222,6 +222,8 @@ extern u32 ENEMY_INERTIA_TIME_SEARCH;
 extern float g_ai_vision_speed_boost;
 extern float g_ai_reload_threshold;
 extern float g_ai_aim_fire_angle;
+// the muzzle flash light of an NPC's shot casts shadows (6 shadow map passes each); the actor's always does
+BOOL g_npc_muzzle_shadows = FALSE;
 int g_ai_hold_position_inertia_base = 1000;
 int g_ai_hold_position_inertia_random = 2000;
 int g_ai_grenade_throw_delay_base = 1000;
@@ -2646,6 +2648,7 @@ void CCC_RegisterCommands()
 	//#ifdef DEBUG
 	CMD4(CCC_Float, "hud_fov", &psHUD_FOV_def, 0.1f, 1.0f);
 	CMD4(CCC_Float, "fov", &g_fov, 5.0f, 180.0f);
+	CMD4(CCC_Integer, "g_npc_muzzle_shadows", &g_npc_muzzle_shadows, 0, 1);
 	CMD4(CCC_Float, "viewport_near", &Device.ViewportNear, 0.0f, 1.0f);
     CMD4(CCC_Float, "step_sound_distance", &g_step_sound_distance, 10.0f, 100.0f);
 	CMD4(CCC_Float, "step_particle_distance", &g_step_particle_distance, 10.0f, 100.0f);
