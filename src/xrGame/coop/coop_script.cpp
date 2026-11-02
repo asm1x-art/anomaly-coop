@@ -190,6 +190,7 @@ namespace coop
 			def("set_downed", &set_downed),              // our player lies wounded (coop_death.script)
 			def("fell", &on_player_fell),               // our player fell: squads that turned on them calm down
 			def("downed", &is_downed),                   // (peer id) a player lying wounded
+			def("set_climbing", &set_climbing),          // our player climbs onto a ledge (climb_rules.script)
 			def("stand_in_peer", &script_stand_in_peer), // (object id) whose stand-in it is, 0 for none
 			def("last_shot", &script_last_shot)          // (shooter id) { weapon, ammo, age } fired here from another game
 		];
