@@ -1,0 +1,80 @@
+-- Where the player may climb onto a ledge (demonized_ledge_grabbing, GRA's mantling) and how high: the numbers and the
+-- places in mod_system_climb.ltx. No climbing while downed in co-op, on a forbidden level or in a forbidden zone.
+
+local RULES = "climb_rules"
+local ZONES = "climb_forbidden_zones"
+
+local min_height, max_height, check_interval
+local forbidden_levels = {}
+local zones = {} -- { level, pos, radius }
+
+local function load()
+	min_height = ini_sys:r_float_ex(RULES, "min_height") or 1.4
+	max_height = ini_sys:r_float_ex(RULES, "max_height") or 2.53
+	check_interval = ini_sys:r_float_ex(RULES, "check_interval") or 50
+	for name in string.gmatch(ini_sys:r_string_ex(RULES, "forbidden_levels") or "", "[^%s,]+") do
+		forbidden_levels[name] = true
+	end
+	if ini_sys:section_exist(ZONES) then
+		local n = ini_sys:line_count(ZONES)
+		for i = 0, n - 1 do
+			local _, key, value = ini_sys:r_line(ZONES, i, "", "")
+			local t = {}
+			for part in string.gmatch(value or "", "[^,]+") do
+				t[#t + 1] = part:match("^%s*(.-)%s*$")
+			end
+			local x, y, z, r = tonumber(t[2]), tonumber(t[3]), tonumber(t[4]), tonumber(t[5])
+			if t[1] and x and y and z and r then
+				zones[#zones + 1] = { level = t[1], pos = vector():set(x, y, z), radius = r }
+			else
+				printf("! [climb_rules] zone %s: want level, x, y, z, radius", tostring(key))
+			end
+		end
+	end
+end
+
+-- may the player climb here and now
+function allowed()
+	if coop_death and coop_death.is_downed and coop_death.is_downed() then
+		return false
+	end
+	local lvl = level.name()
+	if forbidden_levels[lvl] then
+		return false
+	end
+	if #zones > 0 then
+		local pos = db.actor:position()
+		for _, z in ipairs(zones) do
+			if z.level == lvl and pos:distance_to(z.pos) < z.radius then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+function on_game_start()
+	local m = demonized_ledge_grabbing
+	if not m then
+		return
+	end
+	load()
+	local precondition = m.checkClimbPrecondition
+	m.checkClimbPrecondition = function(...)
+		-- the ledge search at most every check_interval ms: the mod's settings come back from MCM on every change and
+		-- every level load (its load_settings), so the floor goes on here, just before its throttle is read
+		local s = m.settings
+		if s and (s.throttleCheck or 0) < check_interval then
+			s.throttleCheck = check_interval
+		end
+		return allowed() and precondition(...)
+	end
+	m.getMinClimbHeight = function() return min_height end
+	m.getMaxClimbHeight = function() return max_height end
+	-- co-op: the others see our puppet in a jump while we climb (coop_puppet.cpp)
+	if coop and coop.set_climbing then
+		RegisterScriptCallback("actor_on_climb_start", function() coop.set_climbing(true) end)
+		RegisterScriptCallback("actor_on_climb_end", function() coop.set_climbing(false) end)
+		RegisterScriptCallback("actor_on_first_update", function() coop.set_climbing(false) end) -- a level left mid-climb
+	end
+end

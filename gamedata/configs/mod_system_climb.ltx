@@ -1,0 +1,15 @@
+; Climbing onto ledges (demonized's Ledge Grabbing, tools/gra/build_pack.py --pack mantling): where and how high.
+; climb_rules.script reads it; the player's own settings (keys, sounds, hardcore mode) stay in the mod's MCM page.
+
+[climb_rules]
+; the ledge's height over the feet, m (the mod's 1.4 and 2.53)
+min_height = 1.4
+max_height = 2.53
+; the ledge search runs at most this often, ms (the mod's MCM default 0 = every frame: 0.2-0.45 ms a frame, measured);
+; a bigger value in the MCM page stays
+check_interval = 50
+; no climbing anywhere on these levels: the shelter's gate, doors and rubble are its questline
+forbidden_levels = bunker_a1
+
+; no climbing within a radius of a point: <any name> = level, x, y, z, radius
+[climb_forbidden_zones]

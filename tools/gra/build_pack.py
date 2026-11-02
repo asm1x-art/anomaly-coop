@@ -83,19 +83,33 @@ EXTRA = {
 }
 
 
+# GRA's sounds of a suit climbing a ledge: NPC Movement Sound (RMS) replaces Ledge Grabbing's own
+MANTLING_SOUNDS = {f"sounds/ledge_grabbing/vaulting/{kind_}/{kind_}{n}.ogg": "[Шаги_в1] NPC Movement Sound [ RMS ]"
+                   for kind_, count in (("exo", 3), ("heavy", 3), ("light", 3), ("medium", 3), ("naked", 2))
+                   for n in range(1, count + 1)}
+
+
 # the packs: each puts its code into gamedata, listed in its own file list (another pack's files count as the repo's:
 # a file two packs have goes to tools\gra\merge), and its assets into <prefix>_*.db
 PACKS = {
     "weapons": {"mods": MODS, "extra": EXTRA, "files": "pack_files.txt", "prefix": "gra"},
     # the shelter's furniture: placing, moving and picking up objects in a hideout
     "hf": {"mods": ["[Убежище] Hideout Furniture"], "extra": {}, "files": "pack_files_hf.txt", "prefix": "gra_hf"},
+    # climbing onto ledges (demonized's Ledge Grabbing): its suit sounds as GRA has them (RMS's), its two shared scripts
+    # left to the weapons pack (the same files), its 0.8 MB of assets in gamedata (no archive to hand round)
+    "mantling": {"mods": ["[Паркур] Mantling v4.4"], "extra": MANTLING_SOUNDS, "files": "pack_files_mantling.txt",
+                 "prefix": "gra_mantling", "assets_in_gamedata": True,
+                 "skip": {"scripts/demonized_geometry_ray.script", "scripts/demonized_randomizing_functions.script",
+                          "scripts/demonized_ledge_grabbing_animation_data_blender_script.py",  # Blender's, not the game's
+                          "anims/camera_effects/climbing_in.anm"}},  # unused: a script moves the camera
 }
 PACK = PACKS["weapons"]  # the one at work, --pack
 
 
 def skipped(rel):
     """files of the taken mods left out"""
-    return (rel.startswith("scripts/это что такое/")  # a stray copy of MRAA's scripts; the engine doesn't read subfolders
+    return (rel in PACK.get("skip", ())
+            or rel.startswith("scripts/это что такое/")  # a stray copy of MRAA's scripts; the engine doesn't read subfolders
             or rel == "scripts/raid_auto_cmd_graphics_parametrs.script"  # GRA's: forces graphics settings every start
             or rel == "particles.xr"  # BaS's is the same as vanilla's
             or os.path.basename(rel).startswith("не нужно")  # GRA's way of turning a file off ("not needed")
@@ -185,8 +199,9 @@ def cmd_manifest():
 def cmd_code():
     files, repo = manifest(), repo_files()
     placed = set()
+    in_gamedata = ("code", "asset") if PACK.get("assets_in_gamedata") else ("code",)
     for rel, (mod, full) in sorted(files.items()):
-        if kind(rel) != "code":
+        if kind(rel) not in in_gamedata:
             continue
         if rel in repo:
             dest = os.path.join(MERGE_DIR, *rel.split("/"))  # the mod's version, next to the repo's, to merge
@@ -202,7 +217,7 @@ def cmd_code():
         if os.path.isfile(path):
             os.remove(path)
     open(pack_files_path(), "w", encoding="utf-8", newline="\n").write("".join(f"{r}\n" for r in sorted(placed)))
-    print(f"{len(placed)} code files in gamedata, {len(files) - len(placed) - sum(kind(r) != 'code' for r in files)} to merge "
+    print(f"{len(placed)} files in gamedata, {len(files) - len(placed) - sum(kind(r) not in in_gamedata for r in files)} to merge "
           f"by hand (tools\\gra\\merge), {len(stale)} stale removed")
 
 
