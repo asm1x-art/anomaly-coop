@@ -149,6 +149,8 @@ float ps_r__ssaHZBvsTEX = 96.f; //RO
 
 int ps_r__tf_Anisotropic = 8;
 float ps_r__tf_Mipbias = 0.0f;
+float ps_r__render_scale = 1.0f;
+float ps_r2_sun_cascade_min_fov = 60.0f;
 // R1
 float ps_r1_ssaLOD_A = 64.f;
 float ps_r1_ssaLOD_B = 48.f;
@@ -1339,6 +1341,8 @@ void xrRender_initconsole()
 	CMD3(CCC_Mask, "r__no_ram_textures", &ps_r__common_flags, RFLAG_NO_RAM_TEXTURES);
 	CMD2(CCC_tf_Aniso, "r__tf_aniso", &ps_r__tf_Anisotropic); //	{1..16}
 	CMD2(CCC_tf_MipBias, "r__tf_mipbias", &ps_r__tf_Mipbias); // {-3 +3}
+	CMD4(CCC_Float, "r2_sun_cascade_min_fov", &ps_r2_sun_cascade_min_fov, 1.f, 120.f); // the sun cascades fitted to at least this fov; 1 = off
+	CMD4(CCC_Float, "r__render_scale", &ps_r__render_scale, 0.5f, 1.f); // the world at this share of the screen's size; vid_restart
 
 	// R1
 	CMD4(CCC_Float, "r1_ssa_lod_a", &ps_r1_ssaLOD_A, 16, 96);

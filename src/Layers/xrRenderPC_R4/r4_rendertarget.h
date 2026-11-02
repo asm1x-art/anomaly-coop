@@ -70,6 +70,7 @@ public:
 	IBlender* b_fakescope; //crookr
 	IBlender* b_heatvision; //--DSR-- HeatVision
 	IBlender* b_lut;
+	IBlender* b_render_scale;
 	IBlender* b_smaa;
 	// compute shader for hdao
 	IBlender* b_hdao_cs;
@@ -227,6 +228,14 @@ public:
 
 	ref_rt rt_tempzb; // Redotix99: for 3D Shader Based Scopes
 
+	// Render scale (r__render_scale < 1): the world's frame is drawn at render_w x render_h into rt_render_scale (with its
+	// own depth buffer) and stretched onto the screen before the UI. While a frame is drawn (scale_begin..scale_end) the
+	// device's size, HW.pBaseRT and HW.pBaseZB are swapped for these, so every pass that draws "to the screen" draws
+	// into them at the render size. Null when the scale is 1.
+	ref_rt rt_render_scale;
+	ref_rt rt_render_scale_z;
+	u32 render_w = 0, render_h = 0;
+
 	ref_shader s_ssfx_dumb;
 
 	//	Igor: for async screenshots
@@ -275,6 +284,7 @@ private:
 	ref_shader s_smaa;
 
 	ref_shader s_lut;
+	ref_shader s_render_scale;
 	//	generate min/max
 	ref_shader s_create_minmax_sm;
 
@@ -462,6 +472,10 @@ public:
 	void phase_ssfx_ao(); // AO
 	void phase_ssfx_il(); // IL
 	void set_viewport_size(ID3DDeviceContext* dev, float w, float h);
+
+	// render scale: true when the frame is now drawn at the render size (and scale_end must follow)
+	bool scale_begin();
+	void scale_end();
 
 	// HDR10
 	void phase_hdr10_bloom();

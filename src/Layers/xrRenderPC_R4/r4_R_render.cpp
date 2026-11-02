@@ -224,6 +224,16 @@ extern u32 g_r;
 
 void CRender::Render()
 {
+	// render scale: the whole frame at the render size, then stretched onto the screen (the UI comes after)
+	const bool scaled = Target->scale_begin();
+	Render_scene();
+	if (scaled)
+		Target->scale_end();
+}
+
+void CRender::Render_scene()
+{
+	PROF_EVENT();
 	PIX_EVENT(CRender_Render);
 
 	VERIFY(0 == mapDistort.size() + mapHUDDistort.size());

@@ -25,6 +25,7 @@
 #include "blender_pp_bloom.h"
 #include "blender_nightvision.h"
 #include "blender_lut.h"
+#include "blender_render_scale.h"
 
 // HDR10
 #include "blender_hdr10_bloom.h"
@@ -350,9 +351,54 @@ void generate_jitter(DWORD* dest, u32 elem_count)
 		*dest = color_rgba(samples[2 * it].x, samples[2 * it].y, samples[2 * it + 1].y, samples[2 * it + 1].x);
 }
 
+// Render scale: the device's size and the screen's buffers, swapped for the render size's while a frame is drawn
+struct render_scale_saved
+{
+	u32 w, h;
+	float w2, h2;
+	ID3DRenderTargetView* rt;
+	ID3DDepthStencilView* zb;
+};
+static render_scale_saved g_render_scale_saved;
+static bool g_render_scale_on = false;
+
+static void render_scale_swap_in(u32 w, u32 h)
+{
+	g_render_scale_saved = { Device.dwWidth, Device.dwHeight, Device.fWidth_2, Device.fHeight_2, HW.pBaseRT, HW.pBaseZB };
+	Device.dwWidth = w;
+	Device.dwHeight = h;
+	Device.fWidth_2 = float(w) / 2.f;
+	Device.fHeight_2 = float(h) / 2.f;
+}
+
+static void render_scale_swap_out()
+{
+	Device.dwWidth = g_render_scale_saved.w;
+	Device.dwHeight = g_render_scale_saved.h;
+	Device.fWidth_2 = g_render_scale_saved.w2;
+	Device.fHeight_2 = g_render_scale_saved.h2;
+	HW.pBaseRT = g_render_scale_saved.rt;
+	HW.pBaseZB = g_render_scale_saved.zb;
+}
+
 CRenderTarget::CRenderTarget()
 {
 	u32 SampleCount = 1;
+
+	// Render scale: every buffer of the frame is made at the render size (the device's size is swapped for it while
+	// they are made), but the ones filled by copying the screen (the PDA's, the second viewport's)
+	const u32 display_w = Device.dwWidth, display_h = Device.dwHeight;
+	const bool scaled = ps_r__render_scale < 0.999f && !RImplementation.o.dx10_msaa && !RImplementation.o.dx11_hdr10;
+	if (ps_r__render_scale < 0.999f && !scaled)
+		Msg("! r__render_scale: off with MSAA or HDR10");
+	render_w = scaled ? _max(u32(64), u32(display_w * ps_r__render_scale) & ~1u) : display_w;
+	render_h = scaled ? _max(u32(64), u32(display_h * ps_r__render_scale) & ~1u) : display_h;
+	if (scaled)
+	{
+		Msg("* r__render_scale %.2f: the world at %ux%u, the screen %ux%u", ps_r__render_scale, render_w, render_h,
+		    display_w, display_h);
+		render_scale_swap_in(render_w, render_h);
+	}
 
 	if (ps_r_ssao_mode != 2/*hdao*/)
 		ps_r_ssao = _min(ps_r_ssao, 3);
@@ -555,12 +601,20 @@ CRenderTarget::CRenderTarget()
 
 		rt_dof.create(r2_RT_dof, w, h, RImplementation.o.dx11_hdr10 ? D3DFMT_A16B16G16R16F : D3DFMT_A8R8G8B8);
 
+		// filled by copying the screen (CRender::RenderToTarget): the screen's size even with a render scale
 		if (RImplementation.o.dx11_hdr10) {
-			rt_secondVP.create(r2_RT_secondVP, w, h, D3DFMT_A2R10G10B10, 1); //--#SM+#-- +SecondVP+ // NOTE: this is a hack to use DXGI R10G10B10A2_UNORM
-			rt_ui_pda.create(r2_RT_ui, w, h, D3DFMT_A2R10G10B10); // NOTE: this is a hack to use DXGI R10G10B10A2_UNORM
+			rt_secondVP.create(r2_RT_secondVP, display_w, display_h, D3DFMT_A2R10G10B10, 1); //--#SM+#-- +SecondVP+ // NOTE: this is a hack to use DXGI R10G10B10A2_UNORM
+			rt_ui_pda.create(r2_RT_ui, display_w, display_h, D3DFMT_A2R10G10B10); // NOTE: this is a hack to use DXGI R10G10B10A2_UNORM
 		} else {
-			rt_secondVP.create(r2_RT_secondVP, w, h, D3DFMT_A8R8G8B8, 1); //--#SM+#-- +SecondVP+
-			rt_ui_pda.create(r2_RT_ui, w, h, D3DFMT_A8R8G8B8);
+			rt_secondVP.create(r2_RT_secondVP, display_w, display_h, D3DFMT_A8R8G8B8, 1); //--#SM+#-- +SecondVP+
+			rt_ui_pda.create(r2_RT_ui, display_w, display_h, D3DFMT_A8R8G8B8);
+		}
+
+		// render scale: the frame and its depth at the render size, stretched to the screen by scale_end
+		if (scaled)
+		{
+			rt_render_scale.create(r2_RT_render_scale, w, h, D3DFMT_A8R8G8B8, 1);
+			rt_render_scale_z.create(r2_RT_render_scale_z, w, h, D3DFMT_D24S8);
 		}
 
 		// TODO: R11G11B10F? needs another horrible hack + cast + update to converter function
@@ -1300,9 +1354,72 @@ CRenderTarget::CRenderTarget()
 	s_menu.create("distort");
 	g_menu.create(FVF::F_TL, RCache.Vertex.Buffer(), RCache.QuadIB);
 
+	// render scale
+	if (rt_render_scale)
+	{
+		b_render_scale = xr_new<CBlender_render_scale>();
+		s_render_scale.create(b_render_scale, "r2\\render_scale");
+	}
+	else
+		b_render_scale = nullptr;
+
 	//
 	dwWidth = Device.dwWidth;
 	dwHeight = Device.dwHeight;
+
+	if (scaled)
+	{
+		Device.dwWidth = display_w;
+		Device.dwHeight = display_h;
+		Device.fWidth_2 = float(display_w) / 2.f;
+		Device.fHeight_2 = float(display_h) / 2.f;
+	}
+}
+
+bool CRenderTarget::scale_begin()
+{
+	if (!rt_render_scale || g_render_scale_on)
+		return false;
+	render_scale_swap_in(render_w, render_h);
+	HW.pBaseRT = rt_render_scale->pRT;
+	HW.pBaseZB = rt_render_scale_z->pZRT;
+	g_render_scale_on = true;
+	return true;
+}
+
+void CRenderTarget::scale_end()
+{
+	if (!g_render_scale_on)
+		return;
+	g_render_scale_on = false;
+	render_scale_swap_out();
+
+	// the scaled frame stretched over the whole screen (the UI goes on top of it after)
+	u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, NULL);
+	set_viewport_size(HW.pContext, float(Device.dwWidth), float(Device.dwHeight));
+	RCache.set_CullMode(CULL_NONE);
+	RCache.set_Stencil(FALSE);
+	RCache.set_Z(FALSE);
+
+	const float w = float(Device.dwWidth), h = float(Device.dwHeight);
+	u32 Offset;
+	const u32 C = color_rgba(255, 255, 255, 255);
+	FVF::TL* pv = (FVF::TL*)RCache.Vertex.Lock(4, g_menu->vb_stride, Offset);
+	pv->set(0.f, h, 0.f, 1.f, C, 0.f, 1.f);
+	pv++;
+	pv->set(0.f, 0.f, 0.f, 1.f, C, 0.f, 0.f);
+	pv++;
+	pv->set(w, h, 0.f, 1.f, C, 1.f, 1.f);
+	pv++;
+	pv->set(w, 0.f, 0.f, 1.f, C, 1.f, 0.f);
+	pv++;
+	RCache.Vertex.Unlock(4, g_menu->vb_stride);
+	RCache.set_Shader(s_render_scale);
+	RCache.set_Geometry(g_menu);
+	RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
+
+	// back to the screen's buffers for what comes after (the UI, the PDA's and the scope's copies)
+	u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, HW.pBaseZB);
 }
 
 CRenderTarget::~CRenderTarget()
@@ -1383,6 +1500,7 @@ CRenderTarget::~CRenderTarget()
 	xr_delete(b_fakescope); //crookr
 	xr_delete(b_heatvision); //--DSR-- HeatVision
 	xr_delete(b_lut);
+	xr_delete(b_render_scale);
 	xr_delete(b_smaa);
 
 	// [ SSS Stuff ]

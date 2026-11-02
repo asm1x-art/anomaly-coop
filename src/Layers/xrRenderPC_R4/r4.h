@@ -425,6 +425,7 @@ public:
 	// Main
 	virtual void Calculate();
 	virtual void Render();
+	void Render_scene(); // Render() at the render scale (CRenderTarget::scale_begin / scale_end)
 	virtual void Screenshot(ScreenshotMode mode = SM_NORMAL, LPCSTR name = 0);
 	virtual void Screenshot(ScreenshotMode mode, CMemoryWriter& memory_writer);
 	virtual void ScreenshotAsyncBegin();

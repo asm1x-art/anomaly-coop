@@ -95,6 +95,8 @@ extern ECORE_API float ps_r__ssaDONTSORT;
 extern ECORE_API float ps_r__ssaHZBvsTEX;
 extern ECORE_API int ps_r__tf_Anisotropic;
 extern ECORE_API float ps_r__tf_Mipbias;
+extern ECORE_API float ps_r__render_scale;
+extern ECORE_API float ps_r2_sun_cascade_min_fov; // the sun cascades are fitted to at least this field of view (zoomed scopes) // the world drawn at this share of the screen's size, stretched (vid_restart)
 
 enum
 {
