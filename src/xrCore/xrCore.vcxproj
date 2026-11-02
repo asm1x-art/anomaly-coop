@@ -555,6 +555,7 @@
     <ClCompile Include="xr_trims.cpp" />
     <ClCompile Include="_compressed_normal.cpp" />
     <ClCompile Include="_math.cpp" />
+    <ClCompile Include="prof_stats.cpp" />
     <ClCompile Include="_sphere.cpp" />
     <ClCompile Include="_std_extensions.cpp" />
   </ItemGroup>
@@ -612,6 +613,7 @@
     <ClInclude Include="PPMdType.h" />
     <ClInclude Include="ppmd_compressor.h" />
     <ClInclude Include="profiler.h" />
+    <ClInclude Include="prof_stats.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="rt_compressor.h" />
     <ClInclude Include="rt_config1x.h" />

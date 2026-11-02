@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #pragma hdrstop
+#include "../../xrCore/profiler.h"
 
 #include "ResourceManager.h"
 
@@ -78,7 +79,16 @@ void CTexture::PostLoad()
 
 void CTexture::apply_load(u32 dwStage)
 {
-	if (!flags.bLoaded) Load();
+	if (!flags.bLoaded)
+	{
+		// a texture first used in a frame is read from the disk right here; the profile names the slow ones
+		PROF_EVENT("late texture load");
+		const u64 t0 = CPU::QPC();
+		Load();
+		const double ms = double(CPU::QPC() - t0) * 1000.0 / double(CPU::qpc_freq);
+		if (prof_stats::on && ms > 2.0)
+			Msg("* [prof] late texture load %.1f ms: %s", ms, cName.c_str());
+	}
 	else PostLoad();
 	bind(dwStage);
 };

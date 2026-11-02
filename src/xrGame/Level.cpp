@@ -1030,9 +1030,11 @@ void CLevel::OnFrame()
 	else
 		psDeviceFlags.set(rsDisableObjectsAsCrows, false);
 	// commit events from bullet manager from prev-frame
+	START_PROFILE("bullets: events")
 	Device.Statistic->TEST0.Begin();
 	BulletManager().CommitEvents();
 	Device.Statistic->TEST0.End();
+	STOP_PROFILE;
 	// Client receive
 	if (net_isDisconnected())
 	{
@@ -1048,12 +1050,17 @@ void CLevel::OnFrame()
 	}
 	else
 	{
+		START_PROFILE("net: receive")
 		Device.Statistic->netClient1.Begin();
 		ClientReceive();
 		Device.Statistic->netClient1.End();
+		STOP_PROFILE;
 	}
 	
-	ProcessGameEvents();
+	{
+		PROF_EVENT("game events");
+		ProcessGameEvents();
+	}
 #ifdef SPAWN_ANTIFREEZE
 	{
 		bool queueEmpty = false;
@@ -1063,6 +1070,7 @@ void CLevel::OnFrame()
 		}
 		if (!queueEmpty)
 		{
+			PROF_EVENT("spawn events");
 			SortSpawnEventsQueue();
 			ProcessSpawnEvents();
 		}
@@ -1089,7 +1097,10 @@ void CLevel::OnFrame()
 			//    m_game_task_manager,&CGameTaskManager::UpdateTasks));
 			//}
 			//else
+		{
+			PROF_EVENT("tasks");
 			GameTaskManager().UpdateTasks();
+		}
 		}
 	}
 	// Inherited update
@@ -1182,9 +1193,15 @@ void CLevel::OnFrame()
 	g_pGamePersistent->Environment().SetGameTime(GetEnvironmentGameDayTimeSec(),
 	                                             game->GetEnvironmentGameTimeFactor());
 	if (!g_dedicated_server)
+	{
+		PROF_EVENT("Lua level processor");
 		ai().script_engine().script_process(ScriptEngine::eScriptProcessorLevel)->update();
-	m_ph_commander->update();
-	m_ph_commander_scripts->update();
+	}
+	{
+		PROF_EVENT("ph commanders (incl. Lua)");
+		m_ph_commander->update();
+		m_ph_commander_scripts->update();
+	}
 	Device.Statistic->TEST0.Begin();
 	BulletManager().CommitRenderSet();
 	Device.Statistic->TEST0.End();
@@ -1216,6 +1233,7 @@ void CLevel::OnFrame()
 		pStatGraphR->AppendItem(float(m_dwRPS) * fRPS_Mult, 0xff00ff00, 0);
 	}
 
+	PROF_EVENT("script attachments");
 	for (auto& pair : m_script_attachments)
 		pair.second->Update();
 }

@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "level_graph.h"
 #include "cover_manager.h"
 #include "ai_space.h"
@@ -83,6 +84,7 @@ IC bool CCoverManager::critical_cover(u32 index)
 
 void CCoverManager::compute_static_cover()
 {
+	LOAD_TIMER("ai: static cover");
 	clear();
 	xr_delete(m_covers);
 	m_covers = xr_new<CPointQuadTree>(ai().level_graph().header().box(), ai().level_graph().header().cell_size() * .5f,

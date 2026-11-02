@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "flod.h"
 
 #ifdef _EDITOR
@@ -16,6 +17,7 @@ ICF bool pred_dot(const std::pair<float, u32>& _1, const std::pair<float, u32>& 
 
 void R_dsgraph_structure::r_dsgraph_render_lods(bool _setup_zb, bool _clear)
 {
+	PROF_EVENT();
 	if (_setup_zb) mapLOD.getLR(lstLODs); // front-to-back
 	else mapLOD.getRL(lstLODs); // back-to-front
 	if (lstLODs.empty()) return;

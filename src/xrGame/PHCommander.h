@@ -14,6 +14,8 @@ public:
 
 	virtual bool obsolete() const =0;
 	virtual bool compare(const CPHReqComparerV* v) const { return false; } ;
+	// the frame profile summary names a call by this (a Lua function's file:line), when it has one
+	virtual const char* prof_name() { return nullptr; }
 };
 
 

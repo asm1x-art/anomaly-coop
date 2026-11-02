@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/prof_stats.h"
 #include "igame_level.h"
 
 //#include "xr_effgamma.h"
@@ -64,6 +65,21 @@ void IConsole_Command::add_LRU_to_tips(vecTips& tips)
 }
 
 // =======================================================
+
+// prof_stats <seconds>: the frame profile summary of the next <seconds> (default 10) into the log, "* [prof]" lines
+class CCC_ProfStats : public IConsole_Command
+{
+public:
+	CCC_ProfStats(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; };
+	virtual void Execute(LPCSTR args)
+	{
+		float seconds = 10.f;
+		if (args && args[0])
+			seconds = (float)atof(args);
+		clamp(seconds, 1.f, 600.f);
+		prof_stats::start(seconds);
+	}
+};
 
 class CCC_Quit : public IConsole_Command
 {
@@ -1034,6 +1050,7 @@ void CCC_Register()
 	// General
 	CMD1(CCC_Help, "help");
 	CMD1(CCC_Quit, "quit");
+	CMD1(CCC_ProfStats, "prof_stats");
 	CMD1(CCC_Start, "start");
 	CMD1(CCC_Disconnect, "disconnect");
 	CMD1(CCC_SaveCFG, "cfg_save");

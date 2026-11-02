@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #pragma hdrstop
+#include "../xrCore/profiler.h"
 
 #include "SoundRender_Core.h"
 #include "SoundRender_Source.h"
@@ -19,9 +20,14 @@ CSoundRender_Source* CSoundRender_Core::i_create_source(LPCSTR name)
 		return it->second;
 	}
 
-	// Load a _new one
+	// Load a _new one (in a frame: read from the disk right here; the profile names the slow ones)
+	PROF_EVENT("late sound load");
+	const u64 t0 = CPU::QPC();
 	CSoundRender_Source* S = xr_new<CSoundRender_Source>();
 	S->load(id);
+	const double ms = double(CPU::QPC() - t0) * 1000.0 / double(CPU::qpc_freq);
+	if (prof_stats::on && ms > 2.0)
+		Msg("* [prof] late sound load %.1f ms: %s", ms, id);
 	s_sources.insert({id, S});
 	return S;
 }

@@ -3,6 +3,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "WallmarksEngine.h"
 
 #include "../../xrEngine/xr_object.h"
@@ -386,6 +387,7 @@ ICF void FlushStream(ref_geom hGeom, ref_shader shader, u32& w_offset, FVF::LIT*
 
 void CWallmarksEngine::Render()
 {
+	PROF_EVENT();
 	//	if (marks.empty())			return;
 	// Projection and xform
 	float _43 = Device.mProject._43;

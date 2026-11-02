@@ -7,6 +7,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "pch_script.h"
+#include "../xrCore/load_timer.h"
+void script_load_stats_print_reset();
 #include "alife_simulator.h"
 #include "xrServer_Objects_ALife.h"
 #include "ai_space.h"
@@ -45,7 +47,10 @@ CALifeSimulator::CALifeSimulator(xrServer* server, shared_str* command_line) :
 	CALifeInteractionManager(server, alife_section),
 	CALifeSimulatorBase(server, alife_section)
 {
-	restart_all();
+	{
+		LOAD_TIMER("alife: restart_all");
+		restart_all();
+	}
 
 	ai().set_alife(this);
 
@@ -72,8 +77,13 @@ CALifeSimulator::CALifeSimulator(xrServer* server, shared_str* command_line) :
 	LPCSTR start_game_callback = pSettings->r_string(alife_section, "start_game_callback");
 	::luabind::functor<void> functor;
 	R_ASSERT2(ai().script_engine().functor(start_game_callback,functor), "failed to get start game callback");
-	functor();
+	{
+		LOAD_TIMER("alife: start_game_callback (Lua on_game_start)");
+		functor();
+	}
+	script_load_stats_print_reset();
 
+	LOAD_TIMER("alife: load");
 	load(p.m_game_or_spawn, !xr_strcmp(p.m_new_or_load, "load") ? false : true, !xr_strcmp(p.m_new_or_load, "new"));
 }
 

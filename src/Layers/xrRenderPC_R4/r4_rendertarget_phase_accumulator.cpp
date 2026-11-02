@@ -1,7 +1,9 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 
 void CRenderTarget::phase_accumulator()
 {
+	PROF_EVENT();
 	// Targets
 	if (dwAccumulatorClearMark == Device.dwFrame)
 	{

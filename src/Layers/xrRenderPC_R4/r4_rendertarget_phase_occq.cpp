@@ -1,7 +1,9 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 
 void CRenderTarget::phase_occq()
 {
+	PROF_EVENT();
 	if (!RImplementation.o.dx10_msaa)
 		u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT,NULL,NULL, HW.pBaseZB);
 	else

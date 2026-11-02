@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "level.h"
 #include "Level_Bullet_Manager.h"
 #include "xrserver.h"
@@ -106,6 +107,7 @@ shared_str level_name(const shared_str& server_options);
 
 bool CLevel::net_start1()
 {
+	LOAD_TIMER("net_start1");
 	// Start client and server if need it
 	if (m_caServerOptions.size())
 	{
@@ -152,6 +154,7 @@ bool CLevel::net_start1()
 
 bool CLevel::net_start2()
 {
+	LOAD_TIMER("net_start2");
 	if (net_start_result_total && m_caServerOptions.size())
 	{
 		GameDescriptionData game_descr;
@@ -171,6 +174,7 @@ bool CLevel::net_start2()
 
 bool CLevel::net_start3()
 {
+	LOAD_TIMER("net_start3");
 	if (!net_start_result_total) return true;
 	//add server port if don't have one in options
 	if (!strstr(m_caClientOptions.c_str(), "port=") && Server)
@@ -216,6 +220,7 @@ bool CLevel::net_start3()
 
 bool CLevel::net_start4()
 {
+	LOAD_TIMER("net_start4");
 	if (!net_start_result_total) return true;
 
 	g_loading_events.pop_front();
@@ -232,6 +237,7 @@ bool CLevel::net_start4()
 
 bool CLevel::net_start5()
 {
+	LOAD_TIMER("net_start5");
 	if (net_start_result_total)
 	{
 		NET_Packet NP;
@@ -249,6 +255,7 @@ bool CLevel::net_start5()
 
 bool CLevel::net_start6()
 {
+	LOAD_TIMER("net_start6");
 	//init bullet manager
 	BulletManager().Clear();
 	BulletManager().Load();

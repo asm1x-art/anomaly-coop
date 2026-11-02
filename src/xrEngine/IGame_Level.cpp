@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "igame_level.h"
 #include "igame_persistent.h"
 
@@ -108,9 +109,15 @@ bool IGame_Level::Load(u32 dwNum)
 	// CForms
 	// g_pGamePersistent->LoadTitle ("st_loading_cform");
 	g_pGamePersistent->LoadTitle();
-	ObjectSpace.Load(build_callback);
+	{
+		LOAD_TIMER("level: collision (cform)");
+		ObjectSpace.Load(build_callback);
+	}
 	//Sound->set_geometry_occ ( &Static );
-	Sound->set_geometry_occ(ObjectSpace.GetStaticModel());
+	{
+		LOAD_TIMER("level: sound occlusion");
+		Sound->set_geometry_occ(ObjectSpace.GetStaticModel());
+	}
 	Sound->set_handler(_sound_event);
 
 	pApp->LoadSwitch();
@@ -121,14 +128,20 @@ bool IGame_Level::Load(u32 dwNum)
 		g_hud = (CCustomHUD*)NEW_INSTANCE(CLSID_HUDMANAGER);
 
 	// Render-level Load
-	Render->level_Load(LL_Stream);
+	{
+		LOAD_TIMER("level: render, all");
+		Render->level_Load(LL_Stream);
+	}
 	// tscreate.FrameEnd ();
 	// Msg ("* S-CREATE: %f ms, %d times",tscreate.result,tscreate.count);
 
 	// Objects
 	g_pGamePersistent->Environment().mods_load();
 	R_ASSERT(Load_GameSpecific_Before());
-	Objects.Load();
+	{
+		LOAD_TIMER("level: objects");
+		Objects.Load();
+	}
 	//. ANDY R_ASSERT (Load_GameSpecific_After ());
 
 	// Done

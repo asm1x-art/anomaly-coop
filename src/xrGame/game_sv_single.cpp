@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "game_sv_single.h"
 #include "xrserver_objects_alife_monsters.h"
 #include "alife_simulator.h"
@@ -25,7 +26,10 @@ game_sv_Single::~game_sv_Single()
 
 void game_sv_Single::Create(shared_str& options)
 {
-	inherited::Create(options);
+	{
+		LOAD_TIMER("server: game Create (inherited)");
+		inherited::Create(options);
+	}
 
 #ifndef NO_SINGLE
 	if (strstr(*options, "/alife"))

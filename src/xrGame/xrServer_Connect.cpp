@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "xrserver.h"
 #include "game_sv_single.h"
 #include "game_sv_deathmatch.h"
@@ -83,8 +84,12 @@ xrServer::EConnect xrServer::Connect(shared_str& session_name, GameDescriptionDa
 	xr_strcpy(game_descr.map_version, game_sv_GameState::parse_level_version(session_name.c_str()).c_str());
 	xr_strcpy(game_descr.download_url, get_map_download_url(game_descr.map_name, game_descr.map_version));
 
-	game->Create(session_name);
+	{
+		LOAD_TIMER("server: game->Create");
+		game->Create(session_name);
+	}
 
+	LOAD_TIMER("server: IPureServer::Connect");
 	return IPureServer::Connect(*session_name, game_descr);
 }
 

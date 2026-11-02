@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "../../xrEngine/igame_persistent.h"
 #include "../../xrEngine/environment.h"
 
@@ -343,6 +344,7 @@ void CRenderTarget::accum_direct(u32 sub_phase)
 
 void CRenderTarget::accum_direct_cascade(u32 sub_phase, Fmatrix& xform, Fmatrix& xform_prev, float fBias)
 {
+	PROF_EVENT();
 	// Choose normal code-path or filtered
 	phase_accumulator();
 	if (RImplementation.o.sunfilter)
@@ -1194,6 +1196,7 @@ void CRenderTarget::accum_direct_lum()
 
 void CRenderTarget::accum_direct_volumetric(u32 sub_phase, const u32 Offset, const Fmatrix& mShadow)
 {
+	PROF_EVENT();
 	PIX_EVENT(accum_direct_volumetric);
 
 	if (!(ps_sunshafts_mode == R2SS_VOLUMETRIC || ps_sunshafts_mode == R2SS_COMBINE_SUNSHAFTS))

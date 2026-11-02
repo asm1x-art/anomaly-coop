@@ -200,6 +200,7 @@ void CScriptBinder::set_object(CScriptBinderObject* object)
 
 void CScriptBinder::shedule_Update(u32 time_delta)
 {
+	PROF_EVENT("Lua binder update");
 	if (m_object)
 	{
 		try

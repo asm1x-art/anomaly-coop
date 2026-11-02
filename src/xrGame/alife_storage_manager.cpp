@@ -7,6 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "alife_storage_manager.h"
 #include "alife_simulator_header.h"
 #include "alife_time_manager.h"
@@ -139,9 +140,18 @@ void CALifeStorageManager::load(void* buffer, const u32& buffer_size, LPCSTR fil
 	IReader source(buffer, buffer_size);
 	header().load(source);
 	time_manager().load(source);
-	spawns().load(source, file_name);
-	graph().on_load();
-	objects().load(source);
+	{
+		LOAD_TIMER("alife: spawns (all.spawn + overlays)");
+		spawns().load(source, file_name);
+	}
+	{
+		LOAD_TIMER("alife: graph on_load");
+		graph().on_load();
+	}
+	{
+		LOAD_TIMER("alife: objects from the save");
+		objects().load(source);
+	}
 	coop::on_world_objects_loaded();
 	spawns().remap_legacy(objects().objects());
 
@@ -150,6 +160,7 @@ void CALifeStorageManager::load(void* buffer, const u32& buffer_size, LPCSTR fil
 	CALifeObjectRegistry::OBJECT_REGISTRY::iterator B = objects().objects().begin();
 	CALifeObjectRegistry::OBJECT_REGISTRY::iterator E = objects().objects().end();
 	CALifeObjectRegistry::OBJECT_REGISTRY::iterator I;
+	load_timer* t_reg = xr_new<load_timer>("alife: register objects + registries");
 	for (I = B; I != E; ++I)
 	{
 		ALife::_OBJECT_ID id = (*I).second->ID;
@@ -162,8 +173,12 @@ void CALifeStorageManager::load(void* buffer, const u32& buffer_size, LPCSTR fil
 
 	can_register_objects(true);
 
-	for (I = B; I != E; ++I)
-		(*I).second->on_register();
+	xr_delete(t_reg);
+	{
+		LOAD_TIMER("alife: on_register (scripts)");
+		for (I = B; I != E; ++I)
+			(*I).second->on_register();
+	}
 
 	if (!g_pGameLevel)
 		return;
@@ -217,18 +232,27 @@ bool CALifeStorageManager::load(LPCSTR save_name_no_check)
 	*/
 	g_pGamePersistent->LoadTitle();
 
-	unload();
-	reload(m_section);
+	{
+		LOAD_TIMER("alife: unload + reload");
+		unload();
+		reload(m_section);
+	}
 
 	u32 source_count = stream->r_u32();
 	void* source_data = xr_malloc(source_count);
-	rtc_decompress(source_data, source_count, stream->pointer(), stream->length() - 3 * sizeof(u32));
+	{
+		LOAD_TIMER("alife: decompress the save");
+		rtc_decompress(source_data, source_count, stream->pointer(), stream->length() - 3 * sizeof(u32));
+	}
 	FS.r_close(stream);
 	load(source_data, source_count, file_name);
 	xr_free(source_data);
 
-	groups().on_after_game_load();
-	coop::on_world_loaded();
+	{
+		LOAD_TIMER("alife: groups + coop after load");
+		groups().on_after_game_load();
+		coop::on_world_loaded();
+	}
 
 	VERIFY(graph().actor());
 

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "../xrRender/resourcemanager.h"
 #include "blender_light_occq.h"
 #include "blender_light_mask.h"
@@ -181,6 +182,7 @@ void CRenderTarget::u_setrt(u32 W, u32 H, ID3DRenderTargetView* _1, ID3DRenderTa
 
 void CRenderTarget::u_stencil_optimize(eStencilOptimizeMode eSOM)
 {
+	PROF_EVENT();
 	//	TODO: DX10: remove half pixel offset?
 	VERIFY(RImplementation.o.nvstencil);
 	//RCache.set_ColorWriteEnable	(FALSE);
@@ -222,6 +224,7 @@ void CRenderTarget::u_stencil_optimize(eStencilOptimizeMode eSOM)
 // 2D texgen (texture adjustment matrix)
 void CRenderTarget::u_compute_texgen_screen(Fmatrix& m_Texgen)
 {
+	PROF_EVENT();
 	//float	_w						= float(Device.dwWidth);
 	//float	_h						= float(Device.dwHeight);
 	//float	o_w						= (.5f / _w);
@@ -1498,6 +1501,7 @@ bool CRenderTarget::need_to_render_sunshafts()
 
 bool CRenderTarget::use_minmax_sm_this_frame()
 {
+	PROF_EVENT();
 	switch (RImplementation.o.dx10_minmax_sm)
 	{
 	case CRender::MMSM_ON:

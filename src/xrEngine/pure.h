@@ -1,6 +1,9 @@
 #ifndef _PURE_H_AAA_
 #define _PURE_H_AAA_
 
+#include <typeinfo>
+#include "../xrCore/prof_stats.h"
+
 // messages
 #define REG_PRIORITY_LOW 0x11111111ul
 #define REG_PRIORITY_NORMAL 0x22222222ul
@@ -105,7 +108,7 @@ public:
 		{
 			for (u32 i = 0; i < R.size(); i++)
 				if (R[i].Prio != REG_PRIORITY_INVALID)
-					f(R[i].Object);
+					PROF_STAT_NAMED(typeid(T).name(), typeid(*(T*)R[i].Object).name(), f(R[i].Object));
 		}
 		if (changed) Resort();
 		in_process = false;

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/load_timer.h"
 #include "r4.h"
 #include "../xrRender/ResourceManager.h"
 #include "../xrRender/fbasicvisual.h"
@@ -34,6 +35,7 @@ void CRender::level_Load(IReader* fs)
 	//	g_pGamePersistent->LoadTitle		("st_loading_shaders");
 	g_pGamePersistent->LoadTitle();
 	{
+		LOAD_TIMER("render: shaders");
 		chunk = fs->open_chunk(fsL_SHADERS);
 		R_ASSERT2(chunk, "Level doesn't builded correctly.");
 		u32 count = chunk->r_u32();
@@ -63,6 +65,7 @@ void CRender::level_Load(IReader* fs)
 		//		g_pGamePersistent->LoadTitle("st_loading_geometry");
 		g_pGamePersistent->LoadTitle();
 		{
+			LOAD_TIMER("render: geometry");
 			CStreamReader* geom = FS.rs_open("$level$", "level.geom");
 			R_ASSERT2(geom, "level.geom");
 			LoadBuffers(geom,FALSE);
@@ -81,30 +84,45 @@ void CRender::level_Load(IReader* fs)
 		// Visuals
 		//		g_pGamePersistent->LoadTitle("st_loading_spatial_db");
 		g_pGamePersistent->LoadTitle();
-		chunk = fs->open_chunk(fsL_VISUALS);
-		LoadVisuals(chunk);
-		chunk->close();
+		{
+			LOAD_TIMER("render: visuals");
+			chunk = fs->open_chunk(fsL_VISUALS);
+			LoadVisuals(chunk);
+			chunk->close();
+		}
 
 		// Details
 		//		g_pGamePersistent->LoadTitle("st_loading_details");
 		g_pGamePersistent->LoadTitle();
-		Details->Load();
+		{
+			LOAD_TIMER("render: details");
+			Details->Load();
+		}
 	}
 
 	// Sectors
 	//	g_pGamePersistent->LoadTitle("st_loading_sectors_portals");
 	g_pGamePersistent->LoadTitle();
-	LoadSectors(fs);
+	{
+		LOAD_TIMER("render: sectors and portals");
+		LoadSectors(fs);
+	}
 
 	// 3D Fluid
 	Load3DFluid();
 
 	// HOM
-	HOM.Load();
+	{
+		LOAD_TIMER("render: HOM");
+		HOM.Load();
+	}
 
 	// Lights
 	// pApp->LoadTitle			("Loading lights...");
-	LoadLights(fs);
+	{
+		LOAD_TIMER("render: lights");
+		LoadLights(fs);
+	}
 
 	// End
 	pApp->LoadEnd();

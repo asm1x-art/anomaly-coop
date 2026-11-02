@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "../../xrEngine/igame_persistent.h"
 #include "../xrRender/FBasicVisual.h"
 #include "../../xrEngine/customhud.h"
@@ -15,6 +16,7 @@ IC bool pred_sp_sort(ISpatial* _1, ISpatial* _2)
 
 void CRender::render_main(Fmatrix& m_ViewProjection, bool _fportals)
 {
+	PROF_EVENT();
 	PIX_EVENT(render_main);
 	//	Msg						("---begin");
 	marker ++;
@@ -660,6 +662,7 @@ void CRender::Render()
 
 void CRender::render_forward()
 {
+	PROF_EVENT();
 	VERIFY(0 == mapDistort.size() + mapHUDDistort.size());
 	RImplementation.o.distortion = RImplementation.o.distortion_enabled; // enable distorion
 

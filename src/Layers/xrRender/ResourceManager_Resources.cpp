@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #pragma hdrstop
+#include "../../xrCore/profiler.h"
 
 #pragma warning(disable:4995)
 #include <d3dx9.h>
@@ -148,6 +149,7 @@ void CResourceManager::_DeleteDecl(const SDeclaration* dcl)
 #ifndef _EDITOR
 SVS* CResourceManager::_CreateVS(LPCSTR _name)
 {
+	PROF_EVENT();
 	xrCriticalSectionGuard guard(creationGuard);
 	string_path name;
 	xr_strcpy(name, _name);
@@ -241,6 +243,7 @@ void CResourceManager::_DeleteVS(const SVS* vs)
 //--------------------------------------------------------------------------------------------------------------
 SPS* CResourceManager::_CreatePS(LPCSTR name)
 {
+	PROF_EVENT();
 	LPSTR N = LPSTR(name);
 	xrCriticalSectionGuard guard(creationGuard);
 	map_PS::iterator I = m_ps.find(N);

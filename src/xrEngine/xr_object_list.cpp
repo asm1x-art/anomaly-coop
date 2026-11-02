@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/profiler.h"
 #include "igame_level.h"
 #include "igame_persistent.h"
 
@@ -125,7 +126,7 @@ void CObjectList::SingleUpdate(CObject* O)
 
 	// Msg ("[%d][0x%08x]IAmNotACrowAnyMore (CObjectList::SingleUpdate)", Device.dwFrame, fast_dynamic_cast<void*>(O));
 
-	O->UpdateCL();
+	PROF_STAT_NAMED("UpdateCL", typeid(*O).name(), O->UpdateCL());
 #ifdef DEBUG
 	VERIFY3(O->dbg_update_cl == Device.dwFrame, "Broken sequence of calls to 'UpdateCL'", *O->cName());
 #endif
@@ -197,6 +198,7 @@ void CObjectList::clear_crow_vec(Objects& o)
 
 void CObjectList::Update(bool bForce)
 {
+	PROF_EVENT("Objects");
 	if (!Device.Paused() || bForce)
 	{
 		// Clients
