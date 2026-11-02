@@ -10,6 +10,14 @@ local dialogs = {
 
 function on_xml_read()
 	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		-- Shurup, thrown out of Freedom, is the shelter's technician: another mechanic at the Warehouses
+		if xml_file_name == [[gameplay\character_desc_military.xml]] then
+			local mechanic = xml_obj:query("specific_character[id=mil_smart_terrain_7_7_freedom_mechanic_stalker]")[1]
+			local name = mechanic and xml_obj:query("name", mechanic)[1]
+			if name then
+				xml_obj:setText(name, "st_shelter_freedom_mechanic_name")
+			end
+		end
 		local add = dialogs[xml_file_name]
 		if not add then
 			return

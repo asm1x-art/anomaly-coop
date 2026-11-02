@@ -760,7 +760,7 @@ end
 
 -- a load (two or three sections, as picked) out of the actor's inventory into the chamber, the making begun
 -- (ui_shelter_chamber.script)
-function load(nature, parts)
+function load(nature, parts, by_staff)
 	if #parts < 2 or work(nature) or not get_alchemy() then
 		return
 	end
@@ -778,7 +778,7 @@ function load(nature, parts)
 		used[found:id()] = true
 		objs[#objs + 1] = found
 	end
-	if not suited() then
+	if not by_staff and not suited() then
 		return kill(nature)
 	end
 	local result, resonance = outcome(nature, parts)
@@ -794,6 +794,57 @@ function load(nature, parts)
 	shelter.set_state("synth_start_" .. nature, now)
 	shelter.set_state("synth_" .. nature, math.floor(now + hours_for(parts) * 3600))
 	msg("st_shelter_synth_started", chamber_name(nature))
+end
+
+-- the materials scientist tries on his own: in a free installed chamber, from what one carries, a load never tried, one
+-- thing off the best resonance so far (else any); a section's chamber, nil if nothing to try
+function staff_try()
+	local a = get_alchemy()
+	if not a then
+		return nil
+	end
+	local owned, pool = {}, {}
+	db.actor:iterate_inventory(function(_, obj)
+		local sec = obj:section()
+		if a.pool[sec] then
+			if not owned[sec] then
+				pool[#pool + 1] = sec
+			end
+			owned[sec] = (owned[sec] or 0) + 1
+		end
+	end, db.actor)
+	if #pool < 2 then
+		return nil
+	end
+	local tries = ini_sys:r_float_ex("shelter_base", "staff_tries") or 30
+	for _, nature in ipairs(NATURES) do
+		if installed(nature) and not work(nature) then
+			local best
+			for _, e in ipairs(journal()) do
+				if e.nature == nature and (not best or e.resonance > best.resonance) then
+					best = e
+				end
+			end
+			for _ = 1, tries do
+				local parts = {}
+				for i = 1, best and #best.parts or math.min(3, #pool) do
+					parts[i] = best and best.parts[i] or pool[math.random(#pool)]
+				end
+				parts[math.random(#parts)] = pool[math.random(#pool)]
+				local need, fits = {}, true
+				for _, s in ipairs(parts) do
+					need[s] = (need[s] or 0) + 1
+					fits = fits and need[s] <= (owned[s] or 0)
+				end
+				if fits and not known(nature, parts) then
+					load(nature, parts, true)
+					shelter.set_state("synth_who_" .. nature, game.translate_string(ini_sys:r_string_ex("raid_rescue_npc_materials", "rescue_name")))
+					return nature
+				end
+			end
+		end
+	end
+	return nil
 end
 
 local WORK_STATES = { "synth_", "synth_result_", "synth_load_", "synth_resonance_", "synth_who_", "synth_start_" }

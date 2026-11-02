@@ -99,3 +99,189 @@ npc_in_squad    = 3, 3
 [raid_death]
 lose_chance     = 0.5
 wake_health     = 0.5
+
+; the window for raids (raid_window.script): world hours. Once every every_hours while the Scorcher works, window_hours
+; long, one sets out in its first entry_hours, a warning warn_hours before it closes; after that a psi hit each 3 s,
+; late_hit + late_hit_grow per second late, at most late_hit_max, and phantoms.
+; reinforce: "smart:squad", once the Scorcher is off: the Pripyat transition, the Scorcher's complex
+[raid_window]
+every_hours     = 168
+every_spread    = 24    ; give or take, drawn each cycle
+window_hours    = 6
+entry_hours     = 2
+warn_hours      = 1
+late_hit        = 0.01
+late_hit_grow   = 0.0008
+late_hit_max    = 0.15
+late_health     = 0.005   ; lost each hit, whatever one wears: this + late_health_grow per second late, at most late_health_max
+late_health_grow = 0.0003
+late_health_max = 0.05
+late_hit_seconds = 3
+late_msg_seconds = 15
+phantom_seconds = 20
+phantoms_max    = 5
+phantom_distance = 12
+senders         = st_raid_cooling_sender_1, st_raid_cooling_sender_2, st_raid_cooling_sender_3, st_raid_cooling_sender_4
+reinforce       = rad_freedom_vs_duty:raid_monolith_far, rad_freedom_vs_duty:raid_monolith_mid, rad_antenna_monolith:raid_monolith_alpha, rad_antenna_camper:raid_monolith_far, rad_antenna_patrol:raid_monolith_far
+
+; the raid's rescue events (raid_rescue.script): chance at each cycle, never two cycles running; reveal: metres from the
+; place at which the people appear once the siege is dead. position: as of the level's AI map, node: its vertex
+[raid_rescue]
+chance          = 0.4
+reveal          = 15
+signal_first_seconds = 3   ; radio signals after landing
+signal_seconds  = 9
+signal_show_seconds = 15
+targets         = scientists, medic, frame, sect
+
+[raid_rescue_scientists]
+level           = raid_limansk
+position        = -14.0, -2.15, 49.7
+node            = 18320
+smart           = raid_lim_smart_terrain_6
+siege           = raid_monolith_mid, raid_monolith_far
+squad           = raid_rescue_scientists_squad
+staff           = raid_rescue_npc_biologist, raid_rescue_npc_physicist, raid_rescue_npc_materials
+staff_places    = 16.56, 1.32, -10.94 | 15.2, 1.32, -9.6 | 18.0, 1.32, -12.2
+
+[raid_rescue_medic]
+level           = raid_hospital
+position        = -94.5, 25.06, 648.2
+node            = 1114
+smart           = raid_katacomb_smart_terrain
+siege           = raid_monolith_far, raid_monolith_sniper
+squad           = raid_rescue_medic_squad
+staff           = raid_rescue_npc_medic
+staff_places    = 2.34, 3.38, 3.5
+
+[raid_rescue_frame]
+level           = raid_limansk
+smart           = raid_lim_smart_terrain_9
+siege           = raid_monolith_alpha, raid_monolith_far
+item            = raid_incubator_frame
+
+[raid_rescue_scientists_squad]:online_offline_group
+faction         = ecolog
+npc             = raid_rescue_npc_biologist, raid_rescue_npc_physicist, raid_rescue_npc_materials
+
+[raid_rescue_medic_squad]:online_offline_group
+faction         = stalker
+npc             = raid_rescue_npc_medic
+
+[raid_rescue_npc_biologist]:sim_default_ecolog_2
+character_profile = shelter_scientist
+spec_rank       = master
+rescue_name     = st_raid_rescue_name_biologist
+
+[raid_rescue_npc_physicist]:sim_default_ecolog_2
+character_profile = shelter_scientist
+spec_rank       = master
+rescue_name     = st_raid_rescue_name_physicist
+
+[raid_rescue_npc_materials]:sim_default_ecolog_1
+character_profile = shelter_scientist
+spec_rank       = master
+rescue_name     = st_raid_rescue_name_materials
+
+[raid_rescue_npc_medic]:sim_default_stalker_3
+rescue_name     = st_raid_rescue_name_medic
+
+; the incubator's frame, on the commander at the Monolith's building site
+[raid_incubator_frame]:tch_quest
+visual          = dynamics\equipments\quest\safe_container.ogf
+inv_name        = st_raid_incubator_frame
+inv_name_short  = st_raid_incubator_frame
+description     = st_raid_incubator_frame_descr
+inv_grid_x      = 4
+inv_grid_y      = 11
+inv_grid_width  = 2
+inv_grid_height = 2
+inv_weight      = 5
+quest_item      = true
+
+; the Monolith on the other raid levels: as Limansk's, no patrols. The Control Center has no smarts.
+[raid_hospital_monolith]
+from            = -76.7, 854.8
+entry           = raid_katacomb_smart_terrain
+
+[raid_stancia_2_monolith]
+from            = 144.4, 336.0
+entry           = raid_aes2_monolith_camp1
+
+[raid_stancia_monolith]
+from            = -43.0, -71.6
+entry           = raid_aes_smart_terrain_monolit_blockpost
+
+[raid_sarcofag_monolith]
+from            = -25.8, 43.8
+entry           = raid_sar_monolith_guard
+
+; rich stashes (raid_rich.script): list; loot drawn anew every refill_hours, loot_min..loot_max things; found with the RF
+; receiver within rf_distance on a frequency between freq_min and freq_max
+[raid_rich]
+list            = n1, n2, s1, s2, sar1, sar2, ctl1
+box             = raid_rich_box
+refill_hours    = 168
+loot_min        = 2
+loot_max        = 4
+loot            = af_glass, af_fire, af_ice, af_compass, af_gold_fish, af_soul, af_night_star, af_eye
+rf_distance     = 150
+freq_min        = 31
+freq_max        = 299
+
+[raid_rich_box]:inventory_box
+visual          = dynamics\equipment_cache\equipment_seif_01_case.ogf
+
+[raid_rich_n1]
+level           = raid_stancia_2
+position        = 862.4, 11.16, 168.7
+node            = 739595
+
+[raid_rich_n2]
+level           = raid_stancia_2
+position        = 1044.4, 0.0, 93.1
+node            = 853311
+
+[raid_rich_s1]
+level           = raid_stancia
+position        = 894.6, 0.0, -436.8
+node            = 397141
+
+[raid_rich_s2]
+level           = raid_stancia
+position        = 1028.3, 0.0, -131.6
+node            = 477521
+
+[raid_rich_sar1]
+level           = raid_sarcofag
+position        = -9.1, 48.94, -32.2
+node            = 266
+
+[raid_rich_sar2]
+level           = raid_sarcofag
+position        = 60.2, 54.49, 18.9
+node            = 10192
+
+[raid_rich_ctl1]
+level           = raid_control_monolith
+position        = -30.8, -34.48, -25.2
+node            = 671
+
+; raid 2: the sect's scientists at ChNPP; their blueprints are on the commander
+[raid_rescue_sect]
+level           = raid_sarcofag
+smart           = raid_sar_monolith_general
+siege           = raid_monolith_alpha, raid_monolith_far, raid_monolith_sniper
+item            = raid_sect_blueprints
+
+[raid_sect_blueprints]:tch_quest
+visual          = dynamics\equipments\quest\notes_document_case_1.ogf
+inv_name        = st_raid_sect_blueprints
+inv_name_short  = st_raid_sect_blueprints
+description     = st_raid_sect_blueprints_descr
+inv_grid_x      = 2
+inv_grid_y      = 44
+inv_grid_width  = 1
+inv_grid_height = 1
+inv_weight      = 0.5
+quest_item      = true

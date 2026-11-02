@@ -180,12 +180,21 @@ local function generator_box()
 	return id and level.object_by_id(id)
 end
 
+-- for the technician (shelter_base.script)
+function generator_box_object()
+	return generator_box()
+end
+
+function electric_section(section)
+	return is_electric(section)
+end
+
 local function powered()
 	local box = generator_box()
 	local found = false
 	if box then
 		box:iterate_inventory_box(function(_, item)
-			found = is_electric(item:section())
+			found = is_electric(item:section()) and item:condition() > 0
 			return found
 		end, box)
 	end
@@ -291,6 +300,51 @@ end
 -- The generator: its tip says what it needs; use repairs it (with the tools) or opens its box; runs while the box
 -- holds an electric artefact
 
+-- the power: the first electric artefact in the box runs down by its condition, a full one in power_hours game hours
+-- ([shelter_base]), and burns out; below power_low the lamps dip and the laptop warns
+local function power_charge_now()
+	local box, charge = generator_box(), 0
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			if is_electric(item:section()) and item:condition() > 0 then
+				charge = item:condition()
+				return true
+			end
+		end, box)
+	end
+	return charge
+end
+
+function power_charge()
+	return (tonumber(state("power_charge", 0)) or 0) / 1000
+end
+
+local function power_drain()
+	local box = generator_box()
+	local now = game.get_game_time():diffSec(level.get_start_time())
+	local since = tonumber(state("power_drained_at", nil)) or now
+	set_state("power_drained_at", now)
+	if not box or now <= since then
+		return
+	end
+	local burnt
+	box:iterate_inventory_box(function(_, item)
+		if is_electric(item:section()) and item:condition() > 0 then
+			local cond = item:condition() - (now - since) / 3600 / (ini_sys:r_float_ex("shelter_base", "power_hours") or 336) / (state("rescue_done_sect", false) and ini_sys:r_float_ex("shelter_base", "sect_power_k") or 1)
+			if cond <= 0 then
+				burnt = item
+			else
+				item:set_condition(cond)
+			end
+			return true
+		end
+	end, box)
+	if burnt then
+		alife_release(burnt)
+		msg("st_shelter_generator_burnt")
+	end
+end
+
 class "generator_binder" (object_binder)
 function generator_binder:__init(obj) super(obj)
 	self.on = nil
@@ -324,12 +378,30 @@ function generator_binder:update(delta)
 		power = on
 		if on then
 			set_state("generator_powered", true) -- the task's done, whatever comes after
+		else
+			set_state("power_drained_at", nil)
 		end
+		set_state("power_on", on and true or nil)
 		gen:play_cycle(on and "work" or "idle", true)
 		set_lamps(on)
 		set_sound(gen, on)
 	else
-		set_lamps(on)
+		local dip = false
+		if on then
+			if now >= (self.drain_at or 0) then
+				self.drain_at = now + (ini_sys:r_float_ex("shelter_base", "power_drain_seconds") or 30) * 1000
+				power_drain()
+				local charge = power_charge_now()
+				set_state("power_charge", math.floor(charge * 1000)) -- whole numbers: a fraction is written with the locale's comma
+				local low = charge < (ini_sys:r_float_ex("shelter_base", "power_low") or 0.2)
+				if low and not state("power_warned", false) then
+					msg("st_shelter_generator_low")
+				end
+				set_state("power_warned", low and true or nil)
+			end
+			dip = state("power_warned", false) and math.random() < (ini_sys:r_float_ex("shelter_base", "power_dip_chance") or 0.25)
+		end
+		set_lamps(on and not dip)
 	end
 end
 function generator_binder:use()

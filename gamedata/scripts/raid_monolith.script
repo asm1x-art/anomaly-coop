@@ -37,7 +37,7 @@ local function ids_of(key)
 	return out
 end
 
-local function squad_alive(id)
+function squad_alive(id)
 	local se = id and id < 65535 and alife():object(id)
 	return se and se:clsid() == clsid.online_offline_group_s and se:npc_count() > 0 and se or nil
 end
@@ -83,7 +83,7 @@ local function held(smart)
 end
 
 -- a squad at a smart, kept there (sent on when its scripted target is changed)
-local function spawn_squad(smart_se, section)
+function spawn_squad(smart_se, section)
 	local squad = SIMBOARD:create_squad(smart_se, section)
 	if not squad then
 		printf("! raid: no squad %s at %s", section, smart_se:name())

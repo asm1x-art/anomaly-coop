@@ -1,6 +1,6 @@
 -- Raids (docs/coop/shelter.md, "Raids"): the raid's levels are copies of the north's (tools/raid/raid_copy.py), each a
--- level of its own named raid_*, with no way in from the world. A raid starts from the laptop's "Raid" app (once the
--- Brain Scorcher is off) and lands in Limansk where the Red Forest's level changer brings one. A transition of a copy
+-- level of its own named raid_*, with no way in from the world. A raid starts from the laptop's "Raid" app (in a
+-- window of the event "Cooling", raid_window.script; always, once the Brain Scorcher is off) and lands in Limansk where the Red Forest's level changer brings one. A transition of a copy
 -- is a restrictor whose custom data has [raid_transition] (level: another copy or a level outside the raid, position,
 -- node, direction; its logic calls raid_transition): the way one came onto a level leads out, straight to the
 -- shelter; the others lead on; a level outside the raid is shut. The PDA is jammed in a raid.
@@ -62,9 +62,14 @@ function dbg(fmt, ...)
 	end
 end
 
--- the raid app is there once the Brain Scorcher is off (in the story after the Radar, in free play from the start)
+-- the raid app is there in a window, or always once the Brain Scorcher is off (raid_window.script)
 function available()
-	return has_alife_info("bar_deactivate_radar_done")
+	return raid_window.available()
+end
+
+-- the text's id if one can't set out now
+function entry_denied()
+	return raid_window.entry_denied()
 end
 
 -- The graph vertex of a level nearest to a position there.
@@ -83,6 +88,10 @@ local function graph_vertex(level_name, position)
 		gvid = gvid + 1
 	end
 	return best
+end
+
+function vertex_of(level_name, position)
+	return graph_vertex(level_name, position)
 end
 
 local function go(level_name, position, node, yaw)
@@ -116,6 +125,10 @@ local function news(what, level_name)
 	local n = tonumber(shelter.state("raid_news_next", 1)) or 1
 	shelter.set_state("raid_news_" .. n, string.format("%s|%s|%s", my_name(), what, level_name or ""))
 	shelter.set_state("raid_news_next", n + 1)
+end
+
+function group_news(what, level_name)
+	news(what, level_name)
 end
 
 local function level_caption(name)
@@ -218,7 +231,7 @@ end
 -------------------------------------------------------------------------------
 -- into the raid: the landing; the way out of the landing level is the transition to where the landing comes from
 function start()
-	if raider() then
+	if raider() or entry_denied() then
 		return
 	end
 	local l = get_levels().landing
@@ -228,6 +241,9 @@ function start()
 	news("start", l.level)
 	save_var(db.actor, "raid_came_from", l.came_from)
 	raid_monolith.prepare(l.level)
+	raid_rescue.prepare(l.level)
+	raid_rich.prepare(l.level)
+	raid_rescue.on_start()
 	go(l.level, l.position, l.node, l.direction)
 end
 
@@ -235,6 +251,7 @@ end
 function exit_to_shelter(died)
 	printf("raid: out of %s to the shelter", level.name())
 	raid_monolith.left(level.name())
+	raid_rescue.on_exit(level.name(), died)
 	if not died then
 		news("out", level.name())
 	end
@@ -259,10 +276,16 @@ function transition(obj)
 		actor_menu.set_msg(1, game.translate_string("st_raid_exit_closed"), 4)
 		return
 	end
+	if raid_rescue.escorting(level.name()) then
+		actor_menu.set_msg(1, game.translate_string("st_raid_rescue_no_further"), 4)
+		return
+	end
 	printf("raid: %s -> %s", obj:name(), target)
 	save_var(db.actor, "raid_came_from", level.name())
 	raid_monolith.left(level.name())
 	raid_monolith.prepare(target)
+	raid_rescue.prepare(target)
+	raid_rich.prepare(target)
 	go(target, vector_of(ini:r_string_ex("raid_transition", "position")), ini:r_u32("raid_transition", "node"),
 		ini:r_float_ex("raid_transition", "direction") or 0)
 end
@@ -473,6 +496,16 @@ end
 function on_game_start()
 	xr_effects.raid_transition = function(actor, obj)
 		transition(obj)
+	end
+	-- Anomaly's guide looks a way up in its table of levels, which has neither the raid's nor the shelter's: with an NPC
+	-- of a fit faction online (the rescued, the staff) it crashes there. Nil: it tries again later.
+	local go_poisk = tasks_guide.go_poisk
+	tasks_guide.go_poisk = function()
+		local name = level.name()
+		if is_raid_level(name) or name == SHELTER.level then
+			return nil
+		end
+		return go_poisk()
 	end
 	local pda_use = pda.pda_use
 	pda.pda_use = function()

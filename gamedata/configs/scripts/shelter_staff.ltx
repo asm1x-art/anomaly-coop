@@ -1,0 +1,18 @@
+; those living in the shelter (shelter_base.script): they hold their place
+[logic]
+active = beh@staff
+
+[beh@staff]
+behavior_state = beh_wait
+target = actor
+wait_anim = guard
+walk_anim = patrol
+jog_anim = patrol
+run_anim = panic
+delay_anim = guard
+meet = meet
+gather_items_enabled = false
+help_wounded_enabled = false
+corpse_detection_enabled = false
+use_camp = false
+invulnerable = true

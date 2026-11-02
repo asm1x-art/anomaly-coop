@@ -4,7 +4,7 @@
 -- shelter_trade.script's and shelter_orders.script's. os: the laptop's window (its parts and clicks, ui_shelter_style).
 
 local C = ui_shelter_style.C
-local TABS = { "overview", "stock", "supply", "ways", "contracts", "journal", "settings" }
+local TABS = { "overview", "base", "stock", "supply", "ways", "contracts", "journal", "settings" }
 local TABS_Y = 50
 local BODY_Y = 94
 local PAD = 18
@@ -166,6 +166,142 @@ local function fill_overview(os)
 	local news = shelter_trade.news()
 	for i = 1, math.min(rows, #news) do
 		os:text(PAD * 2 + half + 4, y + (i - 1) * 30, half - 8, 28, news[i].text, C.dim, body, nil, "s")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the base (shelter_base.script): six cards
+
+local function fill_base(os)
+	local t, body = os.trade, os.trade.body
+	local cw = math.floor((t.w - 4 * PAD) / 3)
+	local ch = math.floor((t.h - BODY_Y - 3 * PAD) / 2)
+	local function at(i)
+		return PAD + (i % 3) * (cw + PAD), BODY_Y + math.floor(i / 3) * (ch + PAD)
+	end
+	local function line(x, y, n, s, color, rows)
+		os:text(x + 14, y + 34 + (n - 1) * 26, cw - 28, 24 + ((rows or 1) - 1) * 26, s, color or C.text, body, nil, "s")
+	end
+	local function action(x, y, n, label, f, on)
+		btn(os, x + 14, y + ch - 48 * n, cw - 28, 40, label, function()
+			f()
+			fill(os)
+		end, on == false and "off" or "primary")
+	end
+	-- the power
+	local x, y = at(0)
+	card(os, x, y, cw, ch, "st_shelter_base_power")
+	if shelter.generator_on() then
+		local charge = shelter.power_charge()
+		line(x, y, 1, tr("st_shelter_base_charge", math.floor(charge * 100 + 0.5)), charge < (ini_sys:r_float_ex("shelter_base", "power_low") or 0.2) and C.warn or C.good)
+		line(x, y, 2, tr("st_shelter_base_power_text"), C.dim, 2)
+	else
+		line(x, y, 1, tr("st_shelter_base_no_power"), C.warn)
+	end
+	-- the window and the analyser
+	x, y = at(1)
+	card(os, x, y, cw, ch, "st_shelter_base_analyser")
+	if raid_window.off() then
+		line(x, y, 1, tr("st_shelter_base_scorcher_off"), C.good)
+	elseif raid_window.open_now() then
+		line(x, y, 1, tr("st_shelter_base_window_open"), C.good)
+	elseif shelter_base.has_analyser() then
+		line(x, y, 1, tr("st_shelter_base_window_in", math.ceil(raid_window.hours_to_next())))
+	else
+		line(x, y, 1, tr("st_shelter_base_window_unknown"), C.dim)
+	end
+	if shelter_base.has_analyser() then
+		local e = shelter_base.emission_hours()
+		line(x, y, 2, e and tr("st_shelter_base_emission_in", math.ceil(e)) or tr("st_shelter_base_emission_unknown"))
+		local on = shelter_base.forecast_on()
+		action(x, y, 1, tr(on and "st_shelter_base_forecast_off" or "st_shelter_base_forecast_on", shelter_base.cost_of("forecast_income")), function()
+			shelter_base.set_forecast(not on)
+		end)
+	elseif shelter_base.has_scientists() then
+		line(x, y, 2, tr("st_shelter_base_analyser_parts", shelter_base.parts_text("analyser_parts")), C.dim, 3)
+		action(x, y, 1, tr("st_shelter_base_analyser_build"), shelter_base.build_analyser)
+	else
+		line(x, y, 2, tr("st_shelter_base_need_scientists"), C.dim, 2)
+	end
+	-- the medic
+	x, y = at(2)
+	card(os, x, y, cw, ch, "st_shelter_base_medic")
+	if shelter_base.has_medic() then
+		line(x, y, 1, tr("st_shelter_base_clinic", shelter.state("clinic_served", 0) or 0, money(tonumber(shelter.state("clinic_total", 0)) or 0)))
+		btn(os, x + 14, y + ch - 48, cw - 28, 40, tr("st_shelter_base_heal", shelter_base.cost_of("heal_hours")), function()
+			os:Close()
+			shelter_base.heal()
+		end, "primary")
+	else
+		line(x, y, 1, tr("st_shelter_base_no_medic"), C.dim, 2)
+	end
+	-- the laboratory
+	x, y = at(3)
+	card(os, x, y, cw, ch, "st_shelter_base_lab")
+	if shelter_base.has_scientists() then
+		local inc = shelter_base.incubator()
+		if shelter_base.bayun_grown() then
+			line(x, y, 1, tr("st_shelter_base_bayun"), C.good)
+		elseif inc then
+			line(x, y, 1, tr("st_shelter_base_incub", math.floor(inc.hours), inc.total))
+			if not inc.checked and inc.hours >= inc.check then
+				line(x, y, 2, tr("st_shelter_base_incub_waits"), C.warn)
+				action(x, y, 2, tr("st_shelter_base_incub_check"), shelter_base.check_incubator)
+			end
+		else
+			line(x, y, 1, tr("st_shelter_base_incub_parts", shelter_base.parts_text("incub_parts")), C.dim, 4)
+			action(x, y, 2, tr("st_shelter_base_incub_start"), shelter_base.start_incubator)
+		end
+		local ac, ac_h, ac_total = shelter_base.autoclave_state()
+		if ac == "work" then
+			line(x, y, 3, tr("st_shelter_base_autoclave_work", math.floor(ac_h), ac_total))
+		elseif ac == "ready" then
+			line(x, y, 3, tr("st_shelter_base_autoclave_parts", shelter_base.parts_text("autoclave_parts")), C.dim)
+			action(x, y, 3, tr("st_shelter_base_autoclave_start"), shelter_base.start_autoclave)
+		elseif ac == "done" then
+			line(x, y, 3, tr("st_shelter_base_autoclave_done"), C.good)
+		elseif ac == "idle" then
+			line(x, y, 3, tr("st_shelter_base_autoclave_idle"), C.dim)
+		end
+		action(x, y, 1, tr("st_shelter_base_try"), function()
+			local nature = shelter_synthesis.staff_try()
+			if not nature then
+				actor_menu.set_msg(1, tr("st_shelter_base_try_none"), 6)
+			end
+		end)
+	else
+		line(x, y, 1, tr("st_shelter_base_need_scientists"), C.dim, 2)
+	end
+	-- the technician
+	x, y = at(4)
+	card(os, x, y, cw, ch, "st_shelter_base_tech")
+	if shelter_base.has_tech() then
+		line(x, y, 1, tr("st_shelter_base_tech_repaired", shelter.state("tech_repaired", 0) or 0))
+		line(x, y, 2, tr("st_shelter_base_tech_text"), C.dim, 2)
+		line(x, y, 4, tr("st_shelter_base_tech_box", shelter_base.tech_box_count()))
+		line(x, y, 5, tr("st_shelter_base_tech_box_text"), C.dim, 2)
+		if shelter_scorcher.can_build() then
+			action(x, y, 1, tr("st_shelter_scorcher_build", shelter_base.parts_text("decoder_parts", "shelter_scorcher")), shelter_scorcher.build_decoder)
+		end
+	else
+		local cost = shelter_base.cost_of("tech_cost")
+		line(x, y, 1, tr("st_shelter_base_tech_none"), C.dim, 2)
+		action(x, y, 1, tr("st_shelter_tr_hire", money(cost)), shelter_base.hire_tech, db.actor:money() >= cost)
+	end
+	-- the perimeter
+	x, y = at(5)
+	card(os, x, y, cw, ch, "st_shelter_base_perimeter")
+	if shelter.state("perimeter_fortified", false) then
+		line(x, y, 1, tr("st_shelter_base_fortified"), C.good)
+	elseif not shelter_base.perimeter_friends() then
+		line(x, y, 1, tr("st_shelter_base_need_friends"), C.warn, 2)
+	elseif not shelter_base.joint_alive() then
+		local cost = shelter_base.cost_of("joint_cost")
+		line(x, y, 1, tr("st_shelter_base_joint_text"), C.dim, 2)
+		action(x, y, 1, tr("st_shelter_base_joint", money(cost)), shelter_base.raise_joint, db.actor:money() >= cost)
+	elseif not shelter_base.perimeter_built() then
+		line(x, y, 1, tr("st_shelter_base_build_text", shelter_base.parts_text("perimeter_parts")), C.dim, 2)
+		action(x, y, 1, tr("st_shelter_base_build", money(shelter_base.cost_of("perimeter_cost"))), shelter_base.build_perimeter)
 	end
 end
 
@@ -369,7 +505,7 @@ local function fill_supply(os)
 		os:text(PAD + 12, y + 4, lw - 24, 26, tr(sup.name), C.text, body)
 		local d = shelter_orders.discount(sup.id)
 		local line = why and tr("st_shelter_tr_sup_" .. why) or d > 0 and tr("st_shelter_tr_sup_discount", math.floor(d * 100 + 0.5))
-			or tr("st_shelter_tr_sup_way", sup.hours_min, sup.hours_max, math.floor(sup.intercept * 100 + 0.5))
+			or tr("st_shelter_tr_sup_way", sup.hours_min, sup.hours_max, math.floor(shelter_orders.intercept_chance(sup) * 100 + 0.5))
 		os:text(PAD + 12, y + 32, lw - 24, 26, line, why and C.bad or C.dim, body, nil, "s")
 	end
 	local sup = shelter_orders.supplier(s.sup)
@@ -686,7 +822,7 @@ end
 -------------------------------------------------------------------------------
 -- the window
 
-local FILL = { overview = fill_overview, stock = fill_stock, supply = fill_supply, ways = fill_ways, contracts = fill_contracts,
+local FILL = { overview = fill_overview, base = fill_base, stock = fill_stock, supply = fill_supply, ways = fill_ways, contracts = fill_contracts,
 	journal = fill_journal, settings = fill_settings }
 
 fill = function(os)
@@ -704,7 +840,8 @@ fill = function(os)
 	t.search:Show(false)
 	t.seen_last = shelter.state("bar_last", nil)
 	for i, id in ipairs(TABS) do
-		btn(os, PAD + (i - 1) * 150, TABS_Y, 144, 36, tr("st_shelter_tr_tab_" .. id), function()
+		local step = math.min(150, math.floor((t.w - 2 * PAD) / #TABS))
+		btn(os, PAD + (i - 1) * step, TABS_Y, step - 6, 36, tr("st_shelter_tr_tab_" .. id), function()
 			t.tab = id
 			fill(os)
 		end, t.tab == id and "on" or "normal")

@@ -1,0 +1,240 @@
+-- The way to the Brain Scorcher (docs/coop/shelter.md, "Scorcher"; every number: mod_system_shelter_scorcher.ltx). While it
+-- works: the white zone of the Radar kills even in a helmet, except in a window of "Cooling" (raid_window.script), no saves
+-- in it; a warning in a band round it; one arriving in it by a transition has a moment to get out. X-10's door is locked:
+-- (its transition does nothing till then) with a decoder built by the technician and the scientists (the laptop's Base tab) one stands at it for hack_minutes while
+-- Monolith squads come in waves. Inside, Alpha squads. The vanilla switcher in the lab turns the Scorcher off
+-- (bar_deactivate_radar_done): then all this ends.
+-- The world's (shelter.state): x10_hacked, x10_left (seconds of the hack left), x10_alpha.
+
+local S = "shelter_scorcher"
+local CHECK_MS = 1000
+local RADAR, LAB = "l10_radar", "l10u_bunker"
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function list(key)
+	local out = {}
+	for _, v in ipairs(str_explode(ini_sys:r_string_ex(S, key) or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function point(key)
+	local p = str_explode(ini_sys:r_string_ex(S, key), ",")
+	return vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+end
+
+local function say(id, seconds)
+	actor_menu.set_msg(1, game.translate_string(id), seconds or 5)
+end
+
+local function working()
+	return ini_sys:r_bool_ex(S, "enabled", true) and not raid_window.off()
+end
+
+-- how far inside the white zone: positive inside, negative outside
+local function depth(pos)
+	return math.min(pos.x - num("x_min", -82), num("x_max", 477) - pos.x, pos.z - num("z_min", -388), num("z_max", 208) - pos.z)
+end
+
+function in_zone()
+	return level.name() == RADAR and working() and depth(db.actor:position()) >= 0
+end
+
+-------------------------------------------------------------------------------
+-- the decoder
+
+function has_decoder()
+	return db.actor:object(ini_sys:r_string_ex(S, "decoder")) ~= nil
+end
+
+function hacked()
+	return shelter.state("x10_hacked", false)
+end
+
+function can_build()
+	return shelter_base.has_tech() and shelter_base.has_scientists() and not hacked() and not has_decoder()
+end
+
+function build_decoder()
+	if can_build() and shelter_base.spend_parts("decoder_parts", S) then
+		alife_create_item(ini_sys:r_string_ex(S, "decoder"), db.actor)
+		say("st_shelter_scorcher_decoder_built")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the zone
+
+local arrived_at, msg_at, hit_at = 0, 0, 0
+
+local function zone(now)
+	local pos = db.actor:position()
+	local d = depth(pos)
+	if d >= 0 and not raid_window.open_now() then
+		if now < arrived_at then
+			return
+		end
+		if now >= hit_at then
+			hit_at = now + num("zone_hit_seconds", 2) * 1000
+			local health = db.actor.health - num("zone_health", 0.08)
+			if health <= 0.02 then
+				db.actor:kill(db.actor)
+			else
+				db.actor:set_health_ex(health)
+			end
+		end
+		if now >= msg_at then
+			msg_at = now + num("msg_seconds", 8) * 1000
+			say("st_shelter_scorcher_zone")
+		end
+	elseif d >= -num("band", 40) and d < 0 and not raid_window.open_now() and now >= msg_at then
+		msg_at = now + num("msg_seconds", 8) * 1000
+		say(shelter.state("occupants", false) and "st_shelter_scorcher_band" or "st_shelter_scorcher_band_first", 7)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- X-10's door and the hack
+
+local wave_at = 0
+
+local function wave()
+	local smarts = list("wave_smarts")
+	local squads = list("wave_squads")
+	if #smarts == 0 or #squads == 0 then
+		return
+	end
+	for _ = 1, num("wave_size", 1) do
+		local smart = SIMBOARD.smarts_by_names[smarts[math.random(#smarts)]]
+		local squad = smart and raid_monolith.spawn_squad(smart, squads[math.random(#squads)])
+		if squad then
+			squad.scripted_target = "actor"
+		end
+	end
+	printf("shelter_scorcher: a wave")
+end
+
+local function door(now)
+	local pos = db.actor:position()
+	local dist = pos:distance_to(point("door"))
+	if hacked() then
+		return
+	end
+	local left = tonumber(shelter.state("x10_left", nil))
+	if dist <= num("hack_radius", 12) and has_decoder() then
+		if not left then
+			left = num("hack_minutes", 27) * 60
+			wave_at = now + num("wave_first_seconds", 20) * 1000
+			say("st_shelter_scorcher_hack_started", 8)
+		end
+		left = left - CHECK_MS / 1000
+		if left <= 0 then
+			shelter.set_state("x10_hacked", true)
+			shelter.set_state("x10_left", nil)
+			say("st_shelter_scorcher_hacked", 8)
+			return
+		end
+		shelter.set_state("x10_left", math.floor(left))
+		if now >= wave_at then
+			wave_at = now + num("wave_seconds", 150) * 1000
+			wave()
+		end
+	end
+end
+
+-- the transition into the lab is locked till the code is found
+local function locked(obj)
+	return obj and obj:name() == ini_sys:r_string_ex(S, "door_transition") and working() and not hacked()
+end
+
+-- the transitions into the white zone from the Red Forest and Pripyat are shut while it works
+local function closed(obj)
+	if not (obj and working()) then
+		return false
+	end
+	for _, name in ipairs(list("closed_transitions")) do
+		if obj:name() == name then
+			return true
+		end
+	end
+	return false
+end
+
+-------------------------------------------------------------------------------
+
+local function lab()
+	if shelter.state("x10_alpha", false) then
+		return
+	end
+	shelter.set_state("x10_alpha", true)
+	for _, name in ipairs(list("lab_smarts")) do
+		local smart = SIMBOARD.smarts_by_names[name]
+		for _, section in ipairs(list("lab_squads")) do
+			if smart then
+				raid_monolith.spawn_squad(smart, section)
+			end
+		end
+	end
+	printf("shelter_scorcher: Alpha squads in the lab")
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	if level.name() ~= RADAR or not working() then
+		return
+	end
+	zone(now)
+	door(now)
+end
+
+local function actor_on_first_update()
+	local name = level.name()
+	if name == RADAR and working() then
+		arrived_at = time_global() + num("arrival_grace_seconds", 45) * 1000
+	elseif name == LAB and working() then
+		lab()
+	end
+end
+
+local function on_before_save_input(flags, typ, text)
+	if in_zone() and ini_sys:r_bool_ex(S, "no_saves", true) then
+		actor_menu.set_msg(1, game.translate_string("st_shelter_scorcher_no_save"), 5)
+		exec_console_cmd("main_menu off")
+		flags.ret = true
+	end
+end
+
+function on_game_start()
+	local sr_teleport = xr_effects.sr_teleport
+	xr_effects.sr_teleport = function(actor, obj, ...)
+		if locked(obj) then
+			say(has_decoder() and "st_shelter_scorcher_door_decoding" or "st_shelter_scorcher_door_locked", 6)
+			return
+		end
+		if closed(obj) then
+			say("st_shelter_scorcher_transition_closed", 6)
+			-- back out of the transition, as when its question is answered "no"
+			local path = ini_file("sr_teleport_sections.ltx"):r_string_ex(obj:name(), "reject_path")
+			if path and level.patrol_path_exists(path) then
+				db.actor:set_actor_position(patrol(path):point(0))
+			end
+			return
+		end
+		return sr_teleport(actor, obj, ...)
+	end
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_before_save_input", on_before_save_input)
+end

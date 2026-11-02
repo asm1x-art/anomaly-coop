@@ -1,4 +1,5 @@
--- Shelter test copy only (H:\anomaly-shelter): F8 takes you to the bunker (bunker_a1, the entrance, point 1) and back
+-- Shelter test copy only (H:\anomaly-shelter, with zz_test_modes.script: the keys work while the test mode "Убежище" is
+-- on, switched in the F7 menu): F8 takes you to the bunker (bunker_a1, the entrance, point 1) and back
 -- (back where you were, or to the Cordon village if you came in another way). F10 gives a demo's kit, F6 pushes the
 -- synthesis questline on to the chambers (below). Digging the rubble goes faster here
 -- (shelter.script, DIG); the rubble a save of 2026-10-28 holds stays frozen.
@@ -184,21 +185,8 @@ function fill_stash()
 	return n
 end
 
-local function on_key_press(dik)
-	if dik == DIK_keys.DIK_END and db.actor then
-		return fill_stash()
-	end
-	if dik == DIK_keys.DIK_INSERT and db.actor then
-		return clear_rubble()
-	end
-	if dik == DIK_keys.DIK_F10 and db.actor then
-		return give_kit()
-	elseif dik == DIK_keys.DIK_F6 and db.actor then
-		return push_synthesis()
-	end
-	if dik ~= DIK_keys.DIK_F8 or not db.actor then
-		return
-	end
+-- F8: to the bunker's entrance and back
+local function travel()
 	if level.name() == BUNKER then
 		if back then
 			ChangeLevel(back.pos, back.lvid, back.gvid, VEC_ZERO)
@@ -242,7 +230,17 @@ function init_block(obj)
 end
 
 function on_game_start()
-	RegisterScriptCallback("on_key_press", on_key_press)
+	-- the keys are a test mode (zz_test_modes.script): on in the F7 menu, tab "toggle", "Тест: Убежище"
+	zz_test_modes.add("shelter", {
+		name = "Убежище",
+		keys = {
+			{ "DIK_F8", "F8", "в убежище и обратно", travel },
+			{ "DIK_F10", "F10", "набор для демо", give_kit },
+			{ "DIK_F6", "F6", "синтез: дальше, к камерам", push_synthesis },
+			{ "DIK_INSERT", "Ins", "убрать завалы", clear_rubble },
+			{ "DIK_END", "End", "тайник: все вещи паков", fill_stash },
+		},
+	})
 	-- digging: 8 strokes a shovel, not 40
 	shelter.DIG.wear = 0.125
 	shelter.DIG.stroke = 1250

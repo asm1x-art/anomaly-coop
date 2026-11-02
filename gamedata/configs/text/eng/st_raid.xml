@@ -84,4 +84,109 @@
 	<string id="st_raid_woke">
 		<text>You wake up in the shelter. What was found on the raid is lost; %s things gone.</text>
 	</string>
+	<string id="st_raid_too_late">
+		<text>Too dangerous. Too much time has passed, the safest stretch is over</text>
+	</string>
+	<string id="st_raid_cooling_text">
+		<text>"Guys, the Radar antennas have slowed down, the background has dropped! Whoever wanted to slip through to Limansk, move it before our brains boil again!"</text>
+	</string>
+	<string id="st_raid_cooling_sender_1">
+		<text>Grey, master</text>
+	</string>
+	<string id="st_raid_cooling_sender_2">
+		<text>Capercaillie, master</text>
+	</string>
+	<string id="st_raid_cooling_sender_3">
+		<text>Merlin, master</text>
+	</string>
+	<string id="st_raid_cooling_sender_4">
+		<text>Elk, master</text>
+	</string>
+	<string id="st_raid_window_soon">
+		<text>The window closes soon. Time to go back.</text>
+	</string>
+	<string id="st_raid_window_closed">
+		<text>The window has closed. The Brain Scorcher is gaining power!</text>
+	</string>
+	<string id="st_raid_rescue_signal_scientists">
+		<text>A faint distress signal. A group of scientists somewhere mid-town.</text>
+	</string>
+	<string id="st_raid_rescue_signal_medic">
+		<text>A faint signal from the Hospital's catacombs. A wounded doctor asks for help.</text>
+	</string>
+	<string id="st_raid_rescue_signal_frame">
+		<text>Monolith talk. A commander with valuable cargo at the building site.</text>
+	</string>
+	<string id="st_raid_rescue_joined_scientists">
+		<text>The scientists follow you. Lead them to the exit.</text>
+	</string>
+	<string id="st_raid_rescue_joined_medic">
+		<text>The doctor follows you. Lead him to the exit.</text>
+	</string>
+	<string id="st_raid_rescue_done_frame">
+		<text>You have the incubator frame.</text>
+	</string>
+	<string id="st_raid_rescue_no_further">
+		<text>You can't go further with them. Lead them out first.</text>
+	</string>
+	<string id="st_raid_rescue_lost">
+		<text>The rescue failed.</text>
+	</string>
+	<string id="st_raid_news_rescued_scientists">
+		<text>%s: the scientists are out (%s).</text>
+	</string>
+	<string id="st_raid_news_rescued_medic">
+		<text>%s: the doctor is out (%s).</text>
+	</string>
+	<string id="st_raid_news_rescued_frame">
+		<text>%s: the incubator frame is taken (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_scientists">
+		<text>%s: the scientists were not saved (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_medic">
+		<text>%s: the doctor was not saved (%s).</text>
+	</string>
+	<string id="st_raid_rescue_name_biologist">
+		<text>Dr. Walter</text>
+	</string>
+	<string id="st_raid_rescue_name_physicist">
+		<text>Eng. Sokolov</text>
+	</string>
+	<string id="st_raid_rescue_name_materials">
+		<text>Romanov</text>
+	</string>
+	<string id="st_raid_rescue_name_medic">
+		<text>Korshunov "Stitch"</text>
+	</string>
+	<string id="st_raid_incubator_frame">
+		<text>X-complex incubator frame</text>
+	</string>
+	<string id="st_raid_incubator_frame_descr">
+		<text>An incubator capsule frame from a Monolith commander. Needed to mount the bio-station in the shelter.</text>
+	</string>
+	<string id="st_raid_news_lost_frame">
+		<text>%s: the incubator frame was not taken (%s).</text>
+	</string>
+	<string id="st_raid_cooling_title">
+		<text>Common net</text>
+	</string>
+	<string id="st_raid_rescue_signal_sect">
+		<text>Intercept: a Monolith science group works in the Sarcophagus, with a commander and blueprints.</text>
+	</string>
+	<string id="st_raid_rescue_done_sect">
+		<text>You have the sect's blueprints.</text>
+	</string>
+	<string id="st_raid_news_rescued_sect">
+		<text>%s: the sect's blueprints are taken (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_sect">
+		<text>%s: the sect's blueprints were not taken (%s).</text>
+	</string>
+	<string id="st_raid_sect_blueprints">
+		<text>Sect blueprints</text>
+	</string>
+	<string id="st_raid_sect_blueprints_descr">
+		<text>Compact capacitor schemes from the Monolith's science sector. The generator's artefact runs down slower with them.</text>
+	</string>
 </string_table>
