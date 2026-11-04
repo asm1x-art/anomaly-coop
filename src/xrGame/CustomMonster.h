@@ -231,6 +231,7 @@ public:
 
 	IC CMemoryManager& memory() const;
 	virtual float feel_vision_mtl_transp(CObject* O, u32 element);
+	virtual float feel_vision_env_transp(const Fvector& from, const Fvector& to);
 	virtual void feel_sound_new(CObject* who, int type, CSound_UserDataPtr user_data, const Fvector& Position,
 	                            float power);
 

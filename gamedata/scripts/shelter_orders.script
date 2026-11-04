@@ -51,7 +51,7 @@ local function settings()
 		local sup = { id = id, name = ini_sys:r_string_ex(s, "name"), story = ini_sys:r_string_ex(s, "story"),
 			faction = ini_sys:r_string_ex(s, "faction"), retail = ini_sys:r_float_ex(s, "retail") or 1,
 			hours_min = ini_sys:r_float_ex(s, "hours_min") or 12, hours_max = ini_sys:r_float_ex(s, "hours_max") or 36,
-			intercept = ini_sys:r_float_ex(s, "intercept") or 0.15, points = list_of(ini_sys:r_string_ex(s, "points")), goods = {} }
+			intercept = ini_sys:r_float_ex(s, "intercept") or 0.2, points = list_of(ini_sys:r_string_ex(s, "points")), goods = {} }
 		for _, sec in ipairs(list_of(ini_sys:r_string_ex(s, "goods"))) do
 			if exists(sec) and shelter_trade.category(sec) then
 				sup.goods[#sup.goods + 1] = sec
@@ -62,12 +62,28 @@ local function settings()
 	return cfg
 end
 
+-- goods_medic: a supplier's goods only once the base has a medic
+local function medic_goods(c)
+	if c.medic_goods_on or not shelter.state("rescue_done_medic", false) then
+		return c
+	end
+	c.medic_goods_on = true
+	for _, sup in ipairs(c.suppliers) do
+		for _, sec in ipairs(list_of(ini_sys:r_string_ex("shelter_supplier_" .. sup.id, "goods_medic"))) do
+			if exists(sec) and shelter_trade.category(sec) then
+				sup.goods[#sup.goods + 1] = sec
+			end
+		end
+	end
+	return c
+end
+
 function suppliers()
-	return settings().suppliers
+	return medic_goods(settings()).suppliers
 end
 
 function supplier(id)
-	return settings().by_id[id]
+	return medic_goods(settings()).by_id[id]
 end
 
 -- records as a world's string: fields by FIELDS, ";" between records, "|" between fields
@@ -178,6 +194,11 @@ function order(sup, section, lot, pay)
 	return true
 end
 
+-- the chance of a lot's interception: none once the perimeter is fortified (state perimeter_fortified)
+function intercept_chance(sup)
+	return shelter.state("perimeter_fortified", false) and 0 or sup.intercept
+end
+
 -- the lot intercepted: the case at a point with a squad; false if there is nowhere to put it (then it just arrives)
 local function intercept(d, sup)
 	local c = settings()
@@ -210,7 +231,7 @@ local function deliveries_tick()
 		local sup = supplier(d.sup)
 		if d.state == "way" and t >= d.due then
 			changed = true
-			if sup and math.random() < sup.intercept and intercept(d, sup) then
+			if sup and math.random() < intercept_chance(sup) and intercept(d, sup) then
 				keep[#keep + 1] = d
 			else
 				shelter_trade.ledger_add(d.section, d.qty)

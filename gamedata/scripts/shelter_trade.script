@@ -571,7 +571,15 @@ end
 -- a supplier the crisis has stopped?
 function supplier_stopped(id)
 	local cur = crisis()
-	return cur ~= nil and ini_sys:r_string_ex("shelter_crisis_" .. cur, "stops") == id
+	if cur == nil then
+		return false
+	end
+	for _, stopped in ipairs(list_of(ini_sys:r_string_ex("shelter_crisis_" .. cur, "stops"))) do
+		if stopped == "all" or stopped == id then
+			return true
+		end
+	end
+	return false
 end
 
 -- the crisis' spoilage: a share of a category gone, from the ledger and the boxes
@@ -606,7 +614,10 @@ local function crisis_tick()
 		return t + a + math.random() * (b - a)
 	end
 	if cur then
-		if t >= (shelter.state("crisis_until", 0) or 0) then
+		if t >= (shelter.state("crisis_until", 0) or 0) or (shelter_base and shelter_base.crisis_over(cur)) then
+			if shelter_base then
+				shelter_base.crisis_ended(cur)
+			end
 			announce("st_shelter_tr_crisis_end", { "#st_shelter_tr_crisis_" .. cur })
 			shelter.set_state("crisis", nil)
 			shelter.set_state("crisis_next", gap())
@@ -617,7 +628,13 @@ local function crisis_tick()
 	if not nxt then
 		shelter.set_state("crisis_next", gap())
 	elseif t >= nxt then
-		local list = list_of(ini_sys:r_string_ex("shelter_crises", "list"))
+		local list = {} -- off_state: not any more once the world has that state
+		for _, id in ipairs(list_of(ini_sys:r_string_ex("shelter_crises", "list"))) do
+			local off = ini_sys:r_string_ex("shelter_crisis_" .. id, "off_state")
+			if not (off and shelter.state(off, false)) then
+				list[#list + 1] = id
+			end
+		end
 		if #list == 0 then
 			return
 		end
@@ -628,6 +645,9 @@ local function crisis_tick()
 		local share = ini_sys:r_float_ex(s, "spoil")
 		if share then
 			spoil(ini_sys:r_string_ex(s, "spoil_cat") or "food", share)
+		end
+		if shelter_base then
+			shelter_base.crisis_started(id)
 		end
 		announce("st_shelter_tr_news_" .. id)
 	end
@@ -698,6 +718,9 @@ function traffic(list)
 	local k = crisis_num("traffic", 1)
 	if k < 1 and markup() <= crisis_num("traffic_fixed_at", 0) then
 		k = 1
+	end
+	if shelter.state("bayun_grown", false) then
+		k = k * (ini_sys:r_float_ex("shelter_base", "bayun_traffic") or 1.15)
 	end
 	return c.low + (c.high - c.low) * (f.rep * c.w_rep + f.range * c.w_range + f.prices * c.w_prices) * k
 end

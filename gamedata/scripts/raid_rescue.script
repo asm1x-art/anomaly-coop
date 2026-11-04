@@ -1,0 +1,363 @@
+-- The raid's random rescue events (docs/coop/shelter.md, "Events"; settings: mod_system_raid.ltx [raid_rescue] and
+-- [raid_rescue_<target>]). At each cycle (raid_window) one comes with chance, never two cycles running, with every target
+-- not yet done, one drawn: only it is on in that cycle; one learns of it from a radio signal right on setting out, nothing shows on the raid app's map.
+-- Out of the raid with a target not done, the event is over, and the next cycle has none.
+-- People (scientists, medic): a Monolith siege at the smart nearby; with it dead and the actor at the place, they appear
+-- and follow as companions; they don't go on to further levels. Out to the shelter with all of them alive = done; they
+-- then live in the shelter (staff). One of them dead, or the raider dead: lost till a later event.
+-- A thing (frame): on the commander of the siege; taken = done.
+-- The world's (shelter.state): rescue_active (targets, comma-separated), rescue_done_<t>, rescue_lost_<t>,
+-- rescue_siege_<t> (squad ids), rescue_people_<t> (squad id), rescue_count_<t>, rescue_pending, rescue_skip_next,
+-- rescue_staff_<t>.
+
+local S = "raid_rescue"
+local CHECK_MS = 2000
+local SHELTER_LEVEL = "bunker_a1"
+
+local function setting(t, key)
+	return ini_sys:r_string_ex("raid_rescue_" .. t, key)
+end
+
+local function list(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function point(t, key)
+	local p = str_explode(setting(t, key), ",")
+	return vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+end
+
+local function active()
+	return list(tostring(shelter.state("rescue_active", "") or ""))
+end
+
+local function done(t)
+	return shelter.state("rescue_done_" .. t, false)
+end
+
+local function open(t)
+	return not done(t) and not shelter.state("rescue_lost_" .. t, false)
+end
+
+local function ids_of(key)
+	local out = {}
+	for _, s in ipairs(list(tostring(shelter.state(key, "") or ""))) do
+		out[#out + 1] = tonumber(s)
+	end
+	return out
+end
+
+local function say(id)
+	actor_menu.set_msg(1, game.translate_string(id), 8)
+end
+
+local function people_squad(t)
+	return raid_monolith.squad_alive(tonumber(shelter.state("rescue_people_" .. t, nil)))
+end
+
+-- squads to go, removed once off the raid level: a release just before a level change is lost (the game's release queue)
+local function gone_later(squad)
+	local ids = tostring(shelter.state("rescue_gone", "") or "")
+	shelter.set_state("rescue_gone", (ids == "" and "" or ids .. ",") .. squad.id)
+end
+
+local function drain_gone()
+	local ids = shelter.state("rescue_gone", nil)
+	if not ids then
+		return
+	end
+	shelter.set_state("rescue_gone", nil)
+	for _, s in ipairs(list(tostring(ids))) do
+		local squad = raid_monolith.squad_alive(tonumber(s))
+		if squad then
+			if axr_companions.companion_squads[squad.id] then
+				axr_companions.dismiss_special_squad(squad)
+			end
+			SIMBOARD:remove_squad(squad)
+		end
+	end
+end
+
+local function remove_people(t)
+	local squad = people_squad(t)
+	if squad then
+		gone_later(squad)
+	end
+	shelter.set_state("rescue_people_" .. t, nil)
+	shelter.set_state("rescue_count_" .. t, nil)
+end
+
+local function clear(t)
+	remove_people(t)
+	for _, id in ipairs(ids_of("rescue_siege_" .. t)) do
+		local squad = raid_monolith.squad_alive(id)
+		if squad then
+			gone_later(squad)
+		end
+	end
+	shelter.set_state("rescue_siege_" .. t, nil)
+	shelter.set_state("rescue_lost_" .. t, nil)
+end
+
+-- a new cycle: what was on is over; a new event with chance, never after one that was on. While someone is in a raid
+-- the change waits for them to come out.
+function new_cycle()
+	local who = shelter.state("raid_in", nil)
+	if who and who ~= "" then
+		shelter.set_state("rescue_pending", true)
+		return
+	end
+	shelter.set_state("rescue_pending", nil)
+	local had = #active() > 0 or shelter.state("rescue_skip_next", false)
+	shelter.set_state("rescue_skip_next", nil)
+	for _, t in ipairs(active()) do
+		clear(t)
+	end
+	local left, target = {}, ""
+	if not had and math.random() < (ini_sys:r_float_ex(S, "chance") or 0.4) then
+		for _, t in ipairs(list(ini_sys:r_string_ex(S, "targets"))) do
+			if not done(t) then
+				left[#left + 1] = t
+			end
+		end
+		target = left[math.random(math.max(1, #left))] or ""
+	end
+	shelter.set_state("rescue_active", target)
+	printf("raid_rescue: new cycle, target: %s", target)
+end
+
+-- the sieges on a raid level, as one goes onto it (before it loads)
+function prepare(level_name)
+	for _, t in ipairs(active()) do
+		if setting(t, "level") == level_name and open(t) and not shelter.state("rescue_siege_" .. t, nil) then
+			local smart = SIMBOARD.smarts_by_names[setting(t, "smart")]
+			local ids = {}
+			for i, section in ipairs(list(setting(t, "siege"))) do
+				local squad = smart and raid_monolith.spawn_squad(smart, section)
+				if squad then
+					ids[#ids + 1] = squad.id
+					local item = setting(t, "item")
+					local commander = item and i == 1 and alife():object(squad:commander_id())
+					if commander then
+						alife_create_item(item, commander)
+					end
+				end
+			end
+			shelter.set_state("rescue_siege_" .. t, table.concat(ids, ","))
+			printf("raid_rescue: siege of %s at %s", t, setting(t, "smart"))
+		end
+	end
+end
+
+local function siege_dead(t)
+	for _, id in ipairs(ids_of("rescue_siege_" .. t)) do
+		if raid_monolith.squad_alive(id) then
+			return false
+		end
+	end
+	return true
+end
+
+-- the people appear and follow (as axr_companions.setup_companion_task makes a task's companions)
+local function spawn_people(t)
+	local pos, node = point(t, "position"), tonumber(setting(t, "node"))
+	local gvid = db.actor:game_vertex_id()
+	local squad = alife_create(setting(t, "squad"), pos, node, gvid)
+	if not squad then
+		return
+	end
+	squad:create_npc(nil, pos, node, gvid)
+	squad:set_squad_relation()
+	axr_companions.companion_squads[squad.id] = squad
+	local count = 0
+	for k in squad:squad_members() do
+		local se = k.object or alife():object(k.id)
+		if se then
+			count = count + 1
+			se:set_character_name(game.translate_string(ini_sys:r_string_ex(se:section_name(), "rescue_name")))
+			se_save_var(se.id, se:name(), "companion", true)
+			se_save_var(se.id, se:name(), "companion_cannot_dismiss", true)
+			se_save_var(se.id, se:name(), "companion_cannot_teleport", false)
+			SIMBOARD:setup_squad_and_group(se)
+		end
+	end
+	shelter.set_state("rescue_people_" .. t, squad.id)
+	shelter.set_state("rescue_count_" .. t, count)
+	say("st_raid_rescue_joined_" .. t)
+	printf("raid_rescue: %s follow (%s)", t, count)
+end
+
+local function lose(t)
+	remove_people(t)
+	shelter.set_state("rescue_lost_" .. t, true)
+	raid.group_news("lost_" .. t, setting(t, "level"))
+	say("st_raid_rescue_lost")
+	printf("raid_rescue: %s lost", t)
+end
+
+local function finish(t)
+	shelter.set_state("rescue_done_" .. t, true)
+	raid.group_news("rescued_" .. t, setting(t, "level"))
+	printf("raid_rescue: %s done", t)
+end
+
+-- people following on this level: they don't go further
+function escorting(level_name)
+	for _, t in ipairs(active()) do
+		if setting(t, "level") == level_name and shelter.state("rescue_people_" .. t, nil) then
+			return true
+		end
+	end
+	return false
+end
+
+-- out of the raid from a level: those following are saved, unless the raider died
+function on_exit(level_name, died)
+	for _, t in ipairs(active()) do
+		if setting(t, "level") == level_name and shelter.state("rescue_people_" .. t, nil) then
+			local squad = people_squad(t)
+			local whole = squad and squad:npc_count() >= (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0)
+			if whole and not died then
+				remove_people(t)
+				finish(t)
+			else
+				lose(t)
+			end
+		end
+	end
+	local unfinished = false
+	for _, t in ipairs(active()) do
+		if not done(t) then
+			unfinished = true
+			if open(t) then
+				raid.group_news("lost_" .. t, setting(t, "level"))
+			end
+		end
+	end
+	if unfinished then
+		for _, t in ipairs(active()) do
+			clear(t)
+		end
+		shelter.set_state("rescue_active", "")
+		shelter.set_state("rescue_skip_next", true)
+		printf("raid_rescue: out with a target not done, the event is over")
+	end
+	if shelter.state("rescue_pending", false) then
+		shelter.set_state("raid_in", nil)
+		new_cycle()
+	end
+end
+
+local function check(level_name)
+	for _, t in ipairs(active()) do
+		if setting(t, "level") == level_name and open(t) and setting(t, "squad") then
+			if shelter.state("rescue_people_" .. t, nil) then
+				local squad = people_squad(t)
+				if not squad or squad:npc_count() < (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0) then
+					lose(t)
+				end
+			elseif siege_dead(t) and db.actor:position():distance_to(point(t, "position")) < (ini_sys:r_float_ex(S, "reveal") or 15) then
+				spawn_people(t)
+			end
+		end
+	end
+end
+
+-- the thing found
+local function actor_on_item_take(item)
+	if not raid.is_raid_level(level.name()) then
+		return
+	end
+	for _, t in ipairs(active()) do
+		if setting(t, "item") == item:section() and open(t) then
+			finish(t)
+			say("st_raid_rescue_done_" .. t)
+		end
+	end
+end
+
+-- those saved, in the shelter: each once for the world
+local function spawn_staff(t)
+	local gvid = db.actor:game_vertex_id()
+	local places = str_explode(setting(t, "staff_places") or "", "|")
+	for i, section in ipairs(list(setting(t, "staff"))) do
+		local p = str_explode(places[i] or "", ",")
+		local lvid = p[3] and level.vertex_id(vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3])))
+		if lvid and lvid < 4294967295 then
+			local se = alife_create(section, level.vertex_position(lvid), lvid, gvid)
+			if se then
+				se:set_character_name(game.translate_string(ini_sys:r_string_ex(section, "rescue_name")))
+				shelter_base.add_staff(se.id)
+			end
+		else
+			printf("! raid_rescue: no AI vertex for %s", section)
+		end
+	end
+	shelter.set_state("rescue_staff_" .. t, true)
+end
+
+-- setting out: the signals are heard as one lands, one after another
+function on_start()
+	save_var(db.actor, "raid_rescue_signals", true)
+end
+
+local signals, signal_at = {}, 0
+
+local function next_signal(now)
+	if #signals > 0 and now >= signal_at then
+		signal_at = now + (ini_sys:r_float_ex(S, "signal_seconds") or 9) * 1000
+		db.actor:give_game_news(game.translate_string("st_raid_rescue_signal_title"), game.translate_string(table.remove(signals, 1)),
+			"ui_inGame2_Radiopomehi", 0, (ini_sys:r_float_ex(S, "signal_show_seconds") or 15) * 1000)
+		xr_sound.set_sound_play(AC_ID, "pda_tips")
+	end
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local name = level.name()
+	local now = time_global()
+	if not raid.is_raid_level(name) then
+		if now >= check_at then
+			check_at = now + CHECK_MS
+			drain_gone()
+		end
+		return
+	end
+	if now >= check_at then
+		check_at = now + CHECK_MS
+		check(name)
+		next_signal(now)
+	end
+end
+
+local function actor_on_first_update()
+	local name = level.name()
+	if name == SHELTER_LEVEL then
+		for _, t in ipairs(list(ini_sys:r_string_ex(S, "targets"))) do
+			if done(t) and setting(t, "staff") and not shelter.state("rescue_staff_" .. t, false) then
+				shelter.once("rescue_staff_" .. t, function() spawn_staff(t) end)
+			end
+		end
+	elseif raid.is_raid_level(name) and load_var(db.actor, "raid_rescue_signals", false) then
+		save_var(db.actor, "raid_rescue_signals", nil)
+		signals, signal_at = {}, time_global() + (ini_sys:r_float_ex(S, "signal_first_seconds") or 3) * 1000
+		for _, t in ipairs(active()) do
+			if open(t) then
+				signals[#signals + 1] = "st_raid_rescue_signal_" .. t
+			end
+		end
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+end

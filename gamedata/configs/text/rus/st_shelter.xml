@@ -1386,4 +1386,280 @@
 	<string id="st_shelter_furniture_box_full">
 		<text>Сначала опустошите ящик.</text>
 	</string>
+	<string id="st_shelter_tr_tab_base">
+		<text>База</text>
+	</string>
+	<string id="st_shelter_tr_crisis_audit">
+		<text>Ревизия у Сахарова</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_audit">
+		<text>Бункер Сахарова закрыт на проверку, его поставки заморожены. Медицина в цене.</text>
+	</string>
+	<string id="st_shelter_tr_news_audit">
+		<text>Бункер Сахарова закрыт на проверку: его поставки заморожены.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_double">
+		<text>Двойной выброс</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_double">
+		<text>Сталкеры в панике забивают бар и сметают медицину, еду и патроны по любым ценам.</text>
+	</string>
+	<string id="st_shelter_tr_news_double">
+		<text>Два выброса подряд: толпы сталкеров идут к нам.</text>
+	</string>
+	<string id="st_shelter_tr_crisis_snipers">
+		<text>Снайперская блокада</text>
+	</string>
+	<string id="st_shelter_tr_crisis_text_snipers">
+		<text>Снайперы Монолита на подступах к Радару. Поставщики не берут заказы, пока их не перебьют.</text>
+	</string>
+	<string id="st_shelter_tr_news_snipers">
+		<text>Монолитовцы сели на скалах Радара: поставки встали.</text>
+	</string>
+	<string id="st_shelter_generator_burnt">
+		<text>Артефакт в генераторе выгорел.</text>
+	</string>
+	<string id="st_shelter_generator_low">
+		<text>Внимание, падение мощности генератора.</text>
+	</string>
+	<string id="st_shelter_base_no_money">
+		<text>Не хватает денег.</text>
+	</string>
+	<string id="st_shelter_base_missing">
+		<text>Не хватает: %s.</text>
+	</string>
+	<string id="st_shelter_base_healed">
+		<text>Врач поставил вас на ноги.</text>
+	</string>
+	<string id="st_shelter_base_analyser_built">
+		<text>Анализатор Ноосферы собран.</text>
+	</string>
+	<string id="st_shelter_base_tech_hired">
+		<text>Шуруп приедет на базу к следующему вашему заходу.</text>
+	</string>
+	<string id="st_shelter_base_joint_raised">
+		<text>Сводный отряд выдвинулся к развилке.</text>
+	</string>
+	<string id="st_shelter_base_perimeter_built">
+		<text>Турели и мешки установлены.</text>
+	</string>
+	<string id="st_shelter_base_news_fortified">
+		<text>Периметр укреплён: караваны больше не перехватываются.</text>
+	</string>
+	<string id="st_shelter_base_news_unfortified">
+		<text>Сводный отряд погиб: караваны снова под угрозой.</text>
+	</string>
+	<string id="st_shelter_base_incub_started">
+		<text>Инкубатор запущен.</text>
+	</string>
+	<string id="st_shelter_base_incub_checked">
+		<text>Температура в норме, рост продолжается.</text>
+	</string>
+	<string id="st_shelter_base_news_bayun">
+		<text>Баюн вырос: вредители на складе больше не страшны.</text>
+	</string>
+	<string id="st_shelter_base_name_tech">
+		<text>Шуруп</text>
+	</string>
+	<string id="st_shelter_base_power">
+		<text>Энергоузел</text>
+	</string>
+	<string id="st_shelter_base_charge">
+		<text>Заряд: %d%%</text>
+	</string>
+	<string id="st_shelter_base_power_text">
+		<text>Артефакт в генераторе постепенно разряжается.</text>
+	</string>
+	<string id="st_shelter_base_no_power">
+		<text>Питания нет</text>
+	</string>
+	<string id="st_shelter_base_analyser">
+		<text>Окна и прогнозы</text>
+	</string>
+	<string id="st_shelter_base_scorcher_off">
+		<text>Выжигатель отключён: окно не нужно</text>
+	</string>
+	<string id="st_shelter_base_window_open">
+		<text>Окно открыто</text>
+	</string>
+	<string id="st_shelter_base_window_in">
+		<text>До окна: %d ч</text>
+	</string>
+	<string id="st_shelter_base_window_unknown">
+		<text>Когда окно, неизвестно</text>
+	</string>
+	<string id="st_shelter_base_emission_in">
+		<text>До выброса: %d ч</text>
+	</string>
+	<string id="st_shelter_base_emission_unknown">
+		<text>Выброс: нет данных</text>
+	</string>
+	<string id="st_shelter_base_forecast_on">
+		<text>Транслировать прогноз (+%d в час)</text>
+	</string>
+	<string id="st_shelter_base_forecast_off">
+		<text>Остановить прогноз (+%d в час)</text>
+	</string>
+	<string id="st_shelter_base_analyser_parts">
+		<text>Нужно: %s</text>
+	</string>
+	<string id="st_shelter_base_analyser_build">
+		<text>Собрать анализатор</text>
+	</string>
+	<string id="st_shelter_base_need_scientists">
+		<text>Нужны учёные: спасти их в рейде.</text>
+	</string>
+	<string id="st_shelter_base_medic">
+		<text>Медблок</text>
+	</string>
+	<string id="st_shelter_base_clinic">
+		<text>Клиентов: %s, выручка: %s</text>
+	</string>
+	<string id="st_shelter_base_heal">
+		<text>Лечиться (%d ч)</text>
+	</string>
+	<string id="st_shelter_base_no_medic">
+		<text>Врача нет: спасти его в рейде.</text>
+	</string>
+	<string id="st_shelter_base_lab">
+		<text>НИЛ «Север»</text>
+	</string>
+	<string id="st_shelter_base_bayun">
+		<text>Баюн вырос</text>
+	</string>
+	<string id="st_shelter_base_incub">
+		<text>Инкубатор: %d из %d ч</text>
+	</string>
+	<string id="st_shelter_base_incub_waits">
+		<text>Нужен контроль температуры</text>
+	</string>
+	<string id="st_shelter_base_incub_check">
+		<text>Проверить температуру</text>
+	</string>
+	<string id="st_shelter_base_incub_parts">
+		<text>Инкубатор: %s</text>
+	</string>
+	<string id="st_shelter_base_incub_start">
+		<text>Запустить инкубатор</text>
+	</string>
+	<string id="st_shelter_base_try">
+		<text>Поручить попытку рецепта</text>
+	</string>
+	<string id="st_shelter_base_try_none">
+		<text>Нет свободной камеры или подходящих вещей при себе.</text>
+	</string>
+	<string id="st_shelter_base_tech">
+		<text>Мастерская</text>
+	</string>
+	<string id="st_shelter_base_tech_repaired">
+		<text>Починено стволов: %s</text>
+	</string>
+	<string id="st_shelter_base_tech_text">
+		<text>Чинит стволы на складе, расходует ремкомплекты из записи.</text>
+	</string>
+	<string id="st_shelter_base_tech_none">
+		<text>Шуруп, бывший механик «Свободы», ищет работу.</text>
+	</string>
+	<string id="st_shelter_base_perimeter">
+		<text>Периметр</text>
+	</string>
+	<string id="st_shelter_base_fortified">
+		<text>Укреплён: перехватов нет</text>
+	</string>
+	<string id="st_shelter_base_need_friends">
+		<text>Нужна дружба с «Долгом» и «Свободой»</text>
+	</string>
+	<string id="st_shelter_base_joint_text">
+		<text>Перемирие и сводный отряд с пси-шлемами на развилке.</text>
+	</string>
+	<string id="st_shelter_base_joint">
+		<text>Собрать отряд (%s)</text>
+	</string>
+	<string id="st_shelter_base_build_text">
+		<text>Турели и мешки: %s</text>
+	</string>
+	<string id="st_shelter_base_build">
+		<text>Построить (%s)</text>
+	</string>
+	<string id="st_shelter_freedom_mechanic_name">
+		<text>Болт</text>
+	</string>
+	<string id="st_raid_rescue_signal_title">
+		<text>Рация</text>
+	</string>
+	<string id="st_shelter_base_tech_swapped">
+		<text>Шуруп поставил в генератор новый артефакт.</text>
+	</string>
+	<string id="st_shelter_base_tech_box">
+		<text>В контейнере артефактов: %s</text>
+	</string>
+	<string id="st_shelter_base_tech_box_text">
+		<text>Контейнер у генератора: сам заменит артефакт, когда заряд упадёт.</text>
+	</string>
+	<string id="st_shelter_base_tech_box_name">
+		<text>Контейнер Шурупа</text>
+	</string>
+	<string id="st_shelter_base_autoclave_started">
+		<text>Автоклав запущен.</text>
+	</string>
+	<string id="st_shelter_base_news_autoclave">
+		<text>Автоклав закончил: %s стал легче и прочнее.</text>
+	</string>
+	<string id="st_shelter_base_autoclave_work">
+		<text>Автоклав: %d из %d ч</text>
+	</string>
+	<string id="st_shelter_base_autoclave_parts">
+		<text>Автоклав, нужно: %s</text>
+	</string>
+	<string id="st_shelter_base_autoclave_start">
+		<text>Запустить автоклав</text>
+	</string>
+	<string id="st_shelter_base_autoclave_done">
+		<text>Автоклав: броня готова</text>
+	</string>
+	<string id="st_shelter_base_autoclave_idle">
+		<text>Автоклав: положите броню</text>
+	</string>
+	<string id="st_shelter_base_autoclave_name">
+		<text>Автоклав</text>
+	</string>
+	<string id="st_shelter_scorcher_zone">
+		<text>Голова раскалывается! Дальше нельзя, надо назад!</text>
+	</string>
+	<string id="st_shelter_scorcher_band">
+		<text>Голова раскалывается, дальше просто нет сил терпеть и идти.</text>
+	</string>
+	<string id="st_shelter_scorcher_band_first">
+		<text>Голова раскалывается, дальше просто нет сил терпеть и идти. Я забрался слишком далеко, чтоб просто развернуться и уйти. Надо найти более безопасное место отдохнуть и подумать. Интересно, что по этой дороге.</text>
+	</string>
+	<string id="st_shelter_scorcher_no_save">
+		<text>О безопасности надо было думать раньше. Теперь просто действуем.</text>
+	</string>
+	<string id="st_shelter_scorcher_transition_closed">
+		<text>Дальше путь лежит прямо в белую зону Выжигателя. Там смерть даже в шлеме: туда только в обход.</text>
+	</string>
+	<string id="st_shelter_scorcher_door_locked">
+		<text>Кодовая дверь. Без дешифратора её не открыть.</text>
+	</string>
+	<string id="st_shelter_scorcher_door_decoding">
+		<text>Дешифратор подбирает код. Держитесь рядом.</text>
+	</string>
+	<string id="st_shelter_scorcher_hack_started">
+		<text>Дешифратор начал подбор кода. Монолит это заметит.</text>
+	</string>
+	<string id="st_shelter_scorcher_hacked">
+		<text>Код подобран. Дверь X-10 открыта.</text>
+	</string>
+	<string id="st_shelter_scorcher_decoder_built">
+		<text>Шуруп и учёные собрали дешифратор.</text>
+	</string>
+	<string id="st_shelter_scorcher_build">
+		<text>Собрать дешифратор (%s)</text>
+	</string>
+	<string id="st_shelter_x10_decoder">
+		<text>Дешифратор кодовых замков</text>
+	</string>
+	<string id="st_shelter_x10_decoder_descr">
+		<text>КПК с модификацией, как у Химика, и запасными платами. Подбирает код двери X-10, пока вы рядом.</text>
+	</string>
 </string_table>

@@ -105,6 +105,25 @@ local function play_appropriate_sounds(material, hit_state)
 	utils_obj.play_sound(path..material.."_"..sound, 6)
 end
 
+-- the cartridge the shooter fired. In co-op a shooter run by another game (an NPC puppet, another player's stand-in)
+-- holds a gun whose ammo isn't synced, or none: the engine keeps the cartridge of the bullets that game sent just
+-- before the hit (coop.last_shot). nil: no gun (grenade shrapnel)
+local COOP_SHOT_MAX_AGE = 3000
+local function shot_ammo(shooter)
+	if coop and coop.connected and coop.connected() and coop.last_shot then
+		local s = coop.last_shot(shooter:id())
+		if s and s.age < COOP_SHOT_MAX_AGE and ini_sys:section_exist(s.ammo) then
+			return s.ammo
+		end
+	end
+	local wpn = shooter:active_item()
+	if not wpn then
+		return
+	end
+	local ammo_list = utils_item.get_ammo(wpn:section(), wpn:id())
+	return ammo_list and ammo_list[wpn:get_ammo_type() + 1]
+end
+
 local function actor_on_before_hit(shit,bone_id)
 	-- only proceed for gunshot wounds that would impact the chest or back
 	if (shit.type == hit.fire_wound) then
@@ -157,16 +176,11 @@ local function actor_on_before_hit(shit,bone_id)
 		local msg = game.translate_string("st_armor_absorbed")-- "Armor insert absorbed impact"
 		
 		local shooter = shit.draftsman
-		local wpn = shooter:active_item()
 		local shot_type = 0
 		local material = SYS_GetParam(0, plate:section(), "material") or "kevlar"
-		if (wpn) then
+		local ammo_section = shooter and shot_ammo(shooter)
+		if (ammo_section) then
 			-- get ammo armor penetration
-			local wpn_id = wpn:id()
-			local sec = wpn:section()
-			local ammo_type_number = wpn:get_ammo_type()
-			local ammo_list = utils_item.get_ammo(sec, wpn_id)
-			local ammo_section = ammo_list[ammo_type_number+1]
 			local k_ap = ini_sys:r_float_ex(ammo_section, "k_ap") or 0
 			ratio = k_ap / armor_defense
 			

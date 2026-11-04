@@ -10,6 +10,7 @@
 #include "vision_client.h"
 #include "entity.h"
 #include "visual_memory_manager.h"
+#include "grass_occlusion.h"
 
 IC const CEntity& vision_client::object() const
 {
@@ -116,6 +117,11 @@ bool vision_client::shedule_Needed()
 float vision_client::feel_vision_mtl_transp(CObject* O, u32 element)
 {
 	return (visual().feel_vision_mtl_transp(O, element));
+}
+
+float vision_client::feel_vision_env_transp(const Fvector& from, const Fvector& to)
+{
+	return (grass_occlusion::transparency(from, to));
 }
 
 void vision_client::reinit()

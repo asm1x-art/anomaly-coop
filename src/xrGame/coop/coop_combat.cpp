@@ -710,6 +710,25 @@ namespace coop
 		send(P);
 	}
 
+	struct SLastShot
+	{
+		shared_str weapon;
+		shared_str ammo;
+		u32 time;
+	};
+	static xr_map<u16, SLastShot> g_last_shots;
+
+	bool last_shot(u16 shooter, shared_str& weapon, shared_str& ammo, u32& age)
+	{
+		auto it = g_last_shots.find(shooter);
+		if (it == g_last_shots.end())
+			return false;
+		weapon = it->second.weapon;
+		ammo = it->second.ammo;
+		age = Device.dwTimeGlobal - it->second.time;
+		return true;
+	}
+
 	void play_bullets(u32 sender, NET_Packet& P)
 	{
 		const u16 npc = P.r_u16();
@@ -751,6 +770,8 @@ namespace coop
 			if (CInventoryItem* item = stalker->inventory().ActiveItem())
 				weapon_id = item->object().ID();
 		}
+		if (shooter != NO_OBJECT)
+			g_last_shots[shooter] = { weapon, ammo, Device.dwTimeGlobal };
 
 		CCartridge cartridge;
 		cartridge.Load(*ammo, 0);
@@ -773,6 +794,7 @@ namespace coop
 	{
 		g_proxies.clear();
 		g_actor_hits.clear();
+		g_last_shots.clear();
 	}
 
 	void clear_grudges()

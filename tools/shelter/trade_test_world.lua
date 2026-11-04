@@ -408,7 +408,7 @@ local function fresh_world()
 	bar.set_own_markup("medkit", 1.5)
 end
 
-local TAB_I = { overview = 0, stock = 1, supply = 2, ways = 3, contracts = 4, journal = 5, settings = 6 }
+local TAB_I = { overview = 0, stock = 2, supply = 3, ways = 4, contracts = 5, journal = 6, settings = 7 } -- 1 is the base's, checked in the game
 local pressed = 0
 for _, w in ipairs({ 1024, 1365 }) do
 	for tab, i in pairs(TAB_I) do
@@ -418,7 +418,7 @@ for _, w in ipairs({ 1024, 1365 }) do
 		env.open(os, w, 720)
 		local function go()
 			for _, b in ipairs(os.app_clicks) do
-				if b[2] == 50 and b[1] == 18 + i * 150 then
+				if b[2] == 50 and b[1] == 18 + i * math.min(150, math.floor((w - 36) / 8)) then
 					b[5]()
 					return true
 				end

@@ -773,13 +773,19 @@ function UIShelterOS:open_raid()
 	-- under the list: the landing, the way out, the start
 	local by = H - 14 - 44
 	local ty = TOP + 44 * #levels.order + 12
-	self:text(14, ty, lw, by - 56 - ty, tr("st_raid_landing"), C.dim, win, nil, "s")
-	self:text(14, by - 50, lw, 44, tr("st_raid_map_hint"), C.faint, win, nil, "s")
+	self:text(14, ty, lw, by - 86 - ty, tr("st_raid_landing"), C.dim, win, nil, "s")
+	local notice = self:text(14, by - 80, lw, 74, tr("st_raid_map_hint"), C.faint, win, nil, "s") -- room for the refusal
 	local busy = raid.raider()
+	local denied = raid.entry_denied() -- the button stays and only tells why not
 	self:button(14, by, lw, 44, busy and tr("st_raid_busy", busy) or tr("st_raid_go"), function()
+		if denied then
+			notice:SetText(tr(denied))
+			actor_menu.set_msg(1, tr(denied), 6)
+			return
+		end
 		self:Close()
 		raid.start()
-	end, self.app_clicks, win, self.wx, self.wy, busy and "off" or "primary")
+	end, self.app_clicks, win, self.wx, self.wy, busy and "off" or denied and "normal" or "primary")
 	self.raid_stashes = raid.stashes()
 	self.raid_marks = raid.marks()
 	self.raid_list, self.raid_card_box = nil, nil

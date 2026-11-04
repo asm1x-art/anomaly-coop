@@ -6,6 +6,7 @@
 #include "coop/coop_npc.h"
 #include "ai_debug.h"
 #include "CustomMonster.h"
+#include "grass_occlusion.h"
 #include "ai_space.h"
 #include "ai/monsters/BaseMonster/base_monster.h"
 #include "xrserver_objects_alife_monsters.h"
@@ -975,6 +976,11 @@ bool CCustomMonster::is_special_killer(CObject* obj)
 float CCustomMonster::feel_vision_mtl_transp(CObject* O, u32 element)
 {
 	return (memory().visual().feel_vision_mtl_transp(O, element));
+}
+
+float CCustomMonster::feel_vision_env_transp(const Fvector& from, const Fvector& to)
+{
+	return (grass_occlusion::transparency(from, to));
 }
 
 void CCustomMonster::feel_sound_new(CObject* who, int type, CSound_UserDataPtr user_data, const Fvector& position,

@@ -1,0 +1,872 @@
+-- The base's systems behind the laptop's "Base" tab (docs/coop/shelter.md, "Base"; every number: mod_system_shelter_base.ltx).
+-- The medic (heals, treats clients, opens Sakharov's heavy goods), the analyser (exact window, emission forecast, paid
+-- forecast), the technician (repairs worn weapons in the store), the perimeter (no interceptions), the incubator, the
+-- crises with squads. The clock is the sim master's, by world hours (shelter_trade.hours()). The world's: shelter.state.
+
+local S = "shelter_base"
+local CHECK_MS = 2000
+local LEVEL = "bunker_a1"
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function text(key)
+	return ini_sys:r_string_ex(S, key)
+end
+
+local function list(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function say(id, ...)
+	local s = game.translate_string(id)
+	actor_menu.set_msg(1, select("#", ...) > 0 and string.format(s, ...) or s, 6)
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function master()
+	return not in_coop() or coop.is_sim_master()
+end
+
+local function pay(cost)
+	if db.actor:money() < cost then
+		say("st_shelter_base_no_money")
+		return false
+	end
+	db.actor:give_money(-cost)
+	news_manager.relocate_money(db.actor, "out", cost)
+	return true
+end
+
+-- "section:count" lines: what is missing, as the first section's name; nil if all is carried
+local function parts_of(key, section)
+	local out = {}
+	for _, entry in ipairs(list(ini_sys:r_string_ex(section or S, key))) do
+		local p = str_explode(entry, ":")
+		out[#out + 1] = { section = p[1], count = tonumber(p[2]) or 1 }
+	end
+	return out
+end
+
+local function missing(parts)
+	for _, p in ipairs(parts) do
+		local n = 0
+		db.actor:iterate_inventory(function(_, item)
+			if item:section() == p.section then
+				n = n + 1
+			end
+		end, db.actor)
+		if n < p.count then
+			return p.section
+		end
+	end
+end
+
+local function take(parts)
+	for _, p in ipairs(parts) do
+		local left, found = p.count, {}
+		db.actor:iterate_inventory(function(_, item)
+			if left > 0 and item:section() == p.section then
+				left = left - 1
+				found[#found + 1] = item
+			end
+		end, db.actor)
+		for _, item in ipairs(found) do
+			news_manager.relocate_item(db.actor, "out", item:section(), 1)
+			alife_release(item)
+		end
+	end
+end
+
+-- a list of parts for the laptop: names and counts; section: where the key is, [shelter_base] without one
+function parts_text(key, section)
+	local t = {}
+	for _, p in ipairs(parts_of(key, section)) do
+		t[#t + 1] = ui_item.get_sec_name(p.section) .. (p.count > 1 and " x" .. p.count or "")
+	end
+	return table.concat(t, ", ")
+end
+
+-- the parts taken from the actor, if all are there
+function spend_parts(key, section)
+	local parts = parts_of(key, section)
+	local lack = missing(parts)
+	if lack then
+		say("st_shelter_base_missing", ui_item.get_sec_name(lack))
+		return false
+	end
+	take(parts)
+	return true
+end
+
+function cost_of(key)
+	return num(key, 0)
+end
+
+-------------------------------------------------------------------------------
+-- the staff
+
+-- those living in the shelter hold their place (scripts\shelter_staff.ltx): without a scheme they walk off
+local STAFF_LTX = "scripts\\shelter_staff.ltx"
+
+function add_staff(id)
+	local ids = tostring(shelter.state("staff_ids", "") or "")
+	shelter.set_state("staff_ids", (ids == "" and "" or ids .. ",") .. id)
+end
+
+local function hold_staff()
+	if level.name() ~= LEVEL then
+		return
+	end
+	for _, s in ipairs(list(tostring(shelter.state("staff_ids", "") or ""))) do
+		local id = tonumber(s)
+		local npc = id and level.object_by_id(id)
+		local st = id and db.storage[id]
+		if npc and st and npc:alive() and st.active_scheme ~= "beh" then
+			local ltx = ini_file(STAFF_LTX)
+			xr_logic.configure_schemes(npc, ltx, STAFF_LTX, modules.stype_stalker, "logic", "")
+			xr_logic.activate_by_section(npc, ltx, xr_logic.determine_section_to_activate(npc, ltx, "logic", db.actor), "", false)
+		end
+	end
+end
+
+function has_medic()
+	return shelter.state("rescue_done_medic", false)
+end
+
+function has_scientists()
+	return shelter.state("rescue_done_scientists", false)
+end
+
+function has_tech()
+	return shelter.state("tech_hired", false)
+end
+
+-- the medic: one's wounds closed, radiation and psi gone, heal_hours asleep
+function heal()
+	if not has_medic() then
+		return
+	end
+	level.add_pp_effector("sleep_fade.ppe", 11, false)
+	level.change_game_time(0, num("heal_hours", 6), 0)
+	db.actor:set_health_ex(1)
+	db.actor.bleeding = 1000
+	db.actor.radiation = 0
+	db.actor.psy_health = 1
+	say("st_shelter_base_healed")
+end
+
+-- clients: each hour one comes with clinic_chance, a medicine from the ledger goes, the fee to the till
+local function clinic(hours)
+	if not has_medic() then
+		return
+	end
+	local item = text("clinic_item")
+	for _ = 1, hours do
+		if math.random() < num("clinic_chance", 0.15) and (shelter_trade.ledger()[item] or 0) > 0 then
+			shelter_trade.ledger_add(item, -1)
+			local fee = math.random(num("clinic_fee_min", 1500), num("clinic_fee_max", 4000))
+			shelter_trade.deposit_till(fee)
+			shelter.set_state("clinic_served", (tonumber(shelter.state("clinic_served", 0)) or 0) + 1)
+			shelter.set_state("clinic_total", (tonumber(shelter.state("clinic_total", 0)) or 0) + fee)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the analyser: built by the scientists from parts
+
+function has_analyser()
+	return shelter.state("analyser", false)
+end
+
+function build_analyser()
+	if not has_scientists() or has_analyser() then
+		return
+	end
+	local parts = parts_of("analyser_parts")
+	local lack = missing(parts)
+	if lack then
+		return say("st_shelter_base_missing", ui_item.get_sec_name(lack))
+	end
+	take(parts)
+	shelter.set_state("analyser", true)
+	say("st_shelter_base_analyser_built")
+end
+
+-- game hours to the next emission, nil if the manager doesn't know yet
+function emission_hours()
+	local m = surge_manager and surge_manager.get_surge_manager and surge_manager.get_surge_manager()
+	if not (m and m.last_surge_time and m._delta) then
+		return nil
+	end
+	return math.max(0, (m._delta - game.get_game_time():diffSec(m.last_surge_time)) / 3600)
+end
+
+function forecast_on()
+	return shelter.state("forecast", false)
+end
+
+function set_forecast(on)
+	shelter.set_state("forecast", on and true or nil)
+end
+
+local function forecast(hours)
+	if has_analyser() and forecast_on() then
+		shelter_trade.deposit_till(num("forecast_income", 300) * hours)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the technician: hired, stands by the workbench; every repair_every hours a worn weapon from the store's boxes goes up
+-- to repair_target, a kit from the ledger gone. Only while one is in the shelter: boxes are online then.
+
+function hire_tech()
+	if has_tech() or not pay(num("tech_cost", 40000)) then
+		return
+	end
+	shelter.set_state("tech_hired", true)
+	shelter.set_state("tech_new", true)
+	say("st_shelter_base_tech_hired")
+end
+
+local function spawn_tech()
+	local p = str_explode(text("tech_place") or "", ",")
+	local lvid = p[3] and level.vertex_id(vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3])))
+	if lvid and lvid < 4294967295 then
+		local section = text("tech_npc")
+		local se = alife_create(section, level.vertex_position(lvid), lvid, db.actor:game_vertex_id())
+		if se then
+			se:set_character_name(game.translate_string(ini_sys:r_string_ex(section, "rescue_name")))
+			add_staff(se.id)
+		end
+	end
+	local b = str_explode(text("tech_box_place") or "", ",")
+	local box_lvid = b[3] and level.vertex_id(vector():set(tonumber(b[1]), tonumber(b[2]), tonumber(b[3])))
+	if box_lvid and box_lvid < 4294967295 then
+		local box = alife_create(text("tech_box"), vector():set(tonumber(b[1]), tonumber(b[2]), tonumber(b[3])), box_lvid, db.actor:game_vertex_id())
+		if box then
+			shelter.set_state("tech_box_id", box.id)
+		end
+	end
+	shelter.set_state("tech_new", nil)
+end
+
+-- his container: electric artefacts there go into the generator once its charge is below tech_swap_below or it stands
+function tech_box()
+	local id = tonumber(shelter.state("tech_box_id", nil))
+	return id and level.object_by_id(id)
+end
+
+function tech_box_count()
+	local box, n = tech_box(), 0
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			if shelter.electric_section(item:section()) and item:condition() >= num("tech_swap_below", 0.1) then
+				n = n + 1
+			end
+		end, box)
+	end
+	return n
+end
+
+local function refill_generator()
+	local box, gen = tech_box(), shelter.generator_box_object()
+	if not (has_tech() and box and gen and shelter.state("generator_repaired", false)) then
+		return
+	end
+	local below = num("tech_swap_below", 0.1)
+	local has_good, worn = false, {}
+	gen:iterate_inventory_box(function(_, item)
+		if shelter.electric_section(item:section()) then
+			if item:condition() >= below then
+				has_good = true
+				return true
+			end
+			worn[#worn + 1] = item
+		end
+	end, gen)
+	if has_good then
+		return
+	end
+	local fresh
+	box:iterate_inventory_box(function(_, item)
+		if shelter.electric_section(item:section()) and item:condition() >= below then
+			fresh = item
+			return true
+		end
+	end, box)
+	if fresh then
+		box:transfer_item(fresh, gen)
+		for _, item in ipairs(worn) do
+			gen:transfer_item(item, box)
+		end
+		say("st_shelter_base_tech_swapped")
+	end
+end
+
+local function repair(hours)
+	if not has_tech() or level.name() ~= LEVEL then
+		return
+	end
+	local due = (tonumber(shelter.state("repair_due", 0)) or 0) + hours
+	local every = num("repair_every", 4)
+	if due < every then
+		return shelter.set_state("repair_due", due)
+	end
+	shelter.set_state("repair_due", due - every)
+	local kit, target = text("repair_kit"), num("repair_target", 0.7)
+	if (shelter_trade.ledger()[kit] or 0) <= 0 then
+		return
+	end
+	for _, g in ipairs(shelter_trade.stock()) do
+		if g.cat and g.cat.id == "weapon" and g.cond and g.cond < target then
+			local obj = level.object_by_id(g.se.id)
+			if obj then
+				obj:set_condition(target)
+				shelter_trade.ledger_add(kit, -1)
+				shelter.set_state("tech_repaired", (tonumber(shelter.state("tech_repaired", 0)) or 0) + 1)
+				return
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the perimeter: friendly with Duty and Freedom, a joint squad on the fork (a truce, psi helmets paid for), then the
+-- turrets and sandbags built. With the squads alive and those built there are no interceptions.
+
+local function goodwill_ok(faction)
+	return relation_registry.community_goodwill(faction, AC_ID) >= num("perimeter_goodwill", 1000)
+end
+
+function perimeter_friends()
+	for _, faction in ipairs(list(text("perimeter_factions"))) do
+		if not goodwill_ok(faction) then
+			return false
+		end
+	end
+	return true
+end
+
+function joint_alive()
+	for _, s in ipairs(list(tostring(shelter.state("joint_squads", "") or ""))) do
+		if raid_monolith.squad_alive(tonumber(s)) then
+			return true
+		end
+	end
+	return false
+end
+
+-- heavy arms for a raised squad: arms_<section> = weapon:ammo, ..., one member each in turn, arms_ammo boxes each
+local function arm(squad, section)
+	local arms = list(text("arms_" .. section))
+	if #arms == 0 then
+		return
+	end
+	local members = {}
+	for k in squad:squad_members() do
+		members[#members + 1] = k.object or alife():object(k.id)
+	end
+	for i, entry in ipairs(arms) do
+		local p = str_explode(entry, ":")
+		local se = members[i]
+		if se and ini_sys:section_exist(p[1]) then
+			alife_create_item(p[1], se)
+			shelter.set_state("perim_arm_" .. se.id, p[1])
+			if p[2] and ini_sys:section_exist(p[2]) then
+				for _ = 1, num("arms_ammo", 3) do
+					alife_create_item(p[2], se)
+				end
+			end
+		end
+	end
+end
+
+-- an armed man fights with what he was given: once online, his other rifles go (an NPC picks its own gun otherwise)
+local stripped = {}
+
+-- the sniper on the tower: put on its platform and kept from walking (no AI map there: he would climb down). In an
+-- emission he walks down to the cover with the rest, and is put back after
+local function hold_sniper(npc, surge)
+	local p = str_explode(text("perimeter_sniper_spot") or "", ",")
+	local spot = #p == 3 and vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+	if not (spot and npc:alive()) then
+		return
+	end
+	if surge then
+		npc:movement_enabled(true)
+		return
+	end
+	if npc:position():distance_to(spot) > 1.5 then
+		npc:set_npc_position(spot)
+	end
+	npc:movement_enabled(false)
+end
+
+-- every few seconds on the level's authority: the sniper, the patrol in an emission, the arms
+local function tend_perimeter()
+	local surge = xr_conditions.surge_started()
+	for _, s in ipairs(list(tostring(shelter.state("joint_squads", "") or ""))) do
+		local squad = raid_monolith.squad_alive(tonumber(s))
+		if squad then
+			local sniper = squad:section_name() == text("perimeter_sniper")
+			-- the patrol, wherever it is, goes to the fork's cover in an emission; patrol() sends it on afterwards
+			if surge and squad:section_name() == text("perimeter_patrol") then
+				squad.scripted_target = text("perimeter_patrol_cover")
+			end
+			for k in squad:squad_members() do
+				local online = sniper and level.object_by_id(k.id)
+				if online then
+					hold_sniper(online, surge)
+				end
+				local given = not stripped[k.id] and shelter.state("perim_arm_" .. k.id, nil)
+				local npc = given and level.object_by_id(k.id)
+				if npc and npc:alive() and npc:object(given) then
+					stripped[k.id] = true
+					local other = {}
+					npc:iterate_inventory(function(_, item)
+						if IsWeapon(item) and not IsMelee(item) and not IsPistol(item) and item:section() ~= given then
+							other[#other + 1] = item:id()
+						end
+					end, npc)
+					for _, id in ipairs(other) do
+						alife_release_id(id)
+					end
+				end
+			end
+		end
+	end
+end
+
+-- the truce: Duty and Freedom are enemies, so the perimeter's men of different factions get a personal goodwill that
+-- leaves them friends (personal + the factions' goodwill = truce_goodwill)
+local function truce(squad_ids)
+	local members = {}
+	for _, id in ipairs(squad_ids) do
+		local squad = alife_object(id)
+		if squad then
+			for k in squad:squad_members() do
+				local se = k.object or alife():object(k.id)
+				if se then
+					members[#members + 1] = se
+				end
+			end
+		end
+	end
+	local target = num("truce_goodwill", 1000)
+	for _, a in ipairs(members) do
+		for _, b in ipairs(members) do
+			local ca, cb = a:community(), b:community()
+			if a.id ~= b.id and ca ~= cb then
+				a:force_set_goodwill(target - relation_registry.community_relation(ca, cb), b.id)
+			end
+		end
+	end
+end
+
+function raise_joint()
+	if not perimeter_friends() or joint_alive() or not pay(num("joint_cost", 150000)) then
+		return
+	end
+	local ids = {}
+	for _, entry in ipairs(list(text("joint_squads"))) do
+		local p = str_explode(entry, ":")
+		local smart = SIMBOARD.smarts_by_names[p[2] or ""]
+		local squad = smart and raid_monolith.spawn_squad(smart, p[1])
+		if squad then
+			ids[#ids + 1] = squad.id
+			arm(squad, p[1])
+		end
+	end
+	truce(ids)
+	shelter.set_state("joint_squads", table.concat(ids, ","))
+	shelter.set_state("perim_patrol_at", 1)
+	say("st_shelter_base_joint_raised")
+end
+
+-- the patrol goes one smart further along its route every perimeter_patrol_hours
+local function patrol(hours)
+	local left = (tonumber(shelter.state("perim_patrol_left", nil)) or num("perimeter_patrol_hours", 1)) - hours
+	if left > 0 then
+		shelter.set_state("perim_patrol_left", left)
+		return
+	end
+	shelter.set_state("perim_patrol_left", num("perimeter_patrol_hours", 1))
+	local route = list(text("perimeter_patrol_route"))
+	if #route == 0 then
+		return
+	end
+	local at = (tonumber(shelter.state("perim_patrol_at", 1)) or 1) % #route + 1
+	shelter.set_state("perim_patrol_at", at)
+	for _, s in ipairs(list(tostring(shelter.state("joint_squads", "") or ""))) do
+		local squad = raid_monolith.squad_alive(tonumber(s))
+		if squad and squad:section_name() == text("perimeter_patrol") then
+			squad.scripted_target = route[at]
+		end
+	end
+end
+
+-- the posts: the jobs of configs\scripts\shelter_perimeter.ltx join their smarts' jobs, for NPCs of their squads only;
+-- "calm" jobs (the posts) outside an emission or a psi storm, "surge" ones (the covers) in it
+local JOBS_INI = "scripts\\shelter_perimeter.ltx"
+local jobs_ini
+
+local function own_squad(se_obj, smart, job)
+	local squad = se_obj.group_id and se_obj.group_id ~= 65535 and alife_object(se_obj.group_id)
+	if not (squad and job.shelter_squads[squad:section_name()]) then
+		return false
+	end
+	return job.shelter_surge == (xr_conditions.surge_started() and true or false)
+end
+
+local function add_post_jobs(smart)
+	jobs_ini = jobs_ini or ini_file(JOBS_INI)
+	local names = jobs_ini:r_string_ex("shelter_perimeter", smart:name())
+	if not (names and smart.stalker_jobs) then
+		return
+	end
+	for _, name in ipairs(list(names)) do
+		local section = "logic@" .. name
+		local scheme = utils_data.get_scheme_by_section(jobs_ini:r_string_ex(section, "active") or "")
+		local squads = {}
+		for _, squad in ipairs(list(jobs_ini:r_string_ex(section, "squad"))) do
+			squads[squad] = true
+		end
+		rawset(smart.stalker_jobs, #smart.stalker_jobs + 1, {
+			section = section, ini_path = JOBS_INI, ltx = jobs_ini, job_type = scheme == "walker" and "path_job" or "point_job",
+			prior = jobs_ini:r_float_ex(section, "prior") or 200, prefix_name = "nil", exclusive = true,
+			precondition_function = own_squad, shelter_squads = squads,
+			shelter_surge = jobs_ini:r_string_ex(section, "when") == "surge",
+		})
+	end
+	table.sort(smart.stalker_jobs, function(a, b) return gulag_general.get_job_prior(a) > gulag_general.get_job_prior(b) end)
+end
+
+function perimeter_built()
+	return shelter.state("perimeter_built", false)
+end
+
+function build_perimeter()
+	if perimeter_built() or not joint_alive() then
+		return
+	end
+	local parts = parts_of("perimeter_parts")
+	local lack = missing(parts)
+	if lack then
+		return say("st_shelter_base_missing", ui_item.get_sec_name(lack))
+	end
+	if not pay(num("perimeter_cost", 100000)) then
+		return
+	end
+	take(parts)
+	shelter.set_state("perimeter_built", true)
+	say("st_shelter_base_perimeter_built")
+end
+
+local function perimeter(hours)
+	if joint_alive() then
+		patrol(hours)
+	end
+	local fortified = perimeter_built() and joint_alive()
+	if fortified ~= (shelter.state("perimeter_fortified", false) and true or false) then
+		shelter.set_state("perimeter_fortified", fortified and true or nil)
+		shelter_trade.announce(fortified and "st_shelter_base_news_fortified" or "st_shelter_base_news_unfortified")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the incubator (the biologist's): the parts in, incub_hours with power, a temperature check due at incub_check_at
+-- (without it the growth waits). Grown: no rats any more, more visitors.
+
+function bayun_grown()
+	return shelter.state("bayun_grown", false)
+end
+
+function incubator()
+	local hours = tonumber(shelter.state("incub_hours", nil))
+	if not hours then
+		return nil
+	end
+	return { hours = hours, total = num("incub_total", 48), check = num("incub_check_at", 24),
+		checked = shelter.state("incub_checked", false) }
+end
+
+function start_incubator()
+	if not has_scientists() or incubator() or bayun_grown() then
+		return
+	end
+	local parts = parts_of("incub_parts")
+	local lack = missing(parts)
+	if lack then
+		return say("st_shelter_base_missing", ui_item.get_sec_name(lack))
+	end
+	take(parts)
+	shelter.set_state("incub_hours", 0)
+	say("st_shelter_base_incub_started")
+end
+
+function check_incubator()
+	shelter.set_state("incub_checked", true)
+	say("st_shelter_base_incub_checked")
+end
+
+local function grow(hours)
+	local inc = incubator()
+	if not inc or not shelter.state("power_on", false) then
+		return
+	end
+	local grown = inc.hours + hours
+	if not inc.checked and grown >= inc.check then
+		grown = inc.check
+	end
+	if grown >= inc.total then
+		shelter.set_state("incub_hours", nil)
+		shelter.set_state("incub_checked", nil)
+		shelter.set_state("bayun_grown", true)
+		shelter_trade.announce("st_shelter_base_news_bayun")
+	else
+		shelter.set_state("incub_hours", grown)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the autoclave (the materials scientist's): a box in the NIL's hall. An outfit laid there, the parts given, autoclave_hours
+-- with power: the outfit is lighter by autoclave_weight, whole, and hits on who wears it are weaker by autoclave_hit. An
+-- item's weight isn't saved by the engine: the world keeps autoclaved_<id> = its weight in grams and it is set again.
+
+function autoclave_box()
+	local id = tonumber(shelter.state("autoclave_box_id", nil))
+	return id and level.object_by_id(id)
+end
+
+local function spawn_autoclave()
+	local p = str_explode(text("autoclave_place") or "", ",")
+	local pos = vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+	local lvid = level.vertex_id(pos)
+	if lvid and lvid < 4294967295 then
+		local se = alife_create(text("autoclave_section"), pos, lvid, db.actor:game_vertex_id())
+		if se then
+			shelter.set_state("autoclave_box_id", se.id)
+		end
+	end
+end
+
+local function autoclaved_grams(id)
+	return tonumber(shelter.state("autoclaved_" .. id, nil))
+end
+
+local function reapply_weight(item)
+	local grams = autoclaved_grams(item:id())
+	if grams and item.set_weight then
+		item:set_weight(grams / 1000)
+	end
+end
+
+-- the outfit in the box, if any
+local function box_outfit()
+	local box, found = autoclave_box(), nil
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			if IsOutfit(item) then
+				found = item
+				return true
+			end
+		end, box)
+	end
+	return found
+end
+
+-- for the laptop: "off" (no box), "idle", "ready" (an outfit there, not done yet), "done" (it has been done), "work"
+function autoclave_state()
+	if shelter.state("autoclave_item", nil) then
+		return "work", tonumber(shelter.state("autoclave_hours", 0)) or 0, num("autoclave_total", 12)
+	end
+	if not autoclave_box() then
+		return "off"
+	end
+	local item = box_outfit()
+	if not item then
+		return "idle"
+	end
+	return autoclaved_grams(item:id()) and "done" or "ready"
+end
+
+function start_autoclave()
+	local item = box_outfit()
+	if not item or autoclaved_grams(item:id()) or shelter.state("autoclave_item", nil) then
+		return
+	end
+	local parts = parts_of("autoclave_parts")
+	local lack = missing(parts)
+	if lack then
+		return say("st_shelter_base_missing", ui_item.get_sec_name(lack))
+	end
+	take(parts)
+	shelter.set_state("autoclave_item", item:id())
+	shelter.set_state("autoclave_hours", 0)
+	say("st_shelter_base_autoclave_started")
+end
+
+local function autoclave_tick(hours)
+	local id = tonumber(shelter.state("autoclave_item", nil))
+	if not id or not shelter.state("power_on", false) then
+		return
+	end
+	local grown = (tonumber(shelter.state("autoclave_hours", 0)) or 0) + hours
+	if grown < num("autoclave_total", 12) then
+		return shelter.set_state("autoclave_hours", grown)
+	end
+	if level.name() ~= LEVEL then -- the box is online only here: done when one is back
+		return shelter.set_state("autoclave_hours", grown)
+	end
+	shelter.set_state("autoclave_item", nil)
+	shelter.set_state("autoclave_hours", nil)
+	local item = level.object_by_id(id)
+	if item then
+		local grams = math.floor(item:weight() * (1 - num("autoclave_weight", 0.2)) * 1000)
+		shelter.set_state("autoclaved_" .. id, grams)
+		item:set_weight(grams / 1000)
+		item:set_condition(1)
+		shelter_trade.announce("st_shelter_base_news_autoclave", { "@" .. item:section() })
+	end
+end
+
+local function actor_on_item_take(item)
+	reapply_weight(item)
+end
+
+-- hits on who wears an autoclaved outfit
+local function actor_on_before_hit(s_hit)
+	local outfit = db.actor:item_in_slot(7)
+	if outfit and autoclaved_grams(outfit:id()) then
+		s_hit.power = s_hit.power * (1 - num("autoclave_hit", 0.1))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- crises with squads (shelter_trade): squads = "smart:section, ..."; until_dead: over once they are dead
+
+function crisis_started(id)
+	local ids = {}
+	for _, entry in ipairs(list(ini_sys:r_string_ex("shelter_crisis_" .. id, "squads"))) do
+		local p = str_explode(entry, ":")
+		local smart = SIMBOARD.smarts_by_names[p[1]]
+		local squad = smart and p[2] and raid_monolith.spawn_squad(smart, p[2])
+		if squad then
+			ids[#ids + 1] = squad.id
+		end
+	end
+	shelter.set_state("crisis_squads", #ids > 0 and table.concat(ids, ",") or nil)
+end
+
+function crisis_over(id)
+	if not ini_sys:r_bool_ex("shelter_crisis_" .. id, "until_dead", false) then
+		return false
+	end
+	local ids = list(tostring(shelter.state("crisis_squads", "") or ""))
+	if #ids == 0 then
+		return false
+	end
+	for _, s in ipairs(ids) do
+		if raid_monolith.squad_alive(tonumber(s)) then
+			return false
+		end
+	end
+	return true
+end
+
+function crisis_ended(id)
+	for _, s in ipairs(list(tostring(shelter.state("crisis_squads", "") or ""))) do
+		local squad = raid_monolith.squad_alive(tonumber(s))
+		if squad then
+			SIMBOARD:remove_squad(squad)
+		end
+	end
+	shelter.set_state("crisis_squads", nil)
+end
+
+-------------------------------------------------------------------------------
+
+local check_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	hold_staff()
+	if not in_coop() or coop.is_authority(level.name()) then
+		tend_perimeter()
+	end
+	if level.name() == LEVEL then
+		refill_generator()
+	end
+	if not master() then
+		return
+	end
+	local t = shelter_trade.hours()
+	local last = tonumber(shelter.state("base_last_hour", nil))
+	if not last or last > t then
+		shelter.set_state("base_last_hour", t)
+		return
+	end
+	local hours = t - last
+	if hours < 1 then
+		return
+	end
+	shelter.set_state("base_last_hour", t)
+	clinic(hours)
+	forecast(hours)
+	repair(hours)
+	grow(hours)
+	autoclave_tick(hours)
+	perimeter(hours)
+end
+
+local function actor_on_first_update()
+	db.actor:iterate_inventory(function(_, item)
+		reapply_weight(item)
+	end, db.actor)
+	if level.name() ~= LEVEL then
+		return
+	end
+	if shelter.state("tech_new", false) then
+		shelter.once("tech_npc", spawn_tech)
+	end
+	if has_scientists() and not shelter.state("autoclave_box_id", nil) then
+		shelter.once("autoclave", spawn_autoclave)
+	end
+	local box = autoclave_box()
+	if box then
+		box:iterate_inventory_box(function(_, item)
+			reapply_weight(item)
+		end, box)
+	end
+end
+
+function on_game_start()
+	local load_job = gulag_general.load_job
+	gulag_general.load_job = function(smart, debug_save, ...)
+		local r = load_job(smart, debug_save, ...)
+		if not debug_save then
+			add_post_jobs(smart)
+		end
+		return r
+	end
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("actor_on_before_hit", actor_on_before_hit)
+end

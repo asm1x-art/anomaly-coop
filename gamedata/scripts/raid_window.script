@@ -1,0 +1,245 @@
+-- The window for raids (docs/coop/shelter.md, "Events"; settings: mod_system_raid.ltx [raid_window]). While the Brain
+-- Scorcher works, about once every every_hours world hours comes the event "Cooling": a master-rank stalker tells the common
+-- net, the raid app is there for window_hours; one may set out in its first entry_hours, later the button only tells it
+-- is too dangerous. One must be back before it closes: then psi hits and a loss of health grow and phantoms come till one is out or dead
+-- (a raid's death rules). With the Scorcher off there is no window, the app is always there; the Monolith reinforces
+-- the Pripyat transition and the Scorcher's complex ([reinforce], topped up each cycle).
+-- The world's (shelter.state): cool_next, cool_open (world hours, shelter_trade.hours()), cool_seq (the events so far),
+-- scorcher_was_on, scorcher_mon_<i> (a reinforcing squad's id). The clock is the sim master's; each game hears the news.
+-- raid_rescue rolls its random events at each cycle's start.
+
+local S = "raid_window"
+local CHECK_MS = 1000
+local NO_NUMBER = -1
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function hours()
+	return shelter_trade.hours()
+end
+
+local function state_num(key)
+	return tonumber(shelter.state(key, nil))
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function master()
+	return not in_coop() or coop.is_sim_master()
+end
+
+-- the Scorcher is off (in the story after its quest, in free play from the start)
+function off()
+	return has_alife_info("bar_deactivate_radar_done")
+end
+
+function open_now()
+	local opened = state_num("cool_open")
+	return opened ~= nil and hours() < opened + num("window_hours", 6)
+end
+
+-- world hours to the next cycle (for the analyser on the laptop)
+function hours_to_next()
+	return math.max(0, (state_num("cool_next") or hours()) - hours())
+end
+
+-- the raid app is there
+function available()
+	return off() or open_now()
+end
+
+-- the text's id if one can't set out now: too late in the window, or none open
+function entry_denied()
+	if off() then
+		return nil
+	end
+	local opened = state_num("cool_open")
+	if opened and hours() < opened + num("entry_hours", 2) then
+		return nil
+	end
+	return "st_raid_too_late"
+end
+
+-------------------------------------------------------------------------------
+-- the Monolith once the Scorcher is off: [reinforce] lines "smart:squad section"; only for a Scorcher seen working (free
+-- play starts with it off and gets none)
+
+local function reinforce()
+	local list = str_explode(ini_sys:r_string_ex(S, "reinforce") or "", ",")
+	for i, entry in ipairs(list) do
+		local p = str_explode(entry, ":")
+		local smart = p[1] and SIMBOARD.smarts_by_names[p[1]]
+		if smart and p[2] and not raid_monolith.squad_alive(state_num("scorcher_mon_" .. i)) then
+			local squad = raid_monolith.spawn_squad(smart, p[2])
+			if squad then
+				shelter.set_state("scorcher_mon_" .. i, squad.id)
+				printf("raid_window: Monolith reinforces %s", p[1])
+			end
+		end
+	end
+end
+
+-- a new cycle: the rescue's roll; the event, while the Scorcher works; the Monolith, once it is off
+local function new_cycle(t)
+	raid_rescue.new_cycle()
+	if off() then
+		if shelter.state("scorcher_was_on", false) then
+			reinforce()
+		end
+		return
+	end
+	shelter.set_state("cool_open", t)
+	shelter.set_state("cool_seq", (state_num("cool_seq") or 0) + 1)
+	printf("raid_window: Cooling at world hour %s", t)
+end
+
+-- the next cycle: every_hours from now, give or take every_spread, so that it does not fall on the same day each week
+local function next_at(t)
+	local spread = num("every_spread", 24)
+	return math.floor(t + num("every_hours", 168) + spread * (2 * math.random() - 1))
+end
+
+local function clock()
+	local t = hours()
+	if not off() then
+		if not shelter.state("scorcher_was_on", false) then
+			shelter.set_state("scorcher_was_on", true)
+		end
+	elseif shelter.state("scorcher_was_on", false) and not shelter.state("scorcher_mon_done", false) then
+		shelter.set_state("scorcher_mon_done", true)
+		reinforce()
+	end
+	local nxt = state_num("cool_next")
+	if not nxt then
+		shelter.set_state("cool_next", next_at(t))
+	elseif t >= nxt then
+		shelter.set_state("cool_next", next_at(t))
+		new_cycle(t)
+	end
+end
+
+-- for the tests (devcmd): the event now
+function force_open()
+	shelter.set_state("cool_next", next_at(hours()))
+	new_cycle(hours())
+end
+
+-------------------------------------------------------------------------------
+-- this game's news of the event
+
+local function hear()
+	local seq = state_num("cool_seq") or 0
+	if seq <= load_var(db.actor, "raid_cool_heard", 0) then
+		return
+	end
+	save_var(db.actor, "raid_cool_heard", seq)
+	if open_now() and not off() then
+		local senders = str_explode(ini_sys:r_string_ex(S, "senders") or "", ",")
+		local sender = senders[math.random(math.max(1, #senders))] or ""
+		-- the sender in the text too: the HUD's caption is faint on a bright background
+		sender = game.translate_string(sender)
+		db.actor:give_game_news(game.translate_string("st_raid_cooling_title"), sender .. ": " .. game.translate_string("st_raid_cooling_text"),
+			"ui_inGame2_Radiopomehi", 0, 20000)
+		xr_sound.set_sound_play(AC_ID, "pda_tips")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- on a raid level with the window running out, then gone
+
+local warned, late_since, late_at, msg_at, phantom_at = NO_NUMBER, nil, 0, 0, 0
+
+local function psi_hit(power)
+	local h = hit()
+	h.type = hit.telepatic
+	h.power = power
+	h.impulse = 0
+	h.direction = vector():set(0, 0, 1)
+	h.draftsman = db.actor
+	db.actor:hit(h)
+end
+
+local function phantom()
+	if phantom_manager.g_PhantomManager.phantom_count >= num("phantoms_max", 5) then
+		return
+	end
+	local d = db.actor:direction()
+	local angle = math.random() * 2 * math.pi
+	local far = num("phantom_distance", 12)
+	local pos = vector():set(db.actor:position())
+	pos.x = pos.x + d.x * far + math.cos(angle) * far / 2
+	pos.z = pos.z + d.z * far + math.sin(angle) * far / 2
+	pos.y = pos.y + 1
+	level.spawn_phantom(pos)
+end
+
+local function late(now)
+	if not late_since then
+		late_since = now
+	end
+	if now >= msg_at then
+		msg_at = now + num("late_msg_seconds", 15) * 1000
+		actor_menu.set_msg(1, game.translate_string("st_raid_window_closed"), 5)
+	end
+	if now >= late_at then
+		late_at = now + num("late_hit_seconds", 3) * 1000
+		local seconds = (now - late_since) / 1000
+		psi_hit(math.min(num("late_hit_max", 0.15), num("late_hit", 0.01) + num("late_hit_grow", 0.0008) * seconds))
+		-- a helmet takes the psi hit: the health goes whatever one wears (at the end a raid's death)
+		local health = db.actor.health - math.min(num("late_health_max", 0.05), num("late_health", 0.005) + num("late_health_grow", 0.0003) * seconds)
+		if health <= 0.02 then
+			db.actor:kill(db.actor)
+		else
+			db.actor:set_health_ex(health)
+		end
+	end
+	if now >= phantom_at then
+		phantom_at = now + num("phantom_seconds", 20) * 1000
+		phantom()
+	end
+end
+
+local function in_raid(now)
+	local opened = state_num("cool_open")
+	if off() or not opened then
+		late_since = nil
+		return
+	end
+	local left = opened + num("window_hours", 6) - hours()
+	if left <= 0 then
+		late(now)
+		return
+	end
+	late_since = nil
+	if left <= num("warn_hours", 1) and warned ~= opened then
+		warned = opened
+		actor_menu.set_msg(1, game.translate_string("st_raid_window_soon"), 8)
+	end
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	if raid.is_raid_level(level.name()) then
+		in_raid(now)
+	else
+		late_since = nil
+	end
+	if master() then
+		clock()
+	end
+	hear()
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end

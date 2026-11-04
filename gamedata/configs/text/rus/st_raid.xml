@@ -84,4 +84,109 @@
 	<string id="st_raid_woke">
 		<text>Вы очнулись в убежище. Найденное в рейде потеряно, пропало вещей: %s.</text>
 	</string>
+	<string id="st_raid_too_late">
+		<text>Слишком опасно. Прошло много времени, самый безопасный промежуток прошел</text>
+	</string>
+	<string id="st_raid_cooling_text">
+		<text>«Мужики, антенны на Радаре сбавили обороты, фон просел! Кто хотел проскочить на Лиманск — шевелитесь, пока снова мозги не закипели!»</text>
+	</string>
+	<string id="st_raid_cooling_sender_1">
+		<text>Седой, мастер</text>
+	</string>
+	<string id="st_raid_cooling_sender_2">
+		<text>Глухарь, мастер</text>
+	</string>
+	<string id="st_raid_cooling_sender_3">
+		<text>Кречет, мастер</text>
+	</string>
+	<string id="st_raid_cooling_sender_4">
+		<text>Лось, мастер</text>
+	</string>
+	<string id="st_raid_window_soon">
+		<text>Окно скоро закроется. Пора возвращаться.</text>
+	</string>
+	<string id="st_raid_window_closed">
+		<text>Окно закрылось. Выжигатель набирает мощность!</text>
+	</string>
+	<string id="st_raid_rescue_signal_scientists">
+		<text>Слабый сигнал бедствия. Группа учёных где-то в середине города.</text>
+	</string>
+	<string id="st_raid_rescue_signal_medic">
+		<text>Слабый сигнал из катакомб Госпиталя. Раненый врач просит помощи.</text>
+	</string>
+	<string id="st_raid_rescue_signal_frame">
+		<text>Переговоры Монолита. На стройке командир с ценным грузом.</text>
+	</string>
+	<string id="st_raid_rescue_joined_scientists">
+		<text>Учёные идут за вами. Выведите их к выходу.</text>
+	</string>
+	<string id="st_raid_rescue_joined_medic">
+		<text>Врач идёт за вами. Выведите его к выходу.</text>
+	</string>
+	<string id="st_raid_rescue_done_frame">
+		<text>Каркас инкубатора у вас.</text>
+	</string>
+	<string id="st_raid_rescue_no_further">
+		<text>С ними дальше не пройти. Сначала выведите их.</text>
+	</string>
+	<string id="st_raid_rescue_lost">
+		<text>Спасти не удалось.</text>
+	</string>
+	<string id="st_raid_news_rescued_scientists">
+		<text>%s: группа учёных выведена (%s).</text>
+	</string>
+	<string id="st_raid_news_rescued_medic">
+		<text>%s: врач выведен (%s).</text>
+	</string>
+	<string id="st_raid_news_rescued_frame">
+		<text>%s: каркас инкубатора добыт (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_scientists">
+		<text>%s: группу учёных спасти не удалось (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_medic">
+		<text>%s: врача спасти не удалось (%s).</text>
+	</string>
+	<string id="st_raid_rescue_name_biologist">
+		<text>Д-р Вальтер</text>
+	</string>
+	<string id="st_raid_rescue_name_physicist">
+		<text>Инж. Соколов</text>
+	</string>
+	<string id="st_raid_rescue_name_materials">
+		<text>Романов</text>
+	</string>
+	<string id="st_raid_rescue_name_medic">
+		<text>Коршунов «Шов»</text>
+	</string>
+	<string id="st_raid_incubator_frame">
+		<text>Каркас инкубатора X-комплекса</text>
+	</string>
+	<string id="st_raid_incubator_frame_descr">
+		<text>Каркас капсулы инкубатора из трофеев командира Монолита. Нужен для монтажа биостанции в убежище.</text>
+	</string>
+	<string id="st_raid_news_lost_frame">
+		<text>%s: каркас инкубатора добыть не удалось (%s).</text>
+	</string>
+	<string id="st_raid_cooling_title">
+		<text>Общая сеть</text>
+	</string>
+	<string id="st_raid_rescue_signal_sect">
+		<text>Перехват: группа учёных Монолита работает в Саркофаге. С ними командир и чертежи.</text>
+	</string>
+	<string id="st_raid_rescue_done_sect">
+		<text>Чертежи сектантов у вас.</text>
+	</string>
+	<string id="st_raid_news_rescued_sect">
+		<text>%s: чертежи сектантов добыты (%s).</text>
+	</string>
+	<string id="st_raid_news_lost_sect">
+		<text>%s: чертежи сектантов добыть не удалось (%s).</text>
+	</string>
+	<string id="st_raid_sect_blueprints">
+		<text>Чертежи сектантов</text>
+	</string>
+	<string id="st_raid_sect_blueprints_descr">
+		<text>Схемы компактных конденсаторов с лабораторного сектора Монолита. С ними артефакт в генераторе расходуется медленнее.</text>
+	</string>
 </string_table>

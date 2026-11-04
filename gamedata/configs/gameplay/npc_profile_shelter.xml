@@ -9,4 +9,8 @@
 		<class>shelter_zombie_seva</class>
 		<specific_character>shelter_zombie_seva</specific_character>
 	</character>
+	<character id="shelter_scientist">
+		<class>shelter_scientist</class>
+		<specific_character>shelter_scientist</specific_character>
+	</character>
 </xml>

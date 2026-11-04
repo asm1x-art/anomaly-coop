@@ -1,0 +1,32 @@
+; NPC fire and sight (scripts\ai_tuning.script, docs/coop/ai.md). Bushes for sight: materials\materials_ai_bush.ltx.
+[ai_tuning]
+; NPC weapon spread times this (1 = vanilla; above 1 = they miss more). Applies on top of the game difficulty's
+; g_dispersion_factor / g_dispersion_base.
+accuracy_k      = 1.2
+
+; Grass hides from sight (engine: src/xrGame/grass_occlusion.cpp). Over the last depth metres of a sight ray before the
+; point looked at, every step metres inside a slot's grass layer (the level's grass, 2x2 m slots; up to max_height above
+; the ground) takes k * density * step of the sight away (density 0..1 from the level's grass map). With the vanilla
+; threshold of 0.6 in a fight: 8 m through grass of density 0.5 leaves 0.36 (hidden), through 2 m 0.78 (seen).
+; Standing in grass the head shows above it; lying or crouching hides. Applies to every NPC and mutant.
+[ai_grass]
+enabled         = true
+depth           = 8
+step            = 0.5
+k               = 0.25
+max_height      = 1.2
+
+; Detection delay (scriptsi_tuning.script): how fast an NPC notices a player (ours or a co-op stand-in) is times the
+; pose's factor (crouch, low: lying or deep crouch; by the head's height over the feet, crouch_height / low_height
+; metres) and times cover ^ cover_power, where cover is the sight the grass and the bushes leave to the player's head
+; and waist, on average (1 in the open). Not below min. Lying half hidden in grass: 0.3 * 0.5 = 0.15, about 7 times
+; slower. Once noticed nothing changes. cache_ms: how long one NPC's reckoning for one player is reused.
+[ai_detection]
+enabled         = true
+crouch          = 0.6
+low             = 0.3
+crouch_height   = 1.3
+low_height      = 0.75
+cover_power     = 1
+min             = 0.05
+cache_ms        = 300

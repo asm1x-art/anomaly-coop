@@ -1,0 +1,126 @@
+-- NPC fire and sight tuning (docs/coop/ai.md; numbers: mod_system_ai_tuning.ltx).
+-- Spread: the engine asks _g.CAI_Stalker__GetWeaponAccuracy for an NPC's spread on every shot (ai_stalker_fire.cpp,
+-- GetWeaponAccuracy): it gets the spread worked out from the stance and the game difficulty and returns the one used.
+-- Detection: an NPC notices a target once a value it builds up while the target is in sight reaches a threshold; the
+-- engine asks visual_memory_manager.get_visible_value for each step of it. For a player (ours, or another's stand-in
+-- in co-op) the step is slowed by the player's pose (crouched, lying) and by how much the grass and see-through things
+-- (bushes) between the NPC's eyes and the player's head and waist hide: half hidden and lying takes several times
+-- longer to be noticed. Once noticed, nothing changes.
+
+local k = 1
+local D = "ai_detection"
+local det = {}
+
+local function num(key, default)
+	return ini_sys:r_float_ex(D, key) or default
+end
+
+local function point(obj, bone, dy)
+	local ok, p = pcall(obj.bone_position, obj, bone)
+	if ok and p then
+		return p
+	end
+	return obj:position():add(vector():set(0, dy, 0))
+end
+
+-- the share of sight the see-through static materials (bushes, nets) leave along the ray
+function materials(from, to)
+	local vis, guard = 1, 0
+	local dir = vector():set(to.x - from.x, to.y - from.y, to.z - from.z)
+	local left = dir:magnitude()
+	dir:normalize()
+	local at = vector():set(from)
+	while left > 0.05 and guard < 16 do
+		guard = guard + 1
+		local rp = ray_pick(at, dir, left, rq_target.rqtStatic, nil)
+		if not rp:query() then
+			break
+		end
+		local r = rp:get_result()
+		vis = vis * (r and r.material_vis_transparency_factor or 0)
+		if vis <= 0 then
+			return 0
+		end
+		local step = rp:get_distance() + 0.05
+		at = at:add(vector():set(dir):mul(step))
+		left = left - step
+	end
+	return vis
+end
+
+local function is_player(obj)
+	if obj:id() == AC_ID then
+		return true
+	end
+	return coop and coop.connected and coop.connected() and obj:section() == "coop_proxy"
+end
+
+-- the pose: the head's height over the feet
+local function pose(who)
+	local h = point(who, "bip01_head", 1.6).y - who:position().y
+	if h < det.low_height then
+		return det.low, "лёжа"
+	elseif h < det.crouch_height then
+		return det.crouch, "присев"
+	end
+	return 1, "стоя"
+end
+
+-- how much of the head and the waist the grass and the bushes leave in sight, on average
+local function cover(npc, who)
+	local eye = point(npc, "bip01_head", 1.7)
+	local v = 0
+	for _, p in ipairs({ point(who, "bip01_head", 1.6), point(who, "bip01_pelvis", 0.9) }) do
+		local g = level.grass_transparency and level.grass_transparency(eye, p) or 1
+		v = v + g * materials(eye, p)
+	end
+	return v / 2
+end
+
+local cache = {}
+
+-- the detection speed's factor for npc looking at who (1 = vanilla); also the pose's name, for the test stand
+function detection_factor(npc, who)
+	local f, name = pose(who)
+	local c = cover(npc, who)
+	return math.max(det.min, f * c ^ det.cover_power), name, c
+end
+
+local function cached_factor(npc, who)
+	local key = npc:id() * 65536 + who:id()
+	local now = time_global()
+	local e = cache[key]
+	if not e or now > e.t then
+		e = { f = detection_factor(npc, who), t = now + det.cache_ms }
+		cache[key] = e
+	end
+	return e.f
+end
+
+function on_game_start()
+	k = ini_sys:r_float_ex("ai_tuning", "accuracy_k") or 1
+	local previous = _G.CAI_Stalker__GetWeaponAccuracy
+	_G.CAI_Stalker__GetWeaponAccuracy = function(npc, wpn, base, body_state, movement_type)
+		if previous then
+			base = previous(npc, wpn, base, body_state, movement_type)
+		end
+		return base * k
+	end
+
+	det = {
+		enabled = ini_sys:r_bool_ex(D, "enabled", true),
+		crouch = num("crouch", 0.6), low = num("low", 0.3),
+		crouch_height = num("crouch_height", 1.3), low_height = num("low_height", 0.75),
+		cover_power = num("cover_power", 1), min = num("min", 0.05), cache_ms = num("cache_ms", 300),
+	}
+	if det.enabled and visual_memory_manager and visual_memory_manager.get_visible_value then
+		local base = visual_memory_manager.get_visible_value
+		visual_memory_manager.get_visible_value = function(npc, who, ...)
+			local v = base(npc, who, ...)
+			if npc and who and is_player(who) then
+				v = v * cached_factor(npc, who)
+			end
+			return v
+		end
+	end
+end

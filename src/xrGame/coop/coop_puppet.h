@@ -35,6 +35,8 @@ namespace coop
 	// our player lies wounded (coop_death.script): the others see it lying, NPCs leave it be
 	void set_downed(bool downed);
 	bool is_downed(u32 peer); // a player lying wounded; peer may be my_id()
+	// our player climbs onto a ledge (climb_rules.script): the actor has no such motion, so others see a jump instead
+	void set_climbing(bool climbing);
 	void read_look(NET_Packet& P, SLook& look);
 
 	// what our actor does, for the others' puppets of it (M_ACTOR_ACTION); weapon hooks

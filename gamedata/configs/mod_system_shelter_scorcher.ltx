@@ -1,0 +1,47 @@
+; The way to the Brain Scorcher (scripts\shelter_scorcher.script, docs/coop/shelter.md). enabled = false turns it all off.
+[shelter_scorcher]
+enabled         = true
+; the white zone of l10_radar; band: metres round it with the warning; zone_health: lost each zone_hit_seconds in it outside
+; a window; arrival_grace_seconds: time to get out for one arriving in it by a transition; no_saves: none inside
+x_min           = -82
+x_max           = 477
+z_min           = -388
+z_max           = 208
+band            = 40
+zone_hit_seconds = 2
+zone_health     = 0.08
+arrival_grace_seconds = 45
+msg_seconds     = 8
+no_saves        = true
+; transitions into the white zone from other levels: shut while it works (detours: Pripyat via Jupiter, Red Forest via
+; the Warehouses)
+closed_transitions = red_space_restrictor_to_radar_1, pri_space_restrictor_to_radar
+; X-10's door: its transition is locked till it is hacked; with the decoder within hack_radius of door the hack runs,
+; hack_minutes real minutes (it pauses away from the door); a wave of wave_size squads every wave_seconds
+door            = 148, -9, -34
+door_transition = rad_space_restrictor_to_bunker
+hack_radius     = 12
+hack_minutes    = 27
+wave_first_seconds = 20
+wave_seconds    = 150
+wave_size       = 1
+wave_smarts     = rad_antenna_patrol, rad_antenna_camper, rad_antenna_monolith
+wave_squads     = raid_monolith_far, raid_monolith_alpha, raid_monolith_mid
+; the decoder: built on the laptop by the technician and the scientists from decoder_parts
+decoder         = shelter_x10_decoder
+decoder_parts   = device_pda_3:1, batteries_dead:2
+; the lab: on each of its smarts these squads, once
+lab_smarts      = bun2_st_bloodsucker, bun2_tushkano_lair, bun_krovosos_nest
+lab_squads      = raid_monolith_alpha, raid_monolith_alpha
+
+[shelter_x10_decoder]:tch_quest
+visual          = dynamics\equipments\quest\notes_document_case_1.ogf
+inv_name        = st_shelter_x10_decoder
+inv_name_short  = st_shelter_x10_decoder
+description     = st_shelter_x10_decoder_descr
+inv_grid_x      = 2
+inv_grid_y      = 44
+inv_grid_width  = 1
+inv_grid_height = 1
+inv_weight      = 0.3
+quest_item      = true

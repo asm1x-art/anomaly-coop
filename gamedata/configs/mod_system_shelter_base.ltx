@@ -1,0 +1,105 @@
+; The base's systems (scripts\shelter_base.script, the laptop's Trade app, "Base" tab; docs/coop/shelter.md "Base"): every
+; number here is for tuning. Hours are game hours.
+[shelter_base]
+; the generator: a full electric artefact lasts power_hours; lamps dip below power_low with power_dip_chance each second
+power_hours     = 336
+sect_power_k    = 0.67   ; drain times this once the sect's blueprints are found: the artefact lasts longer
+power_low       = 0.2
+power_dip_chance = 0.25
+power_drain_seconds = 30   ; real seconds between charge updates
+; the medic: healing takes heal_hours; a client each hour with clinic_chance uses one clinic_item from the ledger and pays
+heal_hours      = 6
+clinic_chance   = 0.15
+clinic_item     = medkit
+clinic_fee_min  = 1500
+clinic_fee_max  = 4000
+; the analyser's parts ("section:count"); forecast_income: into the till each hour while the paid forecast runs
+analyser_parts  = device_weather_radar:1, detector_radio:1, batteries_dead:2
+forecast_income = 300
+; the technician: hired for tech_cost; a weapon below repair_target in the store goes up to it every repair_every hours
+tech_cost       = 40000
+tech_npc        = shelter_base_npc_tech
+tech_place      = 2.0, 2.95, -10.0
+repair_every    = 4
+repair_target   = 0.7
+repair_kit      = medium_repair_kit
+; his container by the generator: electric artefacts from it go into the generator below tech_swap_below
+tech_box        = shelter_tech_box
+tech_box_place  = 3.5, 2.95, -10.0
+tech_swap_below = 0.1
+; the materials scientist: how many random loads he looks through for one never tried
+staff_tries     = 30
+; the perimeter: goodwill needed with each faction, the joint squads and their price (psi helmets and the truce), then
+; the turrets and sandbags with their parts and price. Squads as "squad section:smart it starts at": the post on the fork
+; (point 1, 590,-5 of l10_radar; no smart there: it belongs to rad_after_valley and stands at the fork by its jobs), the
+; checkpoint at the entry (point 2, 607,-312; rad_entrance), the patrol walking perimeter_patrol_route, one smart further
+; every perimeter_patrol_hours. Posts and their jobs: configs\scripts\shelter_perimeter.ltx, the paths in
+; mod_patrol_paths_shelter.ltx. Squad make-up: the shelter_perim_* sections below.
+perimeter_goodwill = 1000
+perimeter_factions = dolg, freedom
+joint_squads    = shelter_perim_post:rad_after_valley, shelter_perim_post2:rad_after_valley, shelter_perim_sniper:rad_after_valley, shelter_perim_gate:rad_entrance, shelter_perim_patrol:rad_after_valley
+; heavy arms handed out when the squads are raised: arms_<squad section> = weapon:ammo, ... (one member each, in turn),
+; arms_ammo boxes of that ammo with each
+arms_shelter_perim_post = wpn_pkm:ammo_pkm_100
+arms_shelter_perim_post2 = wpn_pkp:ammo_pkm_100
+arms_shelter_perim_sniper = wpn_m82:ammo_12.7x55_fmj   ; or wpn_dvl10_leupold:ammo_7.62x51_fmj
+arms_ammo       = 3
+; the truce: the perimeter's men of different factions (Duty and Freedom are enemies) are set to this goodwill to
+; each other (1000 = friends, 0 = neutral)
+truce_goodwill  = 1000
+; the sniper stands on the wooden tower by the fork (its platform has no AI map: he is put there and cannot walk)
+perimeter_sniper = shelter_perim_sniper
+perimeter_sniper_spot = 600.5, -44.3, 15.5
+joint_cost      = 150000
+perimeter_patrol = shelter_perim_patrol
+perimeter_patrol_route = rad_after_valley, rad_valley, rad_entrance, rad_valley
+perimeter_patrol_hours = 1
+; in an emission or a psi storm the patrol goes to this smart's cover (the trailer by the fork), the posts to theirs
+perimeter_patrol_cover = rad_after_valley
+perimeter_parts = medium_repair_kit:2
+perimeter_cost  = 100000
+; the incubator: parts, hours with power, the temperature check at incub_check_at; grown: visitors times bayun_traffic
+incub_parts     = raid_incubator_frame:1, mutant_part_cat_thyroid:1, af_drops:1, drug_psy_blockade:5
+incub_total     = 48
+incub_check_at  = 24
+bayun_traffic   = 1.15
+; the autoclave: a box in the NIL's hall; parts per outfit, hours with power; lighter by autoclave_weight, whole, hits on the wearer weaker by autoclave_hit
+autoclave_section = shelter_autoclave
+autoclave_place = 18.5, 1.32, -9.5
+autoclave_parts = af_gravi:1
+autoclave_total = 12
+autoclave_weight = 0.2
+autoclave_hit   = 0.1
+
+[shelter_base_npc_tech]:sim_default_stalker_2
+rescue_name     = st_shelter_base_name_tech
+
+[shelter_tech_box]:inventory_box
+visual          = dynamics\equipments\quest\safe_container.ogf
+inv_name        = st_shelter_base_tech_box_name
+
+[shelter_autoclave]:inventory_box
+visual          = dynamics\equipment_cache\equipment_seif_01_case.ogf
+inv_name        = st_shelter_base_autoclave_name
+
+; the perimeter's squads: the post on the fork (Duty 5, Freedom 4, a Duty sniper), the checkpoint (Freedom), the
+; patrol between them (Duty)
+[shelter_perim_post]:online_offline_group
+faction         = dolg
+npc             = sim_default_duty_4, sim_default_duty_4, sim_default_duty_3, sim_default_duty_3, sim_default_duty_3
+
+[shelter_perim_post2]:online_offline_group
+faction         = freedom
+npc             = sim_default_freedom_4, sim_default_freedom_4, sim_default_freedom_3, sim_default_freedom_3
+
+[shelter_perim_sniper]:online_offline_group
+faction         = dolg
+npc             = sim_default_duty_4
+
+[shelter_perim_gate]:online_offline_group
+faction         = freedom
+npc             = sim_default_freedom_4, sim_default_freedom_3, sim_default_freedom_3, sim_default_freedom_2
+
+[shelter_perim_patrol]:online_offline_group
+faction         = dolg
+npc             = sim_default_duty_3, sim_default_duty_3, sim_default_duty_2

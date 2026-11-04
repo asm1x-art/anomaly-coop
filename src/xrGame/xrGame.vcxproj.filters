@@ -2676,6 +2676,9 @@
     <ClInclude Include="visual_memory_params.h">
       <Filter>AI\AComponents\MemoryManager\raw_data_managers\VisualMemoryManager\visual_memory_params</Filter>
     </ClInclude>
+    <ClInclude Include="grass_occlusion.h">
+      <Filter>AI\AComponents\MemoryManageraw_data_managers\VisualMemoryManagerision_client</Filter>
+    </ClInclude>
     <ClInclude Include="vision_client.h">
       <Filter>AI\AComponents\MemoryManager\raw_data_managers\VisualMemoryManager\vision_client</Filter>
     </ClInclude>
@@ -7516,6 +7519,9 @@
     </ClCompile>
     <ClCompile Include="visual_memory_params.cpp">
       <Filter>AI\AComponents\MemoryManager\raw_data_managers\VisualMemoryManager\visual_memory_params</Filter>
+    </ClCompile>
+    <ClCompile Include="grass_occlusion.cpp">
+      <Filter>AI\AComponents\MemoryManageraw_data_managers\VisualMemoryManagerision_client</Filter>
     </ClCompile>
     <ClCompile Include="vision_client.cpp">
       <Filter>AI\AComponents\MemoryManager\raw_data_managers\VisualMemoryManager\vision_client</Filter>
