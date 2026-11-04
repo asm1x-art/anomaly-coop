@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../xrCore/profiler.h"
 #include "xrSheduler.h"
 #include "xr_object.h"
 
@@ -365,7 +366,8 @@ void CSheduler::ProcessStep()
 
 		m_current_step_obj = T.Object;
 		// try {
-		T.Object->shedule_Update(clampr(Elapsed, u32(1), u32(_max(u32(T.Object->shedule.t_max), u32(1000)))));
+		PROF_STAT_NAMED("shedule_Update", typeid(*T.Object).name(),
+			T.Object->shedule_Update(clampr(Elapsed, u32(1), u32(_max(u32(T.Object->shedule.t_max), u32(1000))))));
 		if (!m_current_step_obj)
 		{
 #ifdef DEBUG_SCHEDULER
@@ -441,6 +443,7 @@ SwitchToFiber (fiber_main);
 */
 void CSheduler::Update()
 {
+	PROF_EVENT("Scheduler");
 	R_ASSERT(Device.Statistic);
 	// Initialize
 	Device.Statistic->Sheduler.Begin();
@@ -476,7 +479,7 @@ void CSheduler::Update()
         VERIFY(T.Object->dbg_startframe != Device.dwFrame);
         T.Object->dbg_startframe = Device.dwFrame;
 #endif
-		T.Object->shedule_Update(Elapsed);
+		PROF_STAT_NAMED("shedule_Update (realtime)", typeid(*T.Object).name(), T.Object->shedule_Update(Elapsed));
 		T.dwTimeOfLastExecute = dwTime;
 	}
 

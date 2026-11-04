@@ -1,7 +1,9 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 
 void CRenderTarget::create_minmax_SM()
 {
+	PROF_EVENT();
 	u32 Offset;
 	float d_Z = EPS_S, d_W = 1.f;
 	u32 C = color_rgba(255, 255, 255, 255);

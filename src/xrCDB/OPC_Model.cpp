@@ -185,6 +185,18 @@ OPCODE_Model::~OPCODE_Model()
  *	\return		true if success
  */
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+bool OPCODE_Model::Restore(AABBNoLeafNode* nodes, udword nb)
+{
+	CDELETE(mSource);
+	CDELETE(mTree);
+	mNoLeaf = true;
+	mQuantized = false;
+	AABBNoLeafTree* tree = CNEW(AABBNoLeafTree)();
+	tree->Adopt(nodes, nb);
+	mTree = tree;
+	return true;
+}
+
 bool OPCODE_Model::Build(const OPCODECREATE& create)
 {
 	// 1) Checkings

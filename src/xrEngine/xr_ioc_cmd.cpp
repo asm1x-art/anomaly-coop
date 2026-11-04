@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../xrCore/prof_stats.h"
+namespace prof_stats { XRCORE_API extern float spike_ms; } // xrCore/prof_stats.cpp: prof_spikes
 #include "igame_level.h"
 
 //#include "xr_effgamma.h"
@@ -64,6 +66,21 @@ void IConsole_Command::add_LRU_to_tips(vecTips& tips)
 }
 
 // =======================================================
+
+// prof_stats <seconds>: the frame profile summary of the next <seconds> (default 10) into the log, "* [prof]" lines
+class CCC_ProfStats : public IConsole_Command
+{
+public:
+	CCC_ProfStats(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; };
+	virtual void Execute(LPCSTR args)
+	{
+		float seconds = 10.f;
+		if (args && args[0])
+			seconds = (float)atof(args);
+		clamp(seconds, 1.f, 600.f);
+		prof_stats::start(seconds);
+	}
+};
 
 class CCC_Quit : public IConsole_Command
 {
@@ -1034,6 +1051,9 @@ void CCC_Register()
 	// General
 	CMD1(CCC_Help, "help");
 	CMD1(CCC_Quit, "quit");
+	CMD1(CCC_ProfStats, "prof_stats");
+	// frames longer than this many ms go into the log with their marks (prof_stats.h), 0 = off; kept in user.ltx
+	CMD4(CCC_Float, "prof_spikes", &prof_stats::spike_ms, 0.f, 10000.f);
 	CMD1(CCC_Start, "start");
 	CMD1(CCC_Disconnect, "disconnect");
 	CMD1(CCC_SaveCFG, "cfg_save");

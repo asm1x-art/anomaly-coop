@@ -824,7 +824,10 @@ void CGamePersistent::OnFrame()
 
 	// update weathers ambient
 	if (!Device.Paused())
+	{
+		PROF_EVENT("weathers");
 		WeathersUpdate();
+	}
 
 	if (0 != pDemoFile)
 	{

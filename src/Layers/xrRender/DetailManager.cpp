@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #pragma hdrstop
+#include "../../xrCore/profiler.h"
 
 #include "DetailManager.h"
 #include "cl_intersect.h"
@@ -428,6 +429,7 @@ void CDetailManager::UpdateVisibleM()
 
 void CDetailManager::Render()
 {
+	PROF_EVENT();
 #ifndef _EDITOR
 	if (0 == dtFS) return;
 	if (!psDeviceFlags.is(rsDetails)) return;

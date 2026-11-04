@@ -154,6 +154,10 @@ IMPLEMENT_COLLISION_TREE(AABBCollisionTree, AABBCollisionNode)
 class OPCODE_API AABBNoLeafTree : public AABBOptimizedTree
 {
 IMPLEMENT_COLLISION_TREE(AABBNoLeafTree, AABBNoLeafNode)
+
+public:
+	// xrCDB's tree cache: takes a node array (CALLOC'd, child pointers already fixed up) instead of building one
+	void Adopt(AABBNoLeafNode* nodes, udword nb);
 };
 
 class OPCODE_API AABBQuantizedTree : public AABBOptimizedTree

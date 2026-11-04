@@ -1,0 +1,8 @@
+#include "common.h"
+
+// Render scale (engine: CRenderTarget::scale_end): the frame drawn at a lower resolution, stretched onto the screen
+// with a linear filter. A later stage replaces this with FSR / DLSS.
+float4 main(float2 tc : TEXCOORD0) : SV_Target
+{
+	return s_generic.Sample(smp_rtlinear, tc);
+}

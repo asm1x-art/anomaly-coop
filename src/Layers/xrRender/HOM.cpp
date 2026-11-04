@@ -3,6 +3,7 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "HOM.h"
 #include "occRasterizer.h"
 #include "../../xrEngine/GameFont.h"
@@ -259,6 +260,7 @@ void CHOM::Render_DB(CFrustum& base)
 
 void CHOM::Render(CFrustum& base)
 {
+	PROF_EVENT();
 	if (!bEnabled) return;
 
 	Device.Statistic->RenderCALC_HOM.Begin();

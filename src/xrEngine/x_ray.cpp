@@ -6,6 +6,7 @@
 // AlexMX - Alexander Maksimchuk
 //-----------------------------------------------------------------------------
 #include "stdafx.h"
+#include <thread>
 #include "igame_level.h"
 #include "igame_persistent.h"
 
@@ -168,6 +169,49 @@ ENGINE_API string512 g_sLaunchOnExit_app;
 ENGINE_API string_path g_sLaunchWorkingFolder;
 // -------------------------------------------
 // startup point
+// Sounds are read one file at a time when first played (a voice, a new weapon's shot, an ambient sound): on a hard disk
+// each one costs a seek, 10-25 ms inside the frame (16 NPCs coming online: 0.3 s of voices). Reading the sound archives
+// (not music) through once, in the background at the lowest disk priority, puts them in the Windows file cache, and
+// those reads come from memory. -no_warm_sounds: off.
+static void warm_sound_archives()
+{
+	if (strstr(Core.Params, "-no_warm_sounds"))
+		return;
+	xr_vector<xr_string> paths;
+	for (auto& A : FS.m_archives)
+	{
+		string_path low;
+		xr_strcpy(low, A.path.c_str());
+		xr_strlwr(low);
+		if (strstr(low, "sounds") && !strstr(low, "music"))
+			paths.push_back(A.path.c_str());
+	}
+	if (paths.empty())
+		return;
+	std::thread([paths]
+	{
+		SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN); // low CPU and disk priority
+		const DWORD chunk = 1 << 20;
+		void* buf = VirtualAlloc(nullptr, chunk, MEM_COMMIT, PAGE_READWRITE);
+		CTimer T;
+		T.Start();
+		u64 total = 0;
+		for (const xr_string& p : paths)
+		{
+			HANDLE h = CreateFileA(p.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+				FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+			if (h == INVALID_HANDLE_VALUE)
+				continue;
+			DWORD got = 0;
+			while (ReadFile(h, buf, chunk, &got, nullptr) && got)
+				total += got;
+			CloseHandle(h);
+		}
+		VirtualFree(buf, 0, MEM_RELEASE);
+		Msg("* [load] sound archives warmed: %u files, %u MB in %u ms", u32(paths.size()), u32(total >> 20), T.GetElapsed_ms());
+	}).detach();
+}
+
 void InitEngine()
 {
 	Engine.Initialize();
@@ -1141,6 +1185,7 @@ int APIENTRY WinMain_impl(HINSTANCE hInstance,
 
 		FPU::m24r();
 		InitEngine();
+		warm_sound_archives();
 
 		InitInput();
 

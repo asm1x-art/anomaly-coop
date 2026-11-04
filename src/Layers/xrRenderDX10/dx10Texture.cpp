@@ -307,6 +307,29 @@ IC u32 it_height_rev_base(u32 d, u32 s)	{	return	color_rgba	(
 	(color_get_R(s)+color_get_G(s)+color_get_B(s))/3	);	// height
 }
 */
+// texture load timing (CResourceManager::DeferredUpload prints it): wall ticks summed over all loading threads
+#include <atomic>
+static std::atomic<u64> g_tl_find{0}, g_tl_open{0}, g_tl_info{0}, g_tl_create{0}, g_tl_bytes{0};
+static std::atomic<u32> g_tl_count{0};
+struct tl_scope
+{
+	std::atomic<u64>& sum;
+	u64 t0;
+	tl_scope(std::atomic<u64>& s) : sum(s), t0(CPU::QPC()) {}
+	~tl_scope() { sum += CPU::QPC() - t0; }
+};
+void texture_load_stats_reset()
+{
+	g_tl_find = g_tl_open = g_tl_info = g_tl_create = g_tl_bytes = 0;
+	g_tl_count = 0;
+}
+void texture_load_stats_print()
+{
+	auto ms = [](u64 t) { return double(t) * 1000.0 / double(CPU::qpc_freq); };
+	Msg("* [load] textures: %u loaded, %.0f MB; summed over threads: find %.0f ms, read %.0f ms, header %.0f ms, create %.0f ms",
+	    u32(g_tl_count), double(g_tl_bytes) / 1048576.0, ms(g_tl_find), ms(g_tl_open), ms(g_tl_info), ms(g_tl_create));
+}
+
 ID3DBaseTexture* CRender::texture_load(LPCSTR fRName, u32& ret_msize, bool bStaging)
 {
 	//	Moved here just to avoid warning
@@ -371,9 +394,12 @@ ID3DBaseTexture* CRender::texture_load(LPCSTR fRName, u32& ret_msize, bool bStag
 			goto _DDS_2D;
 		}
 	}
-	if (FS.exist(fn, "$level$", fname, ".dds")) goto _DDS;
-	if (FS.exist(fn, "$game_saves$", fname, ".dds")) goto _DDS;
-	if (FS.exist(fn, "$game_textures$", fname, ".dds")) goto _DDS;
+	{
+		tl_scope t(g_tl_find);
+		if (FS.exist(fn, "$level$", fname, ".dds")) goto _DDS;
+		if (FS.exist(fn, "$game_saves$", fname, ".dds")) goto _DDS;
+		if (FS.exist(fn, "$game_textures$", fname, ".dds")) goto _DDS;
+	}
 
 
 #ifdef _EDITOR
@@ -393,15 +419,23 @@ _DDS:
 	{
 		// Load and get header
 
-		S = FS.r_open(fn);
+		{
+			tl_scope t(g_tl_open);
+			S = FS.r_open(fn);
+		}
 #ifdef DEBUG
 		Msg						("* Loaded: %s[%d]",fn,S->length());
 #endif // DEBUG
 		img_size = S->length();
 		R_ASSERT(S);
+		g_tl_bytes += img_size;
+		g_tl_count++;
 		//R_CHK2					(D3DXGetImageInfoFromFileInMemory	(S->pointer(),S->length(),&IMG), fn);
 #ifdef USE_DX11
-		R_CHK2(D3DX11GetImageInfoFromMemory(S->pointer(),S->length(), 0, &IMG, 0), fn);
+		{
+			tl_scope t(g_tl_info);
+			R_CHK2(D3DX11GetImageInfoFromMemory(S->pointer(),S->length(), 0, &IMG, 0), fn);
+		}
 #else
 		R_CHK2(D3DX10GetImageInfoFromMemory(S->pointer(),S->length(), 0, &IMG, 0), fn);
 #endif
@@ -526,14 +560,17 @@ _DDS:
 			LoadInfo.pSrcInfo = &IMG;
 
 #ifdef USE_DX11
-			R_CHK2(D3DX11CreateTextureFromMemory
-			       (
-				       HW.pDevice,S->pointer(),S->length(),
-				       &LoadInfo,
-				       0,
-				       &pTexture2D,
-				       0
-			       ), fn);
+			{
+				tl_scope t(g_tl_create);
+				R_CHK2(D3DX11CreateTextureFromMemory
+				       (
+					       HW.pDevice,S->pointer(),S->length(),
+					       &LoadInfo,
+					       0,
+					       &pTexture2D,
+					       0
+				       ), fn);
+			}
 #else
 			R_CHK2(D3DX10CreateTextureFromMemory
 			       (

@@ -99,6 +99,9 @@
     <ClCompile Include="_math.cpp">
       <Filter>Math</Filter>
     </ClCompile>
+    <ClCompile Include="prof_stats.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
     <ClCompile Include="_sphere.cpp">
       <Filter>Math</Filter>
     </ClCompile>

@@ -191,9 +191,14 @@ void CShootingObject::LoadLights(LPCSTR section, LPCSTR prefix)
 	}
 }
 
+extern BOOL g_npc_muzzle_shadows;
+
 void CShootingObject::Light_Start()
 {
 	if (!light_render) Light_Create();
+	// shadows from the actor's flash; an NPC's only if g_npc_muzzle_shadows (each shadowed point light is 6 passes)
+	if (::Render->get_generation() == IRender_interface::GENERATION_R2)
+		light_render->set_shadow(SOParentIsActor() || g_npc_muzzle_shadows);
 
 	if (Device.dwFrame != light_frame)
 	{

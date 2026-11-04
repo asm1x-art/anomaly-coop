@@ -16,12 +16,14 @@ class CPHScriptCondition :
 	public CPHReqComparerV
 {
 	::luabind::functor<bool>* m_lua_function;
+	const char* m_prof_name = nullptr;
 
 	CPHScriptCondition(const CPHScriptCondition& func);
 
 public:
 	CPHScriptCondition(const ::luabind::functor<bool>& func);
 	virtual ~CPHScriptCondition();
+	virtual const char* prof_name();
 	virtual bool is_true();
 	virtual bool obsolete() const;
 	virtual bool compare(const CPHReqComparerV* v) const { return v->compare(this); }
@@ -36,8 +38,10 @@ class CPHScriptAction :
 {
 	bool b_obsolete;
 	::luabind::functor<void>* m_lua_function;
+	const char* m_prof_name = nullptr;
 public:
 	CPHScriptAction(const ::luabind::functor<void>& func);
+	virtual const char* prof_name();
 	CPHScriptAction(const CPHScriptAction& action);
 	virtual ~CPHScriptAction();
 	virtual void run();

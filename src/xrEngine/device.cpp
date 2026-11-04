@@ -409,6 +409,7 @@ void CRenderDevice::on_idle()
 	}
 
 	PROF_FRAME("X-RAY Primary thread");
+	prof_stats::frame();
 	PROF_EVENT();
 
 #ifdef DEDICATED_SERVER

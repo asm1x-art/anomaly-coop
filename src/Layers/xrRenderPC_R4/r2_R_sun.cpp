@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 #include "../../xrEngine/igame_persistent.h"
 #include "../../xrEngine/irenderable.h"
 #include "../xrRender/FBasicVisual.h"
@@ -1112,6 +1113,7 @@ void CRender::init_cacades()
 
 void CRender::render_sun_cascades()
 {
+	PROF_EVENT();
 	bool b_need_to_render_sunshafts = RImplementation.Target->need_to_render_sunshafts();
 	bool last_cascade_chain_mode = m_sun_cascades.back().reset_chain;
 	if (b_need_to_render_sunshafts)
@@ -1126,12 +1128,22 @@ void CRender::render_sun_cascades()
 
 void CRender::render_sun_cascade(u32 cascade_ind)
 {
+	PROF_EVENT();
 	light* fuckingsun = (light*)Lights.sun_adapted._get();
 
 	// calculate view-frustum bounds in world space
 	Fmatrix ex_project, ex_full, ex_full_inverse;
 	{
 		ex_project = Device.mProject;
+		// A zoomed scope narrows the camera (a 6x optic: under 10 degrees). The cascades, fitted to that frustum, then
+		// put the weapon in hand on the very back edge of the near one, and its shadow flips as the camera moves a
+		// little. They are fitted to at least r2_sun_cascade_min_fov (the projection widened; near and far planes kept).
+		if (Device.fFOV < ps_r2_sun_cascade_min_fov)
+		{
+			const float k = tanf(deg2rad(Device.fFOV) * 0.5f) / tanf(deg2rad(ps_r2_sun_cascade_min_fov) * 0.5f);
+			ex_project._11 *= k;
+			ex_project._22 *= k;
+		}
 		ex_full.mul(ex_project, Device.mView);
 		D3DXMatrixInverse((D3DXMATRIX*)&ex_full_inverse, 0, (D3DXMATRIX*)&ex_full);
 	}

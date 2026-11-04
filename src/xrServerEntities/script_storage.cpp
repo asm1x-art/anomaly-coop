@@ -711,10 +711,23 @@ bool CScriptStorage::parse_namespace(LPCSTR caNamespaceName, LPSTR b, u32 const 
 	return (true);
 }
 
+// script load timing (CALifeSimulator prints it after start_game_callback): parse, run the main chunk, files
+static u64 g_sl_parse = 0, g_sl_exec = 0, g_sl_total = 0;
+static u32 g_sl_files = 0;
+void script_load_stats_print_reset()
+{
+	auto ms = [](u64 t) { return double(t) * 1000.0 / double(CPU::qpc_freq); };
+	Msg("* [load] scripts: %u files, %.0f ms (parse %.0f ms, main chunks %.0f ms)", g_sl_files, ms(g_sl_total), ms(g_sl_parse), ms(g_sl_exec));
+	g_sl_parse = g_sl_exec = g_sl_total = 0;
+	g_sl_files = 0;
+}
+
 bool CScriptStorage::load_buffer(lua_State* L, LPCSTR caBuffer, size_t tSize, LPCSTR caScriptName,
                                  LPCSTR caNameSpaceName)
 {
 	int l_iErrorCode;
+	const u64 parse_t0 = CPU::QPC();
+	struct parse_end { u64 t0; ~parse_end() { g_sl_parse += CPU::QPC() - t0; } } parse_guard{ parse_t0 };
 	if (caNameSpaceName && xr_strcmp("_G", caNameSpaceName))
 	{
 		string512 insert, a, b;
@@ -1029,7 +1042,9 @@ bool CScriptStorage::do_file(LPCSTR caScriptName, LPCSTR caNameSpaceName)
 
 	// because that's the first and the only call of the main chunk - there is no point to compile it
 	//	luaJIT_setmode	(lua(),0,LUAJIT_MODE_ENGINE|LUAJIT_MODE_OFF);						// Oles
+	const u64 exec_t0 = CPU::QPC();
 	int l_iErrorCode = lua_pcall(lua(), 0, 0, (-1 == errFuncId) ? 0 : errFuncId); // new_Andy
+	g_sl_exec += CPU::QPC() - exec_t0;
 	//	luaJIT_setmode	(lua(),0,LUAJIT_MODE_ENGINE|LUAJIT_MODE_ON);						// Oles
 
 #ifdef USE_DEBUGGER
@@ -1053,6 +1068,8 @@ bool CScriptStorage::do_file(LPCSTR caScriptName, LPCSTR caNameSpaceName)
 
 bool CScriptStorage::load_file_into_namespace(LPCSTR caScriptName, LPCSTR caNamespaceName)
 {
+	const u64 total_t0 = CPU::QPC();
+	struct total_end { u64 t0; ~total_end() { g_sl_total += CPU::QPC() - t0; g_sl_files++; } } total_guard{ total_t0 };
 	int start = lua_gettop(lua());
 	if (!do_file(caScriptName, caNamespaceName))
 	{

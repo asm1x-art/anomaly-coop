@@ -777,6 +777,9 @@
     <ClInclude Include="blender_lut.h">
       <Filter>Shading templates</Filter>
     </ClInclude>
+    <ClInclude Include="blender_render_scale.h">
+      <Filter>Shading templates</Filter>
+    </ClInclude>
     <ClInclude Include="blender_smaa.h">
       <Filter>Shading templates</Filter>
     </ClInclude>
@@ -1449,6 +1452,9 @@
       <Filter>Shading templates</Filter>
     </ClCompile>
     <ClCompile Include="blender_lut.cpp">
+      <Filter>Shading templates</Filter>
+    </ClCompile>
+    <ClCompile Include="blender_render_scale.cpp">
       <Filter>Shading templates</Filter>
     </ClCompile>
     <ClCompile Include="..\xrRender\rendertarget_phase_lut.cpp">

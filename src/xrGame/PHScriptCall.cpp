@@ -6,6 +6,55 @@
 
 
 #include "../xrEngine/xr_object.h"
+#include <set>
+
+// "file:line" of a Lua function, for the frame profile summary. AddUniqueCall (_g.script) registers its own wrapper:
+// that one is named by the function it wraps (its upvalue functor_a).
+template <typename T>
+static const char* lua_function_label(const ::luabind::functor<T>& f)
+{
+	lua_State* L = f.lua_state();
+	if (!L)
+		return "(no lua state)";
+	f.pushvalue();
+	if (!lua_isfunction(L, -1))
+	{
+		lua_pop(L, 1);
+		return "(not a function)";
+	}
+	for (int n = 1;; n++)
+	{
+		const char* up = lua_getupvalue(L, -1, n);
+		if (!up)
+			break;
+		if (!xr_strcmp(up, "functor_a") && lua_isfunction(L, -1))
+		{
+			lua_remove(L, -2);
+			break;
+		}
+		lua_pop(L, 1);
+	}
+	lua_Debug ar;
+	lua_getinfo(L, ">S", &ar);
+	string512 buf;
+	xr_sprintf(buf, "%s:%d", ar.short_src, ar.linedefined);
+	static std::set<std::string> names;
+	return names.insert(buf).first->c_str();
+}
+
+const char* CPHScriptCondition::prof_name()
+{
+	if (!m_prof_name)
+		m_prof_name = lua_function_label(*m_lua_function);
+	return m_prof_name;
+}
+
+const char* CPHScriptAction::prof_name()
+{
+	if (!m_prof_name)
+		m_prof_name = lua_function_label(*m_lua_function);
+	return m_prof_name;
+}
 
 
 /*

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 
 IC bool pred_area(light* _1, light* _2)
 {
@@ -53,6 +54,7 @@ IC void hud_light_restore(xr_map<light*, std::pair<Fvector, Fvector>>& saved_pos
 
 void CRender::render_lights(light_Package& LP)
 {
+	PROF_EVENT();
 	xr_map<light*, std::pair<Fvector, Fvector>> saved_pos;
 	//////////////////////////////////////////////////////////////////////////
 	// 0. apply hud_mode projection if necessary
@@ -308,6 +310,7 @@ void CRender::render_lights(light_Package& LP)
 
 void CRender::render_indirect(light* L)
 {
+	PROF_EVENT();
 	if (!ps_r2_ls_flags.test(R2FLAG_GI)) return;
 
 	light LIGEN;

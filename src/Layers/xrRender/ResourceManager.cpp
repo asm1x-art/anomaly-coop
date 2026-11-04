@@ -376,6 +376,9 @@ void CResourceManager::Delete(const Shader* S)
 	Msg("! ERROR: Failed to find complete shader");
 }
 
+void texture_load_stats_reset();
+void texture_load_stats_print();
+
 void CResourceManager::DeferredUpload()
 {
 	if (!RDEVICE.b_is_Ready) return;
@@ -385,9 +388,11 @@ void CResourceManager::DeferredUpload()
 	CTimer timer;
 	timer.Start();
 
+	texture_load_stats_reset();
 	tbb::parallel_for_each(m_textures, [&](auto m_tex) { m_tex.second->Load(); });
 
 	Msg("texture loading time: %d", timer.GetElapsed_ms());
+	texture_load_stats_print();
 }
 
 void CResourceManager::DeferredUnload()

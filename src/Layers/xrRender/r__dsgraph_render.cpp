@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../xrCore/profiler.h"
 
 #include "../../xrEngine/render.h"
 #include "../../xrEngine/irenderable.h"
@@ -362,6 +363,7 @@ void sort_tlist_mat
 
 void R_dsgraph_structure::r_dsgraph_render_graph(u32 _priority, bool _clear)
 {
+	PROF_EVENT();
 	//PIX_EVENT(r_dsgraph_render_graph);
 	Device.Statistic->RenderDUMP.Begin();
 
@@ -577,6 +579,7 @@ void R_dsgraph_structure::r_dsgraph_render_graph(u32 _priority, bool _clear)
 // HUD render
 void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 {
+	PROF_EVENT();
 	//PIX_EVENT(r_dsgraph_render_hud);
 
 	// Change projection
@@ -716,6 +719,7 @@ void R_dsgraph_structure::r_dsgraph_render_cam_ui()
 // strict-sorted render
 void R_dsgraph_structure::r_dsgraph_render_sorted()
 {
+	PROF_EVENT();
 	// Sorted (back to front)
 	mapSorted.traverseRL(sorted_L1);
 	mapSorted.clear();
@@ -783,6 +787,7 @@ void R_dsgraph_structure::r_dsgraph_render_ScopeSorted()  //  Redotix99: for 3D 
 // strict-sorted render
 void R_dsgraph_structure::r_dsgraph_render_emissive(bool clear, bool renderHUD)
 {
+	PROF_EVENT();
 #if	RENDER!=R_R1
 	// Sorted (back to front)
 	mapEmissive.traverseLR(sorted_L1);
@@ -873,6 +878,7 @@ void R_dsgraph_structure::r_dsgraph_render_subspace(IRender_Sector* _sector, Fma
 void R_dsgraph_structure::r_dsgraph_render_subspace(IRender_Sector* _sector, CFrustum* _frustum, Fmatrix& mCombined,
                                                     Fvector& _cop, BOOL _dynamic, BOOL _precise_portals)
 {
+	PROF_EVENT();
 	VERIFY(_sector);
 	RImplementation.marker ++; // !!! critical here
 
@@ -1059,6 +1065,7 @@ void __fastcall pLandscape_1(mapLandscape_Node *N)
 
 void R_dsgraph_structure::r_dsgraph_render_landscape(u32 pass, bool _clear)
 {
+	PROF_EVENT();
 	RCache.set_xform_world(Fidentity);
 
 	if (pass == 0) 

@@ -27,6 +27,14 @@ bool CPHCall::obsolete()
 
 void CPHCall::check()
 {
+	if (prof_stats::on && m_condition)
+	{
+		const char* name = m_condition->prof_name();
+		if (!name && m_action)
+			name = m_action->prof_name();
+		PROF_STAT_NAMED("add_call", name ? name : "(engine)", if (m_condition->is_true() && m_action) m_action->run());
+		return;
+	}
 	if (m_condition && m_condition->is_true() && m_action) m_action->run();
 }
 

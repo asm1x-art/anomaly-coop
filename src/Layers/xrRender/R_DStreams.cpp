@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #pragma hdrstop
+#include "../../xrCore/profiler.h"
 
 #include "ResourceManager.h"
 #include "R_DStreams.h"
@@ -50,6 +51,7 @@ void _VertexStream::Destroy()
 
 void* _VertexStream::Lock(u32 vl_Count, u32 Stride, u32& vOffset)
 {
+	PROF_EVENT();
 #ifdef USE_DX11
 	D3D11_MAPPED_SUBRESOURCE MappedSubRes;
 #endif
@@ -209,6 +211,7 @@ void _IndexStream::Destroy()
 
 u16* _IndexStream::Lock(u32 Count, u32& vOffset)
 {
+	PROF_EVENT();
 #ifdef USE_DX11
 	D3D11_MAPPED_SUBRESOURCE MappedSubRes;
 #endif

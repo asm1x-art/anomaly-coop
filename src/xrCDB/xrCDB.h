@@ -2,6 +2,7 @@
 #define XRCDB_H
 
 //#pragma once
+#include <atomic>
 // The following ifdef block is the standard way of creating macros which make exporting
 // from a DLL simpler. All files within this DLL are compiled with the XRCDB_EXPORTS
 // symbol defined on the command line. this symbol should not be defined on any project
@@ -73,7 +74,7 @@ namespace CDB
 	private:
 		xrCriticalSection cs;
 		Opcode::OPCODE_Model* tree;
-		u32 status; // 0=ready, 1=init, 2=building
+		std::atomic<u32> status; // 0=ready, 1=init, 2=building
 
 		// tris
 		TRI* tris;
@@ -90,19 +91,21 @@ namespace CDB
 		IC const TRI* get_tris() const { return tris; }
 		IC TRI* get_tris() { return tris; }
 		IC int get_tris_count() const { return tris_count; }
+		// waits for the tree when it is still built in the background (MODEL::build)
 		IC void syncronize() const
 		{
-			if (S_READY != status)
+			if (S_BUILD == status)
 			{
 				Log ("! WARNING: syncronized CDB::query");
-				xrCriticalSection* C = (xrCriticalSection*)&cs;
-				C->Enter();
-				C->Leave();
+				while (S_BUILD == status)
+					SwitchToThread();
 			}
 		}
 
 		static void build_thread(void*);
 		void build_internal(Fvector* V, int Vcnt, TRI* T, int Tcnt, build_callback* bc = NULL, void* bcp = NULL);
+		void build_geometry(Fvector* V, int Vcnt, TRI* T, int Tcnt, build_callback* bc = NULL, void* bcp = NULL);
+		void build_tree();
 		void build(Fvector* V, int Vcnt, TRI* T, int Tcnt, build_callback* bc = NULL, void* bcp = NULL);
 		u32 memory();
 	};

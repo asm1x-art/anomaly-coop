@@ -73,6 +73,8 @@
 #define		r2_RT_ui			"$user$ui"
 
 #define		r2_RT_scopert		"$user$scopeRT" //crookr
+#define		r2_RT_render_scale	"$user$render_scale"	// the frame at the render scale, before it is stretched to the screen
+#define		r2_RT_render_scale_z "$user$render_scale_z"	// its depth buffer
 #define		r2_RT_heat			"$user$heat" //--DSR-- HeatVision
 
 #define		r2_RT_smaa_edgetex "$user$smaa_edgetex"
