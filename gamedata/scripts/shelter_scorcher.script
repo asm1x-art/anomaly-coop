@@ -42,8 +42,9 @@ local function depth(pos)
 	return math.min(pos.x - num("x_min", -82), num("x_max", 477) - pos.x, pos.z - num("z_min", -388), num("z_max", 208) - pos.z)
 end
 
+-- in the white zone and hurt by it (coop_psi: the Monolith and Sin aren't)
 function in_zone()
-	return level.name() == RADAR and working() and depth(db.actor:position()) >= 0
+	return level.name() == RADAR and working() and depth(db.actor:position()) >= 0 and not coop_psi.immune()
 end
 
 -------------------------------------------------------------------------------
@@ -74,6 +75,9 @@ end
 local arrived_at, msg_at, hit_at = 0, 0, 0
 
 local function zone(now)
+	if coop_psi.immune() then
+		return
+	end
 	local pos = db.actor:position()
 	local d = depth(pos)
 	if d >= 0 and not raid_window.open_now() then

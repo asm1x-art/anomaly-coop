@@ -350,3 +350,13 @@ clean_interval_s      = 300   ; real s between the host's cleaner passes
 keep_bodies_per_level = 5     ; a level keeps this many bodies even with nothing on them
 max_per_pass          = 10    ; at most this many released per level each pass
 min_player_distance   = 200   ; m: no body this close to a player goes (on a player's level none go at all)
+
+; Co-op: a player of these factions isn't hurt by the Brain Scorcher and the Miracle Machine (coop_psi.script). In
+; story mode Anomaly turns both off for the whole game when one starts as one of them (ui_mm_faction_select,
+; faction_psi_off); a shared world keeps them working and spares such a player in their own game instead: the psi
+; zones and the killing restrictors whose logic checks one of the infos (those vanilla's switch gives), and the
+; shelter's white zone at the Radar. Psi storms, controllers and other psi zones still work on them.
+[coop_psi_immunity]
+enabled  = true                    ; false: no one is immune
+factions = monolith, greh, zombied ; the player's true faction (a faction change carries it)
+infos    = bar_deactivate_radar_done, yan_labx16_switcher_primary_off, yan_labx16_switcher_1_off, yan_labx16_switcher_2_off, yan_labx16_switcher_3_off

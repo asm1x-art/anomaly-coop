@@ -1,0 +1,127 @@
+-- Co-op: a player of the Monolith or Sin isn't hurt by the Brain Scorcher and the Miracle Machine.
+-- In story mode Anomaly turns both off for the whole game when one starts as such a faction (ui_mm_faction_select
+-- on_game_load, faction_psi_off: the infos bar_deactivate_radar_done and yan_labx16_switcher_*_off). In a shared world
+-- those infos are the world's, so the emitters keep working and such a player is spared in their own game: what
+-- vanilla's switch turns off for the actor leaves them alone. That is a level object whose logic checks one of the
+-- infos and either is a psi zone (sr_psy_antenna: the Radar, X-10, Pripyat, the NPP, Yantar - effects, sounds, hits,
+-- so no psi death) or kills the actor (x10/x16_timer_restrictor): to an immune player the actor is never inside it.
+-- The shelter's white zone at the Radar asks immune() too (shelter_scorcher.script). Other psi (storms, controllers,
+-- psi zones not tied to the switch) is left as it is. All of these only ever touch the local actor: other games
+-- and the world don't change, and nothing of theirs reaches the player as a hit (coop_combat sends only hits with an
+-- attacker). The player's true faction counts (not a disguise), as it is now. Settings: [coop_psi_immunity] in
+-- mod_system_coop.ltx.
+
+local S = "coop_psi_immunity"
+local STATE_INSIDE = 1 -- sr_psy_antenna's state_inside
+
+local enabled = true
+local factions = {}
+local infos = {}
+local hazards = {} -- object id -> {ini = its logic ini, yes = true/false}
+
+local function list(key)
+	local out = {}
+	for _, v in ipairs(str_explode(ini_sys:r_string_ex(S, key) or "", ",")) do
+		if v ~= "" then
+			out[v] = true
+		end
+	end
+	return out
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] psi: " .. fmt, ...)
+	end
+end
+
+function immune()
+	return enabled and db.actor ~= nil and factions[get_actor_true_community()] == true
+end
+
+-- a psi zone or a killing restrictor of the switch: its logic checks one of the infos
+local function hazard(obj)
+	local st = obj and db.storage[obj:id()]
+	local ini = st and st.ini
+	if not ini then
+		return false
+	end
+	local h = hazards[obj:id()]
+	if h and h.ini == ini then
+		return h.yes
+	end
+	local checks, harms = false, false
+	ini:section_for_each(function(section)
+		if string.find(section, "sr_psy_antenna", 1, true) == 1 then
+			harms = true
+		end
+		for i = 0, ini:line_count(section) - 1 do
+			local _, _, value = ini:r_line(section, i, "", "")
+			if value and value ~= "" then
+				if string.find(value, "kill_actor", 1, true) then
+					harms = true
+				end
+				for info in pairs(infos) do
+					if string.find(value, info, 1, true) then
+						checks = true
+					end
+				end
+			end
+		end
+		return false
+	end)
+	h = {ini = ini, yes = checks and harms}
+	hazards[obj:id()] = h
+	if h.yes then
+		dbg("%s is the Scorcher's or the Miracle Machine's", obj:name())
+	end
+	return h.yes
+end
+
+local function actor_on_first_update()
+	hazards = {}
+end
+
+function on_game_start()
+	enabled = ini_sys:r_bool_ex(S, "enabled", true)
+	factions = list("factions")
+	infos = list("infos")
+
+	-- the psi zone: an immune player is never in it (and leaves it on becoming immune)
+	local action = sr_psy_antenna.action_psy_antenna
+	local switch_state = action.switch_state
+	action.switch_state = function(self, actor)
+		if immune() and hazard(self.object) then
+			if self.state == STATE_INSIDE then
+				self:zone_leave()
+				dbg("out of %s: immune", self.object:name())
+			end
+			return
+		end
+		return switch_state(self, actor)
+	end
+
+	-- the killing restrictors' on_actor_inside
+	local npc_in_zone = utils_obj.npc_in_zone
+	utils_obj.npc_in_zone = function(npc, zone)
+		if npc and npc.id and npc:id() == AC_ID and immune() then
+			local z = type(zone) == "string" and db.zone_by_name[zone] or zone
+			if z and hazard(z) then
+				return false
+			end
+		end
+		return npc_in_zone(npc, zone)
+	end
+
+	-- and their kill itself, should one fire anyway
+	local kill_actor = xr_effects.kill_actor
+	xr_effects.kill_actor = function(actor, npc, ...)
+		if npc and immune() and hazard(npc) then
+			dbg("%s would kill the actor: immune", npc:name())
+			return
+		end
+		return kill_actor(actor, npc, ...)
+	end
+
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end
