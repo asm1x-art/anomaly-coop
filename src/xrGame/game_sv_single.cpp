@@ -12,6 +12,7 @@
 #include "../xrEngine/x_ray.h"
 #include "../xrEngine/dedicated_server_only.h"
 #include "../xrEngine/no_single.h"
+#include "coop/coop_time.h"
 
 game_sv_Single::game_sv_Single()
 {
@@ -212,7 +213,11 @@ float game_sv_Single::GetGameTimeFactor()
 void game_sv_Single::SetGameTimeFactor(const float fTimeFactor)
 {
 	if (ai().get_alife() && ai().alife().initialized())
+	{
+		if (!coop::allow_time_factor(fTimeFactor)) // co-op: the world's factor is the sim master's
+			return;
 		return (alife().time_manager().set_time_factor(fTimeFactor));
+	}
 	else
 		return (inherited::SetGameTimeFactor(fTimeFactor));
 }

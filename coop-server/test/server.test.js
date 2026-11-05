@@ -18,13 +18,14 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], time: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
     if (type === M.WORLD_INFO) return client.worldInfo.push(msg.payload);
     if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
     if (type === M.GROUPS) return client.groups.push(msg.payload);
+    if (type === M.TIME) return client.time.push(timeOf(msg.payload));
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -33,10 +34,16 @@ function connect(port) {
   return new Promise((r) => socket.on('connect', () => r(client)));
 }
 
-function hello(name, version = PROTOCOL_VERSION) {
+// the world's clock as a TIME message tells it
+function timeOf(p) {
+  return { game: Number(p.readBigUInt64LE(0)), factor: p.readFloatLE(8), running: (p[12] & 1) !== 0, set: (p[12] & 2) !== 0,
+    epoch: p.readUInt32LE(13) };
+}
+
+function hello(name, version = PROTOCOL_VERSION, build = 'dev') {
   const p = Buffer.alloc(2);
   p.writeUInt16LE(version, 0);
-  return Buffer.concat([p, encodeText(name), Buffer.from([0])]);
+  return Buffer.concat([p, encodeText(name), Buffer.from([0]), encodeText(build), Buffer.from([0])]);
 }
 
 test('hello -> welcome with unique ids, ping -> pong echoes time', async () => {
@@ -992,6 +999,162 @@ test('facts: kept by the server, passed on when they change, given with the worl
     a.socket.destroy();
     b.socket.destroy();
     c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+// everything sent before has been answered (other messages skipped)
+async function settle(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  await until(c, M.PONG);
+}
+
+function timeSet(kind, ...values) {
+  const parts = [Buffer.from([kind])];
+  for (const [type, v] of values) {
+    const b = Buffer.alloc(type === 'u64' ? 8 : 4);
+    if (type === 'u64') b.writeBigUInt64LE(BigInt(v));
+    else if (type === 'f32') b.writeFloatLE(v);
+    else b.writeUInt32LE(v);
+    parts.push(b);
+  }
+  return Buffer.concat(parts);
+}
+
+test('clock: set by the first game in the world, runs only while someone is in it and not paused, jumps, factor from the master', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  let server = await startServer(options(dataDir));
+  let { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    await settle(a);
+    assert.equal(a.time.at(-1).set, false); // told after WELCOME: no clock yet
+
+    // not in the world: not taken
+    a.send(M.TIME_SET, timeSet(0, ['u64', 7_000_000], ['f32', 6]));
+    await settle(a);
+    assert.equal(a.time.at(-1).set, false);
+
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    a.send(M.TIME_SET, timeSet(0, ['u64', 7_000_000], ['f32', 6]));
+    await settle(a);
+    let t = a.time.at(-1);
+    assert.equal(t.set, true);
+    assert.equal(t.running, true);
+    assert.equal(t.factor, 6);
+    assert.ok(t.game >= 7_000_000 && t.game < 7_000_000 + 6 * 1000);
+
+    const b = await player(port, 'друг');
+    await settle(b);
+    assert.equal(b.time.at(-1).set, true);
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    b.send(M.TIME_SET, timeSet(0, ['u64', 1], ['f32', 6])); // too late: the clock stays
+    b.send(M.TIME_SET, timeSet(2, ['f32', 10]));            // not the master: no
+    await settle(b);
+    assert.ok(b.time.at(-1).game >= 7_000_000);
+    assert.equal(b.time.at(-1).factor, 6);
+
+    a.send(M.TIME_SET, timeSet(2, ['f32', 10]));
+    b.send(M.TIME_SET, timeSet(1, ['u32', 8 * 3600_000]));
+    await settle(a);
+    await settle(b);
+    t = b.time.at(-1);
+    assert.equal(t.factor, 10);
+    assert.equal(t.epoch, 2);
+    assert.ok(t.game >= 7_000_000 + 8 * 3600_000);
+
+    // a pause stops it; both leaving stops it too
+    a.send(M.PAUSE_PROPOSE, Buffer.from([1]));
+    await until(b, M.PAUSE_VOTE);
+    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
+    await until(a, M.PAUSED);
+    await settle(a);
+    assert.equal(a.time.at(-1).running, false);
+    const paused = a.time.at(-1).game;
+    await new Promise((r) => setTimeout(r, 50));
+    a.send(M.PAUSE_PROPOSE, Buffer.from([0]));
+    await until(b, M.PAUSE_VOTE);
+    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
+    await until(a, M.PAUSED);
+    await settle(a);
+    assert.equal(a.time.at(-1).running, true);
+    assert.ok(a.time.at(-1).game - paused < 50 * 10); // the paused time didn't count
+
+    a.send(M.LEFT_WORLD);
+    b.socket.destroy();
+    await settle(a);
+    assert.equal(a.time.at(-1).running, false);
+    const left = a.time.at(-1).game;
+    a.socket.destroy();
+    server.close();
+
+    // kept over a restart, standing where it was
+    server = await startServer(options(dataDir));
+    port = server.address().port;
+    const c = await player(port, 'artem');
+    await settle(c);
+    assert.equal(c.time.at(-1).game, left);
+    assert.equal(c.time.at(-1).running, false);
+    c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('clock: each save keeps the game time, a rollback takes the clock back to it', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    a.send(M.TIME_SET, timeSet(0, ['u64', 7_000_000], ['f32', 6]));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await settle(a);
+    a.send(M.TIME_SET, timeSet(1, ['u32', 3600_000]));
+    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1);
+    await settle(a);
+    assert.ok(a.time.at(-1).game >= 7_000_000 + 3600_000);
+
+    a.send(M.ROLLBACK_PROPOSE, u32le(1)); // alone: at once
+    await until(a, M.WORLD_RELOAD);
+    await settle(a);
+    const t = a.time.at(-1);
+    assert.ok(t.game >= 7_000_000 && t.game < 7_000_000 + 3600_000);
+    assert.equal(t.epoch, 3);
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('with a builds file only listed builds get in, dev ones by the flag', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const file = path.join(dataDir, 'builds.json');
+  fs.writeFileSync(file, JSON.stringify({ builds: [{ id: '0123456789abcdef', release: '2026.11.06-1', channel: 'stable' }] }));
+  const tryJoin = async (server, name, build) => {
+    const c = await connect(server.address().port);
+    c.send(M.HELLO, hello(name, PROTOCOL_VERSION, build));
+    const msg = await c.next();
+    c.socket.destroy();
+    return msg;
+  };
+  for (const allowDev of [false, true]) {
+    const server = await startServer({ ...options(), builds: { file, allowDev } });
+    try {
+      assert.equal((await tryJoin(server, 'friend', '0123456789ABCDEF')).type, M.WELCOME);
+      const old = await tryJoin(server, 'old', 'ffffffffffffffff');
+      assert.equal(old.type, M.REFUSED);
+      assert.equal(old.payload[0], REFUSED.BUILD);
+      assert.equal((await tryJoin(server, 'artem', 'dev')).type, allowDev ? M.WELCOME : M.REFUSED);
+    } finally {
+      server.close();
+    }
+  }
+  // a file that is not there lets everyone in (a broken publish must not lock players out)
+  const server = await startServer({ ...options(), builds: { file: path.join(dataDir, 'none.json'), allowDev: false } });
+  try {
+    assert.equal((await tryJoin(server, 'friend', 'ffffffffffffffff')).type, M.WELCOME);
   } finally {
     server.close();
   }

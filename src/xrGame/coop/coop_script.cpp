@@ -6,6 +6,7 @@
 #include "coop_puppet.h"
 #include "coop_progress.h"
 #include "coop_facts.h"
+#include "coop_time.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -162,10 +163,13 @@ namespace coop
 
 			def("my_id", &my_id),
 			def("ping", &ping_ms),                   // ms to the server and back
-			def("refused", &refusal),               // why the server turned us away: "full", "version", ""
+			def("refused", &refusal),               // why the server turned us away: "full", "version", "build", ""
+			def("build_id", &build_id),             // -coop_build from the launcher, "dev" without
+			def("auto_launch", &auto_launch),       // -coop_auto: enter the profile on top of the list at once
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
+			def("clock", &clock_ms),                   // the world's game time (ms) as we count it, 0 without one
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none
 			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count

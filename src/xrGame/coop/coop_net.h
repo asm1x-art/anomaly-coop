@@ -11,7 +11,7 @@ namespace coop
 {
 	enum EMessage : u16
 	{
-		M_HELLO = 1,       // c->s: u16 protocol version, stringZ name
+		M_HELLO = 1,       // c->s: u16 protocol version, stringZ name, stringZ build id (launcher's, "dev" without one)
 		M_WELCOME = 2,     // s->c: u32 client id
 		M_PING = 3,        // c->s: u32 client time (ms), u32 our last round trip (ms), for the server's admin page
 		M_PONG = 4,        // s->c: u32 echoed client time (ms)
@@ -70,9 +70,15 @@ namespace coop
 		                        // also each one the server keeps, before M_WORLD_DONE
 		M_LOG = 48,             // c->s: stringZ file name, u32 size, u32 packed size (zlib), u32 offset, data: a log
 		                        // or crash dump of ours, for the server's data/logs (coop_logs.h)
-		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
+		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol, 2 build not let in), u16 the player limit or the
+		                        // server's protocol (0 for a build); it closes
 		M_WORLD_CLAIM = 30,     // c->s: u8 1: we start the world on an empty server, the first to ask gets it (M_WORLD_INFO
 		                        // says who); 0: we gave it up
+		// the world's clock (coop_time.h)
+		M_TIME = 62,            // s->c: u64 game time (ms), float factor, u8 flags (1 running, 2 set), u32 epoch (grows
+		                        // with every jump); after WELCOME, on every change and every 5 s
+		M_TIME_SET = 63,        // c->s: u8 kind, then 0 (no clock yet): u64 game time, float factor; 1 jump: u32 ms;
+		                        // 2 factor (the sim master's): float
 	};
 
 	enum EGroupAction : u8
@@ -85,7 +91,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 19;
+	const u16 PROTOCOL_VERSION = 21;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
@@ -142,7 +148,11 @@ namespace coop
 	bool wait_for_messages(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
 	u32 my_id();
 	u32 ping_ms(); // the last round trip to the server, 0 before the first
-	LPCSTR refusal(); // why the server turned the last connection away: "full", "version" or ""
+	LPCSTR refusal(); // why the server turned the last connection away: "full", "version", "build" or ""
+	// -coop_build <id> on the command line: the launcher's release this game is; "dev" without it
+	LPCSTR build_id();
+	// -coop_auto on the command line: the launcher started us to enter the profile on top of the list
+	bool auto_launch();
 	const xr_string& my_name();
 	const peers_t& peers();
 

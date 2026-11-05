@@ -7,9 +7,10 @@ import { normalizeSettings } from './settings.js';
 //   saves/<revision>/       every world the server was given; the last one is the world now:
 //     world.scop, world.scoc  a save of the sim master's game (.scoc holds Lua state)
 //     characters.json         the players' records as they were then, to go back to with it
-//     meta.json               { revision, owner, time, name, reason, who, from? }: owner is whose actor
+//     meta.json               { revision, owner, time, name, reason, who, from?, clock? }: owner is whose actor
 //                             the save's actor is; reason: auto, quick, named, join, leave, exit, new,
-//                             rollback (from: the save it went back to); who: the player it was for
+//                             rollback (from: the save it went back to); who: the player it was for; clock:
+//                             the world's game time (ms) when it came, for a rollback to take the clock back to
 //   leases.json             { block: player }: id blocks, they must outlive restarts like the world does
 //   characters.json         { player: base64 record }: position, money... as the client sent it
 //   facts.json              { key: value }: facts about the world the games report (protocol.js FACT); saves keep
@@ -19,6 +20,7 @@ import { normalizeSettings } from './settings.js';
 //   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
 //                            copy of the folder (saves/<revision>/progress/), a rollback brings it back
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
+//   clock.json              { game, factor, epoch }: the world's clock (clock.js), gone with the world
 //   groups.json             [{ members: [leader, member...], story }]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
@@ -150,12 +152,18 @@ export function openStorage(dir) {
     // the world and everything that only makes sense with it: saves, characters, id leases, groups
     resetWorld() {
       fs.rmSync(file('saves'), { recursive: true, force: true });
-      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json'])
+      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json', 'clock.json'])
         fs.rmSync(file(f), { force: true });
       facts = {};
       fs.rmSync(file('progress'), { recursive: true, force: true });
       saves.length = 0;
       characters = {};
+    },
+
+    loadClock: () => readJson('clock.json', null),
+    saveClock(clock) {
+      if (clock) writeAtomic('clock.json', JSON.stringify(clock));
+      else fs.rmSync(file('clock.json'), { force: true });
     },
 
     // [{ members: [leader, ...], story }]; a group was a plain list of names before
@@ -187,14 +195,14 @@ export function openStorage(dir) {
     },
 
     // a new save, the world from now on, with the players' records as they are
-    writeWorld(owner, files, { name = '', reason = 'auto', who = '', from } = {}) {
+    writeWorld(owner, files, { name = '', reason = 'auto', who = '', from, clock } = {}) {
       const revision = (saves.at(-1)?.revision ?? 0) + 1;
       fs.mkdirSync(file(saveFile(revision, '')), { recursive: true });
       WORLD_FILES.forEach((f, i) => writeAtomic(saveFile(revision, f), files[i]));
       writeAtomic(saveFile(revision, 'characters.json'), JSON.stringify(characters, null, 1));
       writeAtomic(saveFile(revision, 'facts.json'), JSON.stringify(facts, null, 1));
       copyProgress('progress', saveFile(revision, 'progress'));
-      const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}) };
+      const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}), ...(clock ? { clock } : {}) };
       writeAtomic(saveFile(revision, 'meta.json'), JSON.stringify(meta));
       saves.push(meta);
       return revision;
@@ -208,7 +216,8 @@ export function openStorage(dir) {
       facts = readJson(saveFile(revision, 'facts.json'), {});
       writeAtomic('facts.json', JSON.stringify(facts, null, 1));
       copyProgress(saveFile(revision, 'progress'), 'progress');
-      return this.writeWorld(from.owner, this.readWorld(revision), { name: from.name, reason: 'rollback', from: revision });
+      return this.writeWorld(from.owner, this.readWorld(revision),
+        { name: from.name, reason: 'rollback', from: revision, clock: from.clock });
     },
   };
 }

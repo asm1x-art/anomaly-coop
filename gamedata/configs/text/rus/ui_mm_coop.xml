@@ -106,6 +106,9 @@
 	<string id="ui_mm_coop_status_refused_full">
 		<text>На сервере нет свободных мест.</text>
 	</string>
+	<string id="ui_mm_coop_status_refused_build">
+		<text>Сервер не пускает эту сборку игры: обновите её через лаунчер.</text>
+	</string>
 	<string id="ui_mm_coop_status_refused_version">
 		<text>Версия сервера не совпадает с вашей игрой: обновите игру или сервер.</text>
 	</string>

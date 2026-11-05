@@ -1,12 +1,17 @@
 import net from 'node:net';
 import zlib from 'node:zlib';
 import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
-  encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
+  TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
+import { createClock } from './clock.js';
+import { createBuildCheck } from './builds.js';
 
-export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log } = {}) {
+// builds: { file, allowDev } for builds.js; none lets every build in
+export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, builds = {} } = {}) {
   const storage = openStorage(dataDir);
+  const buildAllowed = createBuildCheck({ ...builds, log });
+  const clock = createClock({ load: () => storage.loadClock(), save: (state) => storage.saveClock(state) });
   let nextId = 1;
   const clients = new Map(); // id -> { send, name, state }
   // id block -> player name. Leases follow the name, so a player who reconnects
@@ -176,11 +181,61 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     log(by ? `world paused ('${by}' asked)` : 'world goes on');
     const payload = pausedPayload();
     for (const c of clients.values()) c.send(M.PAUSED, payload);
+    updateClock();
   };
+
+  // The world's clock (clock.js): every game in the world runs its game time. It runs while someone is in the
+  // world and the world isn't paused, and stands still otherwise.
+  const timePayload = () => {
+    const p = Buffer.alloc(17);
+    p.writeBigUInt64LE(BigInt(clock.now()), 0);
+    p.writeFloatLE(clock.factor(), 8);
+    p[12] = (clock.running() ? TIME_FLAG.RUNNING : 0) | (clock.isSet() ? TIME_FLAG.SET : 0);
+    p.writeUInt32LE(clock.epoch(), 13);
+    return p;
+  };
+  const announceTime = () => {
+    const payload = timePayload();
+    for (const c of clients.values()) c.send(M.TIME, payload);
+  };
+  const updateClock = () => {
+    if (!clock.setRunning([...clients.values()].some((c) => c.inWorld) && !pausedBy)) return;
+    if (clock.isSet()) log(`clock ${clock.running() ? 'runs' : 'stands'} at ${clock.now()}`);
+    announceTime();
+  };
+  const onTimeSet = (id, client, payload) => {
+    const kind = payload[0];
+    if (kind === TIME_SET.INIT && payload.length >= 13) {
+      const game = Number(payload.readBigUInt64LE(1));
+      if (!client.inWorld || !clock.init(game, payload.readFloatLE(9))) return sendTo(id, M.TIME, timePayload());
+      log(`[${id}] '${client.name}' set the clock: ${game}, x${clock.factor()}`);
+    } else if (kind === TIME_SET.JUMP && payload.length >= 5) {
+      const ms = payload.readUInt32LE(1);
+      if (!client.inWorld || !clock.jump(ms)) return;
+      log(`[${id}] '${client.name}' moved the clock ${Math.round(ms / 60000)} game min on`);
+    } else if (kind === TIME_SET.FACTOR && payload.length >= 5) {
+      const factor = payload.readFloatLE(1);
+      if (id !== masterId() || !clock.setFactor(factor)) return;
+      log(`[${id}] '${client.name}' set the time factor x${factor}`);
+    } else return;
+    announceTime();
+  };
+  const sendTo = (id, type, payload) => clients.get(id)?.send(type, payload);
+  const tick = setInterval(() => {
+    if (!clock.isSet()) return;
+    clock.persist();
+    announceTime();
+  }, TIME_TICK_MS).unref();
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
     if (!now) return 0;
     log(`world taken back to revision ${revision} (${how}): revision ${now}`);
+    // the clock goes back with it, to the time that save was made
+    const back = storage.saves().at(-1).clock;
+    if (back && clock.set(back)) {
+      log(`clock taken back to ${back}`);
+      announceTime();
+    }
     // each game puts its character where that save had it
     for (const c of clients.values()) {
       const record = storage.character(c.name);
@@ -241,6 +296,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
             log(`[${id}] protocol mismatch: client ${version}, server ${PROTOCOL_VERSION}`);
             return refuse(REFUSED.VERSION, PROTOCOL_VERSION);
           }
+          const [helloName, build] = readStringsZ(payload, 2, 2);
+          if (!buildAllowed(build)) {
+            log(`[${id}] '${helloName}' turned away: build '${build || 'none'}' is not let in`);
+            return refuse(REFUSED.BUILD, 0);
+          }
           const max = storage.settings().rules.max_players;
           if (clients.size >= max) {
             log(`[${id}] '${readStringZ(payload, 2)}' turned away: ${clients.size} of ${max} online`);
@@ -259,6 +319,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           send(M.GROUPS, groupsPayload());
           send(M.WORLD_INFO, worldInfo());
           if (pausedBy) send(M.PAUSED, pausedPayload());
+          send(M.TIME, timePayload());
           // let the newcomer see players who are standing still
           for (const [otherId, other] of clients)
             if (otherId !== id && other.state) send(M.PEER_STATE, peerState(otherId, other));
@@ -274,6 +335,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (!client.inWorld) {
             client.inWorld = true;
             announceRoles();
+            updateClock();
           }
           break;
         case M.LEFT_WORLD: {
@@ -283,6 +345,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           client.state = null;
           log(`[${id}] '${client.name}' went back to the menu`);
           announceRoles();
+          updateClock();
           // their things are in the master's world: saved now, unless they were the master (saved on the way)
           if (!wasMaster) requestSave('leave', client.name);
           break;
@@ -425,8 +488,9 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
             upload = null;
             break;
           }
+          // the save was just made: the clock now is its time, near enough
           upload = { files: WORLD_FILES.map((_, i) => Buffer.alloc(payload.readUInt32LE(i * 4))),
-            meta: { name, reason: reason || 'auto', who } };
+            meta: { name, reason: reason || 'auto', who, clock: clock.isSet() ? clock.now() : undefined } };
           break;
         }
         case M.WORLD_CHUNK:
@@ -447,6 +511,9 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           break;
         case M.GROUP:
           onGroup(id, client, payload);
+          break;
+        case M.TIME_SET:
+          onTimeSet(id, client, payload);
           break;
         case M.ITEM_PARENT:
         case M.OBJECT_RELEASE:
@@ -481,6 +548,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
       log(`[${id}] '${client.name}' left (${clients.size} online)`);
       broadcast(id, M.PEER_LEFT, u32(id));
       announceRoles();
+      updateClock();
       if (creatorId === id) {
         creatorId = null;
         log(`[${id}] '${client.name}' left before the world was made: anyone may create it`);
@@ -505,6 +573,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master, ping: c.ping ?? null })),
         world: storage.worldInfo(),
         paused: pausedBy || null,
+        clock: clock.isSet() ? { game: clock.now(), factor: clock.factor(), running: clock.running() } : null,
         saves: storage.saves().reverse().slice(0, MAX_SAVES_LISTED),
       };
     },
@@ -536,12 +605,15 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     resetWorld() {
       if (clients.size) return false;
       storage.resetWorld();
+      clock.clear();
       idLeases.clear();
       groups.length = 0;
       log('world reset on the admin page');
       return true;
     },
   };
+
+  server.on('close', () => clearInterval(tick));
 
   return new Promise((resolve) => {
     server.listen(port, host, () => {
