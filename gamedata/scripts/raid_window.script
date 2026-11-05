@@ -1,4 +1,4 @@
--- The window for raids (docs/coop/shelter.md, "Events"; settings: mod_system_raid.ltx [raid_window]). While the Brain
+-- The window for raids (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Events"; settings: mod_system_raid.ltx [raid_window]). While the Brain
 -- Scorcher works, about once every every_hours world hours comes the event "Cooling": a master-rank stalker tells the common
 -- net, the raid app is there for window_hours; one may set out in its first entry_hours, later the button only tells it
 -- is too dangerous. One must be back before it closes: then psi hits and a loss of health grow and phantoms come till one is out or dead

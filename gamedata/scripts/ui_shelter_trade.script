@@ -1,4 +1,4 @@
--- The laptop's Trade app (ui_shelter_laptop.script opens it, a full-screen window; docs/coop/shelter.md, "Economy"): tabs
+-- The laptop's Trade app (ui_shelter_laptop.script opens it, a full-screen window; https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Economy"): tabs
 -- for the overview, the store's positions (filters, search, sorting, a markup and a sale switch for each), the supply
 -- from the traders, the deliveries on their way, the contract board, the journal and the settings. The logic is
 -- shelter_trade.script's and shelter_orders.script's. os: the laptop's window (its parts and clicks, ui_shelter_style).

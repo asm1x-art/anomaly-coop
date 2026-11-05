@@ -1,4 +1,4 @@
--- The laptop's desktop (docs/coop/shelter.md, "План развития", phase 1): a modern dark system on the Chemist's laptop,
+-- The laptop's desktop (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "План развития", phase 1): a modern dark system on the Chemist's laptop,
 -- its look ui_shelter_style.script's. Its shortcuts open programs in a window over the desktop; the taskbar has the
 -- start button (its menu shuts the laptop down), the open program and the game's time and date. Clicks and the hover
 -- are found by the cursor. Laid out in square units: the screen is that many wide (1024 on 4:3, more on a wide one)

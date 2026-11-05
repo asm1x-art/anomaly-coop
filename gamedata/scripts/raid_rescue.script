@@ -1,4 +1,4 @@
--- The raid's random rescue events (docs/coop/shelter.md, "Events"; settings: mod_system_raid.ltx [raid_rescue] and
+-- The raid's random rescue events (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Events"; settings: mod_system_raid.ltx [raid_rescue] and
 -- [raid_rescue_<target>]). At each cycle (raid_window) one comes with chance, never two cycles running, with every target
 -- not yet done, one drawn: only it is on in that cycle; one learns of it from a radio signal right on setting out, nothing shows on the raid app's map.
 -- Out of the raid with a target not done, the event is over, and the next cycle has none.

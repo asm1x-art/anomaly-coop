@@ -2287,7 +2287,7 @@ xrTime get_start_time()
 	return (xrTime(Level().GetStartGameTime()));
 }
 
-// shelter (docs/coop/shelter.md): a piece of the level's static geometry taken out while playing, without recompiling
+// shelter (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): a piece of the level's static geometry taken out while playing, without recompiling
 // the level. The renderer culls a static visual by its bounds (CRender::add_Static), so they go far under the level.
 static void hide_static_visual(int index)
 {

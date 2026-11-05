@@ -1,4 +1,4 @@
--- The shelter's furniture (docs/coop/shelter.md): Hideout Furniture (tools\gra, its pack "hf") works with the shelter's
+-- The shelter's furniture (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): Hideout Furniture (tools\gra, its pack "hf") works with the shelter's
 -- stash instead of the backpack, which can't carry much. A piece lying in the stash is placed right from it: from the
 -- furnishing mode's panel (H in the shelter) or its "Place" in the stash's window. A piece picked up in the shelter
 -- goes into the stash, and so do the bunker's own barrels, cardboard boxes and chairs in the furnishing mode.

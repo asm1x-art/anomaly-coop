@@ -1,4 +1,4 @@
-# The hermetic gate across the lower tunnel (docs/coop/shelter.md, "Ярусы и лифт"): GRA's gate raid_meshes\labx1_germo stretched
+# The hermetic gate across the lower tunnel (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Ярусы и лифт"): GRA's gate raid_meshes\labx1_germo stretched
 # to the tunnel's whole section (7.2 m wide, 4.8 m high), its edges in the rock; one box for the collision. Its texture is
 # copied as it is (metal\metal_germo).
 #   gate_model.py   -> gamedata\meshes\dynamics\shelter\tunnel_gate.ogf, gamedata\textures\metal\metal_germo.*

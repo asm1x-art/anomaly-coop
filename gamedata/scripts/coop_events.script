@@ -1,4 +1,4 @@
--- Co-op: world events (docs/coop/plan.md, "Личный прогресс"): the defence of the barrier from the Monolith or from
+-- Co-op: world events (https://app.notion.com/p/40ed89dbf39d8117a87fd9fbd5e849b1, "Личный прогресс"): the defence of the barrier from the Monolith or from
 -- zombies (tasks_defense) and of the pump station (tasks_pump_station_defense). One at a time for the world: the game
 -- of the player who starts it is its host and runs it - what it spawns is everyone's (and the forced logic of its
 -- NPCs, wherever they are run); the others hear of it from the server's facts. Everyone who took part gets the full

@@ -1,4 +1,4 @@
-# The shelter's lighting on the workbench (docs/coop/shelter.md, "Свет"): a ceiling lamp, the same as the shelter's own, and the
+# The shelter's lighting on the workbench (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Свет"): a ceiling lamp, the same as the shelter's own, and the
 # recipes of Hideout Furniture's lamps: known from the start.
 #   lights_set.py <unpacked meshes> <texture root>...
 #     -> gamedata\configs\mod_system_shelter_lights.ltx, gamedata\configs\items\settings\mod_craft_shelter_lights.ltx,

@@ -1,4 +1,4 @@
-# The synthesis chambers' panels (docs/coop/shelter.md, "Камеры синтеза"): an unseen model laid over a cell's panel on
+# The synthesis chambers' panels (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Камеры синтеза"): an unseen model laid over a cell's panel on
 # the entrance corridor's wall (its monitors and console, prop_komp over prop_pult5: 0.67 x 0.52 m), so that looking at
 # the panel and pressing use reaches the chamber's object. A box for the collision just out of the wall; what's drawn
 # is a speck inside the wall. The model's +z goes into the wall, its origin on the wall at the panel's centre.

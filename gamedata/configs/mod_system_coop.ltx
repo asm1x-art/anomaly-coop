@@ -10,7 +10,7 @@ script_binding = coop_proxy.bind
 species = actor ; mutants take it for the player it stands in for (stalkers judge by community)
 
 ; Co-op: facts about the world Anomaly keeps as the actor's info portions, the same for every player and
-; never part of a player's own progress (src/xrGame/coop/coop_progress.cpp; docs/coop/progress.md).
+; never part of a player's own progress (src/xrGame/coop/coop_progress.cpp; https://app.notion.com/p/40ed89dbf39d81eab92fc869e3ff2553).
 ; Masks: * any characters, ? one.
 [coop_world_infos]
 *_squad_dead            ; a squad's on_death (squad_descr*.ltx)
@@ -23,7 +23,7 @@ species = actor ; mutants take it for the player it stands in for (stalkers judg
 *_item_spawned
 *_first_spawn
 
-; Co-op: the story's info portions (coop_story.script; docs/coop/plan.md, "ׁ‏זוע"): the ones story tasks give or
+; Co-op: the story's info portions (coop_story.script; https://app.notion.com/p/40ed89dbf39d8117a87fd9fbd5e849b1, "ׁ‏זוע"): the ones story tasks give or
 ; check and those of the story dialogs (Lost to the Zone, Warlab), taken from the game's configs, without the world's
 ; above (they are everyone's anyway). "x*" is a prefix. DRX questlines (drx_sl_*) are each player's own chain.
 [coop_story_infos]

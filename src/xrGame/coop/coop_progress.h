@@ -6,7 +6,7 @@ class NET_Packet;
 // (rank, info portions, tasks, PDA news and map, statistics, the body's state; in Lua: tasks, needs,
 // statistics...: gamedata/scripts/coop_progress.script) is the master's. Each game sends its own to the server,
 // which keeps it per character with every save (coop-server/src/storage.js), and puts it on its actor in
-// place of the save's when it loads someone else's save. What it is made of: docs/coop/progress.md.
+// place of the save's when it loads someone else's save. What it is made of: https://app.notion.com/p/40ed89dbf39d81eab92fc869e3ff2553.
 namespace coop
 {
 	void send_progress();                 // M_PROGRESS_REQUEST, and on the way out of the world

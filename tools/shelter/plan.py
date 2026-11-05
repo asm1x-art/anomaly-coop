@@ -1,4 +1,4 @@
-# The shelter's floor plans for the laptop (docs/coop/shelter.md, "План развития", phase 1): bunker_a1's walls cut a metre
+# The shelter's floor plans for the laptop (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "План развития", phase 1): bunker_a1's walls cut a metre
 # over the floor wherever it is, one texture a floor, drawn as a dark blueprint (the laptop's colours); where the world lies
 # on each goes to configs\scripts\shelter\plan.ltx.
 # Furniture and clutter are left out (the walls are the collision's tall faces).

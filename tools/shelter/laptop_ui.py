@@ -1,4 +1,4 @@
-# The Chemist's laptop, a modern dark desktop (docs/coop/shelter.md, "План развития", phase 1; its look:
+# The Chemist's laptop, a modern dark desktop (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "План развития", phase 1; its look:
 # gamedata/scripts/ui_shelter_style.script): the wallpaper and the system's sign on it, the programs' icons, the plan's
 # marks, the system's glyphs, a white to tint, a disc whose quarters round the corners, and see-through frame parts for
 # the typing fields. Drawn four times over and scaled down, so the edges are smooth.

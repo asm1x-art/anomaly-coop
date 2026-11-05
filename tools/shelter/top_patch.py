@@ -1,4 +1,4 @@
-# What the top floor's cleaning needs in place of the debris it takes (docs/coop/shelter.md, "Ярусы и лифт"): the debris hid a
+# What the top floor's cleaning needs in place of the debris it takes (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Ярусы и лифт"): the debris hid a
 # torn column and the gaps round a sagging slab of the ceiling, so a whole column goes round the one and a plate under the
 # other.
 #   top_patch.py   -> gamedata\meshes\dynamics\shelter\top_column.ogf, top_plate.ogf

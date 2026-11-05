@@ -2,7 +2,7 @@
 -- The world's save is the sim master's game, so its Lua state (alife_storage_manager's m_data) carries the
 -- master's tasks, statistics, needs and the actor's variables. A game loading someone else's save puts its
 -- own in their place before the modules read it; a new character gets none of the save's.
--- What is personal: docs/coop/progress/lua-state.md (кхвмне) and docs/coop/progress/actor-vars.md.
+-- What is personal: https://app.notion.com/p/40ed89dbf39d81ce895bc747b4b904d9 (кхвмне) and https://app.notion.com/p/40ed89dbf39d81fbb6c8f1c55cc580f9.
 
 -- top-level m_data keys about one player
 local PERSONAL = {

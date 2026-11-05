@@ -1,4 +1,4 @@
--- The way to the Brain Scorcher (docs/coop/shelter.md, "Scorcher"; every number: mod_system_shelter_scorcher.ltx). While it
+-- The way to the Brain Scorcher (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Scorcher"; every number: mod_system_shelter_scorcher.ltx). While it
 -- works: the white zone of the Radar kills even in a helmet, except in a window of "Cooling" (raid_window.script), no saves
 -- in it; a warning in a band round it; one arriving in it by a transition has a moment to get out. X-10's door is locked:
 -- (its transition does nothing till then) with a decoder built by the technician and the scientists (the laptop's Base tab) one stands at it for hack_minutes while

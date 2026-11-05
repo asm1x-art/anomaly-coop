@@ -1,4 +1,4 @@
--- The base's systems behind the laptop's "Base" tab (docs/coop/shelter.md, "Base"; every number: mod_system_shelter_base.ltx).
+-- The base's systems behind the laptop's "Base" tab (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Base"; every number: mod_system_shelter_base.ltx).
 -- The medic (heals, treats clients, opens Sakharov's heavy goods), the analyser (exact window, emission forecast, paid
 -- forecast), the technician (repairs worn weapons in the store), the perimeter (no interceptions), the incubator, the
 -- crises with squads. The clock is the sim master's, by world hours (shelter_trade.hours()). The world's: shelter.state.

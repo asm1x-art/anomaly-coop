@@ -1,4 +1,4 @@
--- Co-op: the story (docs/coop/plan.md, "—южет (этап 3)").
+-- Co-op: the story (https://app.notion.com/p/40ed89dbf39d8117a87fd9fbd5e849b1, "—южет (этап 3)").
 -- The story is the tasks with storyline = true and the info portions of [coop_story_infos]
 -- (gamedata/configs/mod_system_coop.ltx). The Mysteries of the Zone and Lost to the Zone happen in one world: what
 -- a step of theirs does to the world (WORLD_EFFECTS: squads and items spawned, squads removed, camps cleared) - when
@@ -96,7 +96,7 @@ local function storyline(task_id)
 	return type(task_id) == "string" and ini:section_exist(task_id) and ini:r_bool_ex(task_id, "storyline", false)
 end
 
--- the shelter's questline (scripts\shelter.script, docs/coop/shelter.md): the group's always, whether or not it shares
+-- the shelter's questline (scripts\shelter.script, https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): the group's always, whether or not it shares
 -- its story; a step's reward is only the one's who did it
 local function shelters(id)
 	return type(id) == "string" and string.sub(id, 1, 8) == "shelter_"

@@ -1,4 +1,4 @@
--- Co-op: mechanics' tools (docs/coop/plan.md, "Инструменты техников"). One set per tier per mechanic for the whole
+-- Co-op: mechanics' tools (https://app.notion.com/p/40ed89dbf39d8117a87fd9fbd5e849b1, "Инструменты техников"). One set per tier per mechanic for the whole
 -- world: the tier infos (<mechanic>_upgrade_tier_N) are world facts, and the server remembers who brought each set
 -- ("tool:<mechanic>:<tier>" = player, src/xrGame/coop/coop_facts.cpp). The one who brought it gets that tier's
 -- upgrades at that mechanic cheaper, the group a share of it (coop_rules tool_discount_N, tool_group_share);

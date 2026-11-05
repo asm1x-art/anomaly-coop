@@ -1,4 +1,4 @@
--- AI sight test stand (docs/coop/ai.md, "Тестовый стенд"). Not part of the mod: copy into a test copy as
+-- AI sight test stand (https://app.notion.com/p/40ed89dbf39d815ea34bd623b9aa298c, "Тестовый стенд"). Not part of the mod: copy into a test copy as
 -- gamedata\scripts\zz_ai_stand.script, with zz_test_modes.script. A test mode: switched on in the F7 menu (tab
 -- "toggle", "Тест: Зрение ИИ"); its keys and readout show at the left edge while it is on.
 --   Page Up  an observer 20 m ahead      Page Down  an observer 40 m ahead      Delete  remove the observers

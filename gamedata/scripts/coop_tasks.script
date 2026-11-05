@@ -1,6 +1,6 @@
--- Co-op: tasks several players may hold (docs/coop/plan.md, "Личный прогресс"). When the job is done by another
+-- Co-op: tasks several players may hold (https://app.notion.com/p/40ed89dbf39d8117a87fd9fbd5e849b1, "Личный прогресс"). When the job is done by another
 -- player, the others holding it lose it softly: no goodwill penalty, no "task failed" news, a word from the giver.
--- Whom a task counts for depends on its kind (docs/coop/progress/tasks.md, 2.1), facts of the world on the server:
+-- Whom a task counts for depends on its kind (https://app.notion.com/p/40ed89dbf39d817eaafec27adf15a227, 2.1), facts of the world on the server:
 -- * elimination (bounty): the one who killed the target, at the kill; killed by no player, it is off for everyone.
 --   The target is the world's for a giver and task, the second to hear of the job gets the same one:
 --   "target:<giver id>:<task id>" = target id; "killed:<target id>" = the player, "-" for no player, from the game

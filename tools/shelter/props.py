@@ -1,4 +1,4 @@
-# The shelter's movable props (docs/coop/shelter.md, "Мебель"): bunker_a1's static furniture and clutter cut out of the
+# The shelter's movable props (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Мебель"): bunker_a1's static furniture and clutter cut out of the
 # level into objects Hideout Furniture places, picks up and moves. The visuals are cut into pieces (their connected
 # parts: the compiler merged a material's objects into one visual and splits an object by material), and the pieces
 # are put together into objects: touching pieces of one family of textures (a table's planks, legs and top; a crate's

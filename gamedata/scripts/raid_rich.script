@@ -1,4 +1,4 @@
--- The raid's rich stashes (docs/coop/shelter.md, "Raids"; settings: mod_system_raid.ltx [raid_rich], [raid_rich_<n>]). A box
+-- The raid's rich stashes (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Raids"; settings: mod_system_raid.ltx [raid_rich], [raid_rich_<n>]). A box
 -- on a deep level, made as one first goes there, its loot drawn anew every refill_hours, whether or not it was emptied.
 -- No mark: found with the RF receiver, each on a frequency of its own.
 -- The world's (shelter.state): raid_rich_box_<n>, raid_rich_freq_<n>, raid_rich_at_<n> (the game second of the last refill).

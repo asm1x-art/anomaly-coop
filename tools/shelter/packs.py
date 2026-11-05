@@ -1,4 +1,4 @@
-# The packs of things to furnish with (docs/coop/shelter.md, "Паки предметов"): things cut out of other levels' static geometry and the
+# The packs of things to furnish with (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Паки предметов"): things cut out of other levels' static geometry and the
 # game's and addons' models, each made a rigid model of its own that Hideout Furniture places, with its name, category and an icon
 # drawn from the model. packs.json lists them: { "name", "ru", "en", "cat", "from" }, "from" being "level:<thing id>" (a thing of
 # levelscan.py's, its .pkl in <scan dir>) or "model:<root name>:<path of an .ogf under it>".

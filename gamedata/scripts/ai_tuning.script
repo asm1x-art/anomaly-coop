@@ -1,4 +1,4 @@
--- NPC fire and sight tuning (docs/coop/ai.md; numbers: mod_system_ai_tuning.ltx).
+-- NPC fire and sight tuning (https://app.notion.com/p/40ed89dbf39d815ea34bd623b9aa298c; numbers: mod_system_ai_tuning.ltx).
 -- Spread: the engine asks _g.CAI_Stalker__GetWeaponAccuracy for an NPC's spread on every shot (ai_stalker_fire.cpp,
 -- GetWeaponAccuracy): it gets the spread worked out from the stance and the game difficulty and returns the one used.
 -- Detection: an NPC notices a target once a value it builds up while the target is in sight reaches a threshold; the

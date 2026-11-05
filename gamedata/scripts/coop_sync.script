@@ -209,7 +209,7 @@ local function wrap_corpse_loot()
 end
 
 ------------------------------------------------------------------------------------------------
--- Clean-ups of the world each game would run on its own (docs/coop/progress.md, old bugs): the sim master's alone,
+-- Clean-ups of the world each game would run on its own (https://app.notion.com/p/40ed89dbf39d81eab92fc869e3ff2553, old bugs): the sim master's alone,
 -- and never where a player is, whose NPCs are online in his game.
 
 local function player_on(level_name)

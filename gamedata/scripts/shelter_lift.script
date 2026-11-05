@@ -1,4 +1,4 @@
--- The shelter's lifts (docs/coop/shelter.md, "Lift"): they replace the long stairs, from the middle floor up and down. Their
+-- The shelter's lifts (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Lift"): they replace the long stairs, from the middle floor up and down. Their
 -- doors never open, the walls leave them no room: use on one is the ride itself, a fade and a move to the other door.
 -- Dead until the generator runs. The way up comes back with the repair of its panel, at its lower door; the way down with
 -- the repair of a control box by its upper door; each takes parts in a window (ui_shelter_lift.script, [shelter_lift]).

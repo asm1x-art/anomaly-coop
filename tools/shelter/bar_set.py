@@ -1,4 +1,4 @@
-# The shelter's bar furniture (docs/coop/shelter.md, "Бар: мебель"): modules cut out of the 100 Rentgen's own things (l05_bar's
+# The shelter's bar furniture (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Бар: мебель"): modules cut out of the 100 Rentgen's own things (l05_bar's
 # static geometry, levelscan.py's .pkl) so that a counter of any length can be put together for the room, each made a rigid model
 # Hideout Furniture places and a default recipe of the workbench's (the "blueprints": no finding, no recipe item).
 #   bar_set.py <scan dir> <texture root>... [--preview out.jpg]

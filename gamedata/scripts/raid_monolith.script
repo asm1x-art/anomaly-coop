@@ -1,4 +1,4 @@
--- The Monolith on the raid levels (docs/coop/shelter.md, "Raids"; settings: mod_system_raid.ltx [raid_monolith] and
+-- The Monolith on the raid levels (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Raids"; settings: mod_system_raid.ltx [raid_monolith] and
 -- [<level>_monolith]). A garrison on every smart terrain of a level, its squads by the smart's depth from the level's
 -- "from" point (thirds: near, mid, far); big ones, a rare thing on the commander, on big_count smarts of the deeper
 -- half. A garrison stays at its smart (the squad's scripted target). Killed is killed: a cleared smart stays free, but

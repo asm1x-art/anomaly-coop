@@ -1,4 +1,4 @@
--- A synthesis chamber's loading at its panel (docs/coop/shelter.md, "Алхимия"): the actor's things that can go in
+-- A synthesis chamber's loading at its panel (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Алхимия"): the actor's things that can go in
 -- (junk, mutant parts, artefacts: shelter_synthesis.component), up to three slots, what the journal knows of the load
 -- picked, and the start. The Chemist's software, in the look of his laptop (ui_shelter_style.script; clicks found by
 -- the cursor), in square units: 1024 x 768 on 4:3, wider on a wide screen.

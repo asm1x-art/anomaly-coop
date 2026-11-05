@@ -1,6 +1,6 @@
 #pragma once
 
-// Grass hides from AI sight (docs/coop/ai.md). The level's grass (level.details: 2x2 m slots, up to four detail models
+// Grass hides from AI sight (https://app.notion.com/p/40ed89dbf39d815ea34bd623b9aa298c). The level's grass (level.details: 2x2 m slots, up to four detail models
 // each with a density per quarter) has no collision, so a sight ray never meets it. This walks the last metres of an
 // NPC's sight ray before the point it looks at and, wherever the ray runs inside a slot's grass layer (from the slot's
 // ground up to its grass height), takes away sight in proportion to the grass density and the length run through it.

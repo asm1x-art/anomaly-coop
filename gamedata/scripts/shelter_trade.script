@@ -1,4 +1,4 @@
--- The shelter's trade (docs/coop/shelter.md, "Economy"): the trade sells all kinds of goods from the store, the room given
+-- The shelter's trade (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Economy"): the trade sells all kinds of goods from the store, the room given
 -- that role on the laptop's plan, and from the ledger, the bulk stock kept as counts ("section = how many": thousands of
 -- rounds would be thousands of objects). Each position has a markup of its own, of its category or the general one, and
 -- can be taken off sale while it lies there. Visitors are simulated, none a rookie (they don't get to the Radar): each

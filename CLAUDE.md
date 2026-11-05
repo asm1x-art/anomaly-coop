@@ -8,13 +8,16 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - `main` — upstream `themrdemonized/xray-monolith`, branch `all-in-one-vs2022-wpo`. Never commit here.
 - `coop` — the base co-op: engine networking in `src/xrGame/coop/`, Lua sync in `gamedata/scripts/coop_sync.script`, DLTX in `gamedata/configs/mod_system_coop.ltx`, Node server in `coop-server/`.
 - `raid` — the Limansk raid: six level copies in one spawn pack (`tools/raid/`), scripted transitions. Merged into `coop` and `shelter`.
-- `shelter` — the group's own hideout on top of coop and raid: questline, floors and lifts, laptop apps, bar, trade, perimeter, AI vision. Docs: `docs/coop/shelter.md`, `ai.md`, `optimization.md`, `checklist-base.md`.
+- `shelter` — the group's own hideout on top of coop and raid: questline, floors and lifts, laptop apps, bar, trade, perimeter, AI vision.
 - `multiplayer` — headless host, joins from the journal, character saves, one offline world, packaged server + bot, F10 admin window. Docs: `docs/coop/multiplayer.md`.
 - `render` — engine/render performance: render scale, `prof_spikes`, Lua GC step, optional PGO build (`tools/pgo/pgo.ps1`). Docs: `docs/coop/render.md`.
 - `weapons` — weapon pack plan (`docs/coop/weapons.md`), no code yet.
 - `rebalance` — hard-mode balance, no code yet.
 
-Common docs: `docs/coop/plan.md` (requirements and decisions), `progress.md` + `progress/`, `testing.md` (manual test checklist), `host.md`.
+## Docs
+- Plans, design, progress and test orders live in Notion, "Документация проекта" (https://app.notion.com/p/40ed89dbf39d81f68103c6060dceae0b). It is private, in the project owner's workspace; agents with Notion access use it.
+- Code-bound docs stay in `docs/coop/`: `weapons.md`, `render.md`.
+- New user-facing docs go to Notion, not into new `.md` files in the repo.
 
 ## Build
 - A fresh worktree needs `git submodule update --init` (`src/3rd party/optick-git`) first, otherwise C1083 in optick/coop_logs.

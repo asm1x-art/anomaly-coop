@@ -1,4 +1,4 @@
--- Raids (docs/coop/shelter.md, "Raids"): the raid's levels are copies of the north's (tools/raid/raid_copy.py), each a
+-- Raids (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Raids"): the raid's levels are copies of the north's (tools/raid/raid_copy.py), each a
 -- level of its own named raid_*, with no way in from the world. A raid starts from the laptop's "Raid" app (in a
 -- window of the event "Cooling", raid_window.script; always, once the Brain Scorcher is off) and lands in Limansk where the Red Forest's level changer brings one. A transition of a copy
 -- is a restrictor whose custom data has [raid_transition] (level: another copy or a level outside the raid, position,

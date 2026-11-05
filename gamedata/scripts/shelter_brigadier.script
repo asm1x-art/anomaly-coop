@@ -1,5 +1,5 @@
 -- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
--- docs/coop/shelter.md): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
+-- https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
 -- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
 -- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
 -- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the

@@ -1,4 +1,4 @@
--- Artefact synthesis (docs/coop/shelter.md, "Камеры синтеза"): Herman's capsules filled in anomalies. A capsule of a
+-- Artefact synthesis (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Камеры синтеза"): Herman's capsules filled in anomalies. A capsule of a
 -- nature goes into an anomaly of that nature near the actor ("Put into the anomaly"); about a minute later it lies
 -- there full, and the anomaly is burnt out till the next emission. All of it only in a suit the work allows
 -- ([shelter_synthesis] suits): in any other the capsule's discharge kills, and nothing's done. The capsules being
@@ -377,7 +377,7 @@ function duration_text(seconds)
 end
 
 -------------------------------------------------------------------------------
--- the alchemy (docs/coop/shelter.md, "Алхимия"): two or three things into a chamber make an artefact when they are one
+-- the alchemy (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Алхимия"): two or three things into a chamber make an artefact when they are one
 -- of the chamber's recipes, a stone otherwise, with the chamber's resonance: the most of them one of its recipes has,
 -- of the recipes of the load's kind (junk alone: those of junk; with an artefact: those it is the seed of).
 -- Each world has its own recipes, from its seed: every junk item and mutant part ([shelter_synth_junk],

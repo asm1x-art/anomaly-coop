@@ -1,4 +1,4 @@
-# The stone a synthesis chamber makes of a load that's no recipe (docs/coop/shelter.md, "Алхимия"): a lump of fused
+# The stone a synthesis chamber makes of a load that's no recipe (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Алхимия"): a lump of fused
 # concrete-grey matter, about 15 cm, its model and its inventory icon (a 50 px cell, drawn from the model).
 #   synth_stone.py   -> gamedata\meshes\dynamics\shelter\synth_stone.ogf, gamedata\textures\ui\shelter\synth_stone.dds
 import os

@@ -1,4 +1,4 @@
--- The group's shelter (docs/coop/shelter.md): bunker_a1's middle floor, and its questline "Восстановление".
+-- The group's shelter (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): bunker_a1's middle floor, and its questline "Восстановление".
 --  * The first visit finds it dark and taken: a controller and two zombified stalkers, one with the note that gives
 --    the two tasks (configs\misc\task\tm_shelter.ltx).
 --  * The lamps stay dark until the generator runs: repaired with Kardan's tools (the stalker who took them lies in the
@@ -92,7 +92,7 @@ local function msg(id)
 end
 
 ----------------------------------------------------------------------------------------------------
--- The shelter's state is the world's (docs/coop/shelter.md, "����"): in co-op the server's facts "shelter:<name>",
+-- The shelter's state is the world's (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "����"): in co-op the server's facts "shelter:<name>",
 -- which every game has whoever saved the world; the actor's variables "shelter_<name>" otherwise. What the shelter
 -- spawns is the world's too: in co-op everyone's, the first visit's things once for the world.
 
@@ -507,7 +507,7 @@ function note_menu(obj)
 	return p and p:id() == AC_ID and game.translate_string("st_shelter_read") or nil
 end
 
--- in co-op the shelter is a group's (docs/coop/shelter.md): with no group the note gives no questline
+-- in co-op the shelter is a group's (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): with no group the note gives no questline
 local function no_group()
 	return coop and coop.connected and coop.connected() and #coop.group() < 2
 end

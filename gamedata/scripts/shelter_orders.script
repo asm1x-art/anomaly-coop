@@ -1,4 +1,4 @@
--- The shelter's supply and contracts (docs/coop/shelter.md, "Economy"), on the laptop's Trade app.
+-- The shelter's supply and contracts (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Economy"), on the laptop's Trade app.
 -- Supply: lots ordered from a supplier ([shelter_orders] suppliers), paid from the till or the pocket; always cheaper
 -- than that trader's retail; they come after some hours as ledger counts (shelter_trade). A lot can be intercepted: then a
 -- cargo case lies at a point on the map with a squad over it, for sos_hours: whoever takes it gets the lot to the ledger.
