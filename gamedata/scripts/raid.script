@@ -354,8 +354,22 @@ local function actor_on_before_death(who, flags)
 	end)
 end
 
+-- the way one came onto this raid level, which leads out to the shelter: the actor's, and the world's for a raider
+-- whose game joins the world again mid-raid (a crash, a lost link: its actor's variables then come from the world's save)
+local function set_came_from(name)
+	save_var(db.actor, "raid_came_from", name)
+	shelter.set_state("raid_came_from", name)
+end
+
+local function came_from()
+	return load_var(db.actor, "raid_came_from", nil) or shelter.state("raid_came_from", nil)
+end
+
 -------------------------------------------------------------------------------
--- into the raid: the landing; the way out of the landing level is the transition to where the landing comes from
+-- into the raid: the landing; the way out of the landing level is the transition to where the landing comes from.
+-- What a raid spawns and removes (garrisons, posts, patrols, stashes, loot, the rescued) goes through
+-- shelter.everyones: in co-op it is the world's, so the others' worlds and the master's save, the one kept, have the
+-- raider's Monolith, its dead and the cleared smarts as well.
 function start()
 	if raider() or entry_denied() then
 		return
@@ -367,12 +381,14 @@ function start()
 	m.raid_found, m.raid_own, m.raid_report = nil, nil, nil
 	m.raid_run = { t0 = game_seconds_now(), levels = { l.level }, kills = 0, reinf = 0 }
 	news("start", l.level)
-	save_var(db.actor, "raid_came_from", l.came_from)
-	raid_loot.plan_orders()
-	raid_monolith.prepare(l.level)
-	raid_rescue.prepare(l.level)
-	raid_rich.prepare(l.level)
-	raid_loot.prepare(l.level)
+	set_came_from(l.came_from)
+	shelter.everyones(function()
+		raid_loot.plan_orders()
+		raid_monolith.prepare(l.level)
+		raid_rescue.prepare(l.level)
+		raid_rich.prepare(l.level)
+		raid_loot.prepare(l.level)
+	end)
 	raid_rescue.on_start()
 	go(l.level, l.position, l.node, l.direction)
 end
@@ -380,8 +396,10 @@ end
 -- out of the raid (alive, or dead: died), to the shelter's entrance: what was found is one's own
 function exit_to_shelter(died)
 	printf("raid: out of %s to the shelter", level.name())
-	raid_monolith.left(level.name())
-	raid_rescue.on_exit(level.name(), died)
+	shelter.everyones(function()
+		raid_monolith.left(level.name())
+		raid_rescue.on_exit(level.name(), died)
+	end)
 	if not died then
 		news("out", level.name())
 	end
@@ -389,7 +407,7 @@ function exit_to_shelter(died)
 	local m = alife_storage_manager.get_state()
 	m.raid_found, m.raid_own = nil, nil
 	shelter.set_state("raid_in", nil)
-	save_var(db.actor, "raid_came_from", nil)
+	set_came_from(nil)
 	save_var(db.actor, "raid_face_shelter", true)
 	go(SHELTER.level, SHELTER.position, SHELTER.node, 0)
 end
@@ -400,7 +418,7 @@ function transition(obj)
 		return
 	end
 	local target = ini:r_string_ex("raid_transition", "level")
-	if target == load_var(db.actor, "raid_came_from") then
+	if target == came_from() then
 		exit_to_shelter()
 		return
 	end
@@ -413,17 +431,19 @@ function transition(obj)
 		return
 	end
 	printf("raid: %s -> %s", obj:name(), target)
-	save_var(db.actor, "raid_came_from", level.name())
+	set_came_from(level.name())
 	local r = run()
 	if r then
 		r.levels = r.levels or {}
 		r.levels[#r.levels + 1] = target
 	end
-	raid_monolith.left(level.name())
-	raid_monolith.prepare(target)
-	raid_rescue.prepare(target)
-	raid_rich.prepare(target)
-	raid_loot.prepare(target)
+	shelter.everyones(function()
+		raid_monolith.left(level.name())
+		raid_monolith.prepare(target)
+		raid_rescue.prepare(target)
+		raid_rich.prepare(target)
+		raid_loot.prepare(target)
+	end)
 	go(target, vector_of(ini:r_string_ex("raid_transition", "position")), ini:r_u32("raid_transition", "node"),
 		ini:r_float_ex("raid_transition", "direction") or 0)
 end
@@ -469,8 +489,10 @@ local function make_flat(se)
 	local owner = se.parent_id ~= NO_PARENT and alife():object(se.parent_id)
 	local at = owner or { se.position, se.m_level_vertex_id, se.m_game_vertex_id }
 	shelter.set_state("raid_beacon_" .. se.id, nil)
-	alife_release_id(se.id)
-	alife_create_item(FLAT, at)
+	shelter.everyones(function()
+		alife_release_id(se.id)
+		alife_create_item(FLAT, at)
+	end)
 	printf("raid: beacon %s is flat", se.id)
 end
 

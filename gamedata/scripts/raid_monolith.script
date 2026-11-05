@@ -651,7 +651,7 @@ local function actor_on_update()
 	if not reinforce_at then
 		reinforce_next()
 	elseif now >= reinforce_at then
-		if reinforce(name) then
+		if shelter.everyones(reinforce, name) then
 			reinforce_next()
 		else
 			reinforce_at = now + (number("reinforce_retry", 15)) * 1000

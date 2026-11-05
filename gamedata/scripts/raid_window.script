@@ -99,7 +99,7 @@ local function new_cycle(t)
 	raid_rescue.new_cycle()
 	if off() then
 		if shelter.state("scorcher_was_on", false) then
-			reinforce()
+			shelter.everyones(reinforce)
 		end
 		return
 	end

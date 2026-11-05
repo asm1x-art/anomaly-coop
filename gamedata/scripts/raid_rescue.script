@@ -346,7 +346,7 @@ local function actor_on_update()
 	end
 	if now >= check_at then
 		check_at = now + CHECK_MS
-		check(name)
+		shelter.everyones(check, name)
 		next_signal(now)
 	end
 end
