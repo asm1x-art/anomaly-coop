@@ -360,3 +360,14 @@ min_player_distance   = 200   ; m: no body this close to a player goes (on a pla
 enabled  = true                    ; false: no one is immune
 factions = monolith, greh, zombied ; the player's true faction (a faction change carries it)
 infos    = bar_deactivate_radar_done, yan_labx16_switcher_primary_off, yan_labx16_switcher_1_off, yan_labx16_switcher_2_off, yan_labx16_switcher_3_off
+
+; Co-op: coming back from a death (coop_death.script): with no own save the player stays as he is, with one a
+; save loads that may have been made while something was killing him. What Anomaly's scripts keep of the actor
+; themselves is put right: psi health (arszi_psy) full and its death scene off, no bleeding, no radiation, the HUD
+; and controls back; needs worse than these are brought down to them.
+[coop_rollback]
+thirst_max  = 1440 ; actor_status_thirst's last_drink: above 2880 it takes health, from 7200 it can kill in forced sleep
+sleep_max   = 5000 ; actor_status_sleep's last_sleep: above 6250 it takes stamina, from 9000 it forces sleep
+satiety_min = 0.2  ; below satiety_critical (actor.ltx, 0.2) hunger takes health
+settle_s    = 3    ; real s: back at the save point on the same level, all this once more then (a psi field still hits
+            ; for a moment after one is gone from it)

@@ -4,7 +4,8 @@
 -- revive_time seconds helps them up. Nobody else on the level, the time up, or giving up (the jump key):
 -- back to the player's newest own save (the server's, coop_save.cpp; never the exit save), the world loading
 -- again with the character as that save has it. With no save of their own: back where the player was when the
--- world was last saved, everything carried kept, some rank lost. The world's host (a ghost) never dies.
+-- world was last saved, everything carried kept, some rank lost. Either way what would kill again at once (psi
+-- health, bleeding, radiation, needs, the controls taken) is put right: recover(). The world's host (a ghost) never dies.
 
 local NEAR = 2.5          -- m: how close a helper stays
 local HUD = nil
@@ -113,13 +114,76 @@ end
 
 local going_back = nil -- time_global() we asked the server for our own save, nil: not asked
 
+-- Back from a death: Anomaly's scripts keep some of the actor's state themselves, outside the engine's actor, and
+-- at its worst it kills or cripples again. After a death screen a save loads and that starts over; here we either
+-- stay in place (no own save) or load a save that may have been made with it at its worst. [coop_rollback] in
+-- mod_system_coop.ltx.
+local RB = "coop_rollback"
+
+-- a module's state, changed through its own save_state / load_state
+local function change_state(module, key, change)
+	if not (module and module.save_state and module.load_state) then
+		return false
+	end
+	local m_data = {}
+	module.save_state(m_data)
+	if type(m_data[key]) == "table" and change(m_data[key]) then
+		module.load_state(m_data)
+		return true
+	end
+	return false
+end
+
+local function cap_need(module, key, field, max)
+	local capped = change_state(module, key, function(t)
+		if (t[field] or 0) > max then
+			printf("[coop] back from death: %s %s -> %s", key, t[field], max)
+			t[field] = max
+			return true
+		end
+	end)
+	if capped and module.test_blur then
+		module.test_blur() -- its blur as it is now
+	end
+end
+
+local function recover()
+	-- psi health (arszi_psy) is its own: at 0 and below it blacks the screen out, takes the controls and kills
+	if arszi_psy and arszi_psy.save_state then
+		local m_data = {}
+		arszi_psy.save_state(m_data) -- its live table
+		local psy = m_data.psy_table
+		if psy and (psy.actor_psy_health ~= 1 or psy.psy_death_scene) then
+			printf("[coop] back from death: psi health %s -> 1", psy.actor_psy_health)
+		end
+		if psy then
+			psy.actor_psy_health = 1
+			psy.psy_death_scene = nil
+		end
+		arszi_psy.on_game_load() -- its stage and the death scene's count start over, as when a save loads
+		arszi_psy.remove_all_psy_ppe_effects()
+	end
+	-- thirst and sleep (actor_status_*): past these they take health or stamina, thirst kills in forced sleep
+	cap_need(actor_status_thirst, "drink", "last_drink", ini_sys:r_float_ex(RB, "thirst_max") or 1440)
+	cap_need(actor_status_sleep, "sleep", "last_sleep", ini_sys:r_float_ex(RB, "sleep_max") or 5000)
+	-- hunger: below this the engine takes health
+	local satiety = ini_sys:r_float_ex(RB, "satiety_min") or 0.2
+	if db.actor.satiety < satiety then
+		db.actor.satiety = satiety
+	end
+	db.actor.bleeding = 1
+	db.actor.radiation = 0
+	db.actor.psy_health = 1
+	-- a death that took the controls and the HUD away (a surge's wave, the psi death scene)
+	xr_effects.enable_ui(db.actor, nil)
+end
+
 -- no own save: back where we were when the world was last saved
 local function back_to_save_point()
 	coop.fell()
 	stand(1)
+	recover()
 	db.actor.power = 1
-	db.actor.radiation = 0
-	db.actor.psy_health = 1
 	local rank = db.actor:character_rank()
 	local lost = math.floor(rank * coop_rules.number("rank_loss", 10) / 100)
 	if lost > 0 then
@@ -133,6 +197,14 @@ local function back_to_save_point()
 	end
 	if save_point.level == level.name() then
 		db.actor:set_actor_position(save_point.pos)
+		-- what hurt us where we died lets go only once the game sees us gone from there (a psi field still
+		-- hits for a moment): put right again then
+		CreateTimeEvent("coop_death", "recover", ini_sys:r_float_ex(RB, "settle_s") or 3, function()
+			if db.actor and db.actor:alive() then
+				recover()
+			end
+			return true
+		end)
 	else
 		ChangeLevel(save_point.pos, save_point.lvid, save_point.gvid, VEC_ZERO, false)
 	end
@@ -298,7 +370,22 @@ function on_game_start()
 			mark_save_point()
 		end
 		-- a fresh actor (the world loaded again, with our own save after a lone death too): up as it has us; the
-		-- engine's flag outlives a reload of the scripts
+		-- engine's flag outlives a reload of the scripts. Still down in it: we died and our save came, and that
+		-- save may have been made while something was killing us
+		if coop.downed(coop.my_id()) then
+			recover()
+		else
+			-- a save made during arszi_psy's death scene keeps its flag, and NPCs never see us as an enemy then
+			local m_data = {}
+			if arszi_psy and arszi_psy.save_state then
+				arszi_psy.save_state(m_data)
+			end
+			local psy = m_data.psy_table
+			if psy and psy.psy_death_scene and (psy.actor_psy_health or 1) > 0 then
+				psy.psy_death_scene = nil
+				printf("[coop] arszi_psy's death scene flag left from a save: off")
+			end
+		end
 		going_back, downed_since, helper = nil, nil, nil
 		coop.set_downed(false)
 		hud(false)
