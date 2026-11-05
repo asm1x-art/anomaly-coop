@@ -228,10 +228,10 @@ namespace coop
 
 		const u64 local = tm->game_time();
 		u64 want = u64(target());
-		// never back by a little: wait for the world
-		const u64 floor = g_applied ? g_applied : local;
-		if (want < floor && double(floor - want) < settings().max_hold_s * 1000.)
-			want = floor;
+		// never back by a little: wait for the world. Not right after a load: the level's clock ran on by the
+		// loading time from the save's and nothing has seen it yet, so it simply takes the world's
+		if (g_applied && want < g_applied && double(g_applied - want) < settings().max_hold_s * 1000.)
+			want = g_applied;
 		const s64 step = s64(want) - s64(local);
 		tm->set_game_time(want, g_factor);
 		g_applied = want;
