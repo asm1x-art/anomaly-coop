@@ -737,6 +737,7 @@ test('rollback: everyone must agree; then all reload, characters go back, old ga
     const b = await player(port, 'друг');
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
     b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0)); // b votes: in the world
+    await until(a, M.PEER_STATE); // b's state reaches a in no fixed order with a's own replies
     a.send(M.CHARACTER, Buffer.from('at the start'));
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
     a.send(M.CHARACTER, Buffer.from('much later'));
@@ -813,6 +814,7 @@ test('progress: asked of everyone in the world with each save, given back with t
     const b = await player(port, 'друг');
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
     b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await until(a, M.PEER_STATE); // b's state reaches a in no fixed order with a's own replies
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
     await roundTrip(a);
 
@@ -936,6 +938,7 @@ test('facts: kept by the server, passed on when they change, given with the worl
     const b = await player(port, 'друг');
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
     b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await until(a, M.PEER_STATE); // b's state reaches a in no fixed order with a's own replies
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
     await roundTrip(a);
 

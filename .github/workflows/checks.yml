@@ -36,6 +36,7 @@ jobs:
   server:
     name: Server tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: coop-server
@@ -44,4 +45,5 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-      - run: npm test
+      # a failed test may leave sockets open: exit anyway
+      - run: npm test -- --test-force-exit
