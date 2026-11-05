@@ -63,8 +63,11 @@ export function startHost({ gameDir, exe, args = '', port, secret, events, log =
       if (child) {
         const old = child;
         child = null;
+        // the new one only once the old is gone: one game per exe folder, a second one quits at once
+        old.once('exit', () => { if (!stopping) launch(); });
         old.kill();
         log('host: restarting');
+        return true;
       }
       launch();
       return true;
