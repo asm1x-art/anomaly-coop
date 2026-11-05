@@ -388,9 +388,11 @@ namespace coop
 		{
 			const u8 reason = P.r_u8();
 			const u16 value = P.r_u16();
-			m_refusal = reason == 0 ? "full" : "version";
+			m_refusal = reason == 0 ? "full" : reason == 2 ? "build" : "version";
 			if (reason == 0)
 				Msg("! [coop] the server is full: %u players at most", value);
+			else if (reason == 2)
+				Msg("! [coop] the server does not let build '%s' in: update the game with the launcher", build_id());
 			else
 				Msg("! [coop] the server speaks protocol %u, this game %u", value, PROTOCOL_VERSION);
 			break;
@@ -587,6 +589,7 @@ namespace coop
 		P.w_begin(M_HELLO);
 		P.w_u16(PROTOCOL_VERSION);
 		P.w_stringZ(m_name.c_str());
+		P.w_stringZ(build_id());
 		send(P);
 		m_hello_sent = true;
 	}
@@ -791,6 +794,26 @@ namespace coop
 	u32 my_id() { return g_client.id(); }
 	u32 ping_ms() { return g_client.rtt(); }
 	LPCSTR refusal() { return g_client.refusal().c_str(); }
+
+	LPCSTR build_id()
+	{
+		static string64 id = "";
+		if (!id[0])
+		{
+			xr_strcpy(id, "dev");
+			// ASCII hex from the launcher's manifest; anything else stays "dev"
+			if (LPCSTR p = strstr(Core.Params, "-coop_build "))
+			{
+				string64 value = "";
+				sscanf(p + xr_strlen("-coop_build "), "%63[0-9a-fA-F]", value);
+				if (xr_strlen(value))
+					xr_strcpy(id, value);
+			}
+		}
+		return id;
+	}
+
+	bool auto_launch() { return strstr(Core.Params, "-coop_auto") != nullptr; }
 	const xr_string& my_name() { return g_client.name(); }
 
 	bool is_sim_master()

@@ -163,7 +163,9 @@ namespace coop
 
 			def("my_id", &my_id),
 			def("ping", &ping_ms),                   // ms to the server and back
-			def("refused", &refusal),               // why the server turned us away: "full", "version", ""
+			def("refused", &refusal),               // why the server turned us away: "full", "version", "build", ""
+			def("build_id", &build_id),             // -coop_build from the launcher, "dev" without
+			def("auto_launch", &auto_launch),       // -coop_auto: enter the profile on top of the list at once
 			def("peers", &script_peers),
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
