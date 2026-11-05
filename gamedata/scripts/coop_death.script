@@ -297,11 +297,11 @@ function on_game_start()
 		if not save_point then
 			mark_save_point()
 		end
-		if going_back then -- the world loaded again with our own save: up as it has us
-			going_back, downed_since, helper = nil, nil, nil
-			coop.set_downed(false)
-			hud(false)
-		end
+		-- a fresh actor (the world loaded again, with our own save after a lone death too): up as it has us; the
+		-- engine's flag outlives a reload of the scripts
+		going_back, downed_since, helper = nil, nil, nil
+		coop.set_downed(false)
+		hud(false)
 	end)
 	RegisterScriptCallback("actor_on_net_destroy", function() hud(false) end)
 	RegisterScriptCallback("save_state", function()

@@ -19,6 +19,7 @@
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "../xrEngine/XR_IOConsole.h"
+#include "MainMenu.h"
 #include <sys/stat.h>
 
 void set_character_name_script(CSE_ALifeTraderAbstract* ta, LPCSTR str); // xrServer_Objects_ALife_Monsters_script.cpp
@@ -80,6 +81,7 @@ namespace coop
 	static xr_vector<u16> g_made_again; // of those, the ones made again: for the others once the level runs
 	static xr_vector<u16> g_returned;   // things taken since that save, gone back where they were taken from
 	static bool g_choice_due = false;   // the player chooses a save before the world comes (M_SAVE_CHOICE)
+	static bool g_choice_waiting = false; // ... once the main menu is up: its window needs a dialog holder
 	static xr_string g_choice;          // the saves to choose from, as _G.coop_on_saves has them
 	static bool g_send_states = false; // the others' copies of our things take their restored states then
 
@@ -242,11 +244,23 @@ namespace coop
 			if (ai().script_engine().functor("_G.coop_on_save_choice", handler))
 			{
 				Msg("[coop] an exit save and another one: the player chooses before the world comes");
-				handler(g_choice.c_str());
+				g_choice_waiting = true; // update_world_sync, once the main menu is up
 				return;
 			}
 		}
 		request_world();
+	}
+
+	static void ask_choice()
+	{
+		if (!g_choice_waiting || !MainMenu() || !MainMenu()->IsActive())
+			return;
+		g_choice_waiting = false;
+		::luabind::functor<void> handler;
+		if (ai().script_engine().functor("_G.coop_on_save_choice", handler))
+			handler(g_choice.c_str());
+		else
+			request_world();
 	}
 
 	void choose_save(u32 id)
@@ -827,6 +841,7 @@ namespace coop
 	void update_world_sync()
 	{
 		update_pause();
+		ask_choice();
 		if (g_load_pending)
 		{
 			// Engine.Event defers the actual start, so this is safe from a frame callback
@@ -905,6 +920,7 @@ namespace coop
 		g_load_pending = false;
 		g_in_world = 0;
 		g_choice_due = false;
+		g_choice_waiting = false;
 	}
 
 	void print_world_status()
