@@ -131,6 +131,7 @@ function everyones(f, ...)
 	local res = { pcall(f, ...) }
 	coop.end_shared()
 	sharing = sharing - 1
+	coop_sync.send_squad_members()
 	if not res[1] then
 		error(res[2], 0)
 	end
