@@ -766,6 +766,7 @@ configs/ui/textures_descr/ui_actor_d_portraits.xml
 configs/ui/textures_descr/ui_ingame.xml
 configs/ui/textures_descr/ui_mcm.xml
 configs/ui/textures_descr/ui_wpo_guide.xml
+configs/ui/textures_descr/z_ui_new_game.xml
 configs/ui/ui_debug_launcher_16.xml
 configs/ui/ui_mcm.xml
 configs/ui/ui_mcm_16.xml

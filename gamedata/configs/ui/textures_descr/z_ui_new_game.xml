@@ -1,0 +1,91 @@
+<w>
+	<!-- New game -->
+	<file name="ui\new_game\ui_new_game_main">
+		<texture id="ui_new_game_main" x="0" y="0" width="1024" height="628" />
+	</file>
+	
+	<file name="ui\new_game\ui_new_game_back_t">
+		<texture id="ui_new_game_back" x="0" y="0" width="1024" height="628" />
+	</file>
+	
+	<file name="ui\new_game\ui_new_game_popup">
+		<texture id="ui_new_game_popup_faction"       x="656" y="0"   width="368" height="398" />
+		<texture id="ui_new_game_popup_icon"          x="428" y="0"   width="220" height="498" />
+		<texture id="ui_new_game_popup_options_extra" x="640" y="540" width="384" height="401" />
+		<texture id="ui_new_game_popup_option"        x="0"   y="543" width="644" height="397" />
+		<texture id="ui_new_game_black_back"          x="656" y="406" width="368" height="129" />
+		
+		<texture id="ui_new_game_btn_stalker_d"  x="0"   y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_stalker_e"  x="0"   y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_stalker_h"  x="0"   y="0"   width="88" height="88" />
+		<texture id="ui_new_game_btn_stalker_t"  x="0"   y="0"   width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_bandit_d"   x="89"  y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_bandit_e"   x="89"  y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_bandit_h"   x="89"  y="0"   width="88" height="88" />
+		<texture id="ui_new_game_btn_bandit_t"   x="89"  y="0"   width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_csky_d"     x="178" y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_csky_e"     x="178" y="267" width="88" height="88" />
+		<texture id="ui_new_game_btn_csky_h"     x="178" y="0"   width="88" height="88" />
+		<texture id="ui_new_game_btn_csky_t"     x="178" y="0"   width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_dolg_d"     x="0"   y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_dolg_e"     x="0"   y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_dolg_h"     x="0"   y="89"  width="88" height="88" />
+		<texture id="ui_new_game_btn_dolg_t"     x="0"   y="89"  width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_freedom_d"  x="89"  y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_freedom_e"  x="89"  y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_freedom_h"  x="89"  y="89"  width="88" height="88" />
+		<texture id="ui_new_game_btn_freedom_t"  x="89"  y="89"  width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_killer_d"   x="178" y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_killer_e"   x="178" y="356" width="88" height="88" />
+		<texture id="ui_new_game_btn_killer_h"   x="178" y="89"  width="88" height="88" />
+		<texture id="ui_new_game_btn_killer_t"   x="178" y="89"  width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_army_d"     x="0"   y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_army_e"     x="0"   y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_army_h"     x="0"   y="178" width="88" height="88" />
+		<texture id="ui_new_game_btn_army_t"     x="0"   y="178" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_ecolog_d"   x="89"  y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_ecolog_e"   x="89"  y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_ecolog_h"   x="89"  y="178" width="88" height="88" />
+		<texture id="ui_new_game_btn_ecolog_t"   x="89"  y="178" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_monolith_d" x="178" y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_monolith_e" x="178" y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_monolith_h" x="178" y="178" width="88" height="88" />
+		<texture id="ui_new_game_btn_monolith_t" x="178" y="178" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_renegade_d" x="267" y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_renegade_e" x="267" y="445" width="88" height="88" />
+		<texture id="ui_new_game_btn_renegade_h" x="267" y="178" width="88" height="88" />
+		<texture id="ui_new_game_btn_renegade_t" x="267" y="178" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_isg_d"      x="88"  y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_isg_e"      x="88"  y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_isg_h"      x="0"   y="936" width="88" height="88" />
+		<texture id="ui_new_game_btn_isg_t"      x="0"   y="936" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_greh_d"     x="264" y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_greh_e"     x="264" y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_greh_h"     x="176" y="936" width="88" height="88" />
+		<texture id="ui_new_game_btn_greh_t"     x="176" y="936" width="88" height="88" />
+		
+		<texture id="ui_new_game_btn_zombied_d"  x="440" y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_zombied_e"  x="440" y="939" width="88" height="88" />
+		<texture id="ui_new_game_btn_zombied_h"  x="352" y="936" width="88" height="88" />
+		<texture id="ui_new_game_btn_zombied_t"  x="352" y="936" width="88" height="88" />
+	</file>
+	
+	<file name="ui\ui_actor_multiplayer_game_menu">
+		<texture id="ui_new_game_btn_checkbox_d" x="903" y="153" width="40" height="40" />
+		<texture id="ui_new_game_btn_checkbox_e" x="903" y="193" width="40" height="40" />
+		<texture id="ui_new_game_btn_checkbox_h" x="903" y="233" width="40" height="40" />
+		<texture id="ui_new_game_btn_checkbox_t" x="903" y="273" width="40" height="40" />
+	</file>
+	
+</w>

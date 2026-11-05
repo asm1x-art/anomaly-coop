@@ -80,6 +80,12 @@ EXTRA = {
     "configs/mod_system_xraids_helmet.ltx": "GRA Bolt",
     # the traders' restock hook WPO's parts (wpo_loot) and Hideout Furniture's trade need; GRA's latest version
     "scripts/trader_autoinject.script": "[Геймплей] GRA бартер",
+    # the new game screen: MCM's layout of it (GRA's) is drawn on UI Rework Sota's frames, buttons and checkboxes
+    "configs/ui/textures_descr/z_ui_new_game.xml": "[Интерфейс_инвент] UI Rework Sota + Шабаш",
+    **{f"textures/ui/new_game/{name}.dds": "[Интерфейс_инвент] UI Rework Sota + Шабаш"
+       for name in ("ui_actor_icon_no_data", "ui_new_game_back_f", "ui_new_game_back_t", "ui_new_game_main",
+                    "ui_new_game_maps_3", "ui_new_game_popup")},
+    "textures/ui/ui_actor_multiplayer_game_menu.dds": "[Интерфейс_инвент] UI Rework Sota + Шабаш",
 }
 
 

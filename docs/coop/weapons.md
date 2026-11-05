@@ -52,6 +52,14 @@
 - `configs/mod_system_gra_fixes.ltx` — исправления конфигов пака: путь мировой модели Archangel; ванильные клетки иконок
   пистолетных патронов (Grok's Ballistics ставит их под атлас Cr3pis Icons, которого нет: с ним теряют иконки ~40
   других предметов).
+- Экран новой игры: его разметка из MCM (GRA-версия, `ui_mm_faction_select_16/_21.xml`) нарисована на рамках, кнопках
+  и галочках UI Rework Sota. Из Sota взяты только они: `configs/ui/textures_descr/z_ui_new_game.xml` (в git) и текстуры
+  `textures/ui/new_game/*.dds`, `textures/ui/ui_actor_multiplayer_game_menu.dds` (ассеты релиза; в `EXTRA`
+  `build_pack.py`). Без них рамки ванильного размера не совпадали с разметкой.
+- `shaders/r3/models_lfo_light_dot_weapons.ps` и `_simple.ps` (Mark_switch, Pizza's Ultimate Sight): убран лишний вход
+  `float2 tc0: TEXCOORD0` (не используется). С `USE_R2_STATIC_SUN` (статическое солнце: в user.ltx нет строки
+  `renderer`) он совпадал с `float4 tcdh: TEXCOORD0` из `p_flat`, и шейдер красной точки/лазера не собирался (X3536).
+  Без статического солнца байт-код тот же.
 - `scripts/gra_fixes.script` — включает 3D-прицелы (`r__3Dfakescope 1`) один раз за игру: без этого у ACOG и других
   3D-прицелов пустая труба без сетки. В GRA это делал его графический пресет.
 
