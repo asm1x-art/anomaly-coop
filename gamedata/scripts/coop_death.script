@@ -2,7 +2,8 @@
 -- and no reloading the world in co-op. With another player on the level a deadly hit lays the player
 -- down: they can only look about, NPCs leave them be, and another player holding F on them for
 -- revive_time seconds helps them up. Nobody else on the level, the time up, or giving up (the jump key):
--- back to the player's newest own save (the server's, coop_save.cpp; never the exit save), the world loading
+-- back to the player's newest own save (the server's, coop_save.cpp: a manual one or the autosave «авто»,
+-- coop_autosave.script; never the exit save), the world loading
 -- again with the character as that save has it. With no save of their own: back where the player was when the
 -- world was last saved, everything carried kept, some rank lost. Either way what would kill again at once (psi
 -- health, bleeding, radiation, needs, the controls taken) is put right: recover(). The world's host (a ghost) never dies.

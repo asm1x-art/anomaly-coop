@@ -2,7 +2,7 @@ import net from 'node:net';
 import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
 import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
-  EXIT_SAVE_NAME, TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
+  EXIT_SAVE_NAME, AUTO_SAVE_NAME, TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText, FACTIONS } from './settings.js';
 import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
@@ -267,7 +267,8 @@ autosave_minutes=${autosaveMinutes}`));
   const savesPayload = (name) => {
     const list = storage.characterSaves(name).slice(0, MAX_SAVES_LISTED);
     return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.id), u32(Math.floor(m.time / 1000)),
-      stringZ(m.name), stringZ(m.exit ? 'exit' : m.group ? 'group' : m.name ? 'named' : 'quick'), stringZ(m.by), u32(0)]))]);
+      stringZ(m.name), stringZ(m.exit ? 'exit' : m.auto ? 'auto' : m.group ? 'group' : m.name ? 'named' : 'quick'),
+      stringZ(m.by), u32(0)]))]);
   };
   // a snapshot: u32 size, the record; u32 size, the progress; the things
   const splitSnapshot = (data) => {
@@ -670,8 +671,17 @@ autosave_minutes=${autosaveMinutes}`));
           }
           break;
         case M.SAVE_REQUEST: {
-          // a group's leader saves the group, its other members nothing
           const name = readStringZ(payload, 0);
+          if (name === AUTO_SAVE_NAME) {
+            // the character's autosave: its own, in a group too; the one before goes once the new one is in
+            if (client.host || !client.inWorld) break;
+            const meta = { id: storage.nextCharacterSaveId(), time: Date.now(), name, by: client.name, group: null, auto: true };
+            snapshots.set(meta.id, { meta, waiting: new Set([client.name]) });
+            setTimeout(() => snapshots.delete(meta.id), SNAPSHOT_WAIT_MS).unref();
+            send(M.SNAPSHOT_REQUEST, u32(meta.id));
+            break;
+          }
+          // a group's leader saves the group, its other members nothing
           const g = groupOf(client.name);
           if (g && g.members[0] !== client.name) break;
           const members = g ? [...g.members] : [client.name];
@@ -698,10 +708,12 @@ autosave_minutes=${autosaveMinutes}`));
           client.snapshot.got += payload.copy(client.snapshot.data, offset, 12);
           if (client.snapshot.got < total) break;
           storage.saveCharacterSave(client.name, pending.meta, client.snapshot.data);
+          if (pending.meta.auto)
+            for (const old of storage.characterSaves(client.name)) if (old.auto && old.id !== saveId) storage.deleteCharacterSave(client.name, old.id);
           client.snapshot = null;
           pending.waiting.delete(client.name);
           if (!pending.waiting.size) snapshots.delete(saveId);
-          log(`[${id}] '${client.name}' saved, save ${saveId} (${total} bytes)`);
+          log(`[${id}] '${client.name}' ${pending.meta.auto ? 'autosaved' : 'saved'}, save ${saveId} (${total} bytes)`);
           break;
         }
         case M.SAVES_REQUEST:
@@ -752,7 +764,8 @@ autosave_minutes=${autosaveMinutes}`));
           const saveId = payload.readUInt32LE(0);
           const result = (code) => send(M.LOAD_RESULT, Buffer.concat([Buffer.from([code]), u32(saveId)]));
           if (saveId === 0) {
-            // died with nobody to help: back to the newest of the character's own saves (its part of a group's)
+            // died with nobody to help: back to the newest of the character's own saves (its part of a group's, its
+            // autosave)
             const newest = storage.characterSaves(client.name).find((m) => !m.exit);
             const back = newest && storage.characterSave(client.name, newest.id);
             if (!back) return result(LOAD.NO_SAVE);

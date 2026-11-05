@@ -427,6 +427,15 @@
 	<string id="st_coop_save_exit">
 		<text>При выходе</text>
 	</string>
+	<string id="st_coop_save_auto">
+		<text>Автосохранение</text>
+	</string>
+	<string id="st_coop_autosave_news">
+		<text>Автосохранение</text>
+	</string>
+	<string id="st_coop_saves_auto_name">
+		<text>Имя «авто» занято автосохранением, выберите другое.</text>
+	</string>
 	<string id="st_coop_choice_caption">
 		<text>С какого сохранения продолжить?</text>
 	</string>

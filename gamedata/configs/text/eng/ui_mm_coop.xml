@@ -427,6 +427,15 @@
 	<string id="st_coop_save_exit">
 		<text>On leaving</text>
 	</string>
+	<string id="st_coop_save_auto">
+		<text>Autosave</text>
+	</string>
+	<string id="st_coop_autosave_news">
+		<text>Autosave</text>
+	</string>
+	<string id="st_coop_saves_auto_name">
+		<text>That name belongs to the autosave, pick another one.</text>
+	</string>
 	<string id="st_coop_choice_caption">
 		<text>Which save to go on from?</text>
 	</string>

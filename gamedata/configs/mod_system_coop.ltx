@@ -371,3 +371,20 @@ sleep_max   = 5000 ; actor_status_sleep's last_sleep: above 6250 it takes stamin
 satiety_min = 0.2  ; below satiety_critical (actor.ltx, 0.2) hunger takes health
 settle_s    = 3    ; real s: back at the save point on the same level, all this once more then (a psi field still hits
             ; for a moment after one is gone from it)
+
+; Co-op: a player's own autosave «авто» (coop_autosave.script): one per character, each new one in the old one's
+; place, never touching manual saves or the exit save; in a group too it is the player's own. A lone death goes back
+; to the newest of the player's own saves, this one counted. Made only when the player is safe: alive and up, health
+; at least health_min, no menu, dialog or trade open, nobody fighting them and no hit for hit_quiet_s, not in a psi
+; field or the shelter's white zone, no surge or psi storm; until then it waits.
+[coop_autosave_personal]
+enabled         = true  ; false: no autosaves at all
+on_level_entry  = true  ; autosave on coming onto a level (a level change, joining, the world loading again)
+entry_delay_s   = 10    ; real s after the level is in before the first try
+entry_timeout_s = 300   ; real s: never safe in this long, no autosave for this level entry (0: wait as long as it takes)
+interval_min    = 10    ; real minutes between autosaves while playing (0: none but on coming onto a level)
+hit_quiet_s     = 15    ; real s since the last hit that hurt the player
+health_min      = 0.3   ; at least this much health (0..1)
+in_raid         = false ; true: autosaves on the raid's levels too
+news            = true  ; a news line «Автосохранение» when it is made
+news_ms         = 4000  ; how long the news line shows (real ms)

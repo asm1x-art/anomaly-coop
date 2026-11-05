@@ -29,7 +29,8 @@ import { normalizeSettings } from './settings.js';
 //   personal/<hex name>/things.bin  the things of a save the character was put back to, for its next download
 //                            (then the TAKEN entries since that save, for the things to go back where they were)
 //   personal/<hex name>/taken.jsonl  where the character took each thing from, a { t, m: base64 TAKEN } line each;
-//                            meta.json of an exit save (made when the player leaves) has exit: true, one per character
+//                            meta.json of an exit save (made when the player leaves) has exit: true, one per character;
+//                            of an autosave (protocol.js AUTO_SAVE_NAME) auto: true, one per character
 //   journal.jsonl           the world changes since the last save (server.js), a { t, m: base64 } line each, so a
 //                            server started again still has them
 //   clients.json            { id: name }: every client id given out, so ids go on growing across runs (the journal's

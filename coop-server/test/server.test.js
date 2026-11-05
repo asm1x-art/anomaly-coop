@@ -1614,3 +1614,73 @@ test('exit saves without a host: the record and progress only; a lone death with
     server.close();
   }
 });
+
+test('autosaves: the character\'s own even in a group, one per character, listed as auto; a lone death and the way back in count it', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  const action = (kind, id) => Buffer.concat([Buffer.from([kind]), u32le(id), Buffer.from([0])]);
+  const auto = Buffer.concat([encodeText('авто'), Buffer.from([0])]);
+  try {
+    const a = await player(port, 'artem');
+    let b = await player(port, 'друг');
+    const idA = a.roles.at(-1) ?? 1;
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await settle(a);
+    await settle(b);
+    // b in a's group: a group's member saves nothing by hand, but autosaves alone; a isn't asked, nothing is kept
+    a.send(M.GROUP, action(GROUP.INVITE, 2));
+    await until(b, M.GROUP_INVITE);
+    b.send(M.GROUP, action(GROUP.ACCEPT, idA));
+    await settle(b);
+    b.send(M.SAVE_REQUEST, auto);
+    const auto1 = (await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    sendSnapshot(b, auto1, snapshot('record auto 1', '', 'things auto 1'));
+    await settle(b);
+    const seenA = await drain(a);
+    assert.ok(!seenA.includes(M.SNAPSHOT_REQUEST) && !seenA.includes(M.SCRIPT_EVENT));
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), [{ id: auto1, name: 'авто', reason: 'auto', who: 'друг' }]);
+
+    // the leader's group save goes on as before, the autosave stays
+    a.send(M.SAVE_REQUEST, Buffer.from([0]));
+    const group = (await until(a, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    assert.equal((await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0), group);
+    sendSnapshot(a, group, snapshot('record a', '', 'things a'));
+    sendSnapshot(b, group, snapshot('record group', '', 'things group'));
+    await settle(a);
+    await settle(b);
+    // a lone death: the newest, the group's part now
+    b.send(M.LOAD_REQUEST, u32le(0));
+    assert.equal((await until(b, M.CHARACTER)).payload.toString(), 'record group');
+    assert.equal((await until(b, M.LOAD_RESULT)).payload[0], LOAD.DONE);
+
+    // a new autosave takes the old one's place; the group's save stays
+    b.send(M.SAVE_REQUEST, auto);
+    const auto2 = (await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    sendSnapshot(b, auto2, snapshot('record auto 2', '', 'things auto 2'));
+    await settle(b);
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload).map((s) => [s.id, s.reason]), [[auto2, 'auto'], [group, 'group']]);
+    a.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(a, M.SAVES)).payload).map((s) => [s.id, s.reason]), [[group, 'group']]);
+    // a lone death: the autosave, newer now
+    b.send(M.LOAD_REQUEST, u32le(0));
+    assert.equal((await until(b, M.CHARACTER)).payload.toString(), 'record auto 2');
+
+    // gone: the exit save; back in, a choice of the exit save, the autosave and the group's, newest first
+    b.socket.destroy();
+    await settle(a);
+    b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    await b.next();
+    const choice = await until(b, M.SAVE_CHOICE);
+    const listed = charSaves(choice.payload).map((s) => s.reason);
+    assert.deepEqual(listed, ['exit', 'auto', 'group']);
+    b.socket.destroy();
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

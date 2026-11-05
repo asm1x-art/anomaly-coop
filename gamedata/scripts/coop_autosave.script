@@ -1,0 +1,182 @@
+-- Co-op: our character's autosave «авто» (docs/coop/multiplayer.md «Персонаж»). Coming onto a level, and every
+-- interval_min minutes, our character is saved on the server like a quick save (coop.request_save), into its own
+-- slot: one per character, each new one taking the old one's place; manual saves and the exit save stay as they
+-- are. In a group too it is ours alone (the server asks only our game for the snapshot). A lone death goes back to
+-- the newest of our own saves, this one counted (coop_death.script). It is only a snapshot of our character sent to
+-- the server, never a world save: nothing stops for it.
+-- It waits until we are safe: alive and up, no menu, dialog or trade open, nobody fighting us and no hit for a
+-- while, not in a psi field or the shelter's white zone, no surge or psi storm. Settings: [coop_autosave_personal]
+-- in mod_system_coop.ltx.
+
+local S = "coop_autosave_personal"
+local NAME = "авто" -- the server knows the autosave by it (coop-server/src/protocol.js AUTO_SAVE_NAME)
+local CHECK_MS = 1000
+
+local due = nil       -- { at = time_global() from which it is tried, till = when it gives up (nil: never), why }
+local last_at = nil   -- time_global() of our last autosave, or of coming onto the level
+local hit_at = -1e9   -- time_global() of the last hit that hurt us
+local check_at = 0
+local frames = nil    -- the worst frames around an autosave, with coop_debug 1: { at, before, after, last }
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function on(key, default)
+	return ini_sys:r_bool_ex(S, key, default)
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] autosave: " .. fmt, ...)
+	end
+end
+
+function name()
+	return NAME
+end
+
+-- a player of the shared world (not its host's ghost)
+local function eligible()
+	return coop and coop.connected() and coop.world_status() == "exists" and not coop.is_host() and db.actor ~= nil
+		and on("enabled", true) and (on("in_raid", false) or not (raid and raid.is_raid_level(level.name())))
+end
+
+-- someone online and alive fights us (vanilla's list, as its fast travel uses it; a gone one may linger in it)
+local function fighting()
+	for id in pairs(xr_combat_ignore.fighting_with_actor_npcs) do
+		local obj = level.object_by_id(id)
+		if obj and obj:alive() then
+			return true
+		end
+	end
+	return false
+end
+
+-- why not now; nil: safe
+function unsafe(now)
+	now = now or time_global()
+	if not db.actor:alive() or coop_death.is_downed() then
+		return "dead or down"
+	elseif db.actor.health < num("health_min", 0.3) then
+		return "low health"
+	elseif not actor_menu.is_hud_free() or device():is_paused() then
+		return "a menu"
+	elseif now - hit_at < num("hit_quiet_s", 15) * 1000 then
+		return "hit lately"
+	elseif fighting() then
+		return "combat"
+	elseif xr_conditions.surge_started() then
+		return "surge or psi storm"
+	elseif sr_psy_antenna.psy_antenna and sr_psy_antenna.psy_antenna.hit_intensity > 0.0001 then
+		return "psi field"
+	elseif shelter_scorcher and shelter_scorcher.in_zone() then
+		return "white zone"
+	end
+end
+
+local function save(why)
+	coop.request_save(NAME)
+	printf("[coop] autosave (%s)", why)
+	if on("news", true) then
+		db.actor:give_game_news(game.translate_string("st_coop_group"), game.translate_string("st_coop_autosave_news"),
+			"ui_iconsTotal_grouping", 0, num("news_ms", 4000))
+	end
+end
+
+-- the worst frame time in the seconds before and after an autosave, to see that it costs us nothing (coop_debug 1)
+local function watch_frames(now)
+	if not frames then
+		frames = { before = {}, last = now }
+		return
+	end
+	local dt = now - frames.last
+	frames.last = now
+	if frames.at then
+		if dt > frames.after then
+			frames.after, frames.after_in = dt, now - frames.at
+		end
+		if now - frames.at <= 1000 then
+			frames.first = math.max(frames.first, dt) -- the snapshot is made within it (one round trip)
+		end
+		if now - frames.at > 5000 then
+			local dts = {}
+			for _, f in ipairs(frames.before) do
+				dts[#dts + 1] = f.dt
+			end
+			table.sort(dts)
+			dbg("frames in the 5 s before: median %s ms, worst %s ms; after asking: worst in the first second %s ms, in 5 s %s ms (%s ms after)",
+				dts[math.ceil(#dts / 2)] or 0, dts[#dts] or 0, frames.first, frames.after, frames.after_in)
+			frames = nil
+		end
+		return
+	end
+	table.insert(frames.before, { t = now, dt = dt })
+	while frames.before[1] and now - frames.before[1].t > 5000 do
+		table.remove(frames.before, 1)
+	end
+end
+
+local function update()
+	local now = time_global()
+	if get_console():get_integer("coop_debug") == 1 then
+		watch_frames(now)
+	end
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	if not (last_at and eligible()) then
+		return
+	end
+	local interval = num("interval_min", 10)
+	if not due and interval > 0 and now - last_at >= interval * 60000 then
+		due = { at = now, why = "every " .. interval .. " min" }
+	end
+	if not due or now < due.at then
+		return
+	end
+	if due.till and now > due.till then
+		printf("[coop] autosave on coming here: never safe for %s s, not this time", num("entry_timeout_s", 300))
+		due = nil
+		return
+	end
+	local why = unsafe(now)
+	if why then
+		if due.waiting ~= why then
+			dbg("waits: %s", why)
+			due.waiting = why
+		end
+		return
+	end
+	save(due.why)
+	if frames then
+		frames.at, frames.after, frames.after_in, frames.first = now, 0, 0, 0
+	end
+	due, last_at = nil, now
+end
+
+local function actor_on_first_update()
+	local now = time_global()
+	last_at, due, hit_at = now, nil, -1e9
+	if on("on_level_entry", true) then
+		local at = now + num("entry_delay_s", 10) * 1000
+		local timeout = num("entry_timeout_s", 300)
+		due = { at = at, till = timeout > 0 and at + timeout * 1000 or nil, why = "came to " .. level.name() }
+	end
+end
+
+local function actor_on_hit_callback(obj, amount)
+	if amount and amount > 0 then
+		hit_at = time_global()
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("actor_on_update", update)
+	RegisterScriptCallback("actor_on_hit_callback", actor_on_hit_callback)
+end

@@ -52,13 +52,15 @@ export const M = {
   // characters (docs/coop/multiplayer.md «Сохранения»): a character's save is a snapshot its game makes, a group's
   // leader saves and loads the whole group; the world never goes back for them.
   LEFT_WORLD: 32,     // c->s: our game went back to the main menu, still connected
-  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save my character (a group's leader: the group's)
+  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save my character (a group's leader: the group's);
+                      // AUTO_SAVE_NAME: my character's autosave, its own even in a group, one per character
   SAVE_NOW: 34,       // s->c, to the sim master: stringZ name, reason, who: save the world now, the upload carries them
   SAVES_REQUEST: 35,  // c->s: the list of my character's saves, please
   SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 id, u32 time (unix s),
-                      // stringZ name, reason ('quick', 'named', 'group'), who (the one who saved it), u32 0
+                      // stringZ name, reason ('quick', 'named', 'group', 'auto', 'exit'), who (the one who saved it), u32 0
   LOAD_REQUEST: 37,   // c->s: u32 id: my character (a group's save: the whole group, the leader asks) as that save has it;
                       // id 0: died with nobody to help: my character alone as my newest save but the exit save has it
+                      // (the autosave counts)
   // 38: was a world rollback's vote
   ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a pause)
   LOAD_RESULT: 40,    // s->c: u8 LOAD result, u32 the save's id
@@ -128,6 +130,7 @@ export const M = {
 
 export const TAKEN_FROM = { GROUND: 0, OBJECT: 1 };
 export const EXIT_SAVE_NAME = 'выход';
+export const AUTO_SAVE_NAME = 'авто'; // a character's autosave (coop_autosave.script): its game asks for it by this name
 
 export const TIME_FLAG = { RUNNING: 1, SET: 2 };
 export const TIME_SET = { INIT: 0, JUMP: 1, FACTOR: 2 };

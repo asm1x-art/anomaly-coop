@@ -133,7 +133,11 @@ function UICoopSaves:OnSave()
 	if not may_save() then
 		return self:SetStatus("st_coop_saves_leader")
 	end
-	coop.request_save(trim(self.edit_name:GetText()))
+	local name = trim(self.edit_name:GetText())
+	if name == coop_autosave.name() then
+		return self:SetStatus("st_coop_saves_auto_name") -- the server takes it for the autosave (coop_autosave.script)
+	end
+	coop.request_save(name)
 	self.edit_name:SetText("")
 	self:SetStatus("st_coop_saves_saving")
 	self.asked = device():time_continual() - REFRESH_MS + 1500 -- the new one shows up soon
@@ -201,8 +205,8 @@ function on_load_result(result, id)
 end
 
 ----------------------------------------------------------------------------------------------------
--- Coming in with an exit save (made by the server as we left without saving) and saves of our own: which one
--- to go on from. The newest is chosen at first; Esc takes it too. coop.choose_save then brings the world.
+-- Coming in with an exit save (made by the server as we left without saving) and saves of our own (the autosave
+-- among them): which one to go on from. The newest is chosen at first; Esc takes it too. coop.choose_save then brings the world.
 
 class "UICoopSaveChoice" (CUIScriptWnd)
 
