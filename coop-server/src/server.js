@@ -284,7 +284,7 @@ autosave_minutes=${autosaveMinutes}`));
     const { record, progress, things } = splitSnapshot(snapshot);
     storage.saveCharacter(name, Buffer.from(record));
     if (progress.length) storage.saveProgress(name, Buffer.from(progress));
-    const taken = storage.taken(name).filter((e) => e.time > since);
+    const taken = storage.taken(name).filter((e) => e.time >= since); // in the save too: the save says
     storage.setThings(name, Buffer.concat([things.length ? things : u16(0), u16(taken.length),
       ...taken.map((e) => Buffer.concat([u16(e.message.length), e.message]))]));
     const found = players().find(([, c]) => c.name === name);
