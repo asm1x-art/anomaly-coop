@@ -122,7 +122,7 @@ local function clock()
 		end
 	elseif shelter.state("scorcher_was_on", false) and not shelter.state("scorcher_mon_done", false) then
 		shelter.set_state("scorcher_mon_done", true)
-		reinforce()
+		shelter.everyones(reinforce) -- the master may be the host: its spawns go to every game
 	end
 	local nxt = state_num("cool_next")
 	if not nxt then

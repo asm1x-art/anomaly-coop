@@ -858,6 +858,20 @@ local function share_world_news()
 	local function writes_news()
 		return not coop_on() or coop.is_sim_master()
 	end
+	-- deaths and looted bodies are seen by the game that runs their level (the host runs none)
+	local function sees_news()
+		return not coop_on() or coop.is_authority(level.name())
+	end
+	-- the world's host is a ghost with no PDA of its own: the news it makes need none
+	if item_device and item_device.is_pda_charged then
+		local charged = item_device.is_pda_charged
+		item_device.is_pda_charged = function(...)
+			if coop_on() and coop.is_host() then
+				return true
+			end
+			return charged(...)
+		end
+	end
 
 	local function generating(original, ...)
 		world = world + 1
@@ -881,7 +895,7 @@ local function share_world_news()
 	end
 	for _, name in ipairs({ "npc_on_death_callback", "monster_on_death_callback", "npc_on_get_all_from_corpse" }) do
 		wrap(DNM, name, "DynamicNewsManager", function(original, self, ...)
-			if writes_news() then
+			if sees_news() then
 				return generating(original, self, ...)
 			end
 		end)

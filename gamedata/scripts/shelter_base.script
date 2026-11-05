@@ -315,14 +315,22 @@ local function refill_generator()
 	end
 end
 
+-- The master counts the hours (wherever it is: in co-op the world's host never is in the shelter); the game that
+-- runs the shelter's level does a repair that is due (repair_online)
 local function repair(hours)
-	if not has_tech() or level.name() ~= LEVEL or shelter_events.tech_off() then -- a binge: no repairs (shelter_events)
+	if not has_tech() or shelter_events.tech_off() then -- a binge: no repairs (shelter_events)
 		return
 	end
-	local due = (tonumber(shelter.state("repair_due", 0)) or 0) + hours
 	local every = num("repair_every", 4)
-	if due < every then
-		return shelter.set_state("repair_due", due)
+	local due = math.min((tonumber(shelter.state("repair_due", 0)) or 0) + hours, every * 3)
+	shelter.set_state("repair_due", due)
+end
+
+local function repair_online()
+	local every = num("repair_every", 4)
+	local due = tonumber(shelter.state("repair_due", 0)) or 0
+	if due < every or not has_tech() or shelter_events.tech_off() then
+		return
 	end
 	shelter.set_state("repair_due", due - every)
 	local kit, target = text("repair_kit"), num("repair_target", 0.7)
@@ -724,11 +732,14 @@ local function autoclave_tick(hours)
 		return
 	end
 	local grown = (tonumber(shelter.state("autoclave_hours", 0)) or 0) + hours
-	if grown < num("autoclave_total", 12) then
-		return shelter.set_state("autoclave_hours", grown)
-	end
-	if level.name() ~= LEVEL then -- the box is online only here: done when one is back
-		return shelter.set_state("autoclave_hours", grown)
+	shelter.set_state("autoclave_hours", math.min(grown, num("autoclave_total", 12)))
+end
+
+-- done: by the game that runs the shelter's level (the box is online only there)
+local function autoclave_done()
+	local id = tonumber(shelter.state("autoclave_item", nil))
+	if not id or (tonumber(shelter.state("autoclave_hours", 0)) or 0) < num("autoclave_total", 12) then
+		return
 	end
 	shelter.set_state("autoclave_item", nil)
 	shelter.set_state("autoclave_hours", nil)
@@ -762,7 +773,7 @@ function crisis_started(id)
 	for _, entry in ipairs(list(ini_sys:r_string_ex("shelter_crisis_" .. id, "squads"))) do
 		local p = str_explode(entry, ":")
 		local smart = SIMBOARD.smarts_by_names[p[1]]
-		local squad = smart and p[2] and raid_monolith.spawn_squad(smart, p[2])
+		local squad = smart and p[2] and shelter.everyones(raid_monolith.spawn_squad, smart, p[2])
 		if squad then
 			ids[#ids + 1] = squad.id
 		end
@@ -812,6 +823,10 @@ local function actor_on_update()
 	end
 	if level.name() == LEVEL then
 		refill_generator()
+		if not in_coop() or coop.is_authority(LEVEL) then
+			repair_online()
+			autoclave_done()
+		end
 	end
 	if not master() then
 		return
