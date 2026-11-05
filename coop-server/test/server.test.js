@@ -1100,7 +1100,7 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
     b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
-    await roundTrip(a);
+    await settle(a);
     await settle(b);
 
     // alone: their own game makes it
@@ -1109,7 +1109,7 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     const id1 = asked.payload.readUInt32LE(0);
     sendSnapshot(a, id1, snapshot('record 1', 'progress 1', Buffer.alloc(20000, 3)));
     a.send(M.CHARACTER, Buffer.from('record later'));
-    await roundTrip(a);
+    await settle(a);
     a.send(M.SAVES_REQUEST);
     assert.deepEqual(charSaves((await until(a, M.SAVES)).payload), [{ id: id1, name: 'Перед Баром', reason: 'named', who: 'artem' }]);
     b.send(M.SAVES_REQUEST);
@@ -1140,8 +1140,8 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     sendSnapshot(a, id2, snapshot('record a', '', 'things a'));
     sendSnapshot(b, id2, snapshot('record b', 'progress b', 'things b'));
     await until(a, M.SCRIPT_EVENT); // a runs the world: it keeps what's near where b saved
-    await roundTrip(a);
-    await roundTrip(b);
+    await settle(a);
+    await settle(b);
     b.send(M.SAVES_REQUEST);
     assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), [{ id: id2, name: '', reason: 'group', who: 'artem' }]);
     b.send(M.LOAD_REQUEST, u32le(id2));
