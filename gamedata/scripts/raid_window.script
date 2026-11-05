@@ -42,6 +42,17 @@ function open_now()
 	return opened ~= nil and hours() < opened + num("window_hours", 6)
 end
 
+-- game seconds left of the open window (below 0: closed that long ago), nil with none (the Scorcher off, never one).
+-- The world's hours step by the hour (shelter_trade): the part of the hour since its last step is added.
+function seconds_left()
+	local opened = state_num("cool_open")
+	if off() or not opened then
+		return
+	end
+	local part = shelter_trade.now() - (tonumber(shelter.state("bar_last", nil)) or shelter_trade.now())
+	return (opened + num("window_hours", 6) - hours()) * 3600 - math.max(0, math.min(3600, part))
+end
+
 -- world hours to the next cycle (for the analyser on the laptop)
 function hours_to_next()
 	return math.max(0, (state_num("cool_next") or hours()) - hours())
@@ -88,7 +99,7 @@ local function new_cycle(t)
 	raid_rescue.new_cycle()
 	if off() then
 		if shelter.state("scorcher_was_on", false) then
-			reinforce()
+			shelter.everyones(reinforce)
 		end
 		return
 	end

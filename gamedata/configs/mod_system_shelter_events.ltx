@@ -1,0 +1,70 @@
+; The shelter's events (scripts\shelter_events.script; Notion: "”бежище: событи€ бара и обитателей Ч план").
+; Every gap_min..gap_max hours of the world one comes, drawn by weight among those of list whose needs are met (barman:
+; one hired; tech: the technician; medic: the medic rescued) and whose cooldown (hours) is over. enabled = false: none.
+[shelter_events]
+enabled         = true
+gap_min         = 20
+gap_max         = 40
+list            = rumour, quarrel, spender, gift, wounded, binge
+
+; a visitor let slip a stash: one of Anomaly's stashes, filled and marked on the PDA
+[shelter_event_rumour]
+needs           = barman
+weight          = 3
+cooldown        = 48
+
+; two visitors of a pair of factions quarrel: a fight with fight_chance (fight_chance_truce once the perimeter is built),
+; the damage paid from the till (damage_min..max, no more than is there), the bar's name -rep_fight; else the barman
+; calms them, +rep_calm
+[shelter_event_quarrel]
+needs           = barman
+weight          = 2
+cooldown        = 36
+pairs           = dolg:freedom, stalker:killer, csky:freedom, dolg:killer, ecolog:killer
+fight_chance    = 0.5
+fight_chance_truce = 0.2
+damage_min      = 2000
+damage_max      = 8000
+rep_fight       = 3
+rep_calm        = 0.5
+
+; a squad back from the North drinks to it: money_min..max into the till, +rep
+[shelter_event_spender]
+needs           = barman
+weight          = 2
+cooldown        = 48
+money_min       = 8000
+money_max       = 25000
+rep             = 1
+
+; a regular leaves one of items for the group in the shelter's stash; with no stash, money into the till
+[shelter_event_gift]
+needs           = barman
+weight          = 1
+cooldown        = 72
+items           = af_medusa, medkit_army, ammo_9x39_ap, vodka_quality, cigar, drug_psy_blockade, af_cristall_flower, toolkit_p
+money           = 5000
+
+; a wounded stalker of one of factions at the bar's door: with the medic saved (fee_min..max into the till, +rep_saved,
+; his faction's goodwill to each of the group +goodwill), without him dead (-rep_died)
+[shelter_event_wounded]
+needs           = barman
+weight          = 1
+cooldown        = 72
+factions        = stalker, dolg, freedom, csky, ecolog
+fee_min         = 3000
+fee_max         = 9000
+rep_saved       = 2
+goodwill        = 50
+rep_died        = 1
+
+; the technician on a binge: bottles_min..max of drinks gone from the store (the ledger first, then the boxes), no repairs
+; for hours
+[shelter_event_binge]
+needs           = tech
+weight          = 1
+cooldown        = 96
+bottles_min     = 3
+bottles_max     = 8
+drinks          = vodka, vodka2, vodka_quality
+hours           = 24

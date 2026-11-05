@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding="windows-1251"?>
+<xml>
+	<!-- the raid's Monolith (character_desc_raid.xml): a random one of the class -->
+	<character id="raid_monolith_alpha">
+		<class>raid_monolith_alpha</class>
+	</character>
+	<character id="raid_monolith_scientist">
+		<class>raid_monolith_scientist</class>
+	</character>
+</xml>

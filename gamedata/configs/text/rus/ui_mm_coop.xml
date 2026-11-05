@@ -526,4 +526,10 @@
 	<string id="ui_mm_coop_status_joining">
 		<text>Персонаж создан. Мастер сохраняет мир для вас, затем он скачается и загрузится сам (до 30 с). Не нажимайте «Войти».</text>
 	</string>
+	<string id="ui_mm_coop_general_raid_timer">
+		<text>Таймер окна рейда</text>
+	</string>
+	<string id="ui_mm_coop_general_raid_timer_desc">
+		<text>Сколько осталось до закрытия окна «Охлаждения», в углу экрана во время рейда (реальные минуты).</text>
+	</string>
 </string_table>

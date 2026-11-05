@@ -214,8 +214,8 @@ function on_game_start()
 	ALLOWED = { [key_bindings.kQUIT] = true, [key_bindings.kCONSOLE] = true, [key_bindings.kSCREENSHOT] = true }
 
 	RegisterScriptCallback("actor_on_before_death", function(who_id, flags)
-		if not coop.connected() then
-			return
+		if not coop.connected() or raid and raid.is_raid_level(level.name()) then
+			return -- a raid's level has its own death rules (raid.script)
 		end
 		flags.ret_value = false -- never the death screen in co-op
 		if is_downed() then

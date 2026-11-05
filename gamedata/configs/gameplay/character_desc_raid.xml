@@ -1,0 +1,141 @@
+<?xml version='1.0' encoding="windows-1251"?>
+<xml>
+	<!-- the raid's Monolith (scripts\raid_monolith.script, mod_system_raid.ltx [raid_monolith_ranks]): "Alpha", masters
+	     in exoskeletons (the vanilla Monolith exo models), and the Monolith's scientists in its scientific suits. The
+	     same fields as gameplay\profiles\character_desc_monolith_3/4.xml, classes of their own -->
+	<specific_character id="raid_monolith_alpha_0" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_monolit_4</icon>
+		<bio></bio>
+		<class>raid_monolith_alpha</class>
+		<community>monolith</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="5000" max="10000" infinitive="0"/>
+		<rank min="30000" max="40000" />
+		<reputation min="-2500" max="2500" />
+		<snd_config>characters_voice\human\monolith_3\</snd_config>
+		<visual>actors\stalker_monolith\stalker_monolith_4</visual>
+		<supplies>
+#include "gameplay\loadouts\monolith_base.ltx"
+#include "gameplay\loadouts\monolith_tier_4.ltx"
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_2.xml"
+#include "gameplay\supplies\character_medical_sci.xml"
+#include "gameplay\supplies\character_drugs_3.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_monolith_alpha_1" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_monolit_4</icon>
+		<bio></bio>
+		<class>raid_monolith_alpha</class>
+		<community>monolith</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="5000" max="10000" infinitive="0"/>
+		<rank min="30000" max="40000" />
+		<reputation min="-2500" max="2500" />
+		<snd_config>characters_voice\human\monolith_3\</snd_config>
+		<visual>actors\stalker_monolith\stalker_monolith4a</visual>
+		<supplies>
+#include "gameplay\loadouts\monolith_base.ltx"
+#include "gameplay\loadouts\monolith_tier_4.ltx"
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_2.xml"
+#include "gameplay\supplies\character_medical_sci.xml"
+#include "gameplay\supplies\character_drugs_3.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_monolith_alpha_2" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_monolit_4</icon>
+		<bio></bio>
+		<class>raid_monolith_alpha</class>
+		<community>monolith</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="5000" max="10000" infinitive="0"/>
+		<rank min="30000" max="40000" />
+		<reputation min="-2500" max="2500" />
+		<snd_config>characters_voice\human\monolith_3\</snd_config>
+		<visual>actors\stalker_monolith\stalker_monolith4b</visual>
+		<supplies>
+#include "gameplay\loadouts\monolith_base.ltx"
+#include "gameplay\loadouts\monolith_tier_4.ltx"
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_2.xml"
+#include "gameplay\supplies\character_medical_sci.xml"
+#include "gameplay\supplies\character_drugs_3.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_monolith_scientist_0" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_monolit_1</icon>
+		<bio></bio>
+		<class>raid_monolith_scientist</class>
+		<community>monolith</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="3000" max="6000" infinitive="0"/>
+		<rank min="9000" max="15000" />
+		<reputation min="-2500" max="2500" />
+		<snd_config>characters_voice\human\monolith_3\</snd_config>
+		<visual>actors\stalker_monolith\stalker_monolith_1</visual>
+		<supplies>
+#include "gameplay\loadouts\monolith_base.ltx"
+#include "gameplay\loadouts\monolith_tier_2.ltx"
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_2.xml"
+#include "gameplay\supplies\character_medical_sci.xml"
+#include "gameplay\supplies\character_drugs_3.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_monolith_scientist_1" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_monolit_1</icon>
+		<bio></bio>
+		<class>raid_monolith_scientist</class>
+		<community>monolith</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="3000" max="6000" infinitive="0"/>
+		<rank min="9000" max="15000" />
+		<reputation min="-2500" max="2500" />
+		<snd_config>characters_voice\human\monolith_3\</snd_config>
+		<visual>actors\stalker_monolith\stalker_monolith_nauchni3</visual>
+		<supplies>
+#include "gameplay\loadouts\monolith_base.ltx"
+#include "gameplay\loadouts\monolith_tier_2.ltx"
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_2.xml"
+#include "gameplay\supplies\character_medical_sci.xml"
+#include "gameplay\supplies\character_drugs_3.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+</xml>

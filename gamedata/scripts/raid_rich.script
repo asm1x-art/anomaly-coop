@@ -19,7 +19,8 @@ local function game_seconds()
 	return game.get_game_time():diffSec(level.get_start_time())
 end
 
-local function refill(box_id)
+-- the old loot gone, a new one drawn by the stash's level (raid_loot.fill_rich)
+local function refill(box_id, level_name)
 	local sim = alife()
 	local old = {}
 	for id = 1, 65534 do
@@ -31,12 +32,7 @@ local function refill(box_id)
 	for _, se in ipairs(old) do
 		alife_release(se)
 	end
-	local box = sim:object(box_id)
-	local loot = list(S, "loot")
-	local lo, hi = ini_sys:r_float_ex(S, "loot_min") or 2, ini_sys:r_float_ex(S, "loot_max") or 4
-	for _ = 1, math.random(lo, hi) do
-		alife_create_item(loot[math.random(#loot)], box)
-	end
+	raid_loot.fill_rich(sim:object(box_id), level_name)
 end
 
 -- a raid level made ready as one goes onto it (before it loads)
@@ -57,7 +53,7 @@ function prepare(level_name)
 			end
 			local at = tonumber(shelter.state("raid_rich_at_" .. name, nil))
 			if box and (not at or game_seconds() - at >= (ini_sys:r_float_ex(S, "refill_hours") or 168) * 3600) then
-				refill(box)
+				refill(box, level_name)
 				shelter.set_state("raid_rich_at_" .. name, math.floor(game_seconds()))
 				printf("raid_rich: %s refilled", name)
 			end

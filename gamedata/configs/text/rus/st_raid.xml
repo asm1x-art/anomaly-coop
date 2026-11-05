@@ -189,4 +189,70 @@
 	<string id="st_raid_sect_blueprints_descr">
 		<text>Схемы компактных конденсаторов с лабораторного сектора Монолита. С ними артефакт в генераторе расходуется медленнее.</text>
 	</string>
+	<string id="st_raid_reinforce">
+		<text>Перехват: Монолит выслал отряд на подмогу.</text>
+	</string>
+	<string id="st_raid_timer_label">
+		<text>Окно рейда</text>
+	</string>
+	<string id="st_raid_timer_closed">
+		<text>закрыто</text>
+	</string>
+	<string id="st_raid_report_title">
+		<text>Итоги рейда</text>
+	</string>
+	<string id="st_raid_report_out">
+		<text>Вернулся живым</text>
+	</string>
+	<string id="st_raid_report_died">
+		<text>Погиб в рейде</text>
+	</string>
+	<string id="st_raid_report_time">
+		<text>Время в рейде</text>
+	</string>
+	<string id="st_raid_report_time_value">
+		<text>%d ч %02d мин по игре (%s реального)</text>
+	</string>
+	<string id="st_raid_report_levels">
+		<text>Маршрут</text>
+	</string>
+	<string id="st_raid_report_kills">
+		<text>Убито</text>
+	</string>
+	<string id="st_raid_report_reinf">
+		<text>Подкреплений Монолита</text>
+	</string>
+	<string id="st_raid_report_carried">
+		<text>Вынесено из рейда</text>
+	</string>
+	<string id="st_raid_report_lost">
+		<text>Потеряно</text>
+	</string>
+	<string id="st_raid_report_nothing">
+		<text>ничего</text>
+	</string>
+	<string id="st_raid_report_more">
+		<text>и ещё %d</text>
+	</string>
+	<string id="st_raid_report_close">
+		<text>Закрыть</text>
+	</string>
+	<string id="st_raid_doc_psi_screens">
+		<text>Чертежи пси-экранов</text>
+	</string>
+	<string id="st_raid_doc_psi_screens_descr">
+		<text>Папка из лаборатории Монолита: схемы экранирования от пси-излучения с пометками на полях. Учёные дадут за неё хорошие деньги.</text>
+	</string>
+	<string id="st_raid_doc_gauss">
+		<text>Схемы гаусс-технологий</text>
+	</string>
+	<string id="st_raid_doc_gauss_descr">
+		<text>Расчёты ускорителей и накопителей для гаусс-оружия. За такие бумаги торговцы не торгуются.</text>
+	</string>
+	<string id="st_raid_doc_synthesis">
+		<text>Протоколы синтеза</text>
+	</string>
+	<string id="st_raid_doc_synthesis_descr">
+		<text>Флешка учёного Монолита: протоколы опытов с артефактами. Данные зашифрованы, но ценятся всё равно.</text>
+	</string>
 </string_table>

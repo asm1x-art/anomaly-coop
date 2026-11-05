@@ -189,4 +189,70 @@
 	<string id="st_raid_sect_blueprints_descr">
 		<text>Compact capacitor schemes from the Monolith's science sector. The generator's artefact runs down slower with them.</text>
 	</string>
+	<string id="st_raid_reinforce">
+		<text>Intercepted: the Monolith sent a squad to back its men up.</text>
+	</string>
+	<string id="st_raid_timer_label">
+		<text>Raid window</text>
+	</string>
+	<string id="st_raid_timer_closed">
+		<text>closed</text>
+	</string>
+	<string id="st_raid_report_title">
+		<text>Raid report</text>
+	</string>
+	<string id="st_raid_report_out">
+		<text>Back alive</text>
+	</string>
+	<string id="st_raid_report_died">
+		<text>Died in the raid</text>
+	</string>
+	<string id="st_raid_report_time">
+		<text>Time in the raid</text>
+	</string>
+	<string id="st_raid_report_time_value">
+		<text>%d h %02d min game time (%s real)</text>
+	</string>
+	<string id="st_raid_report_levels">
+		<text>Route</text>
+	</string>
+	<string id="st_raid_report_kills">
+		<text>Kills</text>
+	</string>
+	<string id="st_raid_report_reinf">
+		<text>Monolith reinforcements</text>
+	</string>
+	<string id="st_raid_report_carried">
+		<text>Carried out</text>
+	</string>
+	<string id="st_raid_report_lost">
+		<text>Lost</text>
+	</string>
+	<string id="st_raid_report_nothing">
+		<text>nothing</text>
+	</string>
+	<string id="st_raid_report_more">
+		<text>and %d more</text>
+	</string>
+	<string id="st_raid_report_close">
+		<text>Close</text>
+	</string>
+	<string id="st_raid_doc_psi_screens">
+		<text>Psi screen blueprints</text>
+	</string>
+	<string id="st_raid_doc_psi_screens_descr">
+		<text>A folder from the Monolith's lab: psi radiation shielding schemes with notes in the margins. Scientists pay well for it.</text>
+	</string>
+	<string id="st_raid_doc_gauss">
+		<text>Gauss technology schemes</text>
+	</string>
+	<string id="st_raid_doc_gauss_descr">
+		<text>Calculations of accelerators and capacitors for gauss weapons. Traders don't haggle over papers like these.</text>
+	</string>
+	<string id="st_raid_doc_synthesis">
+		<text>Synthesis protocols</text>
+	</string>
+	<string id="st_raid_doc_synthesis_descr">
+		<text>A Monolith scientist's flash drive: protocols of experiments with artefacts. Encrypted, but valuable all the same.</text>
+	</string>
 </string_table>

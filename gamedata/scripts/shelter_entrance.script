@@ -1,0 +1,175 @@
+-- The shelter's entrance (docs: Notion, shelter, "¬ход и выход"; every number: [shelter_entrance] in
+-- mod_system_shelter.ltx). The bunker under the Radar is reached on foot: at the end of the tunnel east of the concrete
+-- yard by the fork's north road (l10_radar, near rad2_prip_teleport) a half-open armoured gate, its code cracked by the
+-- Chemist long ago; inside, the metal door behind point 1 leads back out there. No level changer: an unseen box over
+-- each door (tools\shelter\entrance_door.py), use on it is the way through. Open from the start: finding the bunker is
+-- how its questline begins. In co-op only a group goes in (the shelter is the group's), anyone gets out. Both doors are
+-- the world's, spawned once; the PDA marks the gate once one has been inside.
+-- A raid still ends at point 1 (raid.script): "the way one came" leads to the shelter, as before.
+
+local S = "shelter_entrance"
+local SPOT = "ui_pda2_actor_sleep_location"
+local busy = false
+
+local function vec(key)
+	local p = str_explode(ini_sys:r_string_ex(S, key) or "0,0,0", ",")
+	return vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))
+end
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function msg(id)
+	actor_menu.set_msg(1, game.translate_string(id), 5)
+end
+
+local function play(path)
+	if path and path ~= "" then
+		sound_object(path):play(db.actor, 0, sound_object.s2d)
+	end
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+-- may one go in: always in single-player; in co-op, with group_only, only one in a group of two or more
+function may_enter()
+	if not in_coop() or not ini_sys:r_bool_ex(S, "group_only", true) then
+		return true
+	end
+	return #coop.group() >= 2
+end
+
+-- each side: the level, where one arrives and which way one looks there
+local function side(name)
+	return { level = ini_sys:r_string_ex(S, name .. "_level"), arrive = vec(name .. "_arrive"),
+		lv = ini_sys:r_u32(S, name .. "_arrive_lv"), look = vec(name .. "_arrive_look") }
+end
+
+-- through a door: "in" to the bunker, "out" to the Radar
+function pass(way)
+	if busy or not db.actor then
+		return
+	end
+	if way == "in" and not may_enter() then
+		play(ini_sys:r_string_ex(S, "sound_locked"))
+		msg("st_shelter_entrance_group")
+		return
+	end
+	local to = side(way == "in" and "bunker" or "radar")
+	local gvid = raid.vertex_of(to.level, to.arrive)
+	if not gvid then
+		printf("! shelter_entrance: level %s has no graph vertices", tostring(to.level))
+		return
+	end
+	busy = true
+	save_var(db.actor, "shelter_entrance_face", way)
+	play(ini_sys:r_string_ex(S, "sound_open"))
+	CreateTimeEvent(S, "go", num("delay", 0.6), function()
+		ChangeLevel(to.arrive, to.lv, gvid, vector():set(0, 0, 0))
+		return true
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- the doors: an unseen box each, their tips; the gate gets a PDA mark once one knows the shelter
+
+class "door_binder" (object_binder)
+function door_binder:__init(obj) super(obj)
+	self.way = ini_sys:r_string_ex(obj:section(), "shelter_way") or "out"
+	self.next = 0
+end
+function door_binder:update(delta)
+	object_binder.update(self, delta)
+	local now = time_global()
+	if now < self.next or not db.actor then
+		return
+	end
+	self.next = now + 500
+	if not self.ready then
+		local shell = self.object:get_physics_shell()
+		if not shell then
+			return
+		end
+		shell:freeze()
+		self.ready = true
+		self.object:set_callback(callback.use_object, door_binder.use, self)
+	end
+	local tip = self.way == "out" and "st_shelter_entrance_out"
+		or may_enter() and "st_shelter_entrance_in" or "st_shelter_entrance_locked"
+	if tip ~= self.tip then
+		self.tip = tip
+		self.object:set_tip_text(tip)
+	end
+end
+function door_binder:use()
+	pass(self.way)
+end
+function door_binder:net_destroy()
+	self.object:set_callback(callback.use_object, nil)
+	object_binder.net_destroy(self)
+end
+function init_door(obj)
+	obj:bind_object(door_binder(obj))
+end
+
+-- a door put in the world: the model's +z into the wall
+local function spawn_door(name, section)
+	local level_name = ini_sys:r_string_ex(S, name .. "_level")
+	local pos, into = vec(name .. "_door"), vec(name .. "_door_into")
+	local gvid = raid.vertex_of(level_name, pos)
+	if not gvid then
+		return nil
+	end
+	local se = alife_create(section, pos, ini_sys:r_u32(S, name .. "_arrive_lv"), gvid)
+	if se then
+		se.angle = vector():set(0, into:getH(), 0)
+		shelter.set_state("entrance_" .. name .. "_id", se.id)
+	end
+	return se
+end
+
+local function place()
+	if shelter.state("entrance_placed", false) or not ini_sys:r_bool_ex(S, "enabled", true) then
+		return
+	end
+	shelter.once("entrance", function()
+		spawn_door("radar", "shelter_entrance_gate")
+		spawn_door("bunker", "shelter_entrance_door")
+		shelter.set_state("entrance_placed", true)
+	end)
+end
+
+local function mark()
+	if not load_var(db.actor, "shelter_entrance_known", false) then
+		return
+	end
+	local id = shelter.state("entrance_radar_id", nil)
+	if id and alife_object(id) and level.map_has_object_spot(id, SPOT) == 0 then
+		level.map_add_object_spot_ser(id, SPOT, game.translate_string("st_shelter_entrance_spot"))
+	end
+end
+
+local function actor_on_first_update()
+	busy = false
+	place()
+	local level_name = level.name()
+	local way = load_var(db.actor, "shelter_entrance_face", nil)
+	if way then
+		save_var(db.actor, "shelter_entrance_face", nil)
+		local to = side(way == "in" and "bunker" or "radar")
+		if level_name == to.level then
+			db.actor:set_actor_direction(-to.look:getH())
+		end
+	end
+	if level_name == ini_sys:r_string_ex(S, "bunker_level") then
+		save_var(db.actor, "shelter_entrance_known", true) -- in however one came: the gate is on the PDA from now on
+	end
+	mark()
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end

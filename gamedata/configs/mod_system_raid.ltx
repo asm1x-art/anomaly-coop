@@ -27,28 +27,95 @@ inv_name_short  = st_raid_gps_beacon_dead
 description     = st_raid_gps_beacon_dead_descr
 cost            = 600
 
-; the Monolith on a raid level (raid_monolith.script): a garrison on every smart terrain, its squads by the smart's
-; depth from where one comes onto the level (a third each: near, mid, far); big garrisons deeper, a rare thing on their
-; commander; patrols of three on routes (chains of smarts), rolled anew each time one comes onto the level
+; the Monolith on a raid level (raid_monolith.script): a garrison on every smart terrain (but no_garrison ones), its
+; men drawn by rank weights ("rank:weight, ...", ranks in [raid_monolith_ranks]) by the smart's depth from where one
+; comes onto the level (a third each: near, mid, far); big garrisons deeper, a rare thing on their commander; snipers
+; on the sniper smarts; posts (a squad of their own; tools\raid\raid_posts.py places them); patrols on routes, rolled
+; anew each time one comes onto the level. Every key below can be set per level in [<level>_monolith]; there it wins.
 [raid_monolith]
-refresh_hours   = 168   ; all the smarts held anew with fresh squads
+refresh_hours   = 168   ; all the smarts and posts held anew with fresh squads
 retake_hours    = 12    ; while one is away, a step each: the free smart nearest to a held one is taken back...
 retake_chance   = 0.6   ; ...with this chance (none held: through the level's entry smart)
-near            = raid_monolith_near
-mid             = raid_monolith_mid
-far             = raid_monolith_far, raid_monolith_sniper
-big             = raid_monolith_alpha, raid_monolith_far   ; a big garrison: these squads together
-big_count       = 2     ; on the deeper half's smarts
+ladder          = novice, regular, experienced, veteran, master, alpha   ; weakest first, for rank_up
+rank_up         = 0.1   ; each man's chance to be one rank higher than drawn
+squad           = raid_monolith_squad   ; the squad the drawn men are put in...
+post_squad      = raid_monolith_post_squad   ; ...a post's: made at its place, always arrived at its smart
+men             = 3, 5  ; a garrison squad's men, min, max
+near            = novice:3, regular:1
+mid             = regular:2, experienced:1
+far             = experienced:2, veteran:1
+big             = veteran:3, master:1   ; a big garrison's first squad (the rare thing on its commander)...
+big_squads      = 2     ; ...and its other squads, of far's weights
+big_count       = 2     ; big garrisons, on the deeper half's smarts
+sniper          = sniper:1
+sniper_men      = 2, 3
+post            = experienced:1, veteran:1   ; a post's squad, if its section has no ranks
+post_men        = 2, 3
 rare_loot       = af_glass, af_fire, af_ice, af_compass, af_gold_fish, af_soul, af_night_star, af_eye
-patrol          = raid_monolith_patrol
+patrol          = experienced:1, veteran:1
+patrol_men      = 3, 3
 patrol_chance   = 0.4   ; each route's
 patrol_max      = 2
-patrol_stay     = 60, 180   ; seconds at a smart on the way
+patrol_stay     = 60, 180   ; seconds at a smart on the way (chain routes)
+; the Monolith's scientists (a post with "scientists"): each carries scientist_loot_count things of scientist_loot,
+; and a rare thing with scientist_rare_chance
+scientist_loot  = medkit_scientic, stimpack_scientic, drug_psy_blockade, drug_radioprotector, drug_antidot, detector_scientific, itm_repairkit_tier_3
+scientist_loot_count = 1, 2
+scientist_rare_chance = 0.5
+underground     = raid_sarcofag, raid_control_monolith   ; the Monolith's torches always on there
+; ...and with scientist_doc_chance one of the Monolith's documents (sold to traders; what they give in the shelter is
+; the user's to say)
+scientist_docs  = raid_doc_psi_screens, raid_doc_gauss, raid_doc_synthesis
+scientist_doc_chance = 0.35
+; reinforcements (raid_monolith.script): while one is on a raid level, every reinforce_every real seconds (drawn anew
+; each time) a squad of reinforce_men men of reinforce's ranks leaves the held smart nearest to one that is
+; reinforce_distance metres away at least, and hunts one; reinforce_max a raid at most (drawn as it starts). None held
+; that far: tried again in reinforce_retry seconds. reinforce_msg: a line on the screen as one sets out
+reinforce_every = 180, 300
+reinforce_max   = 2, 3
+reinforce_distance = 100
+reinforce_retry = 15
+reinforce       = experienced:1, veteran:1
+reinforce_men   = 3, 4
+reinforce_msg   = true
+; the dead's loot by their squad's kind (raid_loot.script): on the body's first search, after the game's own,
+; body_<kind>_count things (min, max) drawn by body_<kind>'s weights ("section:weight"). Kinds: near, mid, far, big,
+; sniper, post, patrol, reinforce, guard (the scientists' guards); a kind with none here takes far's. Per level too.
+body_near       = bandage:4, medkit:2, antirad:2, ammo_5.45x39_fmj:3, ammo_9x18_fmj:2, grenade_rgd5:1
+body_near_count = 0, 1
+body_mid        = medkit:3, bandage:2, stimpack:1, antirad:2, ammo_5.45x39_ap:2, ammo_9x19_fmj:1, grenade_rgd5:1, prt_i_fasteners:1
+body_mid_count  = 0, 1
+body_far        = medkit_army:3, stimpack:2, drug_coagulant:1, antirad:1, ammo_5.45x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, prt_i_capacitors:1, gun_oil:1
+body_far_count  = 0, 2
+body_big        = medkit_army:3, stimpack_army:2, drug_radioprotector:1, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, itm_repairkit_tier_2:1, cleaning_kit_r7:1
+body_big_count  = 1, 2
+body_sniper     = ammo_7.62x54_7h14:4, medkit:2, stimpack:1, cleaning_kit_r7:1
+body_sniper_count = 1, 1
+body_guard      = medkit_scientic:2, stimpack_army:2, drug_psy_blockade:2, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:1, itm_repairkit_tier_3:1
+body_guard_count = 1, 2
 
-; Limansk: the depth from the landing (the Red Forest's tunnel); the Monolith's way back in from the Hospital's side
+; the ranks: a rank's NPC section. alpha: masters in exoskeletons; sniper and scientist are no rank of the ladder
+[raid_monolith_ranks]
+novice          = sim_default_monolith_0
+regular         = sim_default_monolith_1
+experienced     = sim_default_monolith_2
+veteran         = sim_default_monolith_3
+master          = sim_default_monolith_4
+alpha           = raid_monolith_alpha_npc
+sniper          = sim_monolith_sniper
+scientist       = raid_monolith_scientist_npc
+
+; Limansk (novices and experienced): the depth from the landing (the Red Forest's tunnel); the Monolith's way back in
+; from the Hospital's side
 [raid_limansk_monolith]
 from            = 7.6, -372.0
 entry           = raid_lim_smart_terrain_10
+near            = novice:3, experienced:1
+mid             = novice:1, experienced:1
+far             = novice:1, experienced:3
+big             = experienced:1
+patrol          = novice:1, experienced:1
+reinforce       = novice:1, experienced:2
 routes          = raid_lim_route_south, raid_lim_route_centre, raid_lim_route_west, raid_lim_route_north
 
 [raid_lim_route_south]
@@ -63,7 +130,15 @@ smarts          = raid_lim_smart_terrain_5, raid_lim_smart_terrain_7, raid_lim_s
 [raid_lim_route_north]
 smarts          = raid_lim_smart_terrain_6, raid_lim_smart_terrain_9, raid_lim_smart_terrain_10
 
-; the raid's squads
+; the raid's squads: the drawn men's shell, and fixed ones for the rescues, the Scorcher's waves, the perimeter
+[raid_monolith_squad]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_2
+npc_in_squad    = 0, 0
+
+[raid_monolith_post_squad]:raid_monolith_squad
+always_arrived  = true
+
 [raid_monolith_near]:online_offline_group
 faction         = monolith
 npc_random      = sim_default_monolith_0, sim_default_monolith_1, sim_default_monolith_2
@@ -93,6 +168,19 @@ npc_in_squad    = 4, 5
 faction         = monolith
 npc_random      = sim_default_monolith_2, sim_default_monolith_3
 npc_in_squad    = 3, 3
+
+; «Альфа»: masters in exoskeletons; the Monolith's scientists in its scientific suits (gameplay\character_desc_raid.xml)
+![profiles]
+>files = npc_profile_raid
+>specific_characters_files = character_desc_raid
+
+[raid_monolith_alpha_npc]:sim_default_monolith_4
+character_profile = raid_monolith_alpha
+spec_rank       = master
+
+[raid_monolith_scientist_npc]:sim_default_monolith_3
+character_profile = raid_monolith_scientist
+spec_rank       = veteran
 
 ; death in a raid (raid.script): one wakes in the shelter with what is in the slots and on the belt; everything found
 ; in the raid is lost, each other thing in the backpack with lose_chance
@@ -125,10 +213,12 @@ senders         = st_raid_cooling_sender_1, st_raid_cooling_sender_2, st_raid_co
 reinforce       = rad_freedom_vs_duty:raid_monolith_far, rad_freedom_vs_duty:raid_monolith_mid, rad_antenna_monolith:raid_monolith_alpha, rad_antenna_camper:raid_monolith_far, rad_antenna_patrol:raid_monolith_far
 
 ; the raid's rescue events (raid_rescue.script): chance at each cycle, never two cycles running; reveal: metres from the
-; place at which the people appear once the siege is dead. position: as of the level's AI map, node: its vertex
+; place at which the people appear once the siege is dead; clear_radius: and no Monolith man alive this near the place
+; (posts and patrols round it shot them at once). position: as of the level's AI map, node: its vertex
 [raid_rescue]
 chance          = 0.4
 reveal          = 15
+clear_radius    = 30
 signal_first_seconds = 3   ; radio signals after landing
 signal_seconds  = 9
 signal_show_seconds = 15
@@ -199,25 +289,145 @@ inv_grid_height = 2
 inv_weight      = 5
 quest_item      = true
 
-; the Monolith on the other raid levels: as Limansk's, no patrols. The Control Center has no smarts.
+; the Hospital (experienced and veterans): one smart, the catacombs' big garrison; four posts down the catacombs and
+; a patrol on the lower floor
 [raid_hospital_monolith]
 from            = -76.7, 854.8
 entry           = raid_katacomb_smart_terrain
+near            = experienced:2, veteran:1
+mid             = experienced:1, veteran:1
+far             = experienced:1, veteran:2
+big             = veteran:1
+big_count       = 1
+post            = experienced:1, veteran:1
+post_men        = 2, 3
+posts           = raid_hos_p1, raid_hos_p2, raid_hos_p3, raid_hos_p4
+patrol          = experienced:1, veteran:1
+patrol_chance   = 0.6
+patrol_max      = 1
+reinforce       = experienced:1, veteran:1
+routes          = raid_hos_route
 
+; posts and loop routes: their places and host smarts in scripts\raid_posts.ltx (tools\raid\raid_posts.py); here men
+; (min, max) and ranks, else the level's post_men and post
+[raid_hos_p1]   ; the north cave: the first met coming from Limansk
+men             = 3, 4
+[raid_hos_p2]   ; lower floor, the big hall
+[raid_hos_p3]   ; lower floor, the wide room north of the big hall (not by the medic: he was shot at once)
+[raid_hos_p4]   ; south, before the exit to ChNPP
+men             = 3, 4
+[raid_hos_route] ; a loop on the lower floor, from the big hall's north end up
+
+; ChNPP North (veterans and masters, no more than 30-35 men): snipers on their three smarts' roofs, patrols between
+; the camps
 [raid_stancia_2_monolith]
 from            = 144.4, 336.0
 entry           = raid_aes2_monolith_camp1
+ladder          = novice, regular, experienced, veteran, master   ; no «Альфа» here, not even by rank_up
+men             = 2, 3
+near            = veteran:3, master:1
+mid             = veteran:1, master:1
+far             = veteran:1, master:2
+big             = master:1
+sniper          = sniper:2, veteran:1
+sniper_men      = 2, 2
+snipers         = raid_aes2_monolith_snipers_1, raid_aes2_monolith_snipers_2, raid_aes2_monolith_snipers_3
+patrol          = veteran:1, master:1
+patrol_chance   = 0.5
+patrol_max      = 2
+reinforce       = veteran:2, master:1
+reinforce_men   = 2, 3
+routes          = raid_aes2_route_west, raid_aes2_route_centre, raid_aes2_route_east
 
+[raid_aes2_route_west]
+smarts          = raid_aes2_monolith_camp1, raid_aes2_monolith_camp2
+
+[raid_aes2_route_centre]
+smarts          = raid_aes2_monolith_camp2, raid_aes2_monsters2, raid_aes2_monolith_camp3
+
+[raid_aes2_route_east]
+smarts          = raid_aes2_monolith_camp3, raid_aes2_monsters1, raid_aes2_monolith_camp4
+
+; ChNPP South (veterans and masters, no more than 30-35 men): the lairs 2-4 have places of their own (raid_posts.py)
 [raid_stancia_monolith]
 from            = -43.0, -71.6
 entry           = raid_aes_smart_terrain_monolit_blockpost
+ladder          = novice, regular, experienced, veteran, master   ; no «Альфа» here, not even by rank_up
+men             = 2, 3
+near            = veteran:3, master:1
+mid             = veteran:1, master:1
+far             = veteran:1, master:2
+big             = master:1
+patrol          = veteran:1, master:1
+patrol_chance   = 0.5
+patrol_max      = 2
+reinforce       = veteran:2, master:1
+reinforce_men   = 2, 3
+routes          = raid_aes_route_west, raid_aes_route_centre, raid_aes_route_east
 
+[raid_aes_route_west]
+smarts          = raid_aes_smart_terrain_monsters4, raid_aes_smart_terran_soldier, raid_aes_smart_terrain_monolit_blockpost4
+
+[raid_aes_route_centre]
+smarts          = raid_aes_smart_terrain_monolit_blockpost4, raid_aes_smart_terrain_monsters3, raid_aes_smart_terrain_monolit_blockpost2
+
+[raid_aes_route_east]
+smarts          = raid_aes_smart_terrain_monolit_blockpost2, raid_aes_smart_terrain_monsters2, raid_aes_smart_terrain_monsters1, raid_aes_smart_terrain_monolit_blockpost
+
+; the Sarcophagus (masters and «Альфа»): the store is the scientists' lab (no garrison but their guards); the
+; poltergeists' lair has places of its own; a patrol in the general's rooms
 [raid_sarcofag_monolith]
 from            = -25.8, 43.8
-entry           = raid_sar_monolith_guard
+entry           = raid_sar_monolith_general
+men             = 3, 4
+near            = master:1
+mid             = master:3, alpha:1
+far             = master:1, alpha:1
+big             = alpha:1
+big_count       = 1
+no_garrison     = raid_sar_monolith_sklad
+posts           = raid_sar_lab
+patrol          = master:1
+patrol_chance   = 0.5
+patrol_max      = 1
+reinforce       = master:2, alpha:1
+reinforce_men   = 2, 3
+routes          = raid_sar_route_hall
 
-; rich stashes (raid_rich.script): list; loot drawn anew every refill_hours, loot_min..loot_max things; found with the RF
-; receiver within rf_distance on a frequency between freq_min and freq_max
+[raid_sar_lab]  ; the Monolith's scientists in the store's long room, their guards at its ends
+scientists      = 2, 3
+guards          = 3, 4
+guard_ranks     = master:2, alpha:1
+[raid_sar_route_hall]  ; a loop of the general's rooms
+
+; the Control Center (masters and «Альфа»): «Альфа» at the main hall (the north smart's big garrison), the scientists
+; with their guards in it, three posts on the walkways south of it; the south smart has no garrison of its own
+[raid_control_monolith_monolith]
+from            = 36.6, 27.2
+entry           = raid_sar_monolith_guard
+men             = 4, 5
+far             = master:1, alpha:1
+big             = alpha:1
+big_squads      = 1
+big_count       = 1
+no_garrison     = raid_sar_monolith_zombies
+post            = master:2, alpha:1
+post_men        = 2, 3
+posts           = raid_ctl_p1, raid_ctl_p2, raid_ctl_p3, raid_ctl_lab
+reinforce       = master:2, alpha:1
+reinforce_men   = 2, 3
+
+[raid_ctl_p1]   ; west (the vanilla mon_post1)
+[raid_ctl_p2]   ; south-west (mon_post2, mon_camp2)
+[raid_ctl_p3]   ; east, by the way to ChNPP North (mon_camp1)
+[raid_ctl_lab]  ; the scientists in the main hall round its middle, with their guards
+scientists      = 2, 2
+guards          = 2, 3
+guard_ranks     = alpha:1
+
+; rich stashes (raid_rich.script): list; loot drawn anew every refill_hours, by the stash's level's
+; [raid_rich_loot_<level>] (raid_loot.script), else loot_min..loot_max of loot; found with the RF receiver within
+; rf_distance on a frequency between freq_min and freq_max
 [raid_rich]
 list            = n1, n2, s1, s2, sar1, sar2, ctl1
 box             = raid_rich_box
@@ -285,3 +495,94 @@ inv_grid_width  = 1
 inv_grid_height = 1
 inv_weight      = 0.5
 quest_item      = true
+
+; a rich stash's loot by its level (raid_loot.fill_rich): artefact_count (min, max) artefacts drawn by artefacts'
+; weights, item_count things by items' ("section:weight"; ammo comes as a full box)
+[raid_rich_loot_raid_stancia_2]
+artefacts       = af_glass:2, af_fire:2, af_ice:2, af_night_star:2, af_eye:2, af_cristall:2, af_fireball:2, af_medusa:2, af_compass:1, af_gold_fish:1, af_soul:1
+artefact_count  = 1, 2
+items           = medkit_army:3, stimpack_army:2, drug_radioprotector:2, antirad:3, ammo_5.45x39_ap:2, ammo_5.56x45_ap:2, ammo_9x39_ap:2, ammo_7.62x54_7h14:1, grenade_f1:2, itm_repairkit_tier_2:1
+item_count      = 2, 4
+
+[raid_rich_loot_raid_stancia]:raid_rich_loot_raid_stancia_2
+
+[raid_rich_loot_raid_sarcofag]
+artefacts       = af_compass:2, af_gold_fish:2, af_soul:2, af_glass:2, af_night_star:1, af_eye:1, af_fire:1, af_ice:1
+artefact_count  = 2, 3
+items           = medkit_scientic:3, stimpack_scientic:2, drug_psy_blockade:2, drug_radioprotector:2, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, itm_repairkit_tier_3:1
+item_count      = 2, 4
+
+[raid_rich_loot_raid_control_monolith]:raid_rich_loot_raid_sarcofag
+item_count      = 3, 5
+
+; own stashes (raid.script): a box of these sections on a raid level (or one in the game's player_created_stashes, a
+; Hideout Furniture stash) is one's own: no PDA mark there, what is taken from it is never found in the raid
+[raid_stash]
+boxes           = inv_backpack
+
+; the taken contracts' things (raid_loot.script): each wanted section starting with one of order_prefixes lies once in
+; the raid, on a garrison's commander (a big garrison's first) on one of order_levels (drawn as a raid starts), else in
+; a rich stash there; condition (min, max)
+[raid_loot]
+order_prefixes  = wpn_
+order_levels    = raid_limansk, raid_hospital, raid_stancia_2, raid_stancia, raid_sarcofag, raid_control_monolith
+order_condition = 0.9, 0.97
+
+; the Monolith's documents on its scientists ([raid_monolith] scientist_docs): loot to sell for now
+[raid_doc_psi_screens]:tch_junk
+$spawn          = "devices\roubles"
+visual          = dynamics\equipments\quest\notes_document_case_1.ogf
+inv_name        = st_raid_doc_psi_screens
+inv_name_short  = st_raid_doc_psi_screens
+description     = st_raid_doc_psi_screens_descr
+inv_weight      = 0.4
+inv_grid_width  = 2
+inv_grid_height = 1
+inv_grid_x      = 10
+inv_grid_y      = 15
+cost            = 9000
+
+[raid_doc_gauss]:raid_doc_psi_screens
+visual          = dynamics\equipments\quest\notes_document_case_2.ogf
+inv_name        = st_raid_doc_gauss
+inv_name_short  = st_raid_doc_gauss
+description     = st_raid_doc_gauss_descr
+inv_grid_x      = 2
+inv_grid_y      = 15
+cost            = 12000
+
+[raid_doc_synthesis]:raid_doc_psi_screens
+visual          = dynamics\devices\dev_flash_1\dev_flash_1.ogf
+inv_name        = st_raid_doc_synthesis
+inv_name_short  = st_raid_doc_synthesis
+description     = st_raid_doc_synthesis_descr
+inv_weight      = 0.05
+inv_grid_width  = 1
+inv_grid_x      = 8
+inv_grid_y      = 3
+cost            = 10000
+
+; a level with no PDA map: a plan of its own (tools\raid\raid_plan.py draws it from the level's AI map):
+; "texture | x1, z1, x2, z2" (the world's box the texture spans, north up)
+[raid_plans]
+raid_sarcofag   = ui\raid\plan_raid_sarcofag | -36.9, -36.4, 79.6, 51.6
+
+; the window's countdown on the screen (ui_raid_hud.script) on raid levels: show (and the Co-op options page's switch);
+; corner top_right, top_left, bottom_right, bottom_left; margins from it and size (the HUD's 1024x768 units); alpha of
+; the box (0-255); real minutes (the game's divided by time_factor), or the game's with game_time = true; amber in the
+; last warn_minutes
+[raid_timer]
+show            = true
+corner          = top_right
+margin_x        = 16
+margin_y        = 40
+width           = 170
+height          = 40
+alpha           = 210
+game_time       = false
+warn_minutes    = 10
+
+; the report of a raid (ui_raid_hud.script): shown delay_seconds after coming back to the shelter
+[raid_report]
+show            = true
+delay_seconds   = 2

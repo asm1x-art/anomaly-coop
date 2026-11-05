@@ -1,0 +1,261 @@
+-- The raid on the screen (settings: mod_system_raid.ltx [raid_timer], [raid_report]), in the look of the shelter's
+-- computers (ui_shelter_style.script):
+-- - the window's countdown in a corner while on a raid level (raid_window.seconds_left()): real minutes and seconds
+--   (the game's by time_factor), amber in its last warn_minutes, red once it is closed; switched on the Co-op options
+--   page (coop/general/raid_timer);
+-- - the report of a raid shown on coming back (raid.script's raid_report): out alive or dead, the time, the levels,
+--   the kills, the Monolith's reinforcements, what was carried out or lost.
+
+local XML = "ui_shelter_laptop.xml"
+local C = ui_shelter_style.C
+local T = "raid_timer"
+
+local function tr(id)
+	return game.translate_string(id)
+end
+
+local function num(section, key, default)
+	return ini_sys:r_float_ex(section, key) or default
+end
+
+-- "m:ss", or "h:mm:ss" from an hour
+local function clock(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
+	if h > 0 then
+		return string.format("%d:%02d:%02d", h, m, s)
+	end
+	return string.format("%d:%02d", m, s)
+end
+
+-------------------------------------------------------------------------------
+-- the countdown
+
+local HUD
+
+class "UIRaidTimer" (CUIScriptWnd)
+ui_shelter_style.apply(UIRaidTimer)
+
+function UIRaidTimer:__init() super()
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	local w, h = num(T, "width", 150), num(T, "height", 40)
+	local mx, my = num(T, "margin_x", 16), num(T, "margin_y", 40)
+	local corner = ini_sys:r_string_ex(T, "corner") or "top_right"
+	local sw = math.floor(1024 / self.k + 0.5)
+	local x = string.find(corner, "left") and mx or sw - mx - w
+	local y = string.find(corner, "bottom") and 768 - my - h or my
+	local alpha = num(T, "alpha", 210)
+	self.box = self:box(x, y, w, h, self)
+	self:round(0, 0, w, h, C.border, self.box, 8, alpha)
+	self:round(1, 1, w - 2, h - 2, C.surface, self.box, 7, alpha)
+	self.bar = self:rect(6, 8, 3, h - 16, C.accent, self.box)
+	self.label = self:text(16, 0, w - 24, h, tr("st_raid_timer_label"), C.dim, self.box, nil, "s")
+	self.time = self:text(16, 0, w - 26, h, "", C.text, self.box, CGameFont.alRight, "l")
+	self.at = 0
+end
+
+function UIRaidTimer:Update()
+	CUIScriptWnd.Update(self)
+	local now = time_global()
+	if now < self.at then
+		return
+	end
+	self.at = now + 250
+	local left = raid.is_raid_level(level.name()) and raid_window.seconds_left()
+	self.box:Show(left and true or false)
+	if not left then
+		return
+	end
+	local factor = ini_sys:r_bool_ex(T, "game_time", false) and 1 or math.max(1, level.get_time_factor())
+	local color = C.accent
+	if left <= 0 then
+		color = C.bad
+		self.time:SetText(tr("st_raid_timer_closed"))
+	else
+		if left / factor <= num(T, "warn_minutes", 10) * 60 then
+			color = C.warn
+		end
+		self.time:SetText(clock(left / factor))
+	end
+	self.bar:SetTextureColor(ui_shelter_style.argb(color))
+	self.time:SetTextColor(ui_shelter_style.argb(left <= 0 and C.bad or C.text))
+end
+
+local function show_timer(on)
+	if on and not HUD then
+		HUD = UIRaidTimer()
+		get_hud():AddDialogToRender(HUD)
+	elseif not on and HUD then
+		get_hud():RemoveDialogToRender(HUD)
+		HUD = nil
+	end
+end
+
+-- on, off: the option (Co-op page), on raid levels only
+function refresh_timer()
+	if db.actor then
+		show_timer(ini_sys:r_bool_ex(T, "show", true) and ui_options.get("coop/general/raid_timer") ~= false
+			and raid.is_raid_level(level.name()))
+	end
+end
+
+-- for the tests: the countdown's text while it shows
+function timer_state()
+	return HUD and HUD.box:IsShown() and HUD.time:GetText() or nil
+end
+
+-------------------------------------------------------------------------------
+-- the report
+
+local W, ROW, LIST_MAX = 560, 30, 8
+local TOP = ui_shelter_style.TITLE_H + 12
+local gui
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+class "UIRaidReport" (CUIScriptWnd)
+ui_shelter_style.apply(UIRaidReport)
+
+function UIRaidReport:__init(rep) super()
+	self.rep = rep
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self:draw()
+end
+
+function UIRaidReport:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k - self.x0, p.y - self.y0)
+end
+
+-- a list's rows: at most LIST_MAX, the rest in one more
+local function rows_of(items)
+	return math.min(#items, LIST_MAX) + (#items > LIST_MAX and 1 or 0)
+end
+
+function UIRaidReport:list(win, y, title, items, empty)
+	self:text(18, y, W - 36, 24, title, C.dim, win, nil, "s")
+	y = y + 26
+	if #items == 0 then
+		self:text(30, y, W - 48, ROW, tr(empty), C.faint, win, nil, "s")
+		return y + ROW
+	end
+	for i, it in ipairs(items) do
+		if i > LIST_MAX then
+			self:text(30, y, W - 48, ROW, string.format(tr("st_raid_report_more"), #items - LIST_MAX), C.faint, win, nil, "s")
+			return y + ROW
+		end
+		self:icon(it.section, 30, y + 2, ROW - 4, win)
+		self:text(30 + ROW + 8, y, W - 160, ROW, ui_item.get_sec_name(it.section), C.text, win, nil, "s")
+		self:text(W - 120, y, 100, ROW, "x" .. tostring(it.count), C.dim, win, CGameFont.alRight, "s")
+		y = y + ROW
+	end
+	return y
+end
+
+function UIRaidReport:draw()
+	local rep = self.rep
+	local carried, lost = rep.carried or {}, rep.lost or {}
+	local h = TOP + 44 + 4 * ROW + 16 + 26 + math.max(1, rows_of(carried)) * ROW + 12 + 64
+	if rep.died then
+		h = h + 26 + math.max(1, rows_of(lost)) * ROW + 12
+	end
+	self.x0 = math.floor((math.floor(1024 / self.k + 0.5) - W) / 2)
+	self.y0 = math.max(8, math.floor((768 - h) / 2))
+	self.clicks = {}
+	local win = self:chrome(self.x0, self.y0, W, h, tr("st_raid_report_title"), "ui\\shelter\\laptop_icon_raid", self,
+		self.clicks, 0, 0, function() self:Close() end)
+	local y = TOP
+	self:text(18, y, W - 36, 36, tr(rep.died and "st_raid_report_died" or "st_raid_report_out"), rep.died and C.bad or C.good,
+		win, nil, "l")
+	y = y + 44
+	local seconds = rep.seconds or 0
+	local real = seconds / math.max(1, rep.factor or 1)
+	local names = {}
+	local levels = raid.get_levels()
+	for _, name in ipairs(rep.levels or {}) do
+		names[#names + 1] = tr(levels[name] and levels[name].original or name)
+	end
+	local rows = {
+		{ "st_raid_report_time", string.format(tr("st_raid_report_time_value"), math.floor(seconds / 3600),
+			math.floor(seconds / 60) % 60, clock(real)) },
+		{ "st_raid_report_levels", table.concat(names, " > ") },
+		{ "st_raid_report_kills", tostring(rep.kills or 0) },
+		{ "st_raid_report_reinf", tostring(rep.reinf or 0) },
+	}
+	for _, r in ipairs(rows) do
+		self:text(18, y, 200, ROW, tr(r[1]), C.dim, win, nil, "s")
+		self:text(220, y, W - 238, ROW, r[2], C.text, win, nil, "s")
+		y = y + ROW
+	end
+	self:rect(18, y + 7, W - 36, 1, C.line, win)
+	y = y + 16
+	y = self:list(win, y, tr("st_raid_report_carried"), carried, "st_raid_report_nothing") + 12
+	if rep.died then
+		y = self:list(win, y, tr("st_raid_report_lost"), lost, "st_raid_report_nothing") + 12
+	end
+	self:button(18, h - 56, W - 36, 40, tr("st_raid_report_close"), function() self:Close() end, self.clicks, win, 0, 0,
+		"primary")
+end
+
+function UIRaidReport:Update()
+	CUIScriptWnd.Update(self)
+	self:hovers(self:cursor(), { self.clicks })
+end
+
+function UIRaidReport:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			local p = self:cursor()
+			for i = #self.clicks, 1, -1 do
+				if inside(p, self.clicks[i]) then
+					self.clicks[i][5]()
+					return true
+				end
+			end
+			return true
+		elseif dik_to_bind(dik) == key_bindings.kQUIT or dik_to_bind(dik) == key_bindings.kUSE then
+			self:Close()
+			return true
+		end
+	end
+	return res
+end
+
+function UIRaidReport:Close()
+	self:HideDialog()
+	gui = nil
+end
+
+function show_report(rep)
+	if gui and gui:IsShown() then
+		gui:Close()
+	end
+	gui = UIRaidReport(rep)
+	gui:ShowDialog(true)
+end
+
+-- for the tests: the report shown, closing it
+function shown()
+	return gui and gui:IsShown() and gui.rep or nil
+end
+
+function close_report()
+	if gui and gui:IsShown() then
+		gui:Close()
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", refresh_timer)
+	RegisterScriptCallback("actor_on_net_destroy", function() show_timer(false) end)
+end

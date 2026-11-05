@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<string id="st_shelter_ev_rumour">
+		<text>Байка у стойки. Захмелевший посетитель проболтался бармену о чужом тайнике, бармен запомнил место: метка в ПДА.</text>
+	</string>
+	<string id="st_shelter_ev_rumour_hint">
+		<text>Слух из бара «Радар-1»: кто-то оставил здесь ящик и не вернулся.</text>
+	</string>
+	<string id="st_shelter_ev_quarrel_fight">
+		<text>Драка в баре. Сцепились %s и %s: разбили стулья и посуду, на ремонт из кассы ушло %s RU. Слава у бара подмочена.</text>
+	</string>
+	<string id="st_shelter_ev_quarrel_calm">
+		<text>Ссора в баре: %s и %s взялись за грудки, но бармен развёл их по разным столам. До стрельбы не дошло.</text>
+	</string>
+	<string id="st_shelter_ev_spender">
+		<text>Загул. Отряд вернулся с Севера с хабаром и гулял до утра: в кассе +%s RU, о баре заговорили.</text>
+	</string>
+	<string id="st_shelter_ev_gift">
+		<text>Подарок. Завсегдатай оставил группе «спасибо за приют»: %s, в тайнике убежища.</text>
+	</string>
+	<string id="st_shelter_ev_gift_money">
+		<text>Подарок. Завсегдатай оставил группе «спасибо за приют»: %s RU в кассе.</text>
+	</string>
+	<string id="st_shelter_ev_wounded_saved">
+		<text>Раненый у двери. К бару приполз раненый %s, весь в крови. Шов его заштопал: он заплатил %s RU, а его товарищи этого не забудут.</text>
+	</string>
+	<string id="st_shelter_ev_wounded_died">
+		<text>Раненый у двери. К бару приполз раненый %s, весь в крови. Помочь было некому: умер у порога. Убежищу нужен медик.</text>
+	</string>
+	<string id="st_shelter_ev_binge">
+		<text>Шуруп в запое. Со склада пропало бутылок: %s. Мастерская закрыта ещё часов на %s.</text>
+	</string>
+	<string id="st_shelter_ev_fac_dolg">
+		<text>долговец</text>
+	</string>
+	<string id="st_shelter_ev_fac_freedom">
+		<text>свободовец</text>
+	</string>
+	<string id="st_shelter_ev_fac_stalker">
+		<text>одиночка</text>
+	</string>
+	<string id="st_shelter_ev_fac_csky">
+		<text>чистонебовец</text>
+	</string>
+	<string id="st_shelter_ev_fac_ecolog">
+		<text>учёный</text>
+	</string>
+	<string id="st_shelter_ev_fac_killer">
+		<text>наёмник</text>
+	</string>
+</string_table>

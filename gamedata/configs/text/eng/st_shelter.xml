@@ -1662,4 +1662,19 @@
 	<string id="st_shelter_x10_decoder_descr">
 		<text>A PDA modified like the Chemist's, with spare boards. It works out X-10's door code while you stay close.</text>
 	</string>
+	<string id="st_shelter_entrance_in">
+		<text>Enter the shelter</text>
+	</string>
+	<string id="st_shelter_entrance_locked">
+		<text>Code lock: the door won't open</text>
+	</string>
+	<string id="st_shelter_entrance_out">
+		<text>Go out to the Radar</text>
+	</string>
+	<string id="st_shelter_entrance_group">
+		<text>The shelter is a group's business: only a group can get in.</text>
+	</string>
+	<string id="st_shelter_entrance_spot">
+		<text>Shelter "Radar-1": the way in at the end of the tunnel</text>
+	</string>
 </string_table>

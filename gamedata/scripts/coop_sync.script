@@ -227,6 +227,60 @@ local function player_on(level_name)
 	return false
 end
 
+-- A squad made in a shared scope (a smart's respawn, a raid's garrison) reaches the others without its members: each
+-- member's spawn goes out as it is made, before the squad takes it (register_member). The members go after, once the
+-- squad is done (the next update, or the end of shelter.everyones: a level change right after it starts a new Lua
+-- state), with the smart it keeps to; the others put them into their copy of it.
+local new_members = {} -- [squad id] = { member ids }
+
+function send_squad_members()
+	if next(new_members) == nil then
+		return
+	end
+	for squad_id, ids in pairs(new_members) do
+		local squad = alife_object(squad_id)
+		if squad then
+			-- a squad sent at one's actor (a raid's reinforcement) would go after the others' own actors there
+			local target = squad.scripted_target ~= "actor" and squad.scripted_target or "-"
+			send("squad_members", squad_id, squad.smart_id or "-", target, table.concat(ids, ","))
+		end
+	end
+	new_members = {}
+end
+
+local function wrap_squads()
+	wrap(sim_squad_scripted.sim_squad_scripted, "add_squad_member", "sim_squad_scripted", function(original, self, ...)
+		local id = original(self, ...)
+		if id and coop_on() then
+			new_members[self.id] = new_members[self.id] or {}
+			table.insert(new_members[self.id], id)
+		end
+		return id
+	end)
+	RegisterScriptCallback("actor_on_update", send_squad_members)
+	handlers.squad_members = function(sender, payload)
+		local f = fields(payload)
+		local squad = alife_object(tonumber(f[1]) or 65535)
+		if not (squad and squad.register_member) then
+			return -- not shared: only the sender has it
+		end
+		for _, s in ipairs(str_explode(f[4] or "", ",")) do
+			local se = alife_object(tonumber(s) or 65535)
+			if se and se.group_id == 65535 then
+				squad:register_member(se.id)
+				SIMBOARD:setup_squad_and_group(se)
+			end
+		end
+		local smart = tonumber(f[2])
+		if smart and alife_object(smart) and squad.smart_id ~= smart then
+			SIMBOARD:assign_squad_to_smart(squad, smart)
+		end
+		if f[3] and f[3] ~= "-" then
+			squad.scripted_target = f[3]
+		end
+	end
+end
+
 local function wrap_cleanups()
 	-- the inventories of NPCs on other levels, every few days (release_npc_inventory)
 	wrap(release_npc_inventory, "clean_npc_inv", "release_npc_inventory", function(original, se_npc)
@@ -480,6 +534,15 @@ local function watch_reveals(f, hint, ...)
 end
 
 local function wrap_stashes()
+	-- a stash a player lays from a backpack (item_backpack.script) is the world's: the others get its box and the
+	-- master's save keeps it; laid in one's own world only, it was gone at the next load of the world
+	wrap(item_backpack.UICreateStash, "OnAccept", "item_backpack.UICreateStash", function(original, self)
+		if coop_on() then
+			return shared(original, self)
+		end
+		return original(self)
+	end)
+
 	wrap(treasure_manager, "create_random_stash", "treasure_manager", function(original, no_spot, hint, ...)
 		if not coop_on() then
 			return original(no_spot, hint, ...)
@@ -857,6 +920,7 @@ function on_game_start()
 	end
 	wrap_world_logic()
 	wrap_corpse_loot()
+	wrap_squads()
 	wrap_mutant_loot()
 	wrap_cleanups()
 	wrap_stashes()

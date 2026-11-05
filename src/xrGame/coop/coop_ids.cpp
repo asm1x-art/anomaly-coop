@@ -11,6 +11,11 @@ namespace coop
 	static const u32 LOW_RESERVE = 128; // ask for another block when fewer free ids than this are left
 	static const u16 NO_BLOCK = u16(-1);
 	static const u32 WAIT_MS = 2000; // for the first block, see acquire_first_block
+	// A block hands out the id freed longest ago, so one nearly used up hands out ids freed moments ago, while their
+	// objects may still be on their way out of the client: an update of the old object is then read as the new one's
+	// (FATAL "Beer from the creator of ..." in xrServer::Process_update, seen after a raid's garrison died). Such a
+	// block is used only when no other has this many free ids.
+	static const u32 REUSE_MIN_FREE = 32;
 
 	static xr_vector<u16> g_blocks; // leased to us, in grant order
 	static bool g_request_pending = false;
@@ -73,19 +78,22 @@ namespace coop
 		if (g_blocks.empty() && !g_gave_up_waiting && !g_server_exhausted)
 			acquire_first_block(server);
 
-		for (u16 block : g_blocks)
-		{
-			u16 id = server.PerformIDgenFromBlock(block);
-			if (id != u16(-1))
+		for (u32 min_free : {REUSE_MIN_FREE, 1u})
+			for (u16 block : g_blocks)
 			{
-				if (!g_first_logged)
+				if (server.free_ids_in_block(block) < min_free)
+					continue;
+				u16 id = server.PerformIDgenFromBlock(block);
+				if (id != u16(-1))
 				{
-					Msg("[coop] first new id from a leased block: %u", id);
-					g_first_logged = true;
+					if (!g_first_logged)
+					{
+						Msg("[coop] first new id from a leased block: %u", id);
+						g_first_logged = true;
+					}
+					return id;
 				}
-				return id;
 			}
-		}
 
 		// the object still gets created, but another client may reuse this id for something else
 		if (++g_fallbacks <= 10)
