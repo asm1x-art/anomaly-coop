@@ -1662,4 +1662,19 @@
 	<string id="st_shelter_x10_decoder_descr">
 		<text>КПК с модификацией, как у Химика, и запасными платами. Подбирает код двери X-10, пока вы рядом.</text>
 	</string>
+	<string id="st_shelter_entrance_in">
+		<text>Войти в убежище</text>
+	</string>
+	<string id="st_shelter_entrance_locked">
+		<text>Кодовый замок: дверь не открывается</text>
+	</string>
+	<string id="st_shelter_entrance_out">
+		<text>Выйти на Радар</text>
+	</string>
+	<string id="st_shelter_entrance_group">
+		<text>Убежище — дело группы: войти можно только в группе.</text>
+	</string>
+	<string id="st_shelter_entrance_spot">
+		<text>Убежище «Радар-1»: вход в конце тоннеля</text>
+	</string>
 </string_table>
