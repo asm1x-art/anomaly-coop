@@ -118,7 +118,14 @@ POSTS = {
 }
 
 # route: level, host smart, points walked there and back (a loop through them); a patrol of its own squad
-ROUTES = {}
+ROUTES = {
+    "raid_hos_route": ("raid_hospital", "raid_katacomb_smart_terrain", "lower floor, south to north", [
+        (-86.4, 24.2, 604.9), (-88.9, 25.5, 633.7), (-80.3, 25.0, 641.1), (-92.1, 25.0, 660.1), (-86.6, 25.0, 674.8),
+        (-79.2, 25.0, 689.5), (-82.3, 25.0, 710.4), (-80.7, 25.0, 731.6), (-89.5, 25.2, 749.5), (-92.6, 24.2, 763.8)]),
+    "raid_sar_route_hall": ("raid_sarcofag", "raid_sar_monolith_general", "the general's rooms (sar_monolith_general_patrol_walk_room)", [
+        (18.4, 0.1, 41.5), (28.2, -0.1, 39.9), (42.9, 0.0, 40.7), (47.6, 0.1, 37.5), (57.9, 0.1, 36.9), (63.6, -0.1, 36.0),
+        (67.2, -0.1, 38.5), (73.7, 0.1, 37.3), (73.6, 0.0, 26.6), (74.9, -0.1, 21.1), (72.8, 0.0, 9.8), (69.2, 0.1, 5.3)]),
+}
 ROUTE_MEN = 3  # jobs on a route: a patrol's men
 
 

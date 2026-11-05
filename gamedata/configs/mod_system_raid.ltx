@@ -269,6 +269,10 @@ big_count       = 1
 post            = experienced:1, veteran:1
 post_men        = 2, 3
 posts           = raid_hos_p1, raid_hos_p2, raid_hos_p3, raid_hos_p4
+patrol          = experienced:1, veteran:1
+patrol_chance   = 0.6
+patrol_max      = 1
+routes          = raid_hos_route
 
 ; posts and loop routes: their places and host smarts in scripts\raid_posts.ltx (tools\raid\raid_posts.py); here men
 ; (min, max) and ranks, else the level's post_men and post
@@ -278,6 +282,7 @@ men             = 3, 4
 [raid_hos_p3]   ; lower floor, the south hall by the medic's room
 [raid_hos_p4]   ; south, before the exit to ChNPP
 men             = 3, 4
+[raid_hos_route] ; a loop on the lower floor
 
 ; ChNPP North (veterans and masters, no more than 30-35 men): snipers on their three smarts' roofs, patrols between
 ; the camps
@@ -293,6 +298,19 @@ big             = master:1
 sniper          = sniper:2, veteran:1
 sniper_men      = 2, 2
 snipers         = raid_aes2_monolith_snipers_1, raid_aes2_monolith_snipers_2, raid_aes2_monolith_snipers_3
+patrol          = veteran:1, master:1
+patrol_chance   = 0.5
+patrol_max      = 2
+routes          = raid_aes2_route_west, raid_aes2_route_centre, raid_aes2_route_east
+
+[raid_aes2_route_west]
+smarts          = raid_aes2_monolith_camp1, raid_aes2_monolith_camp2
+
+[raid_aes2_route_centre]
+smarts          = raid_aes2_monolith_camp2, raid_aes2_monsters2, raid_aes2_monolith_camp3
+
+[raid_aes2_route_east]
+smarts          = raid_aes2_monolith_camp3, raid_aes2_monsters1, raid_aes2_monolith_camp4
 
 ; ChNPP South (veterans and masters, no more than 30-35 men): the lairs 2-4 have places of their own (raid_posts.py)
 [raid_stancia_monolith]
@@ -304,6 +322,19 @@ near            = veteran:3, master:1
 mid             = veteran:1, master:1
 far             = veteran:1, master:2
 big             = master:1
+patrol          = veteran:1, master:1
+patrol_chance   = 0.5
+patrol_max      = 2
+routes          = raid_aes_route_west, raid_aes_route_centre, raid_aes_route_east
+
+[raid_aes_route_west]
+smarts          = raid_aes_smart_terrain_monsters4, raid_aes_smart_terran_soldier, raid_aes_smart_terrain_monolit_blockpost4
+
+[raid_aes_route_centre]
+smarts          = raid_aes_smart_terrain_monolit_blockpost4, raid_aes_smart_terrain_monsters3, raid_aes_smart_terrain_monolit_blockpost2
+
+[raid_aes_route_east]
+smarts          = raid_aes_smart_terrain_monolit_blockpost2, raid_aes_smart_terrain_monsters2, raid_aes_smart_terrain_monsters1, raid_aes_smart_terrain_monolit_blockpost
 
 ; the Sarcophagus (masters and «Альфа»): the store is the scientists' lab (no garrison but their guards); the
 ; poltergeists' lair has places of its own; a patrol in the general's rooms
@@ -318,11 +349,16 @@ big             = alpha:1
 big_count       = 1
 no_garrison     = raid_sar_monolith_sklad
 posts           = raid_sar_lab
+patrol          = master:1
+patrol_chance   = 0.5
+patrol_max      = 1
+routes          = raid_sar_route_hall
 
 [raid_sar_lab]  ; the Monolith's scientists in the store's long room, their guards at its ends
 scientists      = 2, 3
 guards          = 3, 4
 guard_ranks     = master:2, alpha:1
+[raid_sar_route_hall]  ; a loop of the general's rooms
 
 ; the Control Center (masters and «Альфа»): «Альфа» at the main hall (the north smart's big garrison), the scientists
 ; with their guards in it, three posts on the walkways south of it; the south smart has no garrison of its own

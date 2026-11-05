@@ -4,7 +4,7 @@
 ; or guard: only such; lair: any Monolith man of the smart). Positions and poses: mod_patrol_paths_raid.ltx.
 
 [raid_posts]
-raid_katacomb_smart_terrain = raid_hos_p1_1, raid_hos_p1_2, raid_hos_p1_3, raid_hos_p1_4, raid_hos_p2_1, raid_hos_p2_2, raid_hos_p2_3, raid_hos_p2_4, raid_hos_p3_1, raid_hos_p3_2, raid_hos_p3_3, raid_hos_p3_4, raid_hos_p4_1, raid_hos_p4_2, raid_hos_p4_3, raid_hos_p4_4
+raid_katacomb_smart_terrain = raid_hos_p1_1, raid_hos_p1_2, raid_hos_p1_3, raid_hos_p1_4, raid_hos_p2_1, raid_hos_p2_2, raid_hos_p2_3, raid_hos_p2_4, raid_hos_p3_1, raid_hos_p3_2, raid_hos_p3_3, raid_hos_p3_4, raid_hos_p4_1, raid_hos_p4_2, raid_hos_p4_3, raid_hos_p4_4, raid_hos_route_1, raid_hos_route_2, raid_hos_route_3
 raid_sar_monolith_zombies = raid_ctl_p1_1, raid_ctl_p1_2, raid_ctl_p1_3, raid_ctl_p2_1, raid_ctl_p2_2, raid_ctl_p2_3
 raid_sar_monolith_guard = raid_ctl_p3_1, raid_ctl_p3_2, raid_ctl_p3_3, raid_ctl_lab_1, raid_ctl_lab_2, raid_ctl_lab_3, raid_ctl_lab_4, raid_ctl_lab_5, raid_ctl_lab_6, raid_ctl_lab_7
 raid_sar_monolith_sklad = raid_sar_lab_1, raid_sar_lab_2, raid_sar_lab_3, raid_sar_lab_4, raid_sar_lab_5, raid_sar_lab_6, raid_sar_lab_7
@@ -12,6 +12,7 @@ raid_sar_monolith_poltergeists = raid_sar_polt_1, raid_sar_polt_2, raid_sar_polt
 raid_aes_smart_terrain_monsters2 = raid_aes_m2_1, raid_aes_m2_2, raid_aes_m2_3, raid_aes_m2_4, raid_aes_m2_5
 raid_aes_smart_terrain_monsters3 = raid_aes_m3_1, raid_aes_m3_2, raid_aes_m3_3, raid_aes_m3_4, raid_aes_m3_5
 raid_aes_smart_terrain_monsters4 = raid_aes_m4_1, raid_aes_m4_2, raid_aes_m4_3, raid_aes_m4_4, raid_aes_m4_5
+raid_sar_monolith_general = raid_sar_route_hall_1, raid_sar_route_hall_2, raid_sar_route_hall_3
 
 [raid_post_hosts]
 raid_hos_p1 = raid_katacomb_smart_terrain
@@ -27,6 +28,8 @@ raid_sar_polt = raid_sar_monolith_poltergeists
 raid_aes_m2 = raid_aes_smart_terrain_monsters2
 raid_aes_m3 = raid_aes_smart_terrain_monsters3
 raid_aes_m4 = raid_aes_smart_terrain_monsters4
+raid_hos_route = raid_katacomb_smart_terrain
+raid_sar_route_hall = raid_sar_monolith_general
 
 ; where a post's squads are made: its first man's place (x, y, z, AI node)
 [raid_post_spawns]
@@ -512,3 +515,37 @@ prior           = 200
 [walker@raid_aes_m4_5]
 path_walk       = raid_aes_m4_5_walk
 path_look       = raid_aes_m4_5_look
+
+; raid_hos_route: lower floor, south to north
+[logic@raid_hos_route_1]
+active          = patrol@raid_hos_route
+post            = raid_hos_route
+prior           = 200
+[logic@raid_hos_route_2]
+active          = patrol@raid_hos_route
+post            = raid_hos_route
+prior           = 200
+[logic@raid_hos_route_3]
+active          = patrol@raid_hos_route
+post            = raid_hos_route
+prior           = 200
+[patrol@raid_hos_route]
+path_walk       = raid_hos_route_walk
+formation       = back
+
+; raid_sar_route_hall: the general's rooms (sar_monolith_general_patrol_walk_room)
+[logic@raid_sar_route_hall_1]
+active          = patrol@raid_sar_route_hall
+post            = raid_sar_route_hall
+prior           = 200
+[logic@raid_sar_route_hall_2]
+active          = patrol@raid_sar_route_hall
+post            = raid_sar_route_hall
+prior           = 200
+[logic@raid_sar_route_hall_3]
+active          = patrol@raid_sar_route_hall
+post            = raid_sar_route_hall
+prior           = 200
+[patrol@raid_sar_route_hall]
+path_walk       = raid_sar_route_hall_walk
+formation       = back
