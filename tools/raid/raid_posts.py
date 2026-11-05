@@ -39,11 +39,13 @@ POSTS = {
         spot(-84.7, 25.2, 676.9, -84.7, 25.2, 690.0, GUARD),
         spot(-78.4, 25.1, 660.1, -78.4, 25.1, 645.0, HIDE),
     ]),
-    "raid_hos_p3": ("raid_hospital", "raid_katacomb_smart_terrain", "lower floor, the south hall by the medic's room", [
-        spot(-84.7, 24.5, 637.7, -84.7, 24.5, 615.0, GUARD),
-        spot(-79.8, 25.0, 639.1, -79.8, 25.0, 660.0, HIDE),
-        spot(-81.9, 25.0, 644.0, -81.9, 25.0, 665.0, GUARD),
-        spot(-87.5, 25.4, 636.3, -87.5, 25.4, 615.0, KNEE),
+    # not in the south hall: the medic of the rescue (raid_rescue_medic, -94.5, 648.2) appears there and they shot him
+    # at once; the wide room north of the big hall, ~80 m from him
+    "raid_hos_p3": ("raid_hospital", "raid_katacomb_smart_terrain", "lower floor, the wide room north of the big hall", [
+        spot(-80.5, 25.0, 726.0, -80.5, 25.0, 700.0, GUARD),
+        spot(-76.5, 25.0, 730.0, -95.0, 25.0, 730.0, HIDE),  # not by x -95: an upper floor walkway is over it
+        spot(-86.0, 25.0, 731.0, -70.0, 25.0, 731.0, KNEE),
+        spot(-74.0, 25.0, 725.0, -86.0, 25.0, 705.0, HIDE),
     ]),
     "raid_hos_p4": ("raid_hospital", "raid_katacomb_smart_terrain", "south, before the exit to ChNPP", [
         spot(-85.4, 23.4, 595.0, -85.4, 23.4, 575.0, GUARD),
@@ -119,9 +121,10 @@ POSTS = {
 
 # route: level, host smart, points walked there and back (a loop through them); a patrol of its own squad
 ROUTES = {
-    "raid_hos_route": ("raid_hospital", "raid_katacomb_smart_terrain", "lower floor, south to north", [
-        (-86.4, 24.2, 604.9), (-88.9, 25.5, 633.7), (-80.3, 25.0, 641.1), (-92.1, 25.0, 660.1), (-86.6, 25.0, 674.8),
-        (-79.2, 25.0, 689.5), (-82.3, 25.0, 710.4), (-80.7, 25.0, 731.6), (-89.5, 25.2, 749.5), (-92.6, 24.2, 763.8)]),
+    # from the big hall's north end up: it went through the south hall, by the rescue's medic
+    "raid_hos_route": ("raid_hospital", "raid_katacomb_smart_terrain", "lower floor, the big hall's north end to the north", [
+        (-86.6, 25.0, 674.8), (-79.2, 25.0, 689.5), (-82.3, 25.0, 710.4), (-80.7, 25.0, 731.6), (-89.5, 25.2, 749.5),
+        (-92.6, 24.2, 763.8)]),
     "raid_sar_route_hall": ("raid_sarcofag", "raid_sar_monolith_general", "the general's rooms (sar_monolith_general_patrol_walk_room)", [
         (18.4, 0.1, 41.5), (28.2, -0.1, 39.9), (42.9, 0.0, 40.7), (47.6, 0.1, 37.5), (57.9, 0.1, 36.9), (63.6, -0.1, 36.0),
         (67.2, -0.1, 38.5), (73.7, 0.1, 37.3), (73.6, 0.0, 26.6), (74.9, -0.1, 21.1), (72.8, 0.0, 9.8), (69.2, 0.1, 5.3)]),

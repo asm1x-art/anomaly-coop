@@ -254,6 +254,19 @@ function on_exit(level_name, died)
 	end
 end
 
+-- no Monolith man alive within clear_radius of a place: the people appear only then, else the posts and patrols near
+-- them shoot them at once
+local function area_clear(pos)
+	local clear = true
+	level.iterate_nearest(pos, ini_sys:r_float_ex(S, "clear_radius") or 30, function(o)
+		if IsStalker(o) and o:alive() and o:character_community() == "monolith" then
+			clear = false
+			return true
+		end
+	end)
+	return clear
+end
+
 local function check(level_name)
 	for _, t in ipairs(active()) do
 		if setting(t, "level") == level_name and open(t) and setting(t, "squad") then
@@ -262,7 +275,8 @@ local function check(level_name)
 				if not squad or squad:npc_count() < (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0) then
 					lose(t)
 				end
-			elseif siege_dead(t) and db.actor:position():distance_to(point(t, "position")) < (ini_sys:r_float_ex(S, "reveal") or 15) then
+			elseif siege_dead(t) and db.actor:position():distance_to(point(t, "position")) < (ini_sys:r_float_ex(S, "reveal") or 15)
+				and area_clear(point(t, "position")) then
 				spawn_people(t)
 			end
 		end

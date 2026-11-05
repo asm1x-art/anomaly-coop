@@ -213,10 +213,12 @@ senders         = st_raid_cooling_sender_1, st_raid_cooling_sender_2, st_raid_co
 reinforce       = rad_freedom_vs_duty:raid_monolith_far, rad_freedom_vs_duty:raid_monolith_mid, rad_antenna_monolith:raid_monolith_alpha, rad_antenna_camper:raid_monolith_far, rad_antenna_patrol:raid_monolith_far
 
 ; the raid's rescue events (raid_rescue.script): chance at each cycle, never two cycles running; reveal: metres from the
-; place at which the people appear once the siege is dead. position: as of the level's AI map, node: its vertex
+; place at which the people appear once the siege is dead; clear_radius: and no Monolith man alive this near the place
+; (posts and patrols round it shot them at once). position: as of the level's AI map, node: its vertex
 [raid_rescue]
 chance          = 0.4
 reveal          = 15
+clear_radius    = 30
 signal_first_seconds = 3   ; radio signals after landing
 signal_seconds  = 9
 signal_show_seconds = 15
@@ -311,10 +313,10 @@ routes          = raid_hos_route
 [raid_hos_p1]   ; the north cave: the first met coming from Limansk
 men             = 3, 4
 [raid_hos_p2]   ; lower floor, the big hall
-[raid_hos_p3]   ; lower floor, the south hall by the medic's room
+[raid_hos_p3]   ; lower floor, the wide room north of the big hall (not by the medic: he was shot at once)
 [raid_hos_p4]   ; south, before the exit to ChNPP
 men             = 3, 4
-[raid_hos_route] ; a loop on the lower floor
+[raid_hos_route] ; a loop on the lower floor, from the big hall's north end up
 
 ; ChNPP North (veterans and masters, no more than 30-35 men): snipers on their three smarts' roofs, patrols between
 ; the camps
