@@ -340,6 +340,9 @@ namespace coop
 			g_dying_remotely = id;
 			creature->on_death(creature);
 			g_dying_remotely = u16(-1);
+			// what its game object kept was a live one's (its plans, its memory): a body coming online with it
+			// read past it and crashed (a death replayed from the journal onto the save)
+			creature->client_data.clear();
 			if (placed)
 				place_body(creature, place);
 		}
