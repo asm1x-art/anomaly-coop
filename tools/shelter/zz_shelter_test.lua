@@ -239,6 +239,7 @@ function on_game_start()
 			{ "DIK_F6", "F6", "синтез: дальше, к камерам", push_synthesis },
 			{ "DIK_INSERT", "Ins", "убрать завалы", clear_rubble },
 			{ "DIK_END", "End", "тайник: все вещи паков", fill_stash },
+			{ "DIK_PRIOR", "PgUp", "событие бара (по кругу)", function() msg("Событие: " .. tostring(shelter_events.force())) end },
 		},
 	})
 	-- digging: 8 strokes a shovel, not 40

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<string id="st_shelter_ev_rumour">
+		<text>A tale at the counter. A tipsy visitor let slip someone else's stash to the barman, who remembered the place: marked on the PDA.</text>
+	</string>
+	<string id="st_shelter_ev_rumour_hint">
+		<text>A rumour from the bar "Radar-1": someone left a box here and never came back.</text>
+	</string>
+	<string id="st_shelter_ev_quarrel_fight">
+		<text>A fight in the bar: %s and %s went at each other: chairs and glasses broken, the repairs took %s RU from the till. The bar's name has suffered.</text>
+	</string>
+	<string id="st_shelter_ev_quarrel_calm">
+		<text>A quarrel in the bar: %s and %s grabbed each other, but the barman sat them at different tables. No shots fired.</text>
+	</string>
+	<string id="st_shelter_ev_spender">
+		<text>A spree. A squad back from the North with loot drank till morning: +%s RU in the till, and people talk about the bar.</text>
+	</string>
+	<string id="st_shelter_ev_gift">
+		<text>A gift. A regular left the group a "thanks for the shelter": %s, in the shelter's stash.</text>
+	</string>
+	<string id="st_shelter_ev_gift_money">
+		<text>A gift. A regular left the group a "thanks for the shelter": %s RU in the till.</text>
+	</string>
+	<string id="st_shelter_ev_wounded_saved">
+		<text>A wounded man at the door: %s crawled to the bar, covered in blood. Shov stitched him up: he paid %s RU, and his mates won't forget it.</text>
+	</string>
+	<string id="st_shelter_ev_wounded_died">
+		<text>A wounded man at the door: %s crawled to the bar, covered in blood. Nobody could help: he died on the doorstep. The shelter needs a medic.</text>
+	</string>
+	<string id="st_shelter_ev_binge">
+		<text>Shurup is on a binge. Bottles gone from the store: %s. The workshop is closed for another %s hours.</text>
+	</string>
+	<string id="st_shelter_ev_fac_dolg">
+		<text>a Duty man</text>
+	</string>
+	<string id="st_shelter_ev_fac_freedom">
+		<text>a Freedom man</text>
+	</string>
+	<string id="st_shelter_ev_fac_stalker">
+		<text>a loner</text>
+	</string>
+	<string id="st_shelter_ev_fac_csky">
+		<text>a Clear Sky man</text>
+	</string>
+	<string id="st_shelter_ev_fac_ecolog">
+		<text>a scientist</text>
+	</string>
+	<string id="st_shelter_ev_fac_killer">
+		<text>a mercenary</text>
+	</string>
+</string_table>

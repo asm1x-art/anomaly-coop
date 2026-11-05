@@ -316,7 +316,7 @@ local function refill_generator()
 end
 
 local function repair(hours)
-	if not has_tech() or level.name() ~= LEVEL then
+	if not has_tech() or level.name() ~= LEVEL or shelter_events.tech_off() then -- a binge: no repairs (shelter_events)
 		return
 	end
 	local due = (tonumber(shelter.state("repair_due", 0)) or 0) + hours

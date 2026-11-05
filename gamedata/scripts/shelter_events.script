@@ -1,0 +1,270 @@
+-- The shelter's events (Notion: "”бежище: событи€ бара и обитателей Ч план"; every number: mod_system_shelter_events.ltx,
+-- texts: st_shelter_events.xml): now and then something happens in the bar or with the people living there. Text only:
+-- a line in the trade's news (shelter_trade.announce), which every game of the group shows once as PDA news. The world's
+-- hours (shelter_trade.hours()) are the clock: the next event comes gap_min..gap_max hours after the last one, drawn by
+-- weight among those whose needs are met and whose own cooldown is over. Only the simulation master (or the single game)
+-- draws and changes the world: the till, the bar's name, the store, the stash. A stash tip is Anomaly's own stash with
+-- its PDA mark (co-op shares the reveal with everyone, coop_sync).
+-- The world's (shelter.state): event_next, event_last_<id>, tech_drunk_until.
+
+local S = "shelter_events"
+local CHECK_MS = 5000
+
+local function list(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function sec(id)
+	return "shelter_event_" .. id
+end
+
+local function num(id, key, default)
+	return ini_sys:r_float_ex(sec(id), key) or default
+end
+
+-- a whole number from <key>_min to <key>_max
+local function roll(id, key)
+	local a = math.floor(num(id, key .. "_min", 0))
+	local b = math.floor(num(id, key .. "_max", a))
+	return math.random(math.min(a, b), math.max(a, b))
+end
+
+local function pick(t)
+	return t[math.random(#t)]
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function master()
+	return not in_coop() or coop.is_sim_master()
+end
+
+local function hours()
+	return shelter_trade.hours()
+end
+
+local function rep_add(delta)
+	local rep = math.max(0, math.min(100, shelter_trade.reputation() + delta))
+	shelter.set_state("bar_rep", math.floor(rep * 10 + 0.5) / 10)
+end
+
+local function say(id, args, effect)
+	shelter_trade.announce(id, args, effect)
+end
+
+-------------------------------------------------------------------------------
+-- who has to be there for an event
+
+local NEEDS = {
+	barman = function() return shelter_trade.barman() ~= nil end,
+	tech = function() return shelter_base.has_tech() end,
+	medic = function() return shelter_base.has_medic() end,
+}
+
+local function needs_met(id)
+	for _, need in ipairs(list(ini_sys:r_string_ex(sec(id), "needs"))) do
+		if not (NEEDS[need] and NEEDS[need]()) then
+			return false
+		end
+	end
+	return true
+end
+
+local function ready(id, t)
+	if not needs_met(id) then
+		return false
+	end
+	local last = tonumber(shelter.state("event_last_" .. id, nil))
+	return not last or t - last >= num(id, "cooldown", 48)
+end
+
+-- the technician drinks: no repairs till then (shelter_base.script)
+function tech_off()
+	return (tonumber(shelter.state("tech_drunk_until", nil)) or -1) > hours()
+end
+
+-------------------------------------------------------------------------------
+-- the events
+
+local RUN = {}
+
+-- a visitor let slip a stash: one of Anomaly's stashes filled and marked
+function RUN.rumour(id)
+	treasure_manager.create_random_stash(nil, game.translate_string("st_shelter_ev_rumour_hint"))
+	say("st_shelter_ev_rumour")
+end
+
+-- two of different factions at the bar: a fight (the till pays the damage, the bar's name suffers) or the barman calms
+-- them; with the perimeter's truce fights are rarer
+function RUN.quarrel(id)
+	local pair = str_explode(pick(list(ini_sys:r_string_ex(sec(id), "pairs"))), ":")
+	local a, b = "#st_shelter_ev_fac_" .. pair[1], "#st_shelter_ev_fac_" .. (pair[2] or pair[1])
+	local chance = shelter_base.perimeter_built() and num(id, "fight_chance_truce", 0.2) or num(id, "fight_chance", 0.5)
+	if math.random() < chance then
+		local damage = math.min(roll(id, "damage"), shelter_trade.till_money())
+		if damage > 0 then
+			shelter_trade.pay_from_till(damage)
+		end
+		rep_add(-num(id, "rep_fight", 3))
+		say("st_shelter_ev_quarrel_fight", { a, b, damage })
+	else
+		rep_add(num(id, "rep_calm", 0.5))
+		say("st_shelter_ev_quarrel_calm", { a, b })
+	end
+end
+
+-- a squad back from the North drinks to it
+function RUN.spender(id)
+	local money = roll(id, "money")
+	shelter_trade.deposit_till(money)
+	rep_add(num(id, "rep", 1))
+	say("st_shelter_ev_spender", { money })
+end
+
+-- a regular leaves something for the group: into the shelter's stash, else money into the till
+function RUN.gift(id)
+	local stash = alife_object(shelter.state("stash_id", 65535) or 65535)
+	if stash then
+		local item = pick(list(ini_sys:r_string_ex(sec(id), "items")))
+		shelter.everyones(function()
+			alife_create_item(item, stash)
+		end)
+		say("st_shelter_ev_gift", { "@" .. item })
+	else
+		local money = math.floor(num(id, "money", 5000))
+		shelter_trade.deposit_till(money)
+		say("st_shelter_ev_gift_money", { money })
+	end
+end
+
+-- a wounded stalker at the bar's door: the medic saves him (his faction thanks the group, he pays), or he dies there
+function RUN.wounded(id)
+	local faction = pick(list(ini_sys:r_string_ex(sec(id), "factions")))
+	if shelter_base.has_medic() then
+		local fee = roll(id, "fee")
+		shelter_trade.deposit_till(fee)
+		rep_add(num(id, "rep_saved", 2))
+		say("st_shelter_ev_wounded_saved", { "#st_shelter_ev_fac_" .. faction, fee },
+			{ faction = faction, delta = math.floor(num(id, "goodwill", 50)) })
+	else
+		rep_add(-num(id, "rep_died", 1))
+		say("st_shelter_ev_wounded_died", { "#st_shelter_ev_fac_" .. faction })
+	end
+end
+
+-- the technician drinks: bottles of vodka gone from the store (the ledger first, then the boxes), no repairs for hours
+function RUN.binge(id)
+	local drinks, left = {}, roll(id, "bottles")
+	for _, s in ipairs(list(ini_sys:r_string_ex(sec(id), "drinks"))) do
+		drinks[s] = true
+	end
+	local want = left
+	local ledger = shelter_trade.ledger()
+	for s in pairs(drinks) do
+		local n = math.min(left, ledger[s] or 0)
+		if n > 0 then
+			shelter_trade.ledger_add(s, -n)
+			left = left - n
+		end
+	end
+	if left > 0 then
+		local gone = {}
+		for _, g in ipairs(shelter_trade.stock()) do
+			if left > 0 and drinks[g.section] then
+				gone[#gone + 1] = g.se
+				left = left - 1
+			end
+		end
+		shelter.everyones(function()
+			for _, se in ipairs(gone) do
+				alife_release(se)
+			end
+		end)
+	end
+	local h = math.floor(num(id, "hours", 24))
+	shelter.set_state("tech_drunk_until", hours() + h)
+	say("st_shelter_ev_binge", { want - left, h })
+end
+
+-------------------------------------------------------------------------------
+-- the draw
+
+local function fire(id)
+	shelter.set_state("event_last_" .. id, hours())
+	local ok, err = pcall(RUN[id], id)
+	if not ok then
+		printf("! shelter_events: %s: %s", id, tostring(err))
+	elseif get_console():get_integer("coop_debug") == 1 then
+		printf("[shelter_events] %s at hour %s", id, hours())
+	end
+end
+
+local function gap(t)
+	local a, b = ini_sys:r_float_ex(S, "gap_min") or 20, ini_sys:r_float_ex(S, "gap_max") or 40
+	return t + a + math.random() * (b - a)
+end
+
+local function tick()
+	local t = hours()
+	local nxt = tonumber(shelter.state("event_next", nil))
+	if not nxt then
+		shelter.set_state("event_next", gap(t))
+		return
+	elseif t < nxt then
+		return
+	end
+	shelter.set_state("event_next", gap(t))
+	local pool, sum = {}, 0
+	for _, id in ipairs(list(ini_sys:r_string_ex(S, "list"))) do
+		if RUN[id] and ready(id, t) then
+			local w = num(id, "weight", 1)
+			pool[#pool + 1], sum = { id = id, w = w }, sum + w
+		end
+	end
+	local r = math.random() * sum
+	for _, e in ipairs(pool) do
+		r = r - e.w
+		if r <= 0 then
+			return fire(e.id)
+		end
+	end
+end
+
+-- tests: an event now, whatever its needs and cooldown (an id, or the next one of the list in a ring); its id
+function force(id)
+	if not id then
+		local ids = list(ini_sys:r_string_ex(S, "list"))
+		local i = (load_var(db.actor, "shelter_events_test", 0) or 0) % #ids + 1
+		save_var(db.actor, "shelter_events_test", i)
+		id = ids[i]
+	end
+	if RUN[id] then
+		fire(id)
+	end
+	return id
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	if master() and ini_sys:r_bool_ex(S, "enabled", true) then
+		tick()
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end
