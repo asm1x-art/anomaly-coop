@@ -12,6 +12,7 @@
 #include "Actor.h"
 
 #include <chrono>
+#include <mutex>
 
 namespace coop
 {
@@ -88,9 +89,28 @@ namespace coop
 	static u64 g_applied = 0;      // what we set last; 0: not yet in this level
 	static u32 g_last_init = 0, g_last_log = 0;
 
+	static double target_at(double real)
+	{
+		return g_anchor_game + (g_running ? double(g_factor) * (real - g_anchor_real) : 0.);
+	}
+
 	static double target()
 	{
-		return g_anchor_game + (g_running ? double(g_factor) * (real_ms() - g_anchor_real) : 0.);
+		return target_at(real_ms());
+	}
+
+	// the newest M_TIME from the socket's thread
+	static std::mutex g_inbox_lock;
+	static xr_vector<u8> g_inbox;
+	static double g_inbox_at = 0;
+	static bool g_inbox_new = false;
+
+	void receive_time(const u8* data, u32 size)
+	{
+		std::lock_guard<std::mutex> lock(g_inbox_lock);
+		g_inbox.assign(data, data + size);
+		g_inbox_at = real_ms();
+		g_inbox_new = true;
 	}
 
 	static CALifeTimeManager* time_manager()
@@ -108,8 +128,11 @@ namespace coop
 		return buf;
 	}
 
-	void on_time(NET_Packet& P)
+	// received: real_ms() when it came
+	static void on_time(NET_Packet& P, double received)
 	{
+		u16 type;
+		P.r_begin(type);
 		const u64 game = P.r_u64();
 		const float factor = P.r_float();
 		const u8 flags = P.r_u8();
@@ -122,24 +145,23 @@ namespace coop
 			return;
 		}
 		// our own jump or factor isn't in this one yet
-		if (real_ms() < g_hold_until)
+		if (received < g_hold_until)
 		{
 			if (epoch <= g_hold_epoch && (g_hold_factor == 0.f || !fsimilar(factor, g_hold_factor)))
 				return;
 			g_hold_until = 0;
 		}
 		const bool running = (flags & eTimeRunning) != 0;
-		// it left the server half a round trip ago
-		const double now = real_ms();
-		const double game_now = double(game) + (running ? double(factor) * ping_ms() / 2. : 0.);
+		// it left the server half a round trip before it came
+		const double game_then = double(game) + (running ? double(factor) * ping_ms() / 2. : 0.);
 		const bool changed = !g_set || running != g_running || !fsimilar(factor, g_factor) || epoch != g_epoch;
-		const double off = game_now - target();
+		const double off = game_then - target_at(received);
 		if (changed || _abs(off) > settings().drift_tolerance_ms * factor)
 		{
 			if (debug_mode && g_set)
 				Msg("[coop dbg] clock: server time taken, %+.0f game ms off%s", off, changed ? " (changed)" : "");
-			g_anchor_game = game_now;
-			g_anchor_real = now;
+			g_anchor_game = game_then;
+			g_anchor_real = received;
 		}
 		g_set = true;
 		g_running = running;
@@ -149,6 +171,10 @@ namespace coop
 
 	void reset_time()
 	{
+		{
+			std::lock_guard<std::mutex> lock(g_inbox_lock);
+			g_inbox_new = false;
+		}
 		g_known = g_set = g_running = false;
 		g_epoch = g_hold_epoch = 0;
 		g_hold_until = 0;
@@ -157,6 +183,26 @@ namespace coop
 
 	void update_time()
 	{
+		{
+			xr_vector<u8> msg;
+			double at = 0;
+			{
+				std::lock_guard<std::mutex> lock(g_inbox_lock);
+				if (g_inbox_new)
+				{
+					msg.swap(g_inbox);
+					at = g_inbox_at;
+					g_inbox_new = false;
+				}
+			}
+			if (!msg.empty())
+			{
+				NET_Packet P;
+				P.construct(msg.data(), (u32)msg.size());
+				on_time(P, at);
+			}
+		}
+
 		CALifeTimeManager* tm = time_manager();
 		if (!tm || !g_pGameLevel || !runs_shared_world() || !world_ready())
 		{

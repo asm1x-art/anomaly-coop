@@ -10,7 +10,9 @@ class NET_Packet;
 
 namespace coop
 {
-	void on_time(NET_Packet& P); // M_TIME
+	// M_TIME, on the socket's thread: kept with the moment it came (the newest only), taken by update_time; a
+	// message waiting in the queue while a level loads would otherwise count as new when it is read
+	void receive_time(const u8* data, u32 size);
 	void update_time();          // per frame
 	void reset_time();           // disconnected
 

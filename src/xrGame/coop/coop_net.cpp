@@ -318,6 +318,11 @@ namespace coop
 			if (!recv_all(msg.data(), size))
 				break;
 
+			if (*(const u16*)msg.data() == M_TIME)
+			{
+				receive_time(msg.data(), size); // the newest only, with the moment it came (coop_time.h)
+				continue;
+			}
 			std::lock_guard<std::mutex> lock(m_inbox_lock);
 			m_inbox.push_back(std::move(msg));
 		}
@@ -492,9 +497,6 @@ namespace coop
 			break;
 		case M_FACT:
 			on_fact(P);
-			break;
-		case M_TIME:
-			on_time(P);
 			break;
 		case M_ACTOR_ACTION:
 		{
