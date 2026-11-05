@@ -1,0 +1,277 @@
+-- Co-op: what a player leaves behind stays a while, and the dead with nothing worth taking go (settings:
+-- mod_system_coop.ltx [coop_cleanup]).
+-- Keeping: when a player leaves the world or saves, the server tells the sim master (the host) where they stood
+-- (event "coop_protect"); bodies and boxes within protect_radius holding things worth valuable_price or more are
+-- kept from the game's own cleanup (release_body_manager and the rest, which go through safe_release_manager or
+-- alife_release) for protect_hours of the world's time. The kept ids and until when are a fact on the server
+-- ("coop_keep"), so every game knows them.
+-- Cleaning: the host, every clean_interval_s, releases bodies with nothing worth taking (no things, or junk only:
+-- cheaper than junk_price, a section matching junk_sections, worn below junk_condition) that are not kept, not
+-- a story's, not on a level with a player (nor near one), beyond keep_bodies_per_level on their level, at most max_per_pass per level each time.
+
+local S = "coop_cleanup"
+local FACT = "coop_keep"
+local NO_PARENT = 65535
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] cleanup: " .. fmt, ...)
+	end
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+-- the world's game hours (the server's clock)
+local function hours()
+	local ms = coop.clock and coop.clock() or 0
+	if ms <= 0 then
+		ms = game.time()
+	end
+	return ms / 3600000
+end
+
+----------------------------------------------------------------------------------------------------
+-- What is kept: id -> until (hours), as the fact has it
+
+local keep_text, keep = nil, {}
+
+local function kept()
+	local text = in_coop() and coop.fact(FACT) or ""
+	if text ~= keep_text then
+		keep_text, keep = text, {}
+		for id, till in string.gmatch(text, "(%d+)=([%d%.]+)") do
+			keep[tonumber(id)] = tonumber(till)
+		end
+	end
+	return keep
+end
+
+function is_kept(id)
+	local till = id and kept()[id]
+	return till ~= nil and till > hours()
+end
+
+local function save_keep(map)
+	local now, list = hours(), {}
+	for id, till in pairs(map) do
+		if till > now then
+			list[#list + 1] = { id = id, till = till }
+		end
+	end
+	table.sort(list, function(a, b) return a.till > b.till end)
+	local parts = {}
+	for i = 1, math.min(#list, num("max_kept", 400)) do
+		parts[i] = string.format("%d=%.2f", list[i].id, list[i].till)
+	end
+	coop.report_fact(FACT, table.concat(parts, ";"))
+end
+
+----------------------------------------------------------------------------------------------------
+-- Things and what they are worth
+
+local JUNK = nil
+
+local function junk_sections()
+	if not JUNK then
+		JUNK = {}
+		for _, v in ipairs(str_explode(ini_sys:r_string_ex(S, "junk_sections") or "", ",")) do
+			if v ~= "" then
+				JUNK[#JUNK + 1] = v
+			end
+		end
+	end
+	return JUNK
+end
+
+-- what a thing is worth to someone looting, 0 for junk
+local function worth(se_item)
+	local section = se_item:section_name()
+	local cost = ini_sys:r_float_ex(section, "cost") or 0
+	if cost < num("junk_price", 300) then
+		return 0
+	end
+	for _, pattern in ipairs(junk_sections()) do
+		if string.find(section, pattern, 1, true) then
+			return 0
+		end
+	end
+	local obj = level.object_by_id(se_item.id) -- online here: its condition
+	if obj and obj.condition and obj:condition() < num("junk_condition", 0.25) then
+		return 0
+	end
+	return cost
+end
+
+local function level_of(se_obj)
+	return alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+end
+
+local function is_body(se_obj)
+	local cls = se_obj:clsid()
+	return (IsStalker(nil, cls) or IsMonster(nil, cls)) and not se_obj:alive()
+end
+
+local function is_box(se_obj)
+	return IsInvbox(nil, se_obj:clsid()) and not string.find(se_obj:section_name(), "^coop_")
+end
+
+-- holders that match: id -> { se, worth = 0 }; then each thing on one adds its worth
+local function holders(match)
+	local sim = alife()
+	local out = {}
+	for id = 1, NO_PARENT - 1 do
+		local se = sim:object(id)
+		if se and match(se) then
+			out[id] = { se = se, worth = 0, things = 0 }
+		end
+	end
+	for id = 1, NO_PARENT - 1 do
+		local se = sim:object(id)
+		local h = se and se.parent_id ~= NO_PARENT and out[se.parent_id]
+		if h then
+			h.worth = h.worth + worth(se)
+			h.things = h.things + 1
+		end
+	end
+	return out
+end
+
+----------------------------------------------------------------------------------------------------
+-- Keeping what is near a player who left or saved (the sim master)
+
+local function protect_near(sender, payload)
+	if not (in_coop() and coop.is_sim_master()) then
+		return
+	end
+	local f = str_explode(payload, "\t")
+	local lname, pos, who = f[1], vector():set(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0), f[5] or "?"
+	local radius, price = num("protect_radius", 50), num("valuable_price", 3000)
+	local found = holders(function(se)
+		return (is_body(se) or is_box(se)) and se.position:distance_to(pos) <= radius and level_of(se) == lname
+	end)
+	local map, till, count = {}, hours() + num("protect_hours", 24), 0
+	for id, v in pairs(kept()) do
+		map[id] = v
+	end
+	for id, h in pairs(found) do
+		if h.worth >= price then
+			map[id] = math.max(map[id] or 0, till)
+			count = count + 1
+			dbg("%s keeps %s (%s), worth %s", who, h.se:section_name(), id, h.worth)
+		end
+	end
+	if count > 0 then
+		save_keep(map)
+	end
+	printf("[coop] %s left or saved on %s: %s body(ies) and box(es) with good things kept for %s h", who, lname, count,
+		num("protect_hours", 24))
+end
+
+----------------------------------------------------------------------------------------------------
+-- The host's cleaner
+
+local next_clean = 0
+
+local function near_player(se, lname, distance)
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lname and p.position:distance_to(se.position) < distance then
+			return true
+		end
+	end
+	return false
+end
+
+local function clean()
+	local sim = alife()
+	local bodies = holders(is_body)
+	local per_level = {}
+	for id, h in pairs(bodies) do
+		local lname = level_of(h.se)
+		per_level[lname] = per_level[lname] or { count = 0, junk = {} }
+		local l = per_level[lname]
+		l.count = l.count + 1
+		if h.worth == 0 and not is_kept(id) and not get_object_story_id(id) then
+			l.junk[#l.junk + 1] = h
+		end
+	end
+	local keep_n, max_n, distance = num("keep_bodies_per_level", 5), num("max_per_pass", 10), num("min_player_distance", 200)
+	local released = 0
+	for lname, l in pairs(per_level) do
+		-- a level with a player on it is theirs (its authority's), not the host's
+		local n = coop.is_authority(lname) and math.min(#l.junk, l.count - keep_n, max_n) or 0
+		for i = 1, #l.junk do
+			if n <= 0 then
+				break
+			end
+			local h = l.junk[i]
+			if not near_player(h.se, lname, distance) then
+				dbg("releases %s (%s) on %s, %s junk thing(s)", h.se:section_name(), h.se.id, lname, h.things)
+				safe_release_manager.release(h.se)
+				n = n - 1
+				released = released + 1
+			end
+		end
+	end
+	if released > 0 then
+		printf("[coop] cleanup: %s body(ies) with nothing worth taking released", released)
+	end
+	-- the kept ones whose time is over drop out of the fact
+	local map, over = kept(), false
+	local now = hours()
+	for _, till in pairs(map) do
+		if till <= now then
+			over = true
+		end
+	end
+	if over then
+		save_keep(map)
+	end
+end
+
+local function update()
+	if not (in_coop() and coop.is_host() and coop.is_sim_master()) then
+		return
+	end
+	local now = time_global()
+	if now < next_clean then
+		return
+	end
+	next_clean = now + num("clean_interval_s", 300) * 1000
+	if num("cleaner", 1) == 1 then
+		clean()
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	-- the game's own cleanup leaves kept ones be
+	local release = safe_release_manager.release
+	safe_release_manager.release = function(se_obj)
+		if se_obj and in_coop() and is_kept(se_obj.id) then
+			dbg("%s (%s) is kept: not released", se_obj:section_name(), se_obj.id)
+			return
+		end
+		return release(se_obj)
+	end
+	local alife_release_ = _G.alife_release
+	_G.alife_release = function(se_obj, ...)
+		local id = se_obj and (type(se_obj.id) == "function" and se_obj:id() or se_obj.id)
+		if id and in_coop() and is_kept(id) then
+			dbg("%s is kept: not released", id)
+			return nil
+		end
+		return alife_release_(se_obj, ...)
+	end
+	coop_sync.on_event("coop_protect", protect_near)
+	RegisterScriptCallback("actor_on_update", update)
+end

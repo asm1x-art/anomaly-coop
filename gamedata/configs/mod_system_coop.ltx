@@ -332,3 +332,20 @@ reselect_weather_s   = 600   ; game s: a step of the clock this big (coming into
 hold_ms              = 3000  ; real ms: after our own jump, how long older news from the server are ignored
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
+
+; Co-op: what a player leaves behind (coop_cleanup.script). As a player leaves the world or saves, bodies and boxes
+; near them with good things are kept from the game's cleanup for a while; the host releases bodies with nothing
+; worth taking. Times are the world's game hours; prices are the items' "cost".
+[coop_cleanup]
+protect_radius        = 50    ; m around where the player stood
+protect_hours         = 24    ; game hours a body or box with good things is kept
+valuable_price        = 3000  ; worth of its non-junk things (summed) from which a body or box is kept
+max_kept              = 400   ; at most this many kept at once (the newest stay)
+junk_price            = 300   ; a thing cheaper than this is junk
+junk_condition        = 0.25  ; a thing worn below this is junk (seen only when it is online on the host)
+junk_sections         =       ; comma-separated parts of section names that are always junk (empty mags...)
+cleaner               = 1     ; 1: the host releases bodies with nothing worth taking; 0: it doesn't
+clean_interval_s      = 300   ; real s between the host's cleaner passes
+keep_bodies_per_level = 5     ; a level keeps this many bodies even with nothing on them
+max_per_pass          = 10    ; at most this many released per level each pass
+min_player_distance   = 200   ; m: no body this close to a player goes (on a player's level none go at all)
