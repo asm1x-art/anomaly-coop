@@ -106,6 +106,9 @@
 	<string id="ui_mm_coop_status_refused_full">
 		<text>The server is full.</text>
 	</string>
+	<string id="ui_mm_coop_status_refused_build">
+		<text>The server does not let this build of the game in: update it with the launcher.</text>
+	</string>
 	<string id="ui_mm_coop_status_refused_version">
 		<text>The server runs another version: update the game or the server.</text>
 	</string>

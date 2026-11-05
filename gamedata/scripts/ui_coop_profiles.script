@@ -4,6 +4,9 @@
 -- server: no world there -> the new game screen creates it, or we wait while another player does; a world
 -- without our character -> the new game screen makes one; our character is there -> the world loads by
 -- itself (src/xrGame/coop/coop_save.cpp).
+-- Started by the launcher (-coop_auto, anomaly-coop-launcher), the screen opens by itself and enters the profile
+-- on top, which the launcher put there; how it goes is written to <profile folder>\coop_launch_status.txt for the
+-- launcher to tell the player after the game closes.
 
 local FILE = "coop_profiles.txt"
 local DEFAULT_SERVER = "localhost:7777"
@@ -57,6 +60,28 @@ local function remember(list, name, server)
 end
 
 local shown = false
+
+-- one word for the launcher: connecting, refused_full, refused_version, refused_build, failed, creating_world,
+-- making_character, waiting_world, loading, in_world
+function launch_status(status)
+	if not coop.auto_launch() then
+		return
+	end
+	local f = io.open(getFS():update_path("$app_data_root$", "coop_launch_status.txt"), "w")
+	if f then
+		f:write(status, "\n")
+		f:close()
+	end
+end
+
+-- in the world: the launcher knows the start went through
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", function()
+		if coop.connected() then
+			launch_status("in_world")
+		end
+	end)
+end
 
 -- the screen is up and follows a connection itself
 function is_shown()
@@ -212,6 +237,7 @@ function UICoopProfiles:OnEnter()
 	coop.connect(host, tonumber(port) or 7777, name, "")
 	self.connect_started = device():time_continual()
 	self:SetStatus("ui_mm_coop_status_connecting", server)
+	launch_status("connecting")
 end
 
 -- off the server, staying in the menu (leaving the game does it by itself: coop_save.cpp on_leaving_level)
@@ -243,8 +269,9 @@ function UICoopProfiles:Update()
 		if not coop.link_up() or device():time_continual() - self.connect_started > CONNECT_TIMEOUT_MS then
 			self.connect_started = nil
 			coop.disconnect()
-			local refused = coop.refused() -- "full", "version" or ""
+			local refused = coop.refused() -- "full", "version", "build" or ""
 			self:SetStatus(refused ~= "" and "ui_mm_coop_status_refused_" .. refused or "ui_mm_coop_status_failed")
+			launch_status(refused ~= "" and "refused_" .. refused or "failed")
 		end
 		return
 	end
@@ -252,14 +279,17 @@ function UICoopProfiles:Update()
 	local status = coop.world_status()
 	if status == "none" or status == "no_character" then
 		-- the new game screen creates the world or makes our character (modxml_coop_menu.script)
+		launch_status(status == "none" and "creating_world" or "making_character")
 		self:Close()
 		self.owner:ShowFactionUI()
 	elseif status == "being_created" then
 		self:SetStatus("ui_mm_coop_status_being_created", coop.world_creator())
+		launch_status("waiting_world")
 	elseif status == "exists" then
 		self.connect_started = nil
 		self.loading = true
 		self:SetStatus("ui_mm_coop_status_loading")
+		launch_status("loading")
 	end
 end
 
