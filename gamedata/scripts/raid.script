@@ -32,9 +32,13 @@ function get_levels()
 	end
 	for _, name in ipairs(str_explode(ini:r_string_ex("levels", "order"), ",")) do
 		local l = { name = name, original = ini:r_string_ex(name, "original") }
-		local texture = ini:r_string_ex(name, "map_texture")
+		local texture, bounds = ini:r_string_ex(name, "map_texture"), ini:r_string_ex(name, "map_bounds")
+		if not texture then -- no PDA map (the Sarcophagus): a plan of its own (tools\raid\raid_plan.py), [raid_plans]
+			local plan = str_explode(ini_sys:r_string_ex("raid_plans", name) or "", "|")
+			texture, bounds = plan[2] and plan[1], plan[2]
+		end
 		if texture then
-			local b = str_explode(ini:r_string_ex(name, "map_bounds"), ",")
+			local b = str_explode(bounds, ",")
 			l.map = { texture = texture, x1 = tonumber(b[1]), z1 = tonumber(b[2]), x2 = tonumber(b[3]), z2 = tonumber(b[4]) }
 		end
 		levels.order[#levels.order + 1] = name
