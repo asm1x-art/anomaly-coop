@@ -2,7 +2,7 @@ import net from 'node:net';
 import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
 import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
-  TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
+  EXIT_SAVE_NAME, TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText, FACTIONS } from './settings.js';
 import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
@@ -64,6 +64,7 @@ autosave_minutes=${autosaveMinutes}`));
   // pauseWhenEmpty: the host's world stands while no player is in it (time in the Zone runs many times faster);
   // only the host is told, the players' games never run an empty world
   let emptyPaused = false;
+  let saveWhileEmpty = false; // the host goes on for a save asked while the world stood empty
   const updateEmptyPause = () => {
     const hostClient = hostId === null ? null : clients.get(hostId);
     const empty = pauseWhenEmpty && !!hostClient?.inWorld && !pausedBy && !players().some(([, c]) => c.inWorld);
@@ -249,6 +250,12 @@ autosave_minutes=${autosaveMinutes}`));
   const requestSave = (reason, who, name = '') => {
     const master = clients.get(masterId());
     if (!master?.inWorld) return false;
+    // the host stands while the world is empty: it goes on for the save, then stands again (WORLD_DONE)
+    if (emptyPaused && master.host) {
+      emptyPaused = false;
+      saveWhileEmpty = true;
+      master.send(M.PAUSED, Buffer.concat([Buffer.from([0]), stringZ('')]));
+    }
     for (const c of clients.values()) if (c.inWorld) c.send(M.PROGRESS_REQUEST);
     master.send(M.SAVE_NOW, Buffer.concat([stringZ(name), stringZ(reason), stringZ(who)]));
     return true;
@@ -260,7 +267,7 @@ autosave_minutes=${autosaveMinutes}`));
   const savesPayload = (name) => {
     const list = storage.characterSaves(name).slice(0, MAX_SAVES_LISTED);
     return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.id), u32(Math.floor(m.time / 1000)),
-      stringZ(m.name), stringZ(m.group ? 'group' : m.name ? 'named' : 'quick'), stringZ(m.by), u32(0)]))]);
+      stringZ(m.name), stringZ(m.exit ? 'exit' : m.group ? 'group' : m.name ? 'named' : 'quick'), stringZ(m.by), u32(0)]))]);
   };
   // a snapshot: u32 size, the record; u32 size, the progress; the things
   const splitSnapshot = (data) => {
@@ -271,16 +278,66 @@ autosave_minutes=${autosaveMinutes}`));
   };
   // the character as the save has it: record, progress, and its things for its next download; a game running the
   // world loads it again
-  const putBack = (name, snapshot) => {
+  // What the character took since the save (TAKEN) comes after the things: those things go back where they were
+  // taken from (coop_world.cpp restore_things).
+  const putBack = (name, snapshot, since) => {
     const { record, progress, things } = splitSnapshot(snapshot);
     storage.saveCharacter(name, Buffer.from(record));
     if (progress.length) storage.saveProgress(name, Buffer.from(progress));
-    storage.setThings(name, Buffer.from(things));
+    const taken = storage.taken(name).filter((e) => e.time > since);
+    storage.setThings(name, Buffer.concat([things.length ? things : u16(0), u16(taken.length),
+      ...taken.map((e) => Buffer.concat([u16(e.message.length), e.message]))]));
     const found = players().find(([, c]) => c.name === name);
-    if (!found?.[1].inWorld) return;
-    found[1].send(M.CHARACTER, record);
+    if (!found) return;
+    found[1].send(M.CHARACTER, record); // a game in the menu loads the world with it
+    if (!found[1].inWorld) return;
     found[1].send(M.WORLD_RELOAD);
     found[1].send(M.WORLD_INFO, worldInfo());
+  };
+
+  // A player who leaves the world (to the menu, quitting, a lost connection) gets an exit save: their record and
+  // progress as the server has them, and the things the host's world has in their shadow (EXIT_THINGS_REQUEST;
+  // none without a host). One per character, made anew each time; next time in they choose (SAVE_CHOICE).
+  const EXIT_THINGS_WAIT_MS = 15000;
+  const exits = new Map(); // save id -> { name, record, progress, data, got, timer }
+  const writeExitSave = (saveId, things) => {
+    const pending = exits.get(saveId);
+    if (!pending) return;
+    exits.delete(saveId);
+    clearTimeout(pending.timer);
+    const { name, record, progress } = pending;
+    const meta = { id: saveId, time: Date.now(), name: EXIT_SAVE_NAME, by: name, group: null, exit: true };
+    for (const old of storage.characterSaves(name)) if (old.exit) storage.deleteCharacterSave(name, old.id);
+    storage.saveCharacterSave(name, meta, Buffer.concat([u32(record.length), record, u32(progress.length), progress,
+      things ?? u16(0)]));
+    log(`'${name}' left: exit save ${saveId}${things ? '' : ' (no things from the host)'}`);
+  };
+  const makeExitSave = (name) => {
+    const record = storage.character(name);
+    if (!record) return;
+    const saveId = storage.nextCharacterSaveId();
+    exits.set(saveId, { name, record, progress: storage.progress(name) ?? Buffer.alloc(0), data: null, got: 0,
+      timer: setTimeout(() => writeExitSave(saveId, null), EXIT_THINGS_WAIT_MS).unref() });
+    const hostClient = hostId === null ? null : clients.get(hostId);
+    if (hostClient?.inWorld) hostClient.send(M.EXIT_THINGS_REQUEST, Buffer.concat([u32(saveId), stringZ(name)]));
+    else writeExitSave(saveId, null);
+  };
+  // The sim master keeps bodies and boxes with good things near where a player left or saved from the game's
+  // cleanup for a while (coop_cleanup.script): a script event from the server, "level\tx\ty\tz\tname"
+  const protectNear = (c) => {
+    if (!c.state) return;
+    const level = readStringZ(c.state, 0);
+    const at = c.state.indexOf(0) + 1;
+    const [x, y, z] = [0, 4, 8].map((o) => c.state.readFloatLE(at + o));
+    const master = clients.get(masterId());
+    if (!master?.inWorld || master === c) return;
+    master.send(M.SCRIPT_EVENT, Buffer.concat([u32(0), stringZ('coop_protect'),
+      stringZ([level, x.toFixed(2), y.toFixed(2), z.toFixed(2), c.name].join('\t'))]));
+  };
+  // what's left of a player in the world as they go out of it
+  const leaving = (c) => {
+    protectNear(c);
+    makeExitSave(c.name);
   };
 
   // Votes: everyone in the world agrees (the one who asks does), within VOTE_MS; those in the menu don't run
@@ -484,6 +541,9 @@ autosave_minutes=${autosaveMinutes}`));
           // before WORLD_INFO: a client loading the world needs it to put its own character in
           const record = storage.character(client.name);
           if (record) send(M.CHARACTER, record);
+          // an exit save and another one: the player chooses which to go on from
+          const own = isHost ? [] : storage.characterSaves(client.name);
+          if (own.some((m) => m.exit) && own.some((m) => !m.exit)) send(M.SAVE_CHOICE, savesPayload(client.name));
           for (const [block, owner] of idLeases) if (owner === client.name) send(M.ID_BLOCK_GRANT, u16(block));
           announceRoles();
           send(M.SETTINGS, settingsPayload());
@@ -527,6 +587,7 @@ autosave_minutes=${autosaveMinutes}`));
           break;
         case M.LEFT_WORLD: {
           if (!client.inWorld) break;
+          leaving(client);
           client.inWorld = false;
           client.state = null;
           log(`[${id}] '${client.name}' went back to the menu`);
@@ -619,7 +680,10 @@ autosave_minutes=${autosaveMinutes}`));
           const meta = { id: storage.nextCharacterSaveId(), time: Date.now(), name, by: client.name, group: g ? members : null };
           snapshots.set(meta.id, { meta, waiting: new Set(saving.map(([, c]) => c.name)) });
           setTimeout(() => snapshots.delete(meta.id), SNAPSHOT_WAIT_MS).unref();
-          for (const [, c] of saving) c.send(M.SNAPSHOT_REQUEST, u32(meta.id));
+          for (const [, c] of saving) {
+            c.send(M.SNAPSHOT_REQUEST, u32(meta.id));
+            protectNear(c);
+          }
           log(`[${id}] '${client.name}' saves ${g ? `the group (${saving.length} in the world)` : 'their character'}, save ${meta.id}`);
           break;
         }
@@ -643,6 +707,21 @@ autosave_minutes=${autosaveMinutes}`));
         case M.SAVES_REQUEST:
           send(M.SAVES, savesPayload(client.name));
           break;
+        case M.TAKEN:
+          if (!client.host) storage.appendTaken(client.name, { time: Date.now(), message: Buffer.from(payload) });
+          break;
+        case M.EXIT_THINGS: {
+          const saveId = payload.readUInt32LE(0);
+          const total = payload.readUInt32LE(4);
+          const offset = payload.readUInt32LE(8);
+          const pending = exits.get(saveId);
+          if (!client.host || !pending) break;
+          if (offset === 0) pending.data = Buffer.alloc(total);
+          if (!pending.data || pending.data.length !== total) break;
+          pending.got += payload.copy(pending.data, offset, 12);
+          if (pending.got >= total) writeExitSave(saveId, pending.data);
+          break;
+        }
         case M.ADMIN_LOGIN:
           if ((client.adminTries ?? 0) >= ADMIN_TRIES) break;
           if (readStringZ(payload, 0) !== adminPasswordNow()) {
@@ -672,13 +751,22 @@ autosave_minutes=${autosaveMinutes}`));
         case M.LOAD_REQUEST: {
           const saveId = payload.readUInt32LE(0);
           const result = (code) => send(M.LOAD_RESULT, Buffer.concat([Buffer.from([code]), u32(saveId)]));
+          if (saveId === 0) {
+            // died with nobody to help: back to the newest of the character's own saves (its part of a group's)
+            const newest = storage.characterSaves(client.name).find((m) => !m.exit);
+            const back = newest && storage.characterSave(client.name, newest.id);
+            if (!back) return result(LOAD.NO_SAVE);
+            putBack(client.name, back.snapshot, back.meta.time);
+            log(`[${id}] '${client.name}' died alone: back to save ${newest.id}`);
+            return result(LOAD.DONE);
+          }
           const save = storage.characterSave(client.name, saveId);
           if (!save) return result(LOAD.NO_SAVE);
           if (save.meta.group && save.meta.by !== client.name) return result(LOAD.LEADER_ONLY);
           const names = save.meta.group ?? [client.name];
           for (const name of names) {
             const own = name === client.name ? save : storage.characterSave(name, saveId);
-            if (own) putBack(name, own.snapshot);
+            if (own) putBack(name, own.snapshot, save.meta.time);
           }
           log(`[${id}] '${client.name}' went back to save ${saveId}${save.meta.group ? ` with ${names.join(', ')}` : ''}`);
           result(LOAD.DONE);
@@ -744,6 +832,10 @@ autosave_minutes=${autosaveMinutes}`));
           upload = null;
           creatorId = null;
           announceWorld();
+          if (saveWhileEmpty) {
+            saveWhileEmpty = false;
+            updateEmptyPause(); // still empty: it stands again
+          }
           break;
         }
         case M.ENTITY_DEATH:
@@ -796,6 +888,7 @@ autosave_minutes=${autosaveMinutes}`));
     socket.on('close', () => {
       if (!clients.has(id)) return;
       clients.delete(id);
+      if (!client.host && client.inWorld) leaving(client);
       if (client.host) {
         hostId = null;
         emptyPaused = false;

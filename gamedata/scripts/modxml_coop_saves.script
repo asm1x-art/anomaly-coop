@@ -16,6 +16,7 @@ function on_xml_read()
 
 	_G.coop_on_saves = function(text) ui_coop_saves.on_saves(text) end
 	_G.coop_on_load_result = function(...) ui_coop_saves.on_load_result(...) end
+	_G.coop_on_save_choice = function(text) ui_coop_saves.on_save_choice(text) end
 
 	-- typ 1: the menu's Save button, 2: the quick save key (level_input.script)
 	RegisterScriptCallback("on_before_save_input", function(flags, typ, text)

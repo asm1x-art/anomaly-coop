@@ -551,6 +551,12 @@ namespace coop
 		case M_SNAPSHOT_THINGS:
 			on_snapshot_things(P);
 			break;
+		case M_SAVE_CHOICE:
+			on_save_choice(P);
+			break;
+		case M_EXIT_THINGS_REQUEST:
+			on_exit_things_request(P);
+			break;
 		case M_WORLD_RELOAD:
 			on_world_reload();
 			break;
@@ -794,7 +800,7 @@ namespace coop
 				const u32 sender = *(const u32*)(msg.data() + sizeof(u16));
 				if (m_left.count(sender))
 					continue; // that player is gone: no shadow to apply it to
-				if (!m_peers.count(sender) && sender != m_host_id && !m_names.count(sender))
+				if (sender && !m_peers.count(sender) && sender != m_host_id && !m_names.count(sender)) // 0: the server's own
 					hold = true;
 			}
 			if (world_change && hold)

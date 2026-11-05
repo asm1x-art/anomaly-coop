@@ -171,6 +171,10 @@ test('actor state is relayed to others, replayed to newcomers, and leave is anno
     assert.equal(parsePeerState(live.payload).name, 'друг');
 
     b.socket.destroy();
+    // a runs the world (no host): it keeps what's near where b left (coop_cleanup.script)
+    const protect = await a.next();
+    assert.equal(protect.type, M.SCRIPT_EVENT);
+    assert.deepEqual(readStringsZ(protect.payload, 4, 2), ['coop_protect', 'l02_garbage\t10.00\t0.00\t20.00\tдруг']);
     const left = await a.next();
     assert.equal(left.type, M.PEER_LEFT);
     assert.equal(left.payload.readUInt32LE(0), idB);
@@ -1118,7 +1122,7 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     const done = await until(a, M.LOAD_RESULT);
     assert.equal(done.payload[0], LOAD.DONE);
     const got = await download(a);
-    assert.deepEqual(got.things, Buffer.alloc(20000, 3));
+    assert.deepEqual(got.things, Buffer.concat([Buffer.alloc(20000, 3), Buffer.alloc(2)])); // nothing taken since
     assert.equal(got.progress.toString(), 'progress 1');
     assert.equal((await download(a)).things, null);
     assert.equal(server.coop.status().world.revision, 1); // the world didn't go back
@@ -1135,6 +1139,7 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     assert.equal((await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0), id2);
     sendSnapshot(a, id2, snapshot('record a', '', 'things a'));
     sendSnapshot(b, id2, snapshot('record b', 'progress b', 'things b'));
+    await until(a, M.SCRIPT_EVENT); // a runs the world: it keeps what's near where b saved
     await roundTrip(a);
     await roundTrip(b);
     b.send(M.SAVES_REQUEST);
@@ -1147,7 +1152,7 @@ test('character saves: a snapshot of the character; going back puts it back, wit
     assert.equal((await until(b, M.CHARACTER)).payload.toString(), 'record b');
     await until(b, M.WORLD_RELOAD);
     assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record a');
-    assert.equal((await download(b)).things.toString(), 'things b');
+    assert.equal((await download(b)).things.toString(), 'things b\0\0');
     assert.equal((await download(a)).progress.toString(), 'progress 1'); // none in the save: theirs stays
     a.socket.destroy();
     b.socket.destroy();
@@ -1500,6 +1505,111 @@ test('with a builds file only listed builds get in, dev ones by the flag', async
   const server = await startServer({ ...options(), builds: { file: path.join(dataDir, 'none.json'), allowDev: false } });
   try {
     assert.equal((await tryJoin(server, 'friend', 'ffffffffffffffff')).type, M.WELCOME);
+  } finally {
+    server.close();
+  }
+});
+
+test('exit saves: made by the server from the host\'s things as a player leaves, chosen on the way back in; a lone death goes back to the newest own save; things taken since go back', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d' });
+  const { port } = server.address();
+  try {
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    await uploadSave(h, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'host');
+    await settle(h);
+
+    let a = await player(port, 'artem');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 5, 1, 7, 0));
+    a.send(M.CHARACTER, Buffer.from('record 1'));
+    await settle(a);
+    a.send(M.SAVE_REQUEST, Buffer.from([0]));
+    const id1 = (await until(a, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    sendSnapshot(a, id1, snapshot('record 1', 'progress 1', 'things 1'));
+    await settle(a);
+    // the host keeps the bodies and boxes near where the player saved
+    const near = await until(h, M.SCRIPT_EVENT);
+    assert.deepEqual(readStringsZ(near.payload, 4, 2), ['coop_protect', 'l01_escape\t5.00\t1.00\t7.00\tartem']);
+
+    // taken since the save: comes back with it
+    a.send(M.TAKEN, Buffer.from('taken after'));
+    a.send(M.CHARACTER, Buffer.from('record 2'));
+    await settle(a);
+
+    // gone without saving: the host is asked for the things in their shadow, the exit save is made with them
+    a.socket.destroy();
+    const ask = await until(h, M.EXIT_THINGS_REQUEST);
+    const exitId = ask.payload.readUInt32LE(0);
+    assert.equal(readStringZ(ask.payload, 4), 'artem');
+    const things = Buffer.from('shadow things');
+    h.send(M.EXIT_THINGS, Buffer.concat([u32le(exitId), u32le(things.length), u32le(0), things]));
+    await settle(h);
+
+    // back: a choice between the exit save and the own one, newest first
+    a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record 2');
+    const choice = await until(a, M.SAVE_CHOICE);
+    assert.deepEqual(charSaves(choice.payload).map((s) => [s.id, s.name, s.reason]),
+      [[exitId, 'выход', 'exit'], [id1, '', 'quick']]);
+    a.send(M.LOAD_REQUEST, u32le(exitId));
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record 2');
+    assert.equal((await until(a, M.LOAD_RESULT)).payload[0], LOAD.DONE);
+    assert.deepEqual((await download(a)).things, Buffer.concat([things, Buffer.alloc(2)]));
+
+    // died alone: the newest own save, never the exit one; what was taken since it comes after its things
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 5, 1, 7, 0));
+    await settle(a);
+    a.send(M.LOAD_REQUEST, u32le(0));
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record 1');
+    const back = await until(a, M.LOAD_RESULT);
+    assert.equal(back.payload[0], LOAD.DONE);
+    assert.equal(back.payload.readUInt32LE(1), 0);
+    const taken = Buffer.from('taken after');
+    assert.deepEqual((await download(a)).things,
+      Buffer.concat([Buffer.from('things 1'), Buffer.from([1, 0, taken.length, 0]), taken]));
+
+    // one exit save per character
+    a.send(M.LEFT_WORLD);
+    const again = (await until(h, M.EXIT_THINGS_REQUEST)).payload.readUInt32LE(0);
+    h.send(M.EXIT_THINGS, Buffer.concat([u32le(again), u32le(2), u32le(0), Buffer.alloc(2)]));
+    await settle(h);
+    a.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(a, M.SAVES)).payload).map((s) => s.id), [again, id1]);
+    a.socket.destroy();
+    h.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('exit saves without a host: the record and progress only; a lone death with no save of their own says so', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    let a = await player(port, 'artem');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await settle(a);
+    a.send(M.LOAD_REQUEST, u32le(0));
+    assert.equal((await until(a, M.LOAD_RESULT)).payload[0], LOAD.NO_SAVE);
+    a.send(M.CHARACTER, Buffer.from('record'));
+    await settle(a);
+    a.send(M.LEFT_WORLD);
+    await settle(a);
+    a.send(M.SAVES_REQUEST);
+    const [exit] = charSaves((await until(a, M.SAVES)).payload);
+    assert.equal(exit.reason, 'exit');
+    a.socket.destroy();
+    // only an exit save: nothing to choose
+    a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    await a.next();
+    assert.ok(!(await drain(a)).includes(M.SAVE_CHOICE));
+    a.socket.destroy();
   } finally {
     server.close();
   }

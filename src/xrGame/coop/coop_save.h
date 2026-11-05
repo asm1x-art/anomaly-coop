@@ -28,6 +28,13 @@ namespace coop
 	// back, and the things come with it (restored after the journal's replay, coop_world.h restore_things)
 	void on_snapshot_request(NET_Packet& P);
 	void on_snapshot_things(NET_Packet& P);
+	// Coming in with an exit save (made by the server as we left) and another save of ours: before the world comes,
+	// _G.coop_on_save_choice(lines as _G.coop_on_saves has them) asks the player which; choose_save(id, 0: none)
+	// goes back to it and asks for the world. Without the Lua handler the world comes as it is.
+	void on_save_choice(NET_Packet& P);
+	void choose_save(u32 id);
+	// the host: the things a player's shadow holds, for the exit save the server makes as they leave
+	void on_exit_things_request(NET_Packet& P);
 
 	// Pausing is the whole world's: a game connected and in it never pauses on its own (the main menu, the
 	// window losing focus, the level change box: as in multiplayer); the Pause key asks everyone in the world

@@ -404,10 +404,62 @@ namespace coop
 		send_spawn(object);
 	}
 
+	// The last holder each thing left (not our actor, not a shadow), to tell the server where our actor took it from
+	struct STakenFrom
+	{
+		u16 holder;
+		shared_str section;
+		Fvector position;
+		u16 game_vertex;
+		u32 level_vertex;
+		u32 time;
+	};
+	static xr_map<u16, STakenFrom> g_taken_from;
+	static const u32 TAKEN_FROM_MS = 2000; // a thing leaving a holder and coming to us this soon after: from it
+
+	// M_TAKEN: going back to a save, a thing taken since goes back there (restore_things)
+	static void send_taken(CSE_ALifeDynamicObject* thing)
+	{
+		auto from = g_taken_from.find(thing->ID);
+		const bool held = from != g_taken_from.end() && Device.dwTimeGlobal - from->second.time < TAKEN_FROM_MS;
+		NET_Packet P;
+		P.w_begin(M_TAKEN);
+		P.w_u16(thing->ID);
+		P.w_stringZ(thing->s_name);
+		P.w_u8(held ? 1 : 0);
+		if (held)
+		{
+			P.w_u16(from->second.holder);
+			P.w_stringZ(from->second.section);
+			P.w_vec3(from->second.position);
+			P.w_u16(from->second.game_vertex);
+			P.w_u32(from->second.level_vertex);
+		}
+		else
+		{
+			P.w_vec3(thing->o_Position);
+			P.w_u16(thing->m_tGraphID);
+			P.w_u32(thing->m_tNodeID);
+		}
+		P.w_stringZ(Level().name());
+		send(P);
+		if (from != g_taken_from.end())
+			g_taken_from.erase(from);
+	}
+
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item)
 	{
 		if (!should_send() || is_shadow(&parent))
 			return;
+		// where our actor took it from; not a thing a player gave us (it left their shadow)
+		if (is_actor(&parent))
+		{
+			auto from = g_taken_from.find(item->base()->ID);
+			const bool given = from != g_taken_from.end() && from->second.holder == u16(-1);
+			if (!given)
+				if (CSE_ALifeDynamicObject* thing = smart_cast<CSE_ALifeDynamicObject*>(item->base()))
+					send_taken(thing);
+		}
 
 		if (local_objects().count(item->base()->ID))
 		{
@@ -546,6 +598,20 @@ namespace coop
 
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id)
 	{
+		if (level_running() && !is_actor(&parent))
+		{
+			const CSE_ALifeDynamicObject* holder = smart_cast<CSE_ALifeDynamicObject*>(&parent);
+			STakenFrom& from = g_taken_from[item->base()->ID];
+			from.holder = is_shadow(&parent) ? u16(-1) : parent.ID; // u16(-1): a player's, given to us
+			from.section = parent.s_name;
+			from.position = parent.o_Position;
+			from.game_vertex = game_vertex_id;
+			from.level_vertex = holder ? holder->m_tNodeID : u32(-1);
+			from.time = Device.dwTimeGlobal;
+			if (g_taken_from.size() > 256) // the ones nobody took
+				for (auto it = g_taken_from.begin(); it != g_taken_from.end();)
+					it = Device.dwTimeGlobal - it->second.time > TAKEN_FROM_MS ? g_taken_from.erase(it) : std::next(it);
+		}
 		if (g_remote_drops.erase(item->base()->ID))
 			return;
 		if (!should_send() || is_shadow(&parent) || local_objects().count(item->base()->ID))
@@ -993,12 +1059,109 @@ namespace coop
 		g_replaying = false;
 		defer_messages(events);
 	}
-	void restore_things(IReader& things, xr_vector<u16>& made)
+	// After a save's things: where we took things from since it (M_TAKEN). The last place of each wins.
+	static void return_taken(IReader& in, CSE_ALifeCreatureActor* actor, const xr_set<u16>& in_save, xr_vector<u16>& returned)
+	{
+		if (in.elapsed() < 2)
+			return;
+		struct SPlace
+		{
+			shared_str section;
+			bool held;
+			u16 holder;
+			shared_str holder_section;
+			Fvector position;
+			u16 game_vertex;
+			u32 level_vertex;
+		};
+		xr_map<u16, SPlace> places;
+		for (u16 count = in.r_u16(); count && in.elapsed() >= 2; --count)
+		{
+			const u16 size = in.r_u16();
+			if (in.elapsed() < size)
+				break;
+			NET_Packet P;
+			P.construct(in.pointer(), size);
+			P.r_pos = 0;
+			in.advance(size);
+			SPlace place;
+			const u16 id = P.r_u16();
+			P.r_stringZ(place.section);
+			place.held = P.r_u8() == 1;
+			place.holder = place.held ? P.r_u16() : u16(-1);
+			if (place.held)
+				P.r_stringZ(place.holder_section);
+			P.r_vec3(place.position);
+			place.game_vertex = P.r_u16();
+			place.level_vertex = P.r_u32();
+			places[id] = place;
+		}
+		u32 to_holders = 0, to_ground = 0;
+		for (const auto& [id, place] : places)
+		{
+			if (in_save.count(id))
+				continue; // the save had it: as it says
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
+			CSE_ALifeInventoryItem* item = smart_cast<CSE_ALifeInventoryItem*>(object);
+			if (!item || object->ID_Parent != actor->ID || object->s_name != place.section)
+				continue; // not on us any more
+			CSE_ALifeDynamicObject* holder = place.held ? ai().alife().objects().object(place.holder, true) : nullptr;
+			if (holder && (holder->s_name != place.holder_section || holder == actor))
+				holder = nullptr;
+			if (!holder && (place.game_vertex == GameGraph::_GRAPH_ID(-1) || place.level_vertex == u32(-1)))
+				continue; // nowhere known to put it
+			alife_rw().graph().detach(*actor, item, holder ? holder->m_tGraphID : place.game_vertex, true);
+			if (holder)
+			{
+				alife_rw().graph().attach(*holder, item, holder->m_tGraphID, true);
+				++to_holders;
+			}
+			else
+			{
+				object->o_Position = place.position;
+				object->m_tGraphID = place.game_vertex;
+				object->m_tNodeID = place.level_vertex;
+				++to_ground;
+			}
+			returned.push_back(id);
+		}
+		if (to_holders || to_ground)
+			Msg("[coop] taken since that save: %u thing(s) back to where they were, %u onto the ground there", to_holders, to_ground);
+	}
+
+	void send_item_place(u16 id)
+	{
+		CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
+		if (!object || !is_connected())
+			return;
+		CSE_ALifeDynamicObject* holder = object->ID_Parent != NO_ID ? ai().alife().objects().object(object->ID_Parent, true) : nullptr;
+		NET_Packet P;
+		P.w_begin(M_ITEM_PARENT);
+		P.w_u16(id);
+		P.w_stringZ(object->s_name);
+		if (holder)
+		{
+			P.w_u8(ePlaceObject);
+			P.w_u16(holder->ID);
+			P.w_stringZ(holder->s_name);
+		}
+		else
+		{
+			P.w_u8(ePlaceGround);
+			P.w_vec3(object->o_Position);
+			P.w_u16(object->m_tGraphID);
+			P.w_u32(object->m_tNodeID);
+		}
+		send(P);
+	}
+
+	void restore_things(IReader& things, xr_vector<u16>& made, xr_vector<u16>& returned)
 	{
 		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
 		if (!actor)
 			return;
 		u32 restored = 0, elsewhere = 0;
+		xr_set<u16> in_save;
 		for (u16 count = things.r_u16(); count; --count)
 		{
 			const u16 size = things.r_u16();
@@ -1029,6 +1192,7 @@ namespace coop
 				continue;
 			}
 			state->Spawn_Read(spawn);
+			in_save.insert(thing->ID);
 			CSE_ALifeDynamicObject* object = ai().alife().objects().object(thing->ID, true);
 			if (object && object->s_name == thing->s_name)
 			{
@@ -1061,5 +1225,6 @@ namespace coop
 		}
 		Msg("[coop] our things as the save has them: %u back to its state, %u made again, %u elsewhere in the world now",
 		    restored, u32(made.size()), elsewhere);
+		return_taken(things, actor, in_save, returned);
 	}
 }

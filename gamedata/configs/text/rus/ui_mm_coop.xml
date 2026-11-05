@@ -424,6 +424,21 @@
 	<string id="st_coop_save_named">
 		<text>«%s»</text>
 	</string>
+	<string id="st_coop_save_exit">
+		<text>При выходе</text>
+	</string>
+	<string id="st_coop_choice_caption">
+		<text>С какого сохранения продолжить?</text>
+	</string>
+	<string id="st_coop_choice_hint">
+		<text>Вы вышли из игры, не сохранившись: сервер сохранил персонажа при выходе. Выберите, с чего продолжить. Сверху — самое новое.</text>
+	</string>
+	<string id="st_coop_choice_go">
+		<text>Продолжить с выбранного</text>
+	</string>
+	<string id="st_coop_rolled_back_save">
+		<text>Помочь было некому: персонаж возвращается к своему последнему сохранению.</text>
+	</string>
 	<string id="st_coop_ago_now">
 		<text>только что</text>
 	</string>

@@ -34,9 +34,13 @@ namespace coop
 	// The things of a save our character went back to (M_SNAPSHOT_THINGS: u16 count, u16 size and the state of each),
 	// once the world is loaded and its journal replayed: one on us gets its state back; one somewhere else in the
 	// world now (with a player, on the ground, in a box) stays there, never twice; one the world doesn't have any more
-	// (used up, eaten) is made again, on us. What we picked up since stays with us. made: the ones made again, for
-	// the others once the level runs.
-	void restore_things(IReader& things, xr_vector<u16>& made);
+	// (used up, eaten) is made again, on us. After the things, where we took things from since that save (M_TAKEN):
+	// one of those on us, not in the save, goes back to its holder (a box, a body, a trader) if the world still has
+	// it, or onto the ground where it lay or its holder stood. What has no such entry (made, given) stays with us.
+	// made: the ones made again, returned: the ones gone back, for the others once the level runs.
+	void restore_things(IReader& things, xr_vector<u16>& made, xr_vector<u16>& returned);
+	// a thing's place as the world has it now (on a holder, on the ground) to the others (M_ITEM_PARENT)
+	void send_item_place(u16 id);
 	// called from CALifeGraphRegistry::attach / detach, which every A-Life parent change goes through
 	void on_item_attached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item);
 	void on_item_detached(CSE_Abstract& parent, CSE_ALifeInventoryItem* item, u16 game_vertex_id);

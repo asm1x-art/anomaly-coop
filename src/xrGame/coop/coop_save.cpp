@@ -78,6 +78,9 @@ namespace coop
 	static xr_vector<u16> g_starter_kit;  // spawned while loading, shared once the level runs
 	static xr_vector<u8> g_things; // the things of the save our character went back to, coming with the world
 	static xr_vector<u16> g_made_again; // of those, the ones made again: for the others once the level runs
+	static xr_vector<u16> g_returned;   // things taken since that save, gone back where they were taken from
+	static bool g_choice_due = false;   // the player chooses a save before the world comes (M_SAVE_CHOICE)
+	static xr_string g_choice;          // the saves to choose from, as _G.coop_on_saves has them
 	static bool g_send_states = false; // the others' copies of our things take their restored states then
 
 	// Anomaly writes a save's .scoc after the engine is done with the .scop: the upload waits for it
@@ -158,6 +161,7 @@ namespace coop
 	static bool is_mine(const xr_string& owner);
 	static void leave_world();
 	static void request_world();
+	static void send_record();
 
 	// _G.<name>(args...) when Lua has it
 	template <typename... Args>
@@ -230,6 +234,29 @@ namespace coop
 			if (ai().script_engine().functor("_G.coop_on_character_needed", handler))
 				handler();
 			return;
+		}
+		if (g_choice_due)
+		{
+			g_choice_due = false;
+			::luabind::functor<void> handler;
+			if (ai().script_engine().functor("_G.coop_on_save_choice", handler))
+			{
+				Msg("[coop] an exit save and another one: the player chooses before the world comes");
+				handler(g_choice.c_str());
+				return;
+			}
+		}
+		request_world();
+	}
+
+	void choose_save(u32 id)
+	{
+		if (!is_connected() || g_in_world || g_downloading || g_load_pending || g_loading)
+			return;
+		if (id)
+		{
+			Msg("[coop] going on from our save %u", id);
+			load_save(id); // the server puts our character back to it, then the world comes with it
 		}
 		request_world();
 	}
@@ -406,7 +433,7 @@ namespace coop
 	}
 
 	// lines of revision, time, name, reason, who, from: tab-separated
-	void on_saves(NET_Packet& P)
+	static xr_string saves_text(NET_Packet& P)
 	{
 		xr_string text, name, reason, who;
 		for (u16 i = 0, n = P.r_u16(); i < n; ++i)
@@ -421,7 +448,59 @@ namespace coop
 			xr_sprintf(line, "%u\t%u\t%s\t%s\t%s\t%u\n", revision, time, name.c_str(), reason.c_str(), who.c_str(), from);
 			text += line;
 		}
-		call_lua("_G.coop_on_saves", text.c_str());
+		return text;
+	}
+
+	void on_saves(NET_Packet& P)
+	{
+		call_lua("_G.coop_on_saves", saves_text(P).c_str());
+	}
+
+	void on_save_choice(NET_Packet& P)
+	{
+		g_choice = saves_text(P);
+		g_choice_due = !g_choice.empty();
+	}
+
+	void on_exit_things_request(NET_Packet& P)
+	{
+		const u32 id = P.r_u32();
+		xr_string name;
+		P.r_stringZ(name);
+		if (!is_host() || !g_in_world || !world_ready())
+			return;
+		CMemoryWriter things;
+		u16 count = 0;
+		CMemoryWriter list;
+		if (CSE_ALifeDynamicObject* shadow = ai().alife().objects().object(find_shadow_of(name), true))
+		{
+			for (u16 child : shadow->children)
+			{
+				CSE_ALifeDynamicObject* object = ai().alife().objects().object(child, true);
+				if (!object || !smart_cast<CSE_ALifeInventoryItem*>(object))
+					continue;
+				NET_Packet thing;
+				thing.write_start();
+				write_item_state(thing, object);
+				list.w_u16(u16(thing.B.count));
+				list.w(thing.B.data, thing.B.count);
+				++count;
+			}
+		}
+		things.w_u16(count);
+		things.w(list.pointer(), list.size());
+		const u32 total = things.size();
+		for (u32 offset = 0; offset < total; offset += CHUNK)
+		{
+			NET_Packet S;
+			S.w_begin(M_EXIT_THINGS);
+			S.w_u32(id);
+			S.w_u32(total);
+			S.w_u32(offset);
+			S.w(things.pointer() + offset, _min(CHUNK, total - offset));
+			send(S);
+		}
+		Msg("[coop] '%s' left: %u thing(s) of their shadow for their exit save %u", name.c_str(), count, id);
 	}
 
 	void on_load_result(NET_Packet& P)
@@ -616,7 +695,10 @@ namespace coop
 	static void leave_world()
 	{
 		if (g_in_world)
+		{
+			send_record(); // where we are now, for the exit save the server makes
 			send_progress(); // kept with the save the server asks for now (leave) or with ours (exit)
+		}
 		if (g_in_world && is_sim_master() && g_actor && ai().get_alife())
 		{
 			const u32 before = g_server_revision;
@@ -791,6 +873,9 @@ namespace coop
 			if (CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true))
 				share_object(item);
 		g_made_again.clear();
+		for (u16 id : g_returned)
+			send_item_place(id);
+		g_returned.clear();
 		if (g_send_states)
 		{
 			g_send_states = false;
@@ -819,6 +904,7 @@ namespace coop
 		g_downloading = false;
 		g_load_pending = false;
 		g_in_world = 0;
+		g_choice_due = false;
 	}
 
 	void print_world_status()
@@ -972,7 +1058,7 @@ namespace coop
 		if (!g_things.empty())
 		{
 			IReader things(g_things.data(), int(g_things.size())); // a snapshot's things may not fit a NET_Packet
-			restore_things(things, g_made_again);
+			restore_things(things, g_made_again, g_returned);
 			g_things.clear();
 			g_send_states = true;
 		}

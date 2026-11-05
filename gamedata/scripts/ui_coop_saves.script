@@ -191,7 +191,67 @@ function on_saves(text)
 	end
 end
 
--- result: 0 the world loads again with our character put back, 1 no such save, 2 a group's save: its leader loads it
+-- result: 0 the world loads again with our character put back, 1 no such save, 2 a group's save: its leader loads it.
+-- id 0: died with nobody to help (coop_death.script)
 function on_load_result(result, id)
+	if id == 0 then
+		return coop_death.on_rollback_result(result)
+	end
 	show_result(tr("st_coop_load_" .. result, id))
+end
+
+----------------------------------------------------------------------------------------------------
+-- Coming in with an exit save (made by the server as we left without saving) and saves of our own: which one
+-- to go on from. The newest is chosen at first; Esc takes it too. coop.choose_save then brings the world.
+
+class "UICoopSaveChoice" (CUIScriptWnd)
+
+function UICoopSaveChoice:__init(list) super()
+	self.saves = list
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_saves.xml")
+	xml:InitStatic("background", self)
+	local form = xml:InitStatic("form", self)
+	xml:InitTextWnd("form:caption", form):SetText(tr("st_coop_choice_caption"))
+	xml:InitFrame("form:list_frame", form)
+	self.list = xml:InitListBox("form:list", form)
+	self.list:ShowSelectedItem(true)
+	self:Register(self.list, "list")
+	self.status = xml:InitTextWnd("form:status", form)
+	self.status:SetText(tr("st_coop_choice_hint"))
+	local go = xml:Init3tButton("form:btn_rollback", form)
+	go:TextControl():SetText(tr("st_coop_choice_go"))
+	self:Register(go, "btn_go")
+	self:AddCallback("btn_go", ui_events.BUTTON_CLICKED, self.OnGo, self)
+	for _, s in ipairs(list) do
+		self.list:AddTextItem(line(s))
+	end
+	self.list:SetSelectedIndex(0)
+end
+
+function UICoopSaveChoice:OnGo()
+	local s = self.saves[self.list:GetSelectedIndex() + 1] or self.saves[1]
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	printf("[coop] going on from save %s (%s)", s.id, s.reason)
+	coop.choose_save(s.id)
+end
+
+function UICoopSaveChoice:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and dik == DIK_keys.DIK_ESCAPE then
+		self:OnGo()
+	end
+	return res
+end
+
+-- from the engine (coop_save.cpp on_world_info): the saves as on_saves has them, newest first
+function on_save_choice(text)
+	on_saves(text)
+	if #saves == 0 then
+		return coop.choose_save(0)
+	end
+	UICoopSaveChoice(saves):ShowDialog(true)
 end

@@ -424,6 +424,21 @@
 	<string id="st_coop_save_named">
 		<text>"%s"</text>
 	</string>
+	<string id="st_coop_save_exit">
+		<text>On leaving</text>
+	</string>
+	<string id="st_coop_choice_caption">
+		<text>Which save to go on from?</text>
+	</string>
+	<string id="st_coop_choice_hint">
+		<text>You left without saving: the server saved your character as you left. Choose where to go on from. The newest is on top.</text>
+	</string>
+	<string id="st_coop_choice_go">
+		<text>Go on from this one</text>
+	</string>
+	<string id="st_coop_rolled_back_save">
+		<text>Nobody could help: the character goes back to their last save.</text>
+	</string>
 	<string id="st_coop_ago_now">
 		<text>just now</text>
 	</string>

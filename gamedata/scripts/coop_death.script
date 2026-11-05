@@ -2,7 +2,9 @@
 -- and no reloading the world in co-op. With another player on the level a deadly hit lays the player
 -- down: they can only look about, NPCs leave them be, and another player holding F on them for
 -- revive_time seconds helps them up. Nobody else on the level, the time up, or giving up (the jump key):
--- back where the player was when the world was last saved, everything carried kept, some rank lost.
+-- back to the player's newest own save (the server's, coop_save.cpp; never the exit save), the world loading
+-- again with the character as that save has it. With no save of their own: back where the player was when the
+-- world was last saved, everything carried kept, some rank lost. The world's host (a ghost) never dies.
 
 local NEAR = 2.5          -- m: how close a helper stays
 local HUD = nil
@@ -109,7 +111,10 @@ local function go_down()
 	printf("[coop] down, waiting for help")
 end
 
-local function rollback()
+local going_back = nil -- time_global() we asked the server for our own save, nil: not asked
+
+-- no own save: back where we were when the world was last saved
+local function back_to_save_point()
 	coop.fell()
 	stand(1)
 	db.actor.power = 1
@@ -131,6 +136,38 @@ local function rollback()
 	else
 		ChangeLevel(save_point.pos, save_point.lvid, save_point.gvid, VEC_ZERO, false)
 	end
+end
+
+local GOING_BACK_MS = 10000 -- no answer from the server by then: the save point
+
+local function rollback()
+	if going_back then
+		return
+	end
+	if not coop.connected() then
+		return back_to_save_point()
+	end
+	-- lying safe until the world loads again with our save
+	going_back = time_global()
+	if not is_downed() then
+		go_down()
+	end
+	coop.load_save(0)
+	printf("[coop] died with nobody to help: back to our own save")
+end
+
+-- the server's answer (ui_coop_saves.on_load_result, id 0): 0 the world loads again with our save, 1 we have none
+function on_rollback_result(result)
+	if not going_back then
+		return
+	end
+	if result == 0 then
+		news(game.translate_string("st_coop_rolled_back_save"))
+		return -- the world loads again
+	end
+	going_back = nil
+	printf("[coop] no save of our own: back to the save point")
+	back_to_save_point()
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -167,6 +204,13 @@ local function update()
 	if is_downed() then
 		if db.actor.health < 0.05 then
 			db.actor:set_health_ex(0.05)
+		end
+		if going_back then
+			if now - going_back > GOING_BACK_MS then
+				going_back = nil
+				back_to_save_point()
+			end
+			return
 		end
 		local left = coop_rules.number("downed_time", 90) * 1000 - (now - downed_since)
 		if left <= 0 or not coop.connected() then
@@ -217,6 +261,11 @@ function on_game_start()
 		if not coop.connected() or raid and raid.is_raid_level(level.name()) then
 			return -- a raid's level has its own death rules (raid.script)
 		end
+		if coop.is_host() then
+			flags.ret_value = false -- the host's ghost: a surge or a psi storm on its empty level
+			db.actor:set_health_ex(1)
+			return
+		end
 		flags.ret_value = false -- never the death screen in co-op
 		if is_downed() then
 			db.actor:set_health_ex(0.05)
@@ -240,8 +289,18 @@ function on_game_start()
 	end)
 	RegisterScriptCallback("actor_on_update", update)
 	RegisterScriptCallback("actor_on_first_update", function()
+		if coop.is_host() then
+			-- the ghost: surges and psi storms pass it by (level_environment.is_actor_immune), nothing hurts it
+			save_var(db.actor, "surge_immuned", true)
+			get_console():execute("g_god on")
+		end
 		if not save_point then
 			mark_save_point()
+		end
+		if going_back then -- the world loaded again with our own save: up as it has us
+			going_back, downed_since, helper = nil, nil, nil
+			coop.set_downed(false)
+			hud(false)
 		end
 	end)
 	RegisterScriptCallback("actor_on_net_destroy", function() hud(false) end)

@@ -154,6 +154,7 @@ namespace coop
 			def("set_save_meta", &set_save_meta),    // (name, reason, who) of the save Lua is about to make
 			def("request_save", &request_save),      // (name): our character is saved (the leader: the group)
 			def("request_saves", &request_saves),    // the list comes to _G.coop_on_saves
+			def("choose_save", &choose_save),        // (id, 0: none) on the way in (_G.coop_on_save_choice): then the world
 			def("load_save", &load_save),            // (id): our character (the leader: the group) as that save has it
 			def("answer_rollback", &answer_rollback), // (yes) to a vote (a pause)
 			def("propose_pause", &propose_pause),    // (pause): everyone in the world votes

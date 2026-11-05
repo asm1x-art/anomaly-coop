@@ -27,12 +27,16 @@ import { normalizeSettings } from './settings.js';
 //                            meta.json { id, time, name, by, group }: group, the members' names of a group's save
 //                            (the same id in every member's folder); personal_next.json, the next id
 //   personal/<hex name>/things.bin  the things of a save the character was put back to, for its next download
+//                            (then the TAKEN entries since that save, for the things to go back where they were)
+//   personal/<hex name>/taken.jsonl  where the character took each thing from, a { t, m: base64 TAKEN } line each;
+//                            meta.json of an exit save (made when the player leaves) has exit: true, one per character
 //   journal.jsonl           the world changes since the last save (server.js), a { t, m: base64 } line each, so a
 //                            server started again still has them
 //   clients.json            { id: name }: every client id given out, so ids go on growing across runs (the journal's
 //                            changes are by id)
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
+export const MAX_TAKEN = 2000; // where a character took its things from, per character
 
 export function openStorage(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -56,6 +60,14 @@ export function openStorage(dir) {
 
   const saveFile = (revision, name) => path.join('saves', String(revision), name);
   const playerDir = (name) => Buffer.from(name, 'utf8').toString('hex');
+  const text2taken = (text) => text.split('\n').filter(Boolean).flatMap((line) => {
+    try {
+      const { t, m } = JSON.parse(line);
+      return [{ time: t, message: Buffer.from(m, 'base64') }];
+    } catch {
+      return []; // a line cut short by a crash
+    }
+  });
   // a file name from a client: no paths, nothing odd
   const safeName = (file) => String(file).replace(/^.*[\\/]/, '').replace(/[^\w.-]/g, '_').slice(0, 120) || 'unnamed';
   const progressFile = (name) => path.join('progress', Buffer.from(name, 'utf8').toString('hex') + '.bin');
@@ -249,6 +261,28 @@ export function openStorage(dir) {
       if (!data) return fs.rmSync(file(path.join(dir, 'things.bin')), { force: true });
       fs.mkdirSync(file(dir), { recursive: true });
       writeAtomic(path.join(dir, 'things.bin'), data);
+    },
+    deleteCharacterSave(name, id) {
+      fs.rmSync(file(path.join('personal', playerDir(name), String(id))), { recursive: true, force: true });
+    },
+    // where the character took each thing from (protocol.js TAKEN): [{ time, message }], oldest first, the last
+    // MAX_TAKEN kept
+    taken(name) {
+      try {
+        return text2taken(fs.readFileSync(file(path.join('personal', playerDir(name), 'taken.jsonl')), 'utf8'));
+      } catch {
+        return [];
+      }
+    },
+    appendTaken(name, { time, message }) {
+      const dir = path.join('personal', playerDir(name));
+      fs.mkdirSync(file(dir), { recursive: true });
+      const at = path.join(dir, 'taken.jsonl');
+      const line = (e) => JSON.stringify({ t: e.time, m: e.message.toString('base64') }) + '\n';
+      fs.appendFileSync(file(at), line({ time, message }));
+      if (fs.statSync(file(at)).size < MAX_TAKEN * 2 * 150) return; // ~100 bytes a line: cut now and then
+      const all = text2taken(fs.readFileSync(file(at), 'utf8'));
+      if (all.length > MAX_TAKEN) writeAtomic(at, all.slice(-MAX_TAKEN).map(line).join(''));
     },
 
     // [{ members: [leader, ...], story }]; a group was a plain list of names before

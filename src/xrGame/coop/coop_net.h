@@ -101,6 +101,14 @@ namespace coop
 		                        // with every jump); after WELCOME, on every change and every 5 s
 		M_TIME_SET = 63,        // c->s: u8 kind, then 0 (no clock yet): u64 game time, float factor; 1 jump: u32 ms;
 		                        // 2 factor (the sim master's): float
+		// a player's exit save and things going back where they were taken from (coop_save.cpp, coop_world.cpp)
+		M_TAKEN = 64,           // c->s: where our actor took a thing from: u16 thing, stringZ section, u8 0 ground / 1
+		                        // a holder (then u16 holder, stringZ its section), vec3, u16 game vertex, u32 level
+		                        // vertex, stringZ level. Going back to a save, the ones since come after its things
+		M_SAVE_CHOICE = 65,     // s->c: as M_SAVES, before M_WORLD_INFO: an exit save and another one to choose from
+		M_EXIT_THINGS_REQUEST = 66, // s->c, the host: u32 save id, stringZ name: the things that player's shadow holds
+		M_EXIT_THINGS = 67,     // c->s, the host: u32 save id, u32 total, u32 offset, data (u16 count, u16 size and the
+		                        // state of each, as M_OBJECT_STATE)
 	};
 
 	enum EGroupAction : u8

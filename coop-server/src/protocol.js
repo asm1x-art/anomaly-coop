@@ -57,7 +57,8 @@ export const M = {
   SAVES_REQUEST: 35,  // c->s: the list of my character's saves, please
   SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 id, u32 time (unix s),
                       // stringZ name, reason ('quick', 'named', 'group'), who (the one who saved it), u32 0
-  LOAD_REQUEST: 37,   // c->s: u32 id: my character (a group's save: the whole group, the leader asks) as that save has it
+  LOAD_REQUEST: 37,   // c->s: u32 id: my character (a group's save: the whole group, the leader asks) as that save has it;
+                      // id 0: died with nobody to help: my character alone as my newest save but the exit save has it
   // 38: was a world rollback's vote
   ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a pause)
   LOAD_RESULT: 40,    // s->c: u8 LOAD result, u32 the save's id
@@ -113,8 +114,20 @@ export const M = {
                       // every change and every TIME_TICK_MS
   TIME_SET: 63,       // c->s: u8 TIME_SET kind, then INIT: u64 game time, f32 factor (taken only while the server has
                       // no clock); JUMP: u32 ms forward; FACTOR: f32 (the sim master's only)
+  // A player's exit save and their things going back (docs/coop/multiplayer.md «Сохранения»)
+  TAKEN: 64,          // c->s: where our actor took a thing from: u16 thing, stringZ its section, u8 TAKEN_FROM, then
+                      // OBJECT: u16 holder, stringZ its section; both: vec3 where, u16 game vertex, u32 level vertex,
+                      // stringZ level. Kept per character (storage.js taken); going back to a save, the ones taken
+                      // since come after its things (SNAPSHOT_THINGS) and those things go back there
+  SAVE_CHOICE: 65,    // s->c: as SAVES, after WELCOME and before WORLD_INFO, when the character has an exit save and
+                      // another to choose from: the game asks the player which (LOAD_REQUEST, or none), then the world
+  EXIT_THINGS_REQUEST: 66, // s->c, to the host: u32 save id, stringZ name: the things that player's shadow holds
+  EXIT_THINGS: 67,    // c->s, the host: u32 save id, u32 total, u32 offset, data (u16 count, per thing u16 size and
+                      // its state as OBJECT_STATE has it): with the record and progress the server has, the exit save
 };
 
+export const TAKEN_FROM = { GROUND: 0, OBJECT: 1 };
+export const EXIT_SAVE_NAME = 'выход';
 
 export const TIME_FLAG = { RUNNING: 1, SET: 2 };
 export const TIME_SET = { INIT: 0, JUMP: 1, FACTOR: 2 };
