@@ -212,7 +212,8 @@ function on_xml_read()
 	-- the world is there and we have no character in it: make one now (the profile screen, when up,
 	-- follows its connection itself)
 	_G.coop_on_character_needed = function()
-		if main_menu and not ui_coop_profiles.is_shown() then
+		-- not over the admin window: a world saved from it brings this too; Co-op opens the screen after
+		if main_menu and not ui_coop_profiles.is_shown() and not ui_coop_admin.is_shown() then
 			main_menu:ShowFactionUI()
 		end
 	end

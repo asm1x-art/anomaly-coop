@@ -507,7 +507,10 @@ namespace coop
 		{
 			xr_string text;
 			P.r_stringZ(text);
-			call_lua(type == M_ADMIN_STATE ? "_G.coop_on_admin_state" : "_G.coop_on_admin_result", text.c_str());
+			// not call_lua: the window opens from the main menu too, where there is no level
+			::luabind::functor<void> handler;
+			if (ai().script_engine().functor(type == M_ADMIN_STATE ? "_G.coop_on_admin_state" : "_G.coop_on_admin_result", handler))
+				handler(text.c_str());
 			break;
 		}
 		case M_HOST:

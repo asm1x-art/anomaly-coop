@@ -152,6 +152,7 @@ function UICoopAdmin:Fill(text)
 		logged_in = true
 		self.cap_value:SetText(tr("st_coop_admin_value"))
 		self.btn_apply:TextControl():SetText(tr("st_coop_admin_apply"))
+		self.edit_value:SetText("") -- the password typed in it
 		if self.password then
 			save_password(coop.server_address(), self.password)
 		end
