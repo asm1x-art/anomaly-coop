@@ -34,6 +34,13 @@ public:
 	IC float time_factor() const;
 	IC float normal_time_factor() const;
 	IC void change_game_time(u32 value);
+	// co-op: the world's clock (coop/coop_time.cpp) puts ours where it is, every frame
+	IC void set_game_time(ALife::_TIME_ID game_time, float time_factor)
+	{
+		m_game_time = game_time;
+		m_start_time = Device.dwTimeGlobal;
+		m_time_factor = time_factor;
+	}
 };
 
 #include "alife_time_manager_inline.h"

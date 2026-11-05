@@ -40,6 +40,7 @@
 #include "alife_object_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "coop/coop_net.h"
+#include "coop/coop_time.h"
 #include "hudmanager.h"
 #include "ui\UIMainIngameWnd.h"
 #include "ui\UIHudStatesWnd.h"
@@ -327,6 +328,8 @@ void change_game_time(u32 days, u32 hours, u32 mins)
 		u32 value = days * 86400 + hours * 3600 + mins * 60;
 		float fValue = static_cast<float>(value);
 		value *= 1000; //msec		
+		if (!coop::allow_time_jump(value)) // co-op: the whole world's clock jumps, or none
+			return;
 		g_pGamePersistent->Environment().ChangeGameTime(fValue);
 		tpGame->alife().time_manager().change_game_time(value);
 	}

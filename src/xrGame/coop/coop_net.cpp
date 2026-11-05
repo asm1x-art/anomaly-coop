@@ -12,6 +12,7 @@
 #include "coop_npc.h"
 #include "coop_combat.h"
 #include "coop_projectiles.h"
+#include "coop_time.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -248,6 +249,7 @@ namespace coop
 		clear_projectiles();
 		reset_id_blocks();
 		reset_world_sync();
+		reset_time();
 	}
 
 	void CClient::status() const
@@ -491,6 +493,9 @@ namespace coop
 		case M_FACT:
 			on_fact(P);
 			break;
+		case M_TIME:
+			on_time(P);
+			break;
 		case M_ACTOR_ACTION:
 		{
 			const u32 sender = P.r_u32();
@@ -667,6 +672,7 @@ namespace coop
 			clear_projectiles();
 			reset_id_blocks();
 			reset_world_sync();
+			reset_time();
 			return;
 		}
 
@@ -728,6 +734,7 @@ namespace coop
 		update_bodies();
 		update_releases();
 		update_world_sync();
+		update_time();
 		debug_traffic();
 
 		if (!m_welcomed)

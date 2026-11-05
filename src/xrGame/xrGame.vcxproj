@@ -2019,6 +2019,7 @@
     <ClInclude Include="coop\coop_save.h" />
     <ClInclude Include="coop\coop_shadow.h" />
     <ClInclude Include="coop\coop_world.h" />
+    <ClInclude Include="coop\coop_time.h" />
     <ClInclude Include="xr_time.h" />
     <ClInclude Include="ZoneCampfire.h" />
     <ClInclude Include="ZoneVisual.h" />
@@ -3127,6 +3128,7 @@
     <ClCompile Include="coop\coop_map.cpp" />
     <ClCompile Include="coop\coop_net.cpp" />
     <ClCompile Include="coop\coop_world.cpp" />
+    <ClCompile Include="coop\coop_time.cpp" />
     <ClCompile Include="coop\coop_save.cpp" />
     <ClCompile Include="coop\coop_shadow.cpp" />
     <ClCompile Include="coop\coop_script.cpp">

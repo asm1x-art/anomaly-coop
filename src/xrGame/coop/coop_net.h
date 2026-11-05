@@ -73,6 +73,11 @@ namespace coop
 		M_REFUSED = 31,         // s->c: u8 why (0 full, 1 protocol), u16 the player limit or the server's protocol; it closes
 		M_WORLD_CLAIM = 30,     // c->s: u8 1: we start the world on an empty server, the first to ask gets it (M_WORLD_INFO
 		                        // says who); 0: we gave it up
+		// the world's clock (coop_time.h)
+		M_TIME = 62,            // s->c: u64 game time (ms), float factor, u8 flags (1 running, 2 set), u32 epoch (grows
+		                        // with every jump); after WELCOME, on every change and every 5 s
+		M_TIME_SET = 63,        // c->s: u8 kind, then 0 (no clock yet): u64 game time, float factor; 1 jump: u32 ms;
+		                        // 2 factor (the sim master's): float
 	};
 
 	enum EGroupAction : u8
@@ -85,7 +90,7 @@ namespace coop
 		eGroupStory, // the leader: the group shares its story or stops (coop_story.script)
 	};
 
-	const u16 PROTOCOL_VERSION = 19;
+	const u16 PROTOCOL_VERSION = 20;
 
 	// How a peer's character looks and moves, for its puppet (coop_puppet.cpp)
 	struct SLook
