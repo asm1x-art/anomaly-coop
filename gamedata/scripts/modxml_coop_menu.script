@@ -25,11 +25,25 @@ local WORLD_CHECKS = {
 }
 
 -- character_creation keys of the new game screen (OnStartGame) that a character joining an existing world
--- must not apply: the world's settings are in its save; new_game_map: the engine places it (join_world)
+-- must not apply: the world's settings are in its save; new_game_map: the engine places it (join_world);
+-- new_game_faction: kept as JOIN_FACTION instead, for join_setup
 local NOT_FOR_JOINING = { "new_game_difficulty", "new_game_economy", "new_game_economy_treasure",
 	"new_game_hardcore_mode", "new_game_hardcore_mode_lives", "new_game_hardcore_mode_regenerate",
 	"new_game_azazel_mode", "new_game_survival_mode", "new_game_campfire_mode", "new_game_conditions_mode",
-	"new_game_opened_routes", "new_game_warfare", "new_game_timer_mode", "new_game_character_name", "new_game_map" }
+	"new_game_opened_routes", "new_game_warfare", "new_game_timer_mode", "new_game_character_name", "new_game_map",
+	"new_game_story_mode", "new_game_faction" }
+local JOIN_FACTION = "coop_join_faction" -- character_creation: the faction of a character joining the world
+
+-- Story mode is the world's: set when the world was made (the server's "story" setting then) and kept in its save as
+-- the world info story_mode_disabled (mod_system_coop.ltx). Anomaly's new game code would set the story up again
+-- for each joining character from its screen and faction (Miracle Machine and Brain Scorcher off for Monolith and
+-- Sin, relations, ...), so a joining character skips it (new_game_faction cleared) and gets the rest here:
+-- in a world with story mode off the state such a world gives everyone, in one with story on only its own story.
+local STORY_OFF_INFOS = { "yan_labx16_switcher_1_off", "yan_labx16_switcher_2_off", "yan_labx16_switcher_3_off",
+	"yan_labx16_switcher_primary_off", "bar_deactivate_radar_done", "warlab_deactivate_generators_done",
+	"mortal_sin", "isg_entered_the_zone" } -- ui_mm_faction_select on_game_load, story mode off
+local LIMITED_FACTIONS = { isg = true } -- its faction_limited_playthrough: no Lost to the Zone quests
+local loadouts = ini_file("items\\settings\\new_game_loadouts.ltx")
 
 local start_locations = ini_file("plugins\\new_game_start_locations.ltx")
 local main_menu -- the main menu object, for opening the screen when the engine asks
@@ -143,6 +157,7 @@ local function join(dlg)
 	for _, key in ipairs(NOT_FOR_JOINING) do
 		config:w_value("character_creation", key)
 	end
+	config:w_value("character_creation", JOIN_FACTION, dlg.selected_faction)
 	config:save()
 
 	local gvid = map and start_locations:r_float_ex(map, "gvid")
@@ -157,6 +172,90 @@ local function join(dlg)
 	coop.join_world(gvid, start_locations:r_float_ex(map, "lvid"), position)
 	if main_menu then -- the co-op window says the world is on its way, as when entering with a character
 		ui_coop_profiles.show_loading(main_menu, "ui_mm_coop_status_joining")
+	end
+end
+
+-- the start loadout, as Anomaly's new game code gives it: a weapon with its ammo
+local function give_loadout(loadout)
+	local m_data = alife_storage_manager.get_state()
+	local ammo = {}
+	for _, sec in ipairs(str_explode(loadout, ",")) do
+		if ini_sys:section_exist(sec) then
+			local ammo_class = ini_sys:r_string_ex(sec, "ammo_class")
+			local slot = ammo_class and ini_sys:r_float_ex(sec, "slot")
+			local own -- the weapon's start ammo type, other than its first
+			if slot and ((slot == 0 and ini_sys:r_float_ex(sec, "animation_slot") == 1) or slot == 1 or slot == 2) then
+				local sec_ammo = str_explode(ammo_class, ",")[1]
+				local ammo_type = loadouts:r_string_ex("ammo_type_per_wpn", sec)
+				if ammo_type and ini_sys:section_exist(ammo_type) then
+					own, sec_ammo = ammo_type, ammo_type
+				end
+				local box = ini_sys:r_float_ex(sec_ammo, "box_size") or 50
+				local count = loadouts:r_float_ex("ammo_count", sec_ammo) or (box < 30 and 2 * box or box)
+				ammo[sec_ammo] = (ammo[sec_ammo] or 0) + count
+			end
+			local se_obj = alife_create_item(sec, db.actor)
+			if se_obj and own then
+				m_data.start_wpn_ammo = m_data.start_wpn_ammo or {}
+				m_data.start_wpn_ammo[se_obj.id] = own
+			end
+			if sec == "bolt" or sec == "bolt_bullet" then
+				m_data.bolt_first = sec
+			end
+		end
+	end
+	for sec, count in pairs(ammo) do
+		alife_create_item(sec, db.actor, { ammo = count })
+	end
+end
+
+-- a character that has just joined the world: what Anomaly's new game gives a character, the story's part from the
+-- world (see STORY_OFF_INFOS)
+local function join_setup()
+	local config = axr_main.config
+	local faction = config:r_value("character_creation", JOIN_FACTION, 3)
+	if not (faction and faction ~= "") then
+		return
+	end
+	local money = config:r_value("character_creation", "new_game_money", 2)
+	local loadout = config:r_value("character_creation", "new_game_loadout", 3)
+	for _, key in ipairs({ JOIN_FACTION, "new_game_money", "new_game_loadout" }) do
+		config:w_value("character_creation", key)
+	end
+	config:save()
+
+	local story = not has_alife_info("story_mode_disabled")
+	if story then
+		if LIMITED_FACTIONS[faction] then
+			give_info("faction_limited_playthrough")
+			give_info("faction_limited_playthrough_cf")
+		end
+		xr_effects.drx_sl_setup_questlines(nil, nil, { faction }) -- the character's own DRX storyline
+	else
+		for _, info in ipairs(STORY_OFF_INFOS) do
+			give_info(info)
+		end
+	end
+
+	db.actor:set_character_community("actor_" .. faction, 0, 0)
+	alife_storage_manager.get_state().default_faction = faction
+	for _, community in pairs(utils_obj.get_communities_list()) do
+		relation_registry.set_community_goodwill(community, 0, 0)
+	end
+	if money then
+		db.actor:give_money(money - db.actor:money())
+	end
+	if not mlr_utils.load_var("routes_faction") then
+		mlr_utils.save_var("routes_faction", faction)
+	end
+	give_loadout(loadout or "")
+	alife():actor():set_profile_name("actor_" .. faction)
+	printf("[coop] joined the world as %s, the world's story mode %s", faction, story and "on" or "off")
+end
+
+function on_game_start()
+	if coop then
+		RegisterScriptCallback("on_game_load", join_setup)
 	end
 end
 
@@ -240,6 +339,7 @@ function on_xml_read()
 			self.owner:SetMsg(why, 6)
 			return
 		end
+		axr_main.config:w_value("character_creation", JOIN_FACTION) -- one from a join that never loaded
 		-- the hidden keys (Z, faction passwords) don't get past the server's list
 		local s = server_settings()
 		local allowed = allowed_factions(s)
