@@ -661,6 +661,15 @@ namespace coop
 			Msg("[coop dbg] release of %s (id=%u) sent", object->name_replace(), object->ID);
 	}
 
+	void send_release(u16 id, LPCSTR section)
+	{
+		NET_Packet P;
+		P.w_begin(M_OBJECT_RELEASE);
+		P.w_u16(id);
+		P.w_stringZ(section);
+		send(P);
+	}
+
 	static void spawn_online(NET_Packet& spawn_packet)
 	{
 		u16 type;

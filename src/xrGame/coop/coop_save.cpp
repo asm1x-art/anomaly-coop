@@ -77,6 +77,12 @@ namespace coop
 	static SCharacter g_record;
 	static u32 g_last_record = 0;
 	static xr_vector<u16> g_starter_kit;  // spawned while loading, shared once the level runs
+	static bool g_kit_due = false;       // no shadow of ours in the save: a starter kit if the journal brings nothing of ours
+	// A character made on the new game screen starts with nothing but the screen's loadout (Lua). What an earlier
+	// attempt of the same name left - its things in the journal, in its shadow in the world's save: a first join that
+	// crashed before the server kept the character - goes away while loading, and to the others once the level runs.
+	static bool g_new_character = false;   // join_world asked for it: the next world load is its first
+	static xr_vector<std::pair<u16, shared_str>> g_stale; // id, section: released here, the others' release waits
 	static xr_vector<u8> g_things; // the things of the save our character went back to, coming with the world
 	static xr_vector<u16> g_made_again; // of those, the ones made again: for the others once the level runs
 	static xr_vector<u16> g_returned;   // things taken since that save, gone back where they were taken from
@@ -744,6 +750,7 @@ namespace coop
 		g_join_start.position = position;
 		g_join_start.yaw = 0.f;
 		g_join_requested = true;
+		g_new_character = true;
 		request_world();
 	}
 
@@ -880,6 +887,9 @@ namespace coop
 			return;
 		}
 
+		for (const auto& [id, section] : g_stale)
+			send_release(id, section.c_str());
+		g_stale.clear();
 		for (u16 id : g_starter_kit)
 			if (CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true))
 				share_object(item);
@@ -914,6 +924,7 @@ namespace coop
 		g_world_info_received = false;
 		g_creating = false;
 		g_join_requested = false;
+		g_new_character = false;
 		g_has_record = false; // the next connection may be under another name
 		g_settings.clear();
 		g_downloading = false;
@@ -1063,6 +1074,45 @@ namespace coop
 
 	static void put_character();
 
+	// no shadow of ours in the save and nothing of ours in the journal either: a starter kit, shared with the others
+	// once the level runs
+	static void give_starter_kit()
+	{
+		g_kit_due = false;
+		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
+		if (!actor || !actor->children.empty())
+			return;
+		for (LPCSTR section : STARTER_KIT)
+		{
+			if (!pSettings->section_exist(section))
+				continue;
+			CSE_Abstract* item = alife_rw().spawn_item(section, actor->o_Position, actor->m_tNodeID, actor->m_tGraphID,
+			                                           actor->ID);
+			g_starter_kit.push_back(item->ID);
+		}
+		Msg("[coop] nothing of ours in the world: a starter kit");
+	}
+
+	// our new character's actor, journal replayed: anything on it is an earlier attempt's (see g_new_character)
+	static void clear_new_character()
+	{
+		g_new_character = false;
+		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
+		if (!actor || is_host())
+			return;
+		const xr_vector<u16> children = actor->children;
+		for (u16 id : children)
+		{
+			CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true);
+			if (!item)
+				continue;
+			g_stale.emplace_back(id, item->s_name);
+			alife_rw().release(item, true);
+		}
+		if (!g_stale.empty())
+			Msg("[coop] a new character: %u thing(s) of an earlier attempt of this name taken away", g_stale.size());
+	}
+
 	void on_world_loaded()
 	{
 		if (!g_loading)
@@ -1071,6 +1121,8 @@ namespace coop
 		g_in_world = g_loading_revision;
 		put_character();
 		replay_journal(); // what changed since the save, onto the world with our character in it
+		if (g_new_character)
+			clear_new_character();
 		if (!g_things.empty())
 		{
 			IReader things(g_things.data(), int(g_things.size())); // a snapshot's things may not fit a NET_Packet
@@ -1078,6 +1130,8 @@ namespace coop
 			g_things.clear();
 			g_send_states = true;
 		}
+		if (g_kit_due)
+			give_starter_kit();
 	}
 
 	static void put_character()
@@ -1121,23 +1175,13 @@ namespace coop
 		if (my_shadow)
 			move_inventory(my_shadow, actor);
 		else if (!g_join_requested) // a character made on the new game screen gets its loadout from there
-		{
-			// first time in this world: a starter kit, shared with the others once the level runs
-			for (LPCSTR section : STARTER_KIT)
-			{
-				if (!pSettings->section_exist(section))
-					continue;
-				CSE_Abstract* item = alife_rw().spawn_item(section, actor->o_Position, actor->m_tNodeID,
-				                                           actor->m_tGraphID, actor->ID);
-				g_starter_kit.push_back(item->ID);
-			}
-		}
+			g_kit_due = true; // our things may still come with the journal: a world saved before we were in it
 
 		actor->m_dwMoney = g_has_record ? g_record.money : STARTING_MONEY;
 		if (g_has_record && g_record.health > 0.f)
 			actor->set_health(g_record.health);
 
 		Msg("[coop] world loaded with our character in place of '%s'%s", g_loading_owner.c_str(),
-		    my_shadow ? "" : g_join_requested ? " (new character)" : " (first visit: starter kit)");
+		    my_shadow ? "" : g_join_requested ? " (new character)" : " (no shadow of ours in the save)");
 	}
 }

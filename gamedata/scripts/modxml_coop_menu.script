@@ -243,7 +243,14 @@ local function join_setup()
 		relation_registry.set_community_goodwill(community, 0, 0)
 	end
 	if money then
-		db.actor:give_money(money - db.actor:money())
+		-- not now: the engine's actor takes the money of its spawn after on_game_load (CActor::net_Spawn), the co-op's
+		-- starting money of a character it has no record of
+		local function set_money()
+			UnregisterScriptCallback("actor_on_first_update", set_money)
+			db.actor:give_money(money - db.actor:money())
+			printf("[coop] the new character's money: %s", money)
+		end
+		RegisterScriptCallback("actor_on_first_update", set_money)
 	end
 	if not mlr_utils.load_var("routes_faction") then
 		mlr_utils.save_var("routes_faction", faction)
