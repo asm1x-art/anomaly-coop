@@ -1,14 +1,14 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 20;
+export const PROTOCOL_VERSION = 21;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
 export const NO_BLOCK = 0xffff;
 
 export const M = {
-  HELLO: 1,   // c->s: u16 protocol version, stringZ name
+  HELLO: 1,   // c->s: u16 protocol version, stringZ name, stringZ build id ("dev" without the launcher: builds.js)
   WELCOME: 2, // s->c: u32 client id
   PING: 3,    // c->s: u32 client time (ms), u32 the client's last round trip (ms), for the admin page
   PONG: 4,    // s->c: u32 echoed client time (ms)
@@ -77,7 +77,8 @@ export const M = {
   FACT: 49,           // both: stringZ key ("info:<name>", "rel:<faction>:<faction>"...), stringZ value ('' gone);
                       // s->c also every one kept, right before WORLD_DONE. "once:" keys: the first value stays, and
                       // the one who reported gets the fact back either way (theirs: it's theirs; another: it isn't)
-  REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version; then it closes
+  REFUSED: 31,        // s->c: u8 REFUSED reason, u16 the server's player limit or protocol version (0 for BUILD); then
+                      // it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up
   // the world's clock (clock.js): every game in the world runs the server's game time
@@ -91,7 +92,7 @@ export const TIME_FLAG = { RUNNING: 1, SET: 2 };
 export const TIME_SET = { INIT: 0, JUMP: 1, FACTOR: 2 };
 export const TIME_TICK_MS = 5000;
 
-export const REFUSED = { FULL: 0, VERSION: 1 };
+export const REFUSED = { FULL: 0, VERSION: 1, BUILD: 2 };
 export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 };
 export const MAX_SAVES_LISTED = 200;
 export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4, STORY: 5 };

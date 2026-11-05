@@ -40,10 +40,10 @@ function timeOf(p) {
     epoch: p.readUInt32LE(13) };
 }
 
-function hello(name, version = PROTOCOL_VERSION) {
+function hello(name, version = PROTOCOL_VERSION, build = 'dev') {
   const p = Buffer.alloc(2);
   p.writeUInt16LE(version, 0);
-  return Buffer.concat([p, encodeText(name), Buffer.from([0])]);
+  return Buffer.concat([p, encodeText(name), Buffer.from([0]), encodeText(build), Buffer.from([0])]);
 }
 
 test('hello -> welcome with unique ids, ping -> pong echoes time', async () => {
@@ -1120,6 +1120,38 @@ test('clock: each save keeps the game time, a rollback takes the clock back to i
     assert.ok(t.game >= 7_000_000 && t.game < 7_000_000 + 3600_000);
     assert.equal(t.epoch, 3);
     a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('with a builds file only listed builds get in, dev ones by the flag', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const file = path.join(dataDir, 'builds.json');
+  fs.writeFileSync(file, JSON.stringify({ builds: [{ id: '0123456789abcdef', release: '2026.11.06-1', channel: 'stable' }] }));
+  const tryJoin = async (server, name, build) => {
+    const c = await connect(server.address().port);
+    c.send(M.HELLO, hello(name, PROTOCOL_VERSION, build));
+    const msg = await c.next();
+    c.socket.destroy();
+    return msg;
+  };
+  for (const allowDev of [false, true]) {
+    const server = await startServer({ ...options(), builds: { file, allowDev } });
+    try {
+      assert.equal((await tryJoin(server, 'friend', '0123456789ABCDEF')).type, M.WELCOME);
+      const old = await tryJoin(server, 'old', 'ffffffffffffffff');
+      assert.equal(old.type, M.REFUSED);
+      assert.equal(old.payload[0], REFUSED.BUILD);
+      assert.equal((await tryJoin(server, 'artem', 'dev')).type, allowDev ? M.WELCOME : M.REFUSED);
+    } finally {
+      server.close();
+    }
+  }
+  // a file that is not there lets everyone in (a broken publish must not lock players out)
+  const server = await startServer({ ...options(), builds: { file: path.join(dataDir, 'none.json'), allowDev: false } });
+  try {
+    assert.equal((await tryJoin(server, 'friend', 'ffffffffffffffff')).type, M.WELCOME);
   } finally {
     server.close();
   }

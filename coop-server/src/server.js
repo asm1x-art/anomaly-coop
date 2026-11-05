@@ -5,9 +5,12 @@ import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, 
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText } from './settings.js';
 import { createClock } from './clock.js';
+import { createBuildCheck } from './builds.js';
 
-export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log } = {}) {
+// builds: { file, allowDev } for builds.js; none lets every build in
+export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, builds = {} } = {}) {
   const storage = openStorage(dataDir);
+  const buildAllowed = createBuildCheck({ ...builds, log });
   const clock = createClock({ load: () => storage.loadClock(), save: (state) => storage.saveClock(state) });
   let nextId = 1;
   const clients = new Map(); // id -> { send, name, state }
@@ -292,6 +295,11 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (version !== PROTOCOL_VERSION) {
             log(`[${id}] protocol mismatch: client ${version}, server ${PROTOCOL_VERSION}`);
             return refuse(REFUSED.VERSION, PROTOCOL_VERSION);
+          }
+          const [helloName, build] = readStringsZ(payload, 2, 2);
+          if (!buildAllowed(build)) {
+            log(`[${id}] '${helloName}' turned away: build '${build || 'none'}' is not let in`);
+            return refuse(REFUSED.BUILD, 0);
           }
           const max = storage.settings().rules.max_players;
           if (clients.size >= max) {
