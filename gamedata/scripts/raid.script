@@ -172,11 +172,128 @@ local function found()
 	return m.raid_found
 end
 
+-- what was taken from one's own stash in this raid: one's own, never found, wherever it came from (the user's rule)
+local function own()
+	local m = alife_storage_manager.get_state()
+	m.raid_own = m.raid_own or {}
+	return m.raid_own
+end
+
 local function actor_on_item_take(item)
-	if ready and is_raid_level(level.name()) and time_global() >= loaded_at + TAKE_GRACE_MS then
+	if ready and is_raid_level(level.name()) and time_global() >= loaded_at + TAKE_GRACE_MS and not own()[item:id()] then
 		found()[item:id()] = true
 		dbg("found %s (%s)", item:section(), item:id())
 	end
+end
+
+-------------------------------------------------------------------------------
+-- own stashes ([raid_stash]): a backpack laid as a stash (item_backpack.script), or a stash of the player's own
+-- (player_created_stashes, Hideout Furniture's): left on a raid level it stays there through exits, deaths and the
+-- Monolith's weekly refresh; no PDA mark there (only a GPS beacon in it shows it, on the raid app's map); what one
+-- takes from it is one's own.
+
+function own_stash(box)
+	if not box then
+		return false
+	end
+	local m = alife_storage_manager.get_state()
+	if m.player_created_stashes and m.player_created_stashes[box:id()] then
+		return true
+	end
+	for _, section in ipairs(str_explode(ini_sys:r_string_ex("raid_stash", "boxes") or "inv_backpack", ",")) do
+		if box:section() == section then
+			return true
+		end
+	end
+	return false
+end
+
+local function actor_on_item_take_from_box(box, item)
+	if is_raid_level(level.name()) and own_stash(box) then
+		own()[item:id()] = true
+		found()[item:id()] = nil
+		dbg("own %s (%s) from stash %s", item:section(), item:id(), box:id())
+	end
+end
+
+-- the own stashes lying on raid levels lose the PDA's "treasure" mark
+local function unmark_stashes()
+	local m = alife_storage_manager.get_state()
+	for id in pairs(m.player_created_stashes or {}) do
+		local se = alife():object(id)
+		if se and is_raid_level(alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id()))
+			and level.map_has_object_spot(id, "treasure") ~= 0 then
+			level.map_remove_object_spot(id, "treasure")
+			dbg("stash %s unmarked", id)
+		end
+	end
+end
+
+local function actor_on_stash_create(data)
+	if data and data.stash_id and is_raid_level(level.name()) and level.map_has_object_spot(data.stash_id, "treasure") ~= 0 then
+		level.map_remove_object_spot(data.stash_id, "treasure")
+	end
+end
+
+-------------------------------------------------------------------------------
+-- a raid's run (the game's raid_run, from the start till out): when it began, the levels seen, kills, reinforcements
+-- (raid_monolith.script); out, it becomes the report shown at the shelter (ui_raid_hud.script): what was carried out
+-- or lost, the kills, the time.
+
+function run()
+	return alife_storage_manager.get_state().raid_run
+end
+
+local function game_seconds_now()
+	return game.get_game_time():diffSec(level.get_start_time())
+end
+
+-- { { section, count } } of items, in the order first met
+local function grouped(items)
+	local out, at = {}, {}
+	for _, it in ipairs(items) do
+		local section = it.section
+		if not at[section] then
+			out[#out + 1] = { section = section, count = 0 }
+			at[section] = out[#out]
+		end
+		at[section].count = at[section].count + (it.count or 1)
+	end
+	return out
+end
+
+-- the item's units: rounds in an ammo box, else 1
+local function units(item)
+	return IsAmmo(item) and item:ammo_get_count() or 1
+end
+
+local function npc_on_death_callback(npc, who)
+	local r = run()
+	if r and who and who:id() == AC_ID and is_raid_level(level.name()) then
+		r.kills = (r.kills or 0) + 1
+	end
+end
+
+-- the report of the run ended now: died, or what found is carried out
+local function report(died)
+	local m = alife_storage_manager.get_state()
+	local r = m.raid_run
+	if not r then
+		return
+	end
+	local carried = {}
+	if not died then
+		local f = found()
+		db.actor:iterate_inventory(function(_, item)
+			if f[item:id()] then
+				carried[#carried + 1] = { section = item:section(), count = units(item) }
+			end
+		end)
+	end
+	m.raid_report = { died = died or nil, seconds = math.max(0, game_seconds_now() - (r.t0 or game_seconds_now())),
+		factor = level.get_time_factor(), levels = r.levels, kills = r.kills or 0, reinf = r.reinf or 0,
+		carried = grouped(carried), lost = r.lost }
+	m.raid_run = nil
 end
 
 local function kept(item)
@@ -218,9 +335,14 @@ local function actor_on_before_death(who, flags)
 			lost[#lost + 1] = item
 		end
 	end)
+	local r, lost_items = run(), {}
 	for _, item in ipairs(lost) do
 		dbg("lost %s (%s)%s", item:section(), item:id(), f[item:id()] and ", found" or "")
+		lost_items[#lost_items + 1] = { section = item:section(), count = units(item) }
 		alife_release(item)
+	end
+	if r then
+		r.lost = grouped(lost_items)
 	end
 	printf("raid: died on %s, %s things lost", level.name(), #lost)
 	news("died", level.name())
@@ -241,12 +363,16 @@ function start()
 	local l = get_levels().landing
 	printf("raid: start, landing on %s", l.level)
 	shelter.set_state("raid_in", my_name())
-	alife_storage_manager.get_state().raid_found = nil
+	local m = alife_storage_manager.get_state()
+	m.raid_found, m.raid_own, m.raid_report = nil, nil, nil
+	m.raid_run = { t0 = game_seconds_now(), levels = { l.level }, kills = 0, reinf = 0 }
 	news("start", l.level)
 	save_var(db.actor, "raid_came_from", l.came_from)
+	raid_loot.plan_orders()
 	raid_monolith.prepare(l.level)
 	raid_rescue.prepare(l.level)
 	raid_rich.prepare(l.level)
+	raid_loot.prepare(l.level)
 	raid_rescue.on_start()
 	go(l.level, l.position, l.node, l.direction)
 end
@@ -259,7 +385,9 @@ function exit_to_shelter(died)
 	if not died then
 		news("out", level.name())
 	end
-	alife_storage_manager.get_state().raid_found = nil
+	report(died)
+	local m = alife_storage_manager.get_state()
+	m.raid_found, m.raid_own = nil, nil
 	shelter.set_state("raid_in", nil)
 	save_var(db.actor, "raid_came_from", nil)
 	save_var(db.actor, "raid_face_shelter", true)
@@ -286,10 +414,16 @@ function transition(obj)
 	end
 	printf("raid: %s -> %s", obj:name(), target)
 	save_var(db.actor, "raid_came_from", level.name())
+	local r = run()
+	if r then
+		r.levels = r.levels or {}
+		r.levels[#r.levels + 1] = target
+	end
 	raid_monolith.left(level.name())
 	raid_monolith.prepare(target)
 	raid_rescue.prepare(target)
 	raid_rich.prepare(target)
+	raid_loot.prepare(target)
 	go(target, vector_of(ini:r_string_ex("raid_transition", "position")), ini:r_u32("raid_transition", "node"),
 		ini:r_float_ex("raid_transition", "direction") or 0)
 end
@@ -476,6 +610,7 @@ local function actor_on_update()
 	if now >= checked_at then
 		checked_at = now + (ini_sys:r_float_ex("raid_gps", "check_seconds") or 10) * 1000
 		check_carried()
+		unmark_stashes()
 	end
 	if now >= news_at then
 		news_at = now + NEWS_MS
@@ -494,6 +629,18 @@ local function actor_on_first_update()
 		save_var(db.actor, "raid_woke", nil)
 		patch_up()
 		actor_menu.set_msg(1, string.format(game.translate_string("st_raid_woke"), lost), 10)
+	end
+	unmark_stashes()
+	local m = alife_storage_manager.get_state()
+	if m.raid_report and not is_raid_level(level.name()) then
+		CreateTimeEvent("raid", "report", ini_sys:r_float_ex("raid_report", "delay_seconds") or 2, function()
+			local rep = alife_storage_manager.get_state().raid_report
+			alife_storage_manager.get_state().raid_report = nil
+			if rep and ini_sys:r_bool_ex("raid_report", "show", true) then
+				ui_raid_hud.show_report(rep)
+			end
+			return true
+		end)
 	end
 end
 
@@ -523,5 +670,8 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("actor_on_item_put_in_box", actor_on_item_put_in_box)
 	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("actor_on_item_take_from_box", actor_on_item_take_from_box)
+	RegisterScriptCallback("actor_on_stash_create", actor_on_stash_create)
+	RegisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
 	RegisterScriptCallback("actor_on_before_death", actor_on_before_death)
 end

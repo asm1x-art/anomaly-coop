@@ -63,6 +63,36 @@ scientist_loot  = medkit_scientic, stimpack_scientic, drug_psy_blockade, drug_ra
 scientist_loot_count = 1, 2
 scientist_rare_chance = 0.5
 underground     = raid_sarcofag, raid_control_monolith   ; the Monolith's torches always on there
+; ...and with scientist_doc_chance one of the Monolith's documents (sold to traders; what they give in the shelter is
+; the user's to say)
+scientist_docs  = raid_doc_psi_screens, raid_doc_gauss, raid_doc_synthesis
+scientist_doc_chance = 0.35
+; reinforcements (raid_monolith.script): while one is on a raid level, every reinforce_every real seconds (drawn anew
+; each time) a squad of reinforce_men men of reinforce's ranks leaves the held smart nearest to one that is
+; reinforce_distance metres away at least, and hunts one; reinforce_max a raid at most (drawn as it starts). None held
+; that far: tried again in reinforce_retry seconds. reinforce_msg: a line on the screen as one sets out
+reinforce_every = 180, 300
+reinforce_max   = 2, 3
+reinforce_distance = 100
+reinforce_retry = 15
+reinforce       = experienced:1, veteran:1
+reinforce_men   = 3, 4
+reinforce_msg   = true
+; the dead's loot by their squad's kind (raid_loot.script): on the body's first search, after the game's own,
+; body_<kind>_count things (min, max) drawn by body_<kind>'s weights ("section:weight"). Kinds: near, mid, far, big,
+; sniper, post, patrol, reinforce, guard (the scientists' guards); a kind with none here takes far's. Per level too.
+body_near       = bandage:4, medkit:2, antirad:2, ammo_5.45x39_fmj:3, ammo_9x18_fmj:2, grenade_rgd5:1
+body_near_count = 0, 1
+body_mid        = medkit:3, bandage:2, stimpack:1, antirad:2, ammo_5.45x39_ap:2, ammo_9x19_fmj:1, grenade_rgd5:1, prt_i_fasteners:1
+body_mid_count  = 0, 1
+body_far        = medkit_army:3, stimpack:2, drug_coagulant:1, antirad:1, ammo_5.45x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, prt_i_capacitors:1, gun_oil:1
+body_far_count  = 0, 2
+body_big        = medkit_army:3, stimpack_army:2, drug_radioprotector:1, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, itm_repairkit_tier_2:1, cleaning_kit_r7:1
+body_big_count  = 1, 2
+body_sniper     = ammo_7.62x54_7h14:4, medkit:2, stimpack:1, cleaning_kit_r7:1
+body_sniper_count = 1, 1
+body_guard      = medkit_scientic:2, stimpack_army:2, drug_psy_blockade:2, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:1, itm_repairkit_tier_3:1
+body_guard_count = 1, 2
 
 ; the ranks: a rank's NPC section. alpha: masters in exoskeletons; sniper and scientist are no rank of the ladder
 [raid_monolith_ranks]
@@ -85,6 +115,7 @@ mid             = novice:1, experienced:1
 far             = novice:1, experienced:3
 big             = experienced:1
 patrol          = novice:1, experienced:1
+reinforce       = novice:1, experienced:2
 routes          = raid_lim_route_south, raid_lim_route_centre, raid_lim_route_west, raid_lim_route_north
 
 [raid_lim_route_south]
@@ -272,6 +303,7 @@ posts           = raid_hos_p1, raid_hos_p2, raid_hos_p3, raid_hos_p4
 patrol          = experienced:1, veteran:1
 patrol_chance   = 0.6
 patrol_max      = 1
+reinforce       = experienced:1, veteran:1
 routes          = raid_hos_route
 
 ; posts and loop routes: their places and host smarts in scripts\raid_posts.ltx (tools\raid\raid_posts.py); here men
@@ -301,6 +333,8 @@ snipers         = raid_aes2_monolith_snipers_1, raid_aes2_monolith_snipers_2, ra
 patrol          = veteran:1, master:1
 patrol_chance   = 0.5
 patrol_max      = 2
+reinforce       = veteran:2, master:1
+reinforce_men   = 2, 3
 routes          = raid_aes2_route_west, raid_aes2_route_centre, raid_aes2_route_east
 
 [raid_aes2_route_west]
@@ -325,6 +359,8 @@ big             = master:1
 patrol          = veteran:1, master:1
 patrol_chance   = 0.5
 patrol_max      = 2
+reinforce       = veteran:2, master:1
+reinforce_men   = 2, 3
 routes          = raid_aes_route_west, raid_aes_route_centre, raid_aes_route_east
 
 [raid_aes_route_west]
@@ -352,6 +388,8 @@ posts           = raid_sar_lab
 patrol          = master:1
 patrol_chance   = 0.5
 patrol_max      = 1
+reinforce       = master:2, alpha:1
+reinforce_men   = 2, 3
 routes          = raid_sar_route_hall
 
 [raid_sar_lab]  ; the Monolith's scientists in the store's long room, their guards at its ends
@@ -374,6 +412,8 @@ no_garrison     = raid_sar_monolith_zombies
 post            = master:2, alpha:1
 post_men        = 2, 3
 posts           = raid_ctl_p1, raid_ctl_p2, raid_ctl_p3, raid_ctl_lab
+reinforce       = master:2, alpha:1
+reinforce_men   = 2, 3
 
 [raid_ctl_p1]   ; west (the vanilla mon_post1)
 [raid_ctl_p2]   ; south-west (mon_post2, mon_camp2)
@@ -383,8 +423,9 @@ scientists      = 2, 2
 guards          = 2, 3
 guard_ranks     = alpha:1
 
-; rich stashes (raid_rich.script): list; loot drawn anew every refill_hours, loot_min..loot_max things; found with the RF
-; receiver within rf_distance on a frequency between freq_min and freq_max
+; rich stashes (raid_rich.script): list; loot drawn anew every refill_hours, by the stash's level's
+; [raid_rich_loot_<level>] (raid_loot.script), else loot_min..loot_max of loot; found with the RF receiver within
+; rf_distance on a frequency between freq_min and freq_max
 [raid_rich]
 list            = n1, n2, s1, s2, sar1, sar2, ctl1
 box             = raid_rich_box
@@ -453,7 +494,93 @@ inv_grid_height = 1
 inv_weight      = 0.5
 quest_item      = true
 
+; a rich stash's loot by its level (raid_loot.fill_rich): artefact_count (min, max) artefacts drawn by artefacts'
+; weights, item_count things by items' ("section:weight"; ammo comes as a full box)
+[raid_rich_loot_raid_stancia_2]
+artefacts       = af_glass:2, af_fire:2, af_ice:2, af_night_star:2, af_eye:2, af_cristall:2, af_fireball:2, af_medusa:2, af_compass:1, af_gold_fish:1, af_soul:1
+artefact_count  = 1, 2
+items           = medkit_army:3, stimpack_army:2, drug_radioprotector:2, antirad:3, ammo_5.45x39_ap:2, ammo_5.56x45_ap:2, ammo_9x39_ap:2, ammo_7.62x54_7h14:1, grenade_f1:2, itm_repairkit_tier_2:1
+item_count      = 2, 4
+
+[raid_rich_loot_raid_stancia]:raid_rich_loot_raid_stancia_2
+
+[raid_rich_loot_raid_sarcofag]
+artefacts       = af_compass:2, af_gold_fish:2, af_soul:2, af_glass:2, af_night_star:1, af_eye:1, af_fire:1, af_ice:1
+artefact_count  = 2, 3
+items           = medkit_scientic:3, stimpack_scientic:2, drug_psy_blockade:2, drug_radioprotector:2, ammo_9x39_ap:2, ammo_5.56x45_ap:2, grenade_f1:2, itm_repairkit_tier_3:1
+item_count      = 2, 4
+
+[raid_rich_loot_raid_control_monolith]:raid_rich_loot_raid_sarcofag
+item_count      = 3, 5
+
+; own stashes (raid.script): a box of these sections on a raid level (or one in the game's player_created_stashes, a
+; Hideout Furniture stash) is one's own: no PDA mark there, what is taken from it is never found in the raid
+[raid_stash]
+boxes           = inv_backpack
+
+; the taken contracts' things (raid_loot.script): each wanted section starting with one of order_prefixes lies once in
+; the raid, on a garrison's commander (a big garrison's first) on one of order_levels (drawn as a raid starts), else in
+; a rich stash there; condition (min, max)
+[raid_loot]
+order_prefixes  = wpn_
+order_levels    = raid_limansk, raid_hospital, raid_stancia_2, raid_stancia, raid_sarcofag, raid_control_monolith
+order_condition = 0.9, 0.97
+
+; the Monolith's documents on its scientists ([raid_monolith] scientist_docs): loot to sell for now
+[raid_doc_psi_screens]:tch_junk
+$spawn          = "devices\roubles"
+visual          = dynamics\equipments\quest\notes_document_case_1.ogf
+inv_name        = st_raid_doc_psi_screens
+inv_name_short  = st_raid_doc_psi_screens
+description     = st_raid_doc_psi_screens_descr
+inv_weight      = 0.4
+inv_grid_width  = 2
+inv_grid_height = 1
+inv_grid_x      = 10
+inv_grid_y      = 15
+cost            = 9000
+
+[raid_doc_gauss]:raid_doc_psi_screens
+visual          = dynamics\equipments\quest\notes_document_case_2.ogf
+inv_name        = st_raid_doc_gauss
+inv_name_short  = st_raid_doc_gauss
+description     = st_raid_doc_gauss_descr
+inv_grid_x      = 2
+inv_grid_y      = 15
+cost            = 12000
+
+[raid_doc_synthesis]:raid_doc_psi_screens
+visual          = dynamics\devices\dev_flash_1\dev_flash_1.ogf
+inv_name        = st_raid_doc_synthesis
+inv_name_short  = st_raid_doc_synthesis
+description     = st_raid_doc_synthesis_descr
+inv_weight      = 0.05
+inv_grid_width  = 1
+inv_grid_x      = 8
+inv_grid_y      = 3
+cost            = 10000
+
 ; a level with no PDA map: a plan of its own (tools\raid\raid_plan.py draws it from the level's AI map):
 ; "texture | x1, z1, x2, z2" (the world's box the texture spans, north up)
 [raid_plans]
 raid_sarcofag   = ui\raid\plan_raid_sarcofag | -36.9, -36.4, 79.6, 51.6
+
+; the window's countdown on the screen (ui_raid_hud.script) on raid levels: show (and the Co-op options page's switch);
+; corner top_right, top_left, bottom_right, bottom_left; margins from it and size (the HUD's 1024x768 units); alpha of
+; the box (0-255); real minutes (the game's divided by time_factor), or the game's with game_time = true; amber in the
+; last warn_minutes
+[raid_timer]
+show            = true
+corner          = top_right
+margin_x        = 16
+margin_y        = 40
+width           = 170
+height          = 40
+alpha           = 210
+game_time       = false
+warn_minutes    = 10
+
+; the report of a raid (ui_raid_hud.script): shown delay_seconds after coming back to the shelter
+[raid_report]
+show            = true
+delay_seconds   = 2

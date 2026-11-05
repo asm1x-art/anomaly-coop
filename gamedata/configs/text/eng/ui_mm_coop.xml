@@ -526,4 +526,10 @@
 	<string id="ui_mm_coop_status_joining">
 		<text>Your character is made. The master saves the world for you, then it downloads and loads by itself (up to 30 s). Don't press Enter.</text>
 	</string>
+	<string id="ui_mm_coop_general_raid_timer">
+		<text>Raid window timer</text>
+	</string>
+	<string id="ui_mm_coop_general_raid_timer_desc">
+		<text>Time left till the Cooling window closes, in a corner of the screen during a raid (real minutes).</text>
+	</string>
 </string_table>

@@ -1,0 +1,247 @@
+-- The raid's loot (settings: mod_system_raid.ltx [raid_loot], [raid_monolith] body_*, [raid_rich_loot_<level>]):
+-- - the Monolith's dead carry more by their squad's kind (raid_monolith.spawn_ranked tags each man: near, mid, far,
+--   big, sniper, post, patrol, reinforce, guard, scientist): body_<kind> things drawn on the body's first search, after
+--   the game's own loot (death_manager), so it keeps them;
+-- - the taken contracts' things (shelter_orders.wanted(), of order_prefixes): one of each lies in the raid, on the
+--   commander of a garrison on one of order_levels (else in a rich stash there), drawn as a raid starts; one still in
+--   the raid from an earlier one (not carried out) stays. The world's: raid_order_<section> = its id,
+--   raid_order_lvl_<section> = its level;
+-- - a rich stash's draw by its level (raid_rich.script).
+
+local S = "raid_loot"
+local NO_PARENT = 65535
+
+local function list(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+-- "a, b" drawn: a number from a to b
+local function count_of(s, a, b)
+	local t = list(s)
+	local lo = tonumber(t[1]) or a
+	local hi = tonumber(t[2]) or (t[1] and lo) or b
+	return math.random(lo, math.max(lo, hi))
+end
+
+-- "section:weight, ..." drawn: a known section, or nil
+function draw(weights)
+	local t, total = {}, 0
+	for _, entry in ipairs(list(weights)) do
+		local section, w = string.match(entry, "^([^:]+):%s*([%d%.]+)$")
+		section, w = section or entry, tonumber(w) or 1
+		if ini_sys:section_exist(section) and w > 0 then
+			t[#t + 1] = { section, w }
+			total = total + w
+		end
+	end
+	if total <= 0 then
+		return
+	end
+	local r = math.random() * total
+	for _, e in ipairs(t) do
+		r = r - e[2]
+		if r <= 0 then
+			return e[1]
+		end
+	end
+	return t[#t][1]
+end
+
+-- count things of weights into an owner (a game or server object)
+function give(weights, count, owner)
+	for _ = 1, count do
+		local section = draw(weights)
+		if section then
+			alife_create_item(section, owner)
+		end
+	end
+end
+
+local function level_of(se)
+	while se and se.parent_id ~= NO_PARENT do
+		se = se.parent_id < NO_PARENT and alife():object(se.parent_id)
+	end
+	return se and alife():level_name(game_graph():vertex(se.m_game_vertex_id):level_id())
+end
+
+-------------------------------------------------------------------------------
+-- the dead's loot by their kind: [<level>_monolith] body_<kind>, else [raid_monolith]'s; no body_<kind>: far's
+
+local function body_setting(level_name, key)
+	return ini_sys:r_string_ex(level_name .. "_monolith", key) or ini_sys:r_string_ex("raid_monolith", key)
+end
+
+local function body_loot(npc)
+	local kind = se_load_var(npc:id(), npc:name(), "raid_kind")
+	local level_name = level.name()
+	if not (kind and raid.is_raid_level(level_name)) then
+		return
+	end
+	local weights = body_setting(level_name, "body_" .. kind)
+	local count = body_setting(level_name, "body_" .. kind .. "_count")
+	if not weights then
+		weights, count = body_setting(level_name, "body_far"), body_setting(level_name, "body_far_count")
+	end
+	local n = count_of(count, 0, 1)
+	give(weights, n, npc)
+	raid.dbg("body loot of %s (%s): %s things", npc:name(), kind, n)
+end
+
+-------------------------------------------------------------------------------
+-- the contracts' things
+
+local function wanted_here(section)
+	if not ini_sys:section_exist(section) then
+		return false
+	end
+	for _, prefix in ipairs(list(ini_sys:r_string_ex(S, "order_prefixes"))) do
+		if string.sub(section, 1, #prefix) == prefix then
+			return true
+		end
+	end
+	return false
+end
+
+local function wanted()
+	local out = {}
+	if shelter_orders and shelter_orders.wanted then
+		for section in pairs(shelter_orders.wanted()) do
+			if wanted_here(section) then
+				out[#out + 1] = section
+			end
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+-- one placed in an earlier raid, still lying in the raid (not carried out)
+local function still_there(section)
+	local id = tonumber(shelter.state("raid_order_" .. section, nil))
+	local se = id and alife():object(id)
+	return se and se:section_name() == section and raid.is_raid_level(level_of(se)) or false
+end
+
+-- as a raid starts: where each wanted thing lies this time
+function plan_orders()
+	local levels = list(ini_sys:r_string_ex(S, "order_levels"))
+	if #levels == 0 then
+		return
+	end
+	for _, section in ipairs(wanted()) do
+		if not still_there(section) then
+			local lv = levels[math.random(#levels)]
+			shelter.set_state("raid_order_" .. section, nil)
+			shelter.set_state("raid_order_lvl_" .. section, lv)
+			printf("raid_loot: %s for a contract on %s", section, lv)
+		end
+	end
+end
+
+-- a thing of condition cond made in an owner's inventory, offline too: its state packet changed once registered (an
+-- unregistered one's methods crash: pure virtual call)
+local function create_with_condition(section, owner, cond)
+	local se = alife_create(section, owner.position, owner.m_level_vertex_id, owner.m_game_vertex_id, owner.id)
+	if not se then
+		return
+	end
+	local weapon = IsWeapon(nil, se:clsid())
+	local data = weapon and utils_stpk.get_weapon_data(se) or utils_stpk.get_item_data(se)
+	if data then
+		data.condition = cond
+		if weapon then
+			utils_stpk.set_weapon_data(data, se)
+		else
+			utils_stpk.set_item_data(data, se)
+		end
+	end
+	return se
+end
+
+-- the commanders of the garrisons on a level: big ones first
+local function commanders(level_name)
+	local big, other = {}, {}
+	for name, smart in pairs(SIMBOARD.smarts_by_names) do
+		if alife():level_name(game_graph():vertex(smart.m_game_vertex_id):level_id()) == level_name then
+			local ids = list(tostring(shelter.state("raid_g_" .. name, "") or ""))
+			for i, s in ipairs(ids) do
+				local squad = raid_monolith.squad_alive(tonumber(s))
+				local commander = squad and alife():object(squad:commander_id())
+				if commander then
+					local into = (i == 1 and #ids > 1) and big or other -- a big garrison's first squad
+					into[#into + 1] = commander
+				end
+			end
+		end
+	end
+	return #big > 0 and big or other
+end
+
+local function rich_box(level_name)
+	for _, name in ipairs(list(ini_sys:r_string_ex("raid_rich", "list"))) do
+		if ini_sys:r_string_ex("raid_rich_" .. name, "level") == level_name then
+			local box = alife():object(tonumber(shelter.state("raid_rich_box_" .. name, nil)) or NO_PARENT)
+			if box then
+				return box
+			end
+		end
+	end
+end
+
+-- a raid level made ready as one goes onto it (after the Monolith and the rich stashes): the contracts' things for it
+function prepare(level_name)
+	local cond = list(ini_sys:r_string_ex(S, "order_condition"))
+	local lo, hi = tonumber(cond[1]) or 0.9, tonumber(cond[2] or cond[1]) or 0.97
+	for _, section in ipairs(wanted()) do
+		if shelter.state("raid_order_lvl_" .. section, nil) == level_name and not still_there(section) then
+			local c = commanders(level_name)
+			local owner = #c > 0 and c[math.random(#c)] or rich_box(level_name)
+			local se = owner and create_with_condition(section, owner, lo + math.random() * (hi - lo))
+			if se then
+				shelter.set_state("raid_order_" .. section, se.id)
+				if not IsInvbox(nil, owner:clsid()) then
+					-- death_manager leaves such a weapon as it is (the player's, strapped on): no wear on the body
+					se_save_var(se.id, se:name(), "strapped_item", true)
+				end
+				printf("raid_loot: %s for a contract with %s on %s", section, owner:name(), level_name)
+			else
+				printf("! raid_loot: nowhere to put %s on %s", section, level_name)
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- a rich stash's loot: [raid_rich_loot_<level>] artefacts (weights), artefact_count, items (weights), item_count;
+-- none for the level: [raid_rich]'s loot, loot_min..loot_max artefacts
+function fill_rich(box, level_name)
+	local s = "raid_rich_loot_" .. level_name
+	if not ini_sys:section_exist(s) then
+		local loot = list(ini_sys:r_string_ex("raid_rich", "loot"))
+		local lo, hi = ini_sys:r_float_ex("raid_rich", "loot_min") or 2, ini_sys:r_float_ex("raid_rich", "loot_max") or 4
+		for _ = 1, math.random(lo, math.max(lo, hi)) do
+			alife_create_item(loot[math.random(#loot)], box)
+		end
+		return
+	end
+	give(ini_sys:r_string_ex(s, "artefacts"), count_of(ini_sys:r_string_ex(s, "artefact_count"), 1, 2), box)
+	give(ini_sys:r_string_ex(s, "items"), count_of(ini_sys:r_string_ex(s, "item_count"), 2, 4), box)
+end
+
+function on_game_start()
+	-- the death_manager's private items are its last loot of a body: ours after them
+	local create_item_list = death_manager.create_item_list
+	death_manager.create_item_list = function(npc, npc_comm, npc_rank, is_private, to_save, ...)
+		local r = create_item_list(npc, npc_comm, npc_rank, is_private, to_save, ...)
+		if is_private and not to_save then
+			body_loot(npc)
+		end
+		return r
+	end
+end

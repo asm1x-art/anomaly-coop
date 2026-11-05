@@ -177,8 +177,9 @@ local function draw_section(weights, level_name)
 end
 
 -- a squad of the smart's of men by rank weights, men = {min, max}; kept there as spawn_squad's. Made at the smart, or
--- "at" { position, level vertex, game vertex } (a post's place: the post squad, always arrived at its smart)
-function spawn_ranked(smart_se, weights, men, at)
+-- "at" { position, level vertex, game vertex } (a post's place: the post squad, always arrived at its smart). kind: the
+-- squad's kind for its dead's loot (raid_loot.script: near, far, big, post...)
+function spawn_ranked(smart_se, weights, men, at, kind)
 	local pos, lv, gv = smart_se.position, smart_se.m_level_vertex_id, smart_se.m_game_vertex_id
 	if at then
 		pos, lv, gv = at[1], at[2], at[3]
@@ -196,6 +197,9 @@ function spawn_ranked(smart_se, weights, men, at)
 		if se then
 			SIMBOARD:setup_squad_and_group(se)
 			SendScriptCallback("squad_on_npc_creation", squad, se, smart_se)
+			if kind then
+				se_save_var(se.id, se:name(), "raid_kind", kind)
+			end
 		end
 	end
 	if squad:npc_count() == 0 then
@@ -240,7 +244,7 @@ local function garrison(level_name, smart, tier, big)
 		what, squads = "sniper", { { setting(level_name, "sniper"), range_of(setting(level_name, "sniper_men"), 2, 3) } }
 	end
 	for i, s in ipairs(squads) do
-		local squad = spawn_ranked(smart.se, s[1], s[2])
+		local squad = spawn_ranked(smart.se, s[1], s[2], nil, what)
 		if squad then
 			ids[#ids + 1] = squad.id
 			if big and i == 1 then
@@ -265,7 +269,7 @@ local function man_post(level_name, post)
 	local at = pos and { pos, tonumber(p[4]), raid.vertex_of(level_name, pos) }
 	local ids = {}
 	if ini_sys:line_exist(post, "scientists") then
-		local squad = spawn_ranked(smart, "scientist:1", range_of(ini_sys:r_string_ex(post, "scientists"), 2, 3), at)
+		local squad = spawn_ranked(smart, "scientist:1", range_of(ini_sys:r_string_ex(post, "scientists"), 2, 3), at, "scientist")
 		if squad then
 			ids[#ids + 1] = squad.id
 			local count = range_of(ini_sys:r_string_ex(S, "scientist_loot_count"), 1, 2)
@@ -276,14 +280,17 @@ local function man_post(level_name, post)
 				if math.random() < number("scientist_rare_chance", 0) then
 					alife_create_item(pick(list(S, "rare_loot")), alife():object(k.id))
 				end
+				if math.random() < number("scientist_doc_chance", 0) then
+					alife_create_item(pick(list(S, "scientist_docs")), alife():object(k.id))
+				end
 			end
 		end
 		squad = spawn_ranked(smart, ini_sys:r_string_ex(post, "guard_ranks") or setting(level_name, "far"),
-			range_of(ini_sys:r_string_ex(post, "guards"), 2, 3), at)
+			range_of(ini_sys:r_string_ex(post, "guards"), 2, 3), at, "guard")
 		ids[#ids + 1] = squad and squad.id
 	else
 		local squad = spawn_ranked(smart, ini_sys:r_string_ex(post, "ranks") or setting(level_name, "post"),
-			range_of(ini_sys:r_string_ex(post, "men") or setting(level_name, "post_men"), 2, 3), at)
+			range_of(ini_sys:r_string_ex(post, "men") or setting(level_name, "post_men"), 2, 3), at, "post")
 		ids[#ids + 1] = squad and squad.id
 	end
 	shelter.set_state("raid_g_" .. post, table.concat(ids, ","))
@@ -370,7 +377,7 @@ local function patrols(level_name)
 			local index = #chain > 0 and math.random(#chain) or 0
 			local host = #chain > 0 and chain[index] or posts():r_string_ex("raid_post_hosts", route)
 			local smart = host and SIMBOARD.smarts_by_names[host]
-			local squad = smart and spawn_ranked(smart, weights, men)
+			local squad = smart and spawn_ranked(smart, weights, men, nil, "patrol")
 			if squad then
 				n = n + 1
 				shelter.set_state("raid_p_" .. level_name .. "_" .. n,
@@ -384,12 +391,83 @@ local function patrols(level_name)
 	end
 end
 
+-------------------------------------------------------------------------------
+-- reinforcements (the user's: a squad every 3-5 minutes, 2-3 a raid at most, only from held smarts, 100 m away at
+-- least): while one is on a raid level, every reinforce_every real seconds (drawn anew each time) a squad of reinforce's
+-- ranks leaves the held smart nearest to one that is reinforce_distance metres away at least and hunts one; at most
+-- reinforce_max (drawn as the raid starts) a raid (raid.run()). The world's raid_r_<level> = "squad id:smart, ...":
+-- they go back to their smarts as one leaves the level, and are gone as one next comes.
+
+local reinforce_at -- time_global() of the next one on this level
+
+local function reinforcements(level_name)
+	local out = {}
+	for _, entry in ipairs(str_explode(tostring(shelter.state("raid_r_" .. level_name, "") or ""), ",")) do
+		local id, smart = string.match(entry, "^(%d+):(.+)$")
+		if id then
+			out[#out + 1] = { id = tonumber(id), smart = smart }
+		end
+	end
+	return out
+end
+
+local function reinforce_next()
+	local r = range_of(ini_sys:r_string_ex(S, "reinforce_every"), 180, 300)
+	reinforce_at = time_global() + math.random(r[1], math.max(r[1], r[2])) * 1000
+end
+
+-- a squad sent now; false: none could be (no held smart far enough)
+local function reinforce(level_name)
+	local run = raid.run()
+	if not run then
+		return true
+	end
+	run.reinf = run.reinf or 0
+	if not run.reinf_max then
+		local r = range_of(setting(level_name, "reinforce_max"), 2, 3)
+		run.reinf_max = math.random(r[1], math.max(r[1], r[2]))
+	end
+	if run.reinf >= run.reinf_max then
+		return true
+	end
+	local min_d, pos = level_number(level_name, "reinforce_distance", 100), db.actor:position()
+	local best, best_d
+	for _, smart in ipairs(garrison_smarts(level_name, smarts_of(level_name))) do
+		local d = smart.se.position:distance_to(pos)
+		if d >= min_d and (not best_d or d < best_d) and held(smart) then
+			best, best_d = smart, d
+		end
+	end
+	if not best then
+		raid.dbg("reinforce: no held smart %s m away", min_d)
+		return false
+	end
+	local squad = spawn_ranked(best.se, setting(level_name, "reinforce"), range_of(setting(level_name, "reinforce_men"), 3, 4),
+		nil, "reinforce")
+	if not squad then
+		return false
+	end
+	squad.scripted_target = "actor"
+	run.reinf = run.reinf + 1
+	local list = tostring(shelter.state("raid_r_" .. level_name, "") or "")
+	shelter.set_state("raid_r_" .. level_name, (list == "" and "" or list .. ",") .. squad.id .. ":" .. best.name)
+	printf("raid: reinforcement %s of %s from %s, %s m away", run.reinf, run.reinf_max, best.name, math.floor(best_d))
+	if ini_sys:r_bool_ex(S, "reinforce_msg", true) then
+		actor_menu.set_msg(1, game.translate_string("st_raid_reinforce"), 5)
+	end
+	return true
+end
+
 -- a raid level made ready as one goes onto it (before it loads): refreshed if due, else the retakes since it was
--- last seen; the patrols rolled
+-- last seen; the patrols rolled; the reinforcements of an earlier visit gone
 function prepare(level_name)
 	if not ini_sys:section_exist(level_name .. "_monolith") then
 		return
 	end
+	for _, r in ipairs(reinforcements(level_name)) do
+		remove_squads({ r.id })
+	end
+	shelter.set_state("raid_r_" .. level_name, nil)
 	local smarts = garrison_smarts(level_name, smarts_of(level_name))
 	if #smarts == 0 and #level_list(level_name, "posts") == 0 then
 		return
@@ -412,10 +490,17 @@ function prepare(level_name)
 	patrols(level_name)
 end
 
--- the level left now: the time away counts from here
+-- the level left now: the time away counts from here; the reinforcements go back to their smarts (a hunt of one
+-- elsewhere would look for a way off the level)
 function left(level_name)
 	if ini_sys:section_exist(level_name .. "_monolith") then
 		shelter.set_state("raid_seen_" .. level_name, game_seconds())
+		for _, r in ipairs(reinforcements(level_name)) do
+			local squad = squad_alive(r.id)
+			if squad then
+				squad.scripted_target = r.smart
+			end
+		end
 	end
 end
 
@@ -561,8 +646,21 @@ local function actor_on_update()
 	end
 	if now >= seen_at then
 		seen_at = now + SEEN_MS
-		left(name)
+		shelter.set_state("raid_seen_" .. name, game_seconds())
 	end
+	if not reinforce_at then
+		reinforce_next()
+	elseif now >= reinforce_at then
+		if reinforce(name) then
+			reinforce_next()
+		else
+			reinforce_at = now + (number("reinforce_retry", 15)) * 1000
+		end
+	end
+end
+
+local function actor_on_first_update()
+	reinforce_at = nil -- a level loaded: its own count from now
 end
 
 function on_game_start()
@@ -594,4 +692,5 @@ function on_game_start()
 		end
 	end
 	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 end
