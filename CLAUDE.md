@@ -16,7 +16,7 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 
 ## Docs
 - Plans, design, progress and test orders live in Notion, "Документация проекта" (https://app.notion.com/p/40ed89dbf39d81f68103c6060dceae0b). It is private, in the project owner's workspace; agents with Notion access use it.
-- Code-bound docs stay in `docs/coop/`: `weapons.md`, `render.md`.
+- Code-bound docs stay in `docs/coop/`: `multiplayer.md`, `weapons.md`, `render.md`.
 - New user-facing docs go to Notion, not into new `.md` files in the repo.
 
 ## Build

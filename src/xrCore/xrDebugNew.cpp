@@ -67,6 +67,18 @@ XRCORE_API xrDebug Debug;
 
 static bool error_after_dialog = false;
 
+// The co-op world's headless host (-coop_host) has nobody to answer an error box: it ends instead, and its server
+// starts it again (coop-server/src/host.js)
+static int error_box(HWND window, LPCSTR text, LPCSTR caption, UINT type)
+{
+	if (strstr(GetCommandLine(), "-coop_host"))
+	{
+		FlushLog();
+		TerminateProcess(GetCurrentProcess(), 1);
+	}
+	return MessageBox(window, text, caption, type);
+}
+
 namespace crash_saving
 {
     void (*save_impl)() = nullptr;
@@ -239,7 +251,7 @@ void xrDebug::gather_info(const char* expression, const char* description, const
 void xrDebug::do_exit(const std::string& message)
 {
 	FlushLog();
-	MessageBox(NULL, message.c_str(), "Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+	error_box(NULL, message.c_str(), "Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 	TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -279,7 +291,7 @@ void xrDebug::backend(const char* expression, const char* description, const cha
 
 	ShowCursor(true);
 	ShowWindow(GetActiveWindow(), SW_FORCEMINIMIZE);
-	MessageBox(
+	error_box(
 		NULL,
 		assertion_info,
 		"Fatal Error",
@@ -327,13 +339,13 @@ void xrDebug::backend(const char* expression, const char* description, const cha
     FlushLog();
 
 #ifdef XRCORE_STATIC
-    MessageBox (NULL,assertion_info,"X-Ray error",MB_OK|MB_ICONERROR|MB_SYSTEMMODAL);
+    error_box (NULL,assertion_info,"X-Ray error",MB_OK|MB_ICONERROR|MB_SYSTEMMODAL);
 #else
 # ifdef USE_OWN_ERROR_MESSAGE_WINDOW
     ShowCursor(true);
     ShowWindow(GetActiveWindow(), SW_FORCEMINIMIZE);
     int result =
-        MessageBox(
+        error_box(
         GetTopWindow(NULL),
         assertion_info,
         "Fatal Error",
@@ -862,7 +874,7 @@ LONG WINAPI UnhandledFilter(_EXCEPTION_POINTERS* pExceptionInfo)
 
 	ShowCursor(true);
 	ShowWindow(GetActiveWindow(), SW_FORCEMINIMIZE);
-	MessageBox(
+	error_box(
 		GetTopWindow(NULL),
 		"Unhandled exception occured. See log for details",
 		"Fatal Error",
@@ -931,7 +943,7 @@ LONG WINAPI UnhandledFilter(_EXCEPTION_POINTERS* pExceptionInfo)
     {
         if (Debug.get_on_dialog())
             Debug.get_on_dialog() (true);
-        MessageBox(
+        error_box(
             NULL,
             "Fatal error occured\n\nPress OK to abort program execution",
             "Fatal Error",
@@ -1022,7 +1034,7 @@ void _terminate()
     LPSTR buffer = assertion_info + xr_strlen(assertion_info);
     buffer += xr_sprintf(buffer, sizeof(buffer), "Press OK to abort execution%s",endline);
 
-    MessageBox (
+    error_box (
         GetTopWindow(NULL),
         assertion_info,
         "Fatal Error",

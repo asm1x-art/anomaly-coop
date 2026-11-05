@@ -520,6 +520,10 @@ extern ENGINE_API float refresh_rate;
 
 extern ENGINE_API bool g_bBenchmark;
 
+// -coop_host: the co-op world's headless host (docs/coop/multiplayer.md). Its window stays hidden and nothing is drawn;
+// frames run at a fixed rate for A-Life and scripts
+extern ENGINE_API bool g_coop_headless;
+
 typedef fastdelegate::FastDelegate0<bool> LOADING_EVENT;
 extern ENGINE_API xr_list<LOADING_EVENT> g_loading_events;
 

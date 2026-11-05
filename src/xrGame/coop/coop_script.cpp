@@ -7,6 +7,7 @@
 #include "coop_progress.h"
 #include "coop_facts.h"
 #include "coop_time.h"
+#include "coop_npc.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -151,10 +152,10 @@ namespace coop
 			def("world_creator", &world_creator),
 			def("claim_world", &claim_world),
 			def("set_save_meta", &set_save_meta),    // (name, reason, who) of the save Lua is about to make
-			def("request_save", &request_save),      // (name): the master saves the world
+			def("request_save", &request_save),      // (name): our character is saved (the leader: the group)
 			def("request_saves", &request_saves),    // the list comes to _G.coop_on_saves
-			def("propose_rollback", &propose_rollback), // (revision): everyone votes
-			def("answer_rollback", &answer_rollback),
+			def("load_save", &load_save),            // (id): our character (the leader: the group) as that save has it
+			def("answer_rollback", &answer_rollback), // (yes) to a vote (a pause)
 			def("propose_pause", &propose_pause),    // (pause): everyone in the world votes
 			def("world_paused", &world_paused),
 			def("join_world", &join_world),
@@ -170,6 +171,11 @@ namespace coop
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
 			def("clock", &clock_ms),                   // the world's game time (ms) as we count it, 0 without one
+			def("is_host", &is_host),                  // this game is the world's headless host
+			def("server_address", &server_address),    // "host:port" we connected to, "" before
+			def("admin_login", &admin_login),          // (password) for the admin window: _G.coop_on_admin_state comes
+			def("admin_command", &admin_command),      // (tab-split command): _G.coop_on_admin_result, _admin_state
+			def("squad_online_elsewhere", &squad_online_elsewhere), // (squad id) the host: a player's game has it online
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none
 			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count

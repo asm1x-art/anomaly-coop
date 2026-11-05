@@ -178,6 +178,8 @@ void CAI_Trader::OnEvent(NET_Packet& P, u16 type)
 	case GE_OWNERSHIP_TAKE:
 		P.r_u16(id);
 		Obj = Level().Objects.net_Find(id);
+		if (!Obj) // destroyed before its event came (a level unloading, co-op's moves)
+			break;
 		if (inventory().CanTakeItem(smart_cast<CInventoryItem*>(Obj)))
 		{
 			Obj->H_SetParent(this);
@@ -196,6 +198,8 @@ void CAI_Trader::OnEvent(NET_Packet& P, u16 type)
 		{
 			P.r_u16(id);
 			Obj = Level().Objects.net_Find(id);
+			if (!Obj) // destroyed before its event came (a level unloading, co-op's moves)
+				break;
 			bool just_before_destroy = !P.r_eof() && P.r_u8();
 			bool dont_create_shell = (type == GE_TRADE_SELL) || just_before_destroy;
 

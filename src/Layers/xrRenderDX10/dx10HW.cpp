@@ -1184,6 +1184,10 @@ BOOL CHW::support(D3DFORMAT fmt, DWORD type, DWORD usage)
 
 void CHW::updateWindowProps(HWND m_hWnd)
 {
+	// the co-op host's window never shows (device.h)
+	if (g_coop_headless)
+		return;
+
 	//	BOOL	bWindowed				= strstr(Core.Params,"-dedicated") ? TRUE : !psDeviceFlags.is	(rsFullscreen);
     BOOL bWindowed = (g_screenmode != 2);
 

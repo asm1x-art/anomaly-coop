@@ -1,14 +1,15 @@
 // Wire format shared with the engine (src/xrGame/coop/coop_net.h):
 // u32 size | NET_Packet bytes (u16 type | payload), little-endian.
 
-export const PROTOCOL_VERSION = 21;
+export const PROTOCOL_VERSION = 25;
 
 // engine id generator (xrServer::id_generator_type): ids 0..65534 in 256 blocks of 256
 export const ID_BLOCK_COUNT = 256;
 export const NO_BLOCK = 0xffff;
 
 export const M = {
-  HELLO: 1,   // c->s: u16 protocol version, stringZ name, stringZ build id ("dev" without the launcher: builds.js)
+  HELLO: 1,   // c->s: u16 protocol version, stringZ name, stringZ build id ("dev" without the launcher: builds.js),
+              // u8 1 for the world's host (else 0), stringZ the host's secret
   WELCOME: 2, // s->c: u32 client id
   PING: 3,    // c->s: u32 client time (ms), u32 the client's last round trip (ms), for the admin page
   PONG: 4,    // s->c: u32 echoed client time (ms)
@@ -47,19 +48,21 @@ export const M = {
   GROUPS: 28,         // s->c: u8 count, per group u8 size, the names (leader first), u8 GROUP_FLAG bits; to all on
                       // every change
   GROUP_NOTE: 29,     // s->c: u8 GROUP_NOTE, stringZ the other player's name: why an invite came to nothing
-  // the world's saves (storage.js): every upload is one, the last is the world
+  // The world's saves (storage.js) are the sim master's uploads, the last is the world. The players save their
+  // characters (docs/coop/multiplayer.md «Сохранения»): a character's save is a snapshot its game makes, a group's
+  // leader saves and loads the whole group; the world never goes back for them.
   LEFT_WORLD: 32,     // c->s: our game went back to the main menu, still connected
-  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save the world now
-  SAVE_NOW: 34,       // s->c, to the sim master: stringZ name, reason, who: save now, the upload carries them back
-  SAVES_REQUEST: 35,  // c->s: the list of saves, please
-  SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 revision, u32 time (unix s),
-                      // stringZ name, reason, who, u32 the revision it went back to (rollback) or 0
-  ROLLBACK_PROPOSE: 37, // c->s: u32 revision: take the world back to that save, if everyone agrees
-  ROLLBACK_VOTE: 38,  // s->c, to all: u32 proposer id, stringZ proposer name, u32 revision, u32 time, stringZ name, reason
-  ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a rollback, a pause)
-  ROLLBACK_RESULT: 40, // s->c, to all: u8 ROLLBACK result, stringZ the player it came to (said no, didn't answer, left),
-                      // u32 the world's new revision (ACCEPTED)
-  WORLD_RELOAD: 41,   // s->c: the world went back to a save: a game running it loads it again (WORLD_INFO follows)
+  SAVE_REQUEST: 33,   // c->s: stringZ name ('' for a quick save): save my character (a group's leader: the group's)
+  SAVE_NOW: 34,       // s->c, to the sim master: stringZ name, reason, who: save the world now, the upload carries them
+  SAVES_REQUEST: 35,  // c->s: the list of my character's saves, please
+  SAVES: 36,          // s->c: u16 count, newest first (at most MAX_SAVES_LISTED), each u32 id, u32 time (unix s),
+                      // stringZ name, reason ('quick', 'named', 'group'), who (the one who saved it), u32 0
+  LOAD_REQUEST: 37,   // c->s: u32 id: my character (a group's save: the whole group, the leader asks) as that save has it
+  // 38: was a world rollback's vote
+  ROLLBACK_ANSWER: 39, // c->s: u8 1 yes, 0 no: the answer to whatever vote is on (a pause)
+  LOAD_RESULT: 40,    // s->c: u8 LOAD result, u32 the save's id
+  WORLD_RELOAD: 41,   // s->c: the world, or our character in it, went back to a save: a game running it loads it again
+                      // (WORLD_INFO follows)
   // pausing the world: everyone in it agrees, as with a rollback
   PAUSE_PROPOSE: 42,  // c->s: u8 1 pause, 0 go on
   PAUSE_VOTE: 43,     // s->c, to all: u32 proposer id, stringZ proposer name, u8 1 pause, 0 go on
@@ -81,6 +84,30 @@ export const M = {
                       // it closes
   WORLD_CLAIM: 30,    // c->s: u8 1: this player starts the world on an empty server, the first to ask gets it
                       // (WORLD_INFO); 0: they gave it up
+  LEVELS: 51,         // s->c: u8 count, per level with players on it stringZ level, u32 its authority: the player
+                      // there longest (the first to come); to all on every change
+  HOST: 52,           // s->c: u32 the world's host (0: none), stringZ its name; after WELCOME and to all on every change.
+                      // The host (the game the server started with -coop_host) is the sim master whenever it is in the
+                      // world, and no player: no PEER_STATE, no level, no group, no say in votes
+  // Joining: the world's last save comes with the changes made since (the journal); the game replays them while
+  // it loads, so nobody saves for a player to come in or go
+  JOURNAL: 53,        // s->c: a world change made since the save: u16 type, then the message as it was relayed;
+                      // after the facts, before WORLD_DONE
+  NAMES: 54,          // s->c: u16 count, per player u32 id, stringZ name: everyone of this server run (the journal's
+                      // changes are by ids, some of players gone), before the journal
+  SNAPSHOT_REQUEST: 55, // s->c: u32 save id: send a snapshot of your character for that save
+  SNAPSHOT: 56,       // c->s: u32 save id, u32 total size, u32 offset, data (offset 0 first): u32 size, the character's
+                      // record (as CHARACTER); u32 size, its progress (as PROGRESS); then its things (the game's own)
+  SNAPSHOT_THINGS: 57, // s->c: u32 total size, u32 offset, data: the things of the save the character was put back to,
+                      // with the world (before WORLD_DONE), once
+  // The in-game admin window (ui_coop_admin.script): the admin page's password, then what the page and the bot do
+  ADMIN_LOGIN: 58,    // c->s: stringZ the admin password: ADMIN_STATE back, or ADMIN_RESULT saying it is wrong
+  ADMIN_STATE: 59,    // s->c: stringZ lines of tab-split fields: host <text> | world <revision> <owner> | player <name>
+                      // <level> <ping> <1: runs its level> | setting <world|rules> <key> <value> <min> <max> <title> |
+                      // faction <id> <1: allowed> <title> | save <revision> <unix time> <text>
+  ADMIN_COMMAND: 60,  // c->s: stringZ tab-split: state | set <key> <value> | faction <id> <on|off> | save | restart_host |
+                      // kick <name> | rollback <revision>; ADMIN_RESULT (but for state), then ADMIN_STATE back
+  ADMIN_RESULT: 61,   // s->c: stringZ what happened, as the admin reads it (Russian)
   // the world's clock (clock.js): every game in the world runs the server's game time
   TIME: 62,           // s->c: u64 game time (ms), f32 factor, u8 TIME_FLAG bits, u32 epoch; after WELCOME, to all on
                       // every change and every TIME_TICK_MS
@@ -88,12 +115,14 @@ export const M = {
                       // no clock); JUMP: u32 ms forward; FACTOR: f32 (the sim master's only)
 };
 
+
 export const TIME_FLAG = { RUNNING: 1, SET: 2 };
 export const TIME_SET = { INIT: 0, JUMP: 1, FACTOR: 2 };
 export const TIME_TICK_MS = 5000;
 
-export const REFUSED = { FULL: 0, VERSION: 1, BUILD: 2 };
-export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 };
+export const REFUSED = { FULL: 0, VERSION: 1, BUILD: 2, HOST: 3 }; // HOST: a wrong secret, or a host is there already
+export const ROLLBACK = { ACCEPTED: 0, DECLINED: 1, TIMEOUT: 2, CANCELLED: 3, BUSY: 4 }; // a vote's result (a pause)
+export const LOAD = { DONE: 0, NO_SAVE: 1, LEADER_ONLY: 2 }; // LEADER_ONLY: a group's save, the leader loads it
 export const MAX_SAVES_LISTED = 200;
 export const GROUP = { INVITE: 0, ACCEPT: 1, DECLINE: 2, LEAVE: 3, KICK: 4, STORY: 5 };
 export const GROUP_FLAG = { STORY: 1 }; // the group shares its story (coop_story.script)

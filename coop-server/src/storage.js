@@ -23,6 +23,14 @@ import { normalizeSettings } from './settings.js';
 //   clock.json              { game, factor, epoch }: the world's clock (clock.js), gone with the world
 //   groups.json             [{ members: [leader, member...], story }]: groups of players, by character name
 //   admin.json              { password } for the admin page, made up on the first start
+//   personal/<hex name>/<id>/ a character's own save: snapshot.bin (as its game sent it, protocol.js SNAPSHOT) and
+//                            meta.json { id, time, name, by, group }: group, the members' names of a group's save
+//                            (the same id in every member's folder); personal_next.json, the next id
+//   personal/<hex name>/things.bin  the things of a save the character was put back to, for its next download
+//   journal.jsonl           the world changes since the last save (server.js), a { t, m: base64 } line each, so a
+//                            server started again still has them
+//   clients.json            { id: name }: every client id given out, so ids go on growing across runs (the journal's
+//                            changes are by id)
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
 
@@ -152,10 +160,12 @@ export function openStorage(dir) {
     // the world and everything that only makes sense with it: saves, characters, id leases, groups
     resetWorld() {
       fs.rmSync(file('saves'), { recursive: true, force: true });
-      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json', 'clock.json'])
+      for (const f of ['leases.json', 'characters.json', 'groups.json', 'facts.json', 'clock.json', 'journal.jsonl'])
         fs.rmSync(file(f), { force: true });
       facts = {};
       fs.rmSync(file('progress'), { recursive: true, force: true });
+      fs.rmSync(file('personal'), { recursive: true, force: true }); // the characters' saves are of this world
+      fs.rmSync(file('personal_next.json'), { force: true });
       saves.length = 0;
       characters = {};
     },
@@ -164,6 +174,81 @@ export function openStorage(dir) {
     saveClock(clock) {
       if (clock) writeAtomic('clock.json', JSON.stringify(clock));
       else fs.rmSync(file('clock.json'), { force: true });
+    },
+
+    // [{ time, message }], oldest first
+    journal() {
+      let text = '';
+      try {
+        text = fs.readFileSync(file('journal.jsonl'), 'utf8');
+      } catch {
+        return [];
+      }
+      return text.split('\n').filter(Boolean).flatMap((line) => {
+        try {
+          const { t, m } = JSON.parse(line);
+          return [{ time: t, message: Buffer.from(m, 'base64') }];
+        } catch {
+          return []; // a line cut short by a crash
+        }
+      });
+    },
+    appendJournal({ time, message }) {
+      fs.appendFileSync(file('journal.jsonl'), JSON.stringify({ t: time, m: message.toString('base64') }) + '\n');
+    },
+    saveJournal(entries) {
+      writeAtomic('journal.jsonl', entries.map(({ time, message }) =>
+        JSON.stringify({ t: time, m: message.toString('base64') }) + '\n').join(''));
+    },
+    clientNames() {
+      return new Map(Object.entries(readJson('clients.json', {})).map(([id, name]) => [Number(id), name]));
+    },
+    saveClientNames(names) {
+      writeAtomic('clients.json', JSON.stringify(Object.fromEntries(names)));
+    },
+
+    nextCharacterSaveId() {
+      const id = readJson('personal_next.json', 1);
+      writeAtomic('personal_next.json', JSON.stringify(id + 1));
+      return id;
+    },
+    saveCharacterSave(name, meta, snapshot) {
+      const dir = path.join('personal', playerDir(name), String(meta.id));
+      fs.mkdirSync(file(dir), { recursive: true });
+      writeAtomic(path.join(dir, 'snapshot.bin'), snapshot);
+      writeAtomic(path.join(dir, 'meta.json'), JSON.stringify(meta));
+    },
+    // newest first; a save counts once its meta.json, written last, is there
+    characterSaves(name) {
+      const dir = path.join('personal', playerDir(name));
+      if (!fs.existsSync(file(dir))) return [];
+      return fs.readdirSync(file(dir)).filter((d) => /^\d+$/.test(d))
+        .map((d) => readJson(path.join(dir, d, 'meta.json'), null)).filter(Boolean).sort((a, b) => b.id - a.id);
+    },
+    // { meta, snapshot } or null
+    characterSave(name, id) {
+      const dir = path.join('personal', playerDir(name), String(id));
+      const meta = readJson(path.join(dir, 'meta.json'), null);
+      if (!meta) return null;
+      try {
+        return { meta, snapshot: fs.readFileSync(file(path.join(dir, 'snapshot.bin'))) };
+      } catch {
+        return null;
+      }
+    },
+    things(name) {
+      try {
+        return fs.readFileSync(file(path.join('personal', playerDir(name), 'things.bin')));
+      } catch {
+        return null;
+      }
+    },
+    // null: given, none left
+    setThings(name, data) {
+      const dir = path.join('personal', playerDir(name));
+      if (!data) return fs.rmSync(file(path.join(dir, 'things.bin')), { force: true });
+      fs.mkdirSync(file(dir), { recursive: true });
+      writeAtomic(path.join(dir, 'things.bin'), data);
     },
 
     // [{ members: [leader, ...], story }]; a group was a plain list of names before

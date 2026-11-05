@@ -682,6 +682,8 @@ void Startup()
 		if (pCoop) Console->Execute(pCoop + 1);
 	}
 
+	g_coop_headless = !!strstr(Core.Params, "-coop_host ");
+
 	// Initialize APP
 	Device.Create();
 
@@ -1613,6 +1615,7 @@ PROTECT_API void CApplication::LoadDraw()
 
 	if (g_appLoaded) return;
 	Device.dwFrame += 1;
+	if (g_coop_headless) return;
 
 
 	if (!Device.Begin()) return;

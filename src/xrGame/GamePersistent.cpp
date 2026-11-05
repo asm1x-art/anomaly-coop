@@ -595,6 +595,7 @@ void CGamePersistent::game_loaded()
 		if (g_pGameLevel &&
 			g_pGameLevel->bReady &&
 			(allow_intro() && psDeviceFlags2.test(rsKeypress)) &&
+			!g_coop_headless && // the co-op host has nobody to press a key
 			load_screen_renderer.b_need_user_input &&
 			m_game_params.m_e_game_type == eGameIDSingle)
 		{

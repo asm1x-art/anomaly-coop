@@ -1,19 +1,33 @@
 import net from 'node:net';
 import zlib from 'node:zlib';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
+import { EventEmitter } from 'node:events';
+import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
   TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
-import { settingsText } from './settings.js';
+import { settingsText, FACTIONS } from './settings.js';
+import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
 import { createClock } from './clock.js';
 import { createBuildCheck } from './builds.js';
 
-// builds: { file, allowDev } for builds.js; none lets every build in
-export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, builds = {} } = {}) {
+// hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
+// journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0).
+// autosaveMinutes, pauseWhenEmpty: server.cfg's [host] (config.js), for the host. adminPassword: the admin page's,
+// for the in-game admin window too (null: the one made up in data/admin.json). builds: { file, allowDev } for
+// builds.js; none lets every build in
+export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
+  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {} } = {}) {
   const storage = openStorage(dataDir);
   const buildAllowed = createBuildCheck({ ...builds, log });
   const clock = createClock({ load: () => storage.loadClock(), save: (state) => storage.saveClock(state) });
-  let nextId = 1;
-  const clients = new Map(); // id -> { send, name, state }
+  // id -> name: every player and the host so far, for the journal's ids; ids go on growing across runs
+  const names = storage.clientNames();
+  let nextId = Math.max(0, ...names.keys()) + 1;
+  const clients = new Map(); // id -> { send, name, state, host, socket }
+  // what happened, for the Telegram bot (coop.on): joined, left { name }; host_up, host_down; save_failed
+  const events = new EventEmitter();
+  const traffic = { in: 0, out: 0, since: Date.now() }; // bytes through the game port, for the admins
+  let hostId = null; // the world's host, connected
+  const players = () => [...clients].filter(([, c]) => !c.host);
   // id block -> player name. Leases follow the name, so a player who reconnects
   // gets the same blocks back and keeps owning the objects created with them.
   const idLeases = storage.loadLeases();
@@ -35,15 +49,70 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     for (const [id, c] of clients) if (id !== fromId) c.send(type, payload);
   };
   const peerState = (id, c) => Buffer.concat([u32(id), stringZ(c.name), c.state]);
-  // the sim master runs offline A-Life and world spawns for empty levels, and saves the world: the
-  // longest-connected player in the world (ids only grow), or anyone while nobody is in it
+  // the sim master runs offline A-Life and world spawns for empty levels, and saves the world: the host once it
+  // runs the world; else the longest-connected player in the world (ids only grow), or anyone while nobody is in it
   const masterId = () => {
-    const inWorld = [...clients].filter(([, c]) => c.inWorld).map(([cid]) => cid);
-    return Math.min(...(inWorld.length ? inWorld : clients.keys()));
+    if (hostId !== null && clients.get(hostId).inWorld) return hostId;
+    const all = players().map(([cid]) => cid);
+    const inWorld = players().filter(([, c]) => c.inWorld).map(([cid]) => cid);
+    return Math.min(...(inWorld.length ? inWorld : all.length ? all : clients.keys()));
+  };
+  // the world's settings for the games; the host also takes its autosave interval from them
+  const settingsPayload = () => stringZ(settingsText(storage.settings()) +
+    (autosaveMinutes === null ? '' : `
+autosave_minutes=${autosaveMinutes}`));
+  // pauseWhenEmpty: the host's world stands while no player is in it (time in the Zone runs many times faster);
+  // only the host is told, the players' games never run an empty world
+  let emptyPaused = false;
+  const updateEmptyPause = () => {
+    const hostClient = hostId === null ? null : clients.get(hostId);
+    const empty = pauseWhenEmpty && !!hostClient?.inWorld && !pausedBy && !players().some(([, c]) => c.inWorld);
+    if (empty !== emptyPaused) {
+      emptyPaused = empty;
+      log(empty ? 'nobody in the world: the host pauses it' : 'a player is in the world: the host lets it go on');
+      hostClient?.send(M.PAUSED, Buffer.concat([Buffer.from([empty ? 1 : 0]), stringZ(empty ? 'server' : '')]));
+    }
+    updateClock(); // the clock stands with the world
+  };
+  const hostPayload = () => Buffer.concat([u32(hostId ?? 0), stringZ(hostId === null ? '' : clients.get(hostId).name)]);
+  const announceHost = () => {
+    const payload = hostPayload();
+    for (const c of clients.values()) c.send(M.HOST, payload);
   };
   const announceRoles = () => {
     if (!clients.size) return;
     for (const c of clients.values()) c.send(M.ROLES, u32(masterId()));
+  };
+
+  // A level with players on it is run by the one who came to it first (its authority); when they go, by the
+  // next to have come. level -> ids in the order they came.
+  const levels = new Map();
+  const levelsPayload = () => Buffer.concat([Buffer.from([levels.size]),
+    ...[...levels].map(([level, ids]) => Buffer.concat([stringZ(level), u32(ids[0])]))]);
+  const announceLevels = () => {
+    const payload = levelsPayload();
+    for (const c of clients.values()) c.send(M.LEVELS, payload);
+  };
+  // the player is on that level now (null: on none); true when a level's authority changed
+  const moveToLevel = (id, client, level) => {
+    if (client.level === level) return false;
+    let changed = false;
+    const queue = levels.get(client.level);
+    if (queue) {
+      const at = queue.indexOf(id);
+      if (at !== -1) queue.splice(at, 1);
+      if (!queue.length) levels.delete(client.level);
+      if (at === 0) changed = true;
+    }
+    client.level = level;
+    if (level) {
+      if (!levels.has(level)) {
+        levels.set(level, []);
+        changed = true;
+      }
+      levels.get(level).push(id);
+    }
+    return changed;
   };
 
   // Groups of players, by character name, leader first; kept between runs like the characters.
@@ -75,7 +144,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     if (action === GROUP.INVITE || action === GROUP.ACCEPT || action === GROUP.DECLINE) {
       const otherId = payload.readUInt32LE(1);
       const other = clients.get(otherId);
-      if (!other) return;
+      if (!other || other.host) return;
       if (action === GROUP.INVITE) {
         const g = groupOf(client.name);
         if (g?.members.includes(other.name)) return groupNote(client, GROUP_NOTE.ALREADY, other.name);
@@ -129,6 +198,26 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     const info = worldInfo();
     for (const c of clients.values()) c.send(M.WORLD_INFO, info);
   };
+  // The journal: the world changes since the world's last save, as relayed. A player coming in gets the save and
+  // then these, and replays them while it loads: nobody saves for them. A new save keeps those that came within
+  // journalOverlapMs before its upload began (the game made the save a little earlier, and may not have applied
+  // the latest yet); replaying one the save has changes nothing.
+  // Lua events that change the world (coop_sync.script, coop_events.script); the others are for the players there
+  const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
+  const record = (type, payload) => {
+    if (!storage.worldInfo()) return;
+    const entry = { time: Date.now(), message: Buffer.concat([u16(type), payload]) };
+    journal.push(entry);
+    storage.appendJournal(entry);
+  };
+  const setJournal = (entries) => {
+    journal = entries;
+    storage.saveJournal(entries);
+  };
+  const namesPayload = () => Buffer.concat([u16(names.size),
+    ...[...names].map(([cid, n]) => Buffer.concat([u32(cid), stringZ(n)]))]);
+
   // the player's own progress goes with it, before WORLD_DONE: the game puts it on its actor while loading
   const sendWorld = (send, name) => {
     const info = storage.worldInfo();
@@ -137,6 +226,15 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         send(M.WORLD_CHUNK, Buffer.concat([Buffer.from([file]), u32(offset), data.subarray(offset, offset + CHUNK_SIZE)]));
     });
     for (const [key, value] of Object.entries(storage.facts())) send(M.FACT, Buffer.concat([stringZ(key), stringZ(value)]));
+    send(M.NAMES, namesPayload());
+    for (const entry of journal) send(M.JOURNAL, entry.message);
+    // the things of a save the character was put back to: given once
+    const things = storage.things(name);
+    if (things) {
+      for (let at = 0; at < things.length; at += CHUNK_SIZE)
+        send(M.SNAPSHOT_THINGS, Buffer.concat([u32(things.length), u32(at), things.subarray(at, at + CHUNK_SIZE)]));
+      storage.setThings(name, null);
+    }
     const progress = storage.progress(name) ?? Buffer.alloc(0);
     let offset = 0;
     do {
@@ -155,19 +253,34 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     master.send(M.SAVE_NOW, Buffer.concat([stringZ(name), stringZ(reason), stringZ(who)]));
     return true;
   };
-  // a player coming in waits for the master's save of the world as it is now, JOIN_WAIT_MS at most
-  const JOIN_WAIT_MS = 30000;
-  const awaiting = new Map(); // id -> timer
-  const giveWorld = (cid) => {
-    clearTimeout(awaiting.get(cid));
-    awaiting.delete(cid);
-    const c = clients.get(cid);
-    if (c && storage.worldInfo()) sendWorld(c.send, c.name);
+  // A character's saves: the game's snapshots (SNAPSHOT), asked of everyone saved together. snapshots: save id ->
+  // { meta, waiting: names }; each game's snapshot is kept as it comes, the save is listed once all are in.
+  const SNAPSHOT_WAIT_MS = 60000;
+  const snapshots = new Map();
+  const savesPayload = (name) => {
+    const list = storage.characterSaves(name).slice(0, MAX_SAVES_LISTED);
+    return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.id), u32(Math.floor(m.time / 1000)),
+      stringZ(m.name), stringZ(m.group ? 'group' : m.name ? 'named' : 'quick'), stringZ(m.by), u32(0)]))]);
   };
-  const savesPayload = () => {
-    const list = storage.saves().reverse().slice(0, MAX_SAVES_LISTED);
-    return Buffer.concat([u16(list.length), ...list.map((m) => Buffer.concat([u32(m.revision),
-      u32(Math.floor(m.time / 1000)), stringZ(m.name), stringZ(m.reason), stringZ(m.who), u32(m.from ?? 0)]))]);
+  // a snapshot: u32 size, the record; u32 size, the progress; the things
+  const splitSnapshot = (data) => {
+    const recordEnd = 4 + data.readUInt32LE(0);
+    const progressEnd = recordEnd + 4 + data.readUInt32LE(recordEnd);
+    return { record: data.subarray(4, recordEnd), progress: data.subarray(recordEnd + 4, progressEnd),
+      things: data.subarray(progressEnd) };
+  };
+  // the character as the save has it: record, progress, and its things for its next download; a game running the
+  // world loads it again
+  const putBack = (name, snapshot) => {
+    const { record, progress, things } = splitSnapshot(snapshot);
+    storage.saveCharacter(name, Buffer.from(record));
+    if (progress.length) storage.saveProgress(name, Buffer.from(progress));
+    storage.setThings(name, Buffer.from(things));
+    const found = players().find(([, c]) => c.name === name);
+    if (!found?.[1].inWorld) return;
+    found[1].send(M.CHARACTER, record);
+    found[1].send(M.WORLD_RELOAD);
+    found[1].send(M.WORLD_INFO, worldInfo());
   };
 
   // Votes: everyone in the world agrees (the one who asks does), within VOTE_MS; those in the menu don't run
@@ -181,7 +294,8 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     log(by ? `world paused ('${by}' asked)` : 'world goes on');
     const payload = pausedPayload();
     for (const c of clients.values()) c.send(M.PAUSED, payload);
-    updateClock();
+    emptyPaused = false; // the host was told with the others
+    updateEmptyPause();
   };
 
   // The world's clock (clock.js): every game in the world runs its game time. It runs while someone is in the
@@ -199,7 +313,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     for (const c of clients.values()) c.send(M.TIME, payload);
   };
   const updateClock = () => {
-    if (!clock.setRunning([...clients.values()].some((c) => c.inWorld) && !pausedBy)) return;
+    if (!clock.setRunning([...clients.values()].some((c) => c.inWorld) && !pausedBy && !emptyPaused)) return;
     if (clock.isSet()) log(`clock ${clock.running() ? 'runs' : 'stands'} at ${clock.now()}`);
     announceTime();
   };
@@ -229,6 +343,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
     if (!now) return 0;
+    setJournal([]); // the changes since were made to the world as it was
     log(`world taken back to revision ${revision} (${how}): revision ${now}`);
     // the clock goes back with it, to the time that save was made
     const back = storage.saves().at(-1).clock;
@@ -246,16 +361,10 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     return now;
   };
   const endVote = (result, who = '') => {
-    const { kind, revision, proposer, timer } = vote;
+    const { kind, proposer, timer } = vote;
     clearTimeout(timer);
     vote = null;
     const accepted = result === ROLLBACK.ACCEPTED;
-    if (kind === 'rollback') {
-      const now = accepted ? rollback(revision, `everyone agreed, '${proposer}' asked`) : 0;
-      const payload = Buffer.concat([Buffer.from([result]), stringZ(who), u32(now)]);
-      for (const c of clients.values()) c.send(M.ROLLBACK_RESULT, payload);
-      return;
-    }
     if (accepted) setPaused(kind === 'pause' ? proposer : '');
     const payload = Buffer.concat([Buffer.from([result]), stringZ(who), Buffer.from([kind === 'pause' ? 1 : 0])]);
     for (const c of clients.values()) c.send(M.PAUSE_RESULT, payload);
@@ -263,18 +372,62 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   // asks the others in the world (msg with ask to all), or decides at once when there are none
   const startVote = (kind, id, client, extra, msg, ask) => {
     vote = { kind, ...extra, proposer: client.name, proposerId: id,
-      waiting: new Set([...clients].filter(([cid, c]) => cid !== id && c.inWorld).map(([cid]) => cid)) };
+      waiting: new Set(players().filter(([cid, c]) => cid !== id && c.inWorld).map(([cid]) => cid)) };
     if (!vote.waiting.size) return endVote(ROLLBACK.ACCEPTED);
     vote.timer = setTimeout(() => endVote(ROLLBACK.TIMEOUT,
       [...vote.waiting].map((cid) => clients.get(cid)?.name).filter(Boolean).join(', ')), VOTE_MS).unref();
     for (const c of clients.values()) c.send(msg, ask);
   };
 
+  // The in-game admin window: a connection that gave the admin password may do what the admin page does
+  const ADMIN_TRIES = 5; // wrong passwords a connection may give
+  const adminPasswordNow = () => adminPassword || storage.adminPassword().password;
+  const adminStatePayload = () => {
+    const st = server.coop.status();
+    const s = storage.settings();
+    const h = st.host;
+    const lines = [['host', !h ? 'нет: мир держит игра игрока' : [h.running === false ? 'не работает' : 'работает',
+      h.master ? 'держит мир' : h.connected ? 'загружает мир' : 'не подключён', h.gave_up ? 'упал 3 раза, ждёт перезапуска' : '']
+      .filter(Boolean).join(', ')]];
+    if (st.world) lines.push(['world', st.world.revision, st.world.owner]);
+    for (const p of st.online) lines.push(['player', p.name, p.level ?? '', p.ping ?? '', p.authority ? 1 : 0]);
+    for (const [group, list] of [['world', WORLD], ['rules', RULES]])
+      for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
+    for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
+    for (const m of st.saves.slice(0, 20)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
+    return stringZ(lines.map((l) => l.join('\t')).join('\n'));
+  };
+  // '' for state: nothing to say
+  const adminCommand = ([cmd, a = '', b = '']) => {
+    switch (cmd) {
+      case 'state':
+        return '';
+      case 'set':
+        return setSetting(server.coop, a, b);
+      case 'faction':
+        return setFaction(server.coop, a, b) ?? `${FACTION_NAMES[a] ?? a}: ${yesNo(storage.settings().factions.includes(a))}`;
+      case 'save':
+        return server.coop.saveWorld() ? 'Мир сохраняется.' : 'Сохранить сейчас некому: мир никто не держит.';
+      case 'restart_host':
+        return server.coop.restartHost() ? 'Хост перезапускается.' : 'Хоста нет: в server.cfg не указана папка игры.';
+      case 'kick':
+        return server.coop.kick(a) ? `Отключён: ${a}` : `Нет такого игрока онлайн: ${a}`;
+      case 'rollback':
+        return server.coop.rollback(Number(a)) ? `Мир возвращён к №${a}.` : `Нет сохранения №${a}.`;
+      default:
+        return `Не знаю такой команды: ${cmd}`;
+    }
+  };
+
   const server = net.createServer((socket) => {
     socket.setNoDelay(true);
     const id = nextId++;
     const addr = `${socket.remoteAddress}:${socket.remotePort}`;
-    const send = (type, payload) => socket.write(encode(type, payload));
+    const send = (type, payload) => {
+      const frame = encode(type, payload);
+      traffic.out += frame.length;
+      socket.write(frame);
+    };
     let client = null; // set after HELLO
     let upload = null; // { files: Buffer[] } while this client sends the world
 
@@ -296,30 +449,49 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
             log(`[${id}] protocol mismatch: client ${version}, server ${PROTOCOL_VERSION}`);
             return refuse(REFUSED.VERSION, PROTOCOL_VERSION);
           }
-          const [helloName, build] = readStringsZ(payload, 2, 2);
+          const name = readStringZ(payload, 2);
+          const buildAt = payload.indexOf(0, 2) + 1;
+          const build = buildAt > 0 ? readStringZ(payload, buildAt) : '';
           if (!buildAllowed(build)) {
-            log(`[${id}] '${helloName}' turned away: build '${build || 'none'}' is not let in`);
+            log(`[${id}] '${name}' turned away: build '${build || 'none'}' is not let in`);
             return refuse(REFUSED.BUILD, 0);
           }
+          const roleAt = buildAt > 0 ? payload.indexOf(0, buildAt) + 1 : 0;
+          const isHost = roleAt > 0 && payload[roleAt] === 1;
+          if (isHost && (!hostSecret || readStringZ(payload, roleAt + 1) !== hostSecret || hostId !== null)) {
+            log(`[${id}] '${name}' says it is the host: ${hostId !== null ? 'there is one' : 'wrong secret'}, turned away`);
+            return refuse(REFUSED.HOST, 0);
+          }
           const max = storage.settings().rules.max_players;
-          if (clients.size >= max) {
-            log(`[${id}] '${readStringZ(payload, 2)}' turned away: ${clients.size} of ${max} online`);
+          if (!isHost && players().length >= max) {
+            log(`[${id}] '${name}' turned away: ${players().length} of ${max} online`);
             return refuse(REFUSED.FULL, max);
           }
-          client = { send, name: readStringZ(payload, 2), state: null };
+          client = { send, name, state: null, host: isHost, socket };
           clients.set(id, client);
-          log(`[${id}] '${client.name}' joined from ${addr} (${clients.size} online)`);
+          names.set(id, name);
+          storage.saveClientNames(names);
+          log(`[${id}] '${client.name}' joined from ${addr} (${players().length} online${isHost ? ', the world host' : ''})`);
           send(M.WELCOME, u32(id));
+          if (isHost) {
+            hostId = id;
+            announceHost();
+            events.emit('host_up', { name });
+          } else {
+            send(M.HOST, hostPayload());
+            events.emit('joined', { name });
+          }
           // before WORLD_INFO: a client loading the world needs it to put its own character in
           const record = storage.character(client.name);
           if (record) send(M.CHARACTER, record);
           for (const [block, owner] of idLeases) if (owner === client.name) send(M.ID_BLOCK_GRANT, u16(block));
           announceRoles();
-          send(M.SETTINGS, stringZ(settingsText(storage.settings())));
+          send(M.SETTINGS, settingsPayload());
           send(M.GROUPS, groupsPayload());
           send(M.WORLD_INFO, worldInfo());
           if (pausedBy) send(M.PAUSED, pausedPayload());
           send(M.TIME, timePayload());
+          if (levels.size) send(M.LEVELS, levelsPayload());
           // let the newcomer see players who are standing still
           for (const [otherId, other] of clients)
             if (otherId !== id && other.state) send(M.PEER_STATE, peerState(otherId, other));
@@ -330,24 +502,37 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           send(M.PONG, payload.subarray(0, 4));
           break;
         case M.ACTOR_STATE:
+          // the host's state only says its game runs the world: it is on no level and nobody sees it
+          if (client.host) {
+            if (!client.inWorld) {
+              client.inWorld = true;
+              log(`[${id}] the host runs the world: the sim master now`);
+              announceRoles();
+              updateEmptyPause();
+            }
+            break;
+          }
           client.state = Buffer.from(payload);
+          // before the state: a game that sees a player on its level knows by then who runs it
+          if (moveToLevel(id, client, readStringZ(payload, 0))) {
+            log(`[${id}] '${client.name}' is on ${client.level}, run by '${clients.get(levels.get(client.level)[0]).name}'`);
+            announceLevels();
+          }
           broadcast(id, M.PEER_STATE, peerState(id, client));
           if (!client.inWorld) {
             client.inWorld = true;
             announceRoles();
-            updateClock();
+            updateEmptyPause();
           }
           break;
         case M.LEFT_WORLD: {
           if (!client.inWorld) break;
-          const wasMaster = masterId() === id;
           client.inWorld = false;
           client.state = null;
           log(`[${id}] '${client.name}' went back to the menu`);
           announceRoles();
-          updateClock();
-          // their things are in the master's world: saved now, unless they were the master (saved on the way)
-          if (!wasMaster) requestSave('leave', client.name);
+          if (moveToLevel(id, client, null)) announceLevels();
+          updateEmptyPause();
           break;
         }
         case M.ID_BLOCK_REQUEST: {
@@ -418,30 +603,85 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         }
         case M.WORLD_REQUEST:
           if (!storage.worldInfo()) send(M.WORLD_INFO, worldInfo());
-          // a player coming in gets the world as it is now: the master saves it first
-          else if (!awaiting.has(id) && requestSave('join', client.name))
-            awaiting.set(id, setTimeout(() => giveWorld(id), JOIN_WAIT_MS).unref());
-          else if (!awaiting.has(id)) sendWorld(send, client.name);
+          else {
+            sendWorld(send, client.name);
+            log(`[${id}] '${client.name}' got the world, revision ${storage.worldInfo().revision}, and ${journal.length} change(s) since`);
+          }
           break;
         case M.SAVE_REQUEST: {
+          // a group's leader saves the group, its other members nothing
           const name = readStringZ(payload, 0);
-          if (!requestSave(name ? 'named' : 'quick', client.name, name))
-            log(`[${id}] '${client.name}' asked for a save, but nobody runs the world`);
+          const g = groupOf(client.name);
+          if (g && g.members[0] !== client.name) break;
+          const members = g ? [...g.members] : [client.name];
+          const saving = players().filter(([, c]) => c.inWorld && members.includes(c.name));
+          if (!saving.length) break;
+          const meta = { id: storage.nextCharacterSaveId(), time: Date.now(), name, by: client.name, group: g ? members : null };
+          snapshots.set(meta.id, { meta, waiting: new Set(saving.map(([, c]) => c.name)) });
+          setTimeout(() => snapshots.delete(meta.id), SNAPSHOT_WAIT_MS).unref();
+          for (const [, c] of saving) c.send(M.SNAPSHOT_REQUEST, u32(meta.id));
+          log(`[${id}] '${client.name}' saves ${g ? `the group (${saving.length} in the world)` : 'their character'}, save ${meta.id}`);
+          break;
+        }
+        case M.SNAPSHOT: {
+          const saveId = payload.readUInt32LE(0);
+          const total = payload.readUInt32LE(4);
+          const offset = payload.readUInt32LE(8);
+          const pending = snapshots.get(saveId);
+          if (!pending?.waiting.has(client.name)) break;
+          if (offset === 0) client.snapshot = { saveId, data: Buffer.alloc(total), got: 0 };
+          if (client.snapshot?.saveId !== saveId || client.snapshot.data.length !== total) break;
+          client.snapshot.got += payload.copy(client.snapshot.data, offset, 12);
+          if (client.snapshot.got < total) break;
+          storage.saveCharacterSave(client.name, pending.meta, client.snapshot.data);
+          client.snapshot = null;
+          pending.waiting.delete(client.name);
+          if (!pending.waiting.size) snapshots.delete(saveId);
+          log(`[${id}] '${client.name}' saved, save ${saveId} (${total} bytes)`);
           break;
         }
         case M.SAVES_REQUEST:
-          send(M.SAVES, savesPayload());
+          send(M.SAVES, savesPayload(client.name));
           break;
-        case M.ROLLBACK_PROPOSE: {
-          const save = storage.saves().find((m) => m.revision === payload.readUInt32LE(0));
-          if (!save) break;
-          if (vote) {
-            send(M.ROLLBACK_RESULT, Buffer.concat([Buffer.from([ROLLBACK.BUSY]), stringZ(vote.proposer), u32(0)]));
+        case M.ADMIN_LOGIN:
+          if ((client.adminTries ?? 0) >= ADMIN_TRIES) break;
+          if (readStringZ(payload, 0) !== adminPasswordNow()) {
+            client.adminTries = (client.adminTries ?? 0) + 1;
+            log(`[${id}] '${client.name}' gave a wrong admin password`);
+            send(M.ADMIN_RESULT, stringZ('Неверный пароль админки.'));
             break;
           }
-          log(`[${id}] '${client.name}' asks to take the world back to revision ${save.revision}`);
-          startVote('rollback', id, client, { revision: save.revision }, M.ROLLBACK_VOTE, Buffer.concat([u32(id),
-            stringZ(client.name), u32(save.revision), u32(Math.floor(save.time / 1000)), stringZ(save.name), stringZ(save.reason)]));
+          if (!client.admin) log(`[${id}] '${client.name}' opened the admin window`);
+          client.admin = true;
+          send(M.ADMIN_STATE, adminStatePayload());
+          break;
+        case M.ADMIN_COMMAND: {
+          if (!client.admin) {
+            send(M.ADMIN_RESULT, stringZ('Сначала пароль админки.'));
+            break;
+          }
+          const fields = readStringZ(payload, 0).split('\t');
+          const answer = adminCommand(fields);
+          if (answer) {
+            log(`[${id}] '${client.name}' (admin): ${fields.join(' ')} - ${answer}`);
+            send(M.ADMIN_RESULT, stringZ(answer));
+          }
+          if (clients.has(id)) send(M.ADMIN_STATE, adminStatePayload()); // kicked themselves: gone
+          break;
+        }
+        case M.LOAD_REQUEST: {
+          const saveId = payload.readUInt32LE(0);
+          const result = (code) => send(M.LOAD_RESULT, Buffer.concat([Buffer.from([code]), u32(saveId)]));
+          const save = storage.characterSave(client.name, saveId);
+          if (!save) return result(LOAD.NO_SAVE);
+          if (save.meta.group && save.meta.by !== client.name) return result(LOAD.LEADER_ONLY);
+          const names = save.meta.group ?? [client.name];
+          for (const name of names) {
+            const own = name === client.name ? save : storage.characterSave(name, saveId);
+            if (own) putBack(name, own.snapshot);
+          }
+          log(`[${id}] '${client.name}' went back to save ${saveId}${save.meta.group ? ` with ${names.join(', ')}` : ''}`);
+          result(LOAD.DONE);
           break;
         }
         case M.PAUSE_PROPOSE: {
@@ -490,7 +730,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           }
           // the save was just made: the clock now is its time, near enough
           upload = { files: WORLD_FILES.map((_, i) => Buffer.alloc(payload.readUInt32LE(i * 4))),
-            meta: { name, reason: reason || 'auto', who, clock: clock.isSet() ? clock.now() : undefined } };
+            meta: { name, reason: reason || 'auto', who, clock: clock.isSet() ? clock.now() : undefined }, startedAt: Date.now() };
           break;
         }
         case M.WORLD_CHUNK:
@@ -500,13 +740,14 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
           if (!upload) break;
           const revision = storage.writeWorld(client.name, upload.files, upload.meta);
           log(`[${id}] '${client.name}' uploaded the world, revision ${revision} (${upload.meta.reason})`);
+          setJournal(journal.filter((entry) => entry.time >= upload.startedAt - journalOverlapMs));
           upload = null;
           creatorId = null;
           announceWorld();
-          for (const cid of [...awaiting.keys()]) giveWorld(cid);
           break;
         }
         case M.ENTITY_DEATH:
+          record(type, payload);
           broadcast(id, type, Buffer.from(payload));
           break;
         case M.GROUP:
@@ -520,8 +761,18 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
         case M.OBJECT_SPAWN:
         case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
+          if (type !== M.SCRIPT_EVENT || JOURNAL_EVENTS.has(readStringZ(payload, 0)))
+            record(type, Buffer.concat([u32(id), payload]));
+          broadcast(id, type, Buffer.concat([u32(id), payload]));
+          break;
+        case M.NPC_STATES: {
+          // a level's NPCs: for the players on it, and the host (it follows which squads are online where)
+          const level = readStringZ(payload, 0);
+          const relayed = Buffer.concat([u32(id), payload]);
+          for (const [cid, c] of clients) if (cid !== id && (c.host || c.level === level)) c.send(type, relayed);
+          break;
+        }
         case M.ACTOR_ACTION:
-        case M.NPC_STATES:
         case M.COOP_HIT:
           // receivers need to know whose actor "the sender's actor" is
           broadcast(id, type, Buffer.concat([u32(id), payload]));
@@ -533,6 +784,7 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
 
     const decode = createDecoder(handle);
     socket.on('data', (chunk) => {
+      traffic.in += chunk.length;
       try {
         decode(chunk);
       } catch (e) {
@@ -543,44 +795,58 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     socket.on('error', () => {}); // 'close' follows and reports
     socket.on('close', () => {
       if (!clients.has(id)) return;
-      const wasMaster = masterId() === id;
       clients.delete(id);
-      log(`[${id}] '${client.name}' left (${clients.size} online)`);
+      if (client.host) {
+        hostId = null;
+        emptyPaused = false;
+        log(`[${id}] the host left: the sim master is a player's game again`);
+        announceHost();
+        announceRoles();
+        updateClock();
+        return;
+      }
+      log(`[${id}] '${client.name}' left (${players().length} online)`);
+      events.emit('left', { name: client.name });
       broadcast(id, M.PEER_LEFT, u32(id));
       announceRoles();
-      updateClock();
+      if (moveToLevel(id, client, null)) announceLevels();
       if (creatorId === id) {
         creatorId = null;
         log(`[${id}] '${client.name}' left before the world was made: anyone may create it`);
         announceWorld();
       }
-      clearTimeout(awaiting.get(id));
-      awaiting.delete(id);
-      // their things are in the master's world: saved now, unless they were the master (saved on the way)
-      if (client.inWorld && !wasMaster) requestSave('leave', client.name);
       if (vote?.proposerId === id) endVote(ROLLBACK.CANCELLED, client.name);
       else if (vote?.waiting.delete(id) && !vote.waiting.size) endVote(ROLLBACK.ACCEPTED);
-      if (!clients.size && pausedBy) setPaused(''); // nobody left to let it go on
+      if (!players().length && pausedBy) setPaused(''); // nobody left to let it go on
+      updateEmptyPause();
     });
   });
 
-  // what the admin page (admin.js) sees and does
+  let hostProcess = null; // host.js, when this server starts the host itself
+
+  // what the admin page (admin.js) and the Telegram bot (telegram.js) see and do
   server.coop = {
     status() {
       const master = clients.size ? masterId() : null;
+      const hostClient = hostId === null ? null : clients.get(hostId);
+      const host = hostProcess || hostClient ? { ...hostProcess?.status(), connected: !!hostClient,
+        in_world: !!hostClient?.inWorld, master: hostId !== null && hostId === master } : null;
       return {
-        online: [...clients].map(([cid, c]) =>
-          ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master, ping: c.ping ?? null })),
+        host,
+        online: players().map(([cid, c]) =>
+          ({ id: cid, name: c.name, level: c.state ? readStringZ(c.state, 0) : null, master: cid === master,
+            authority: !!c.level && levels.get(c.level)[0] === cid, ping: c.ping ?? null })),
         world: storage.worldInfo(),
         paused: pausedBy || null,
         clock: clock.isSet() ? { game: clock.now(), factor: clock.factor(), running: clock.running() } : null,
+        traffic: { ...traffic },
         saves: storage.saves().reverse().slice(0, MAX_SAVES_LISTED),
       };
     },
     // the world's pause, lifted without a vote (a vote nobody could answer...)
     resume() {
       if (!pausedBy) return false;
-      if (vote && vote.kind !== 'rollback') endVote(ROLLBACK.CANCELLED, 'admin');
+      if (vote) endVote(ROLLBACK.CANCELLED, 'admin');
       setPaused('');
       return true;
     },
@@ -597,20 +863,39 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     saveSettings(settings) {
       storage.saveSettings(settings);
       log('settings changed on the admin page');
-      const text = stringZ(settingsText(storage.settings()));
+      const text = settingsPayload();
       for (const c of clients.values()) c.send(M.SETTINGS, text);
       return storage.settings();
     },
-    // only with nobody online: their games run the old world
+    // only with no player online: their games run the old world. The host's does too: it is sent off, comes
+    // back (host.js) and waits for a new world.
     resetWorld() {
-      if (clients.size) return false;
+      if (players().length) return false;
+      if (hostId !== null) clients.get(hostId).socket.destroy();
       storage.resetWorld();
       clock.clear();
+      journal = [];
       idLeases.clear();
       groups.length = 0;
       log('world reset on the admin page');
       return true;
     },
+    on: (event, handler) => events.on(event, handler),
+    events, // host.js tells host_down through it
+    // the master (the host, if it runs the world) saves it now
+    saveWorld: () => requestSave('admin', 'admin'),
+    // that player is off the server (their game says it lost the connection)
+    kick(name) {
+      const found = players().find(([, c]) => c.name === name);
+      if (!found) return false;
+      log(`[${found[0]}] '${name}' put off the server by an admin`);
+      found[1].socket.destroy();
+      return true;
+    },
+    setHostProcess(process) {
+      hostProcess = process;
+    },
+    restartHost: () => hostProcess?.restart() ?? false,
   };
 
   server.on('close', () => clearInterval(tick));

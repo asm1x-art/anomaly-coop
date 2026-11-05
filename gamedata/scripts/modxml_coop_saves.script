@@ -1,7 +1,7 @@
 -- Co-op: while this game runs the shared world, a save or a load of its own would be a world nobody else
--- has. So the pause menu's Save, Load and Last save open the world's saves (ui_coop_saves.script), and the
--- quick save key asks the sim master's game to save the world (coop_save.cpp). The engine's callbacks for
--- the saves and the vote go to ui_coop_saves.
+-- has. So the pause menu's Save, Load and Last save open our character's saves (ui_coop_saves.script), and the
+-- quick save key saves our character (a group's leader: the group; coop_save.cpp). The engine's callbacks for
+-- the saves go to ui_coop_saves.
 
 local function in_world()
 	return coop.connected() and coop.world_status() == "exists" and level.present() and db.actor ~= nil
@@ -15,8 +15,7 @@ function on_xml_read()
 	end
 
 	_G.coop_on_saves = function(text) ui_coop_saves.on_saves(text) end
-	_G.coop_on_rollback_vote = function(...) ui_coop_saves.on_rollback_vote(...) end
-	_G.coop_on_rollback_result = function(...) ui_coop_saves.on_rollback_result(...) end
+	_G.coop_on_load_result = function(...) ui_coop_saves.on_load_result(...) end
 
 	-- typ 1: the menu's Save button, 2: the quick save key (level_input.script)
 	RegisterScriptCallback("on_before_save_input", function(flags, typ, text)
@@ -25,6 +24,9 @@ function on_xml_read()
 		end
 		flags.ret = true
 		if typ == 2 then
+			if not ui_coop_saves.may_save() then
+				return actor_menu.set_msg(1, game.translate_string("st_coop_saves_leader"), 3)
+			end
 			coop.request_save("")
 			actor_menu.set_msg(1, game.translate_string("st_coop_saves_saving"), 3)
 		elseif menu then

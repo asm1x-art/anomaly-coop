@@ -20,12 +20,15 @@
 #include "alife_object_registry.h"
 #include "level_graph.h"
 #include "game_level_cross_table.h"
+#include "game_graph.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "../Include/xrRender/KinematicsAnimated.h"
 
 namespace coop
 {
 	static const u32 SEND_INTERVAL_MS = 100;
+	static const u32 HOST_SEND_INTERVAL_MS = 1000; // nobody else here: only the host follows the stream, to know which
+	                                               // squads we have online (squad_online_elsewhere)
 	static const u32 FRESH_MS = 500;        // a state older than this: the authority no longer has that NPC online
 	static const u32 BRING_RETRY_MS = 3000; // how often an NPC the authority has and we don't is moved to it
 	static const u32 MAX_PER_PACKET = 100;
@@ -367,9 +370,9 @@ namespace coop
 		P.w_u16(active ? active->object().ID() : NO_ITEM);
 	}
 
-	static void send_states()
+	static void send_states(u32 interval)
 	{
-		if (Device.dwTimeContinual - g_last_send < SEND_INTERVAL_MS)
+		if (Device.dwTimeContinual - g_last_send < interval)
 			return;
 		g_last_send = Device.dwTimeContinual;
 
@@ -409,10 +412,138 @@ namespace coop
 	//------------------------------------------------------------------------------------------------
 	// Everybody else's side
 
+	static void read_state(NET_Packet& P, SNpcState& state)
+	{
+		P.r_vec3(state.position);
+		state.heading = P.r_float();
+		state.body.yaw = P.r_float();
+		state.body.pitch = P.r_float();
+		state.body.roll = 0.f;
+		state.head.yaw = P.r_float();
+		state.head.pitch = P.r_float();
+		state.head.roll = 0.f;
+		state.health = P.r_float();
+		state.aims = !!P.r_u8();
+		if (state.aims)
+		{
+			state.sight_enabled = !!P.r_u8();
+			for (Fquaternion& q : state.aim)
+			{
+				q.x = P.r_float();
+				q.y = P.r_float();
+				q.z = P.r_float();
+				q.w = P.r_float();
+			}
+		}
+		const u8 parts = P.r_u8();
+		for (u32 part = 0; part < MAX_PARTS; ++part)
+		{
+			state.motions[part] = part < parts ? P.r_u32() : NO_MOTION;
+			state.times[part] = part < parts ? P.r_float() : 0.f;
+		}
+		state.active_item = P.r_u16();
+		state.received = Device.dwTimeContinual;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	// One offline world: the host's side of the squads
+
+	// squads a player's game has online, by the squad: where a member of it was last seen in the stream
+	struct SStreamedSquad
+	{
+		u32 seen; // Device.dwTimeContinual
+		shared_str level;
+		Fvector position;
+	};
+	static xr_map<u16, SStreamedSquad> g_streamed;
+	static const u32 STREAM_GONE_MS = 3000;
+
+	static void note_streamed(const shared_str& level, NET_Packet& P)
+	{
+		SNpcState state;
+		for (u16 count = P.r_u16(); count; --count)
+		{
+			const u16 id = P.r_u16();
+			read_state(P, state);
+			const CSE_ALifeMonsterAbstract* npc = smart_cast<const CSE_ALifeMonsterAbstract*>(ai().alife().objects().object(id, true));
+			if (npc && npc->m_group_id != u16(-1))
+				g_streamed[npc->m_group_id] = {Device.dwTimeContinual, level, state.position};
+		}
+	}
+
+	bool squad_online_elsewhere(u16 squad_id)
+	{
+		auto it = g_streamed.find(squad_id);
+		return it != g_streamed.end() && Device.dwTimeContinual - it->second.seen < STREAM_GONE_MS;
+	}
+
+	bool moves_offline_squad(const CSE_ALifeDynamicObject* squad)
+	{
+		if (squad->m_bOnline || !is_connected())
+			return true;
+		if (is_host())
+			return !squad_online_elsewhere(squad->ID);
+		return !host_runs_world();
+	}
+
+	// gone from the stream (offline in that game now): the host goes on with it from the game vertex of that level
+	// nearest to where it was last seen
+	static void take_on_squad(u16 squad_id, const SStreamedSquad& seen)
+	{
+		CALifeSimulator& alife = const_cast<CALifeSimulator&>(ai().alife());
+		CSE_ALifeOnlineOfflineGroup* squad = smart_cast<CSE_ALifeOnlineOfflineGroup*>(ai().alife().objects().object(squad_id, true));
+		if (!squad || squad->m_bOnline)
+			return;
+		const CGameGraph& graph = ai().game_graph();
+		GameGraph::_GRAPH_ID best = GameGraph::_GRAPH_ID(-1);
+		float best_distance = flt_max;
+		for (GameGraph::_GRAPH_ID gvid = 0; gvid < graph.header().vertex_count(); ++gvid)
+		{
+			const CGameGraph::CVertex* vertex = graph.vertex(gvid);
+			if (graph.header().level(vertex->level_id()).name() != seen.level)
+				continue;
+			const float distance = vertex->level_point().distance_to_sqr(seen.position);
+			if (distance < best_distance)
+			{
+				best = gvid;
+				best_distance = distance;
+			}
+		}
+		if (best == GameGraph::_GRAPH_ID(-1))
+			return;
+		const CGameGraph::CVertex* vertex = graph.vertex(best);
+		alife.teleport_object(squad_id, best, vertex->level_vertex_id(), vertex->level_point());
+		for (const auto& member : squad->squad_members())
+			alife.teleport_object(member.first, best, vertex->level_vertex_id(), vertex->level_point());
+		if (debug_mode)
+			Msg("[coop dbg] squad %s gone from the %s stream: the host goes on with it (game vertex %u)",
+			    squad->name_replace(), seen.level.c_str(), best);
+	}
+
+	void update_host_squads()
+	{
+		if (!is_host() || !world_ready())
+			return;
+		for (auto it = g_streamed.begin(); it != g_streamed.end();)
+		{
+			if (Device.dwTimeContinual - it->second.seen < STREAM_GONE_MS)
+			{
+				++it;
+				continue;
+			}
+			take_on_squad(it->first, it->second);
+			it = g_streamed.erase(it);
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+
 	void on_npc_states(u32 sender, NET_Packet& P)
 	{
 		shared_str level;
 		P.r_stringZ(level);
+		if (is_host())
+			return note_streamed(level, P);
 		// only the authority of a level sends; we may have been it a moment ago
 		if (!g_pGameLevel || level != Level().name() || is_authority(level))
 			return;
@@ -422,36 +553,7 @@ namespace coop
 		for (u16 i = 0; i < count; ++i)
 		{
 			const u16 id = P.r_u16();
-			SNpcState& state = g_states[id];
-			P.r_vec3(state.position);
-			state.heading = P.r_float();
-			state.body.yaw = P.r_float();
-			state.body.pitch = P.r_float();
-			state.body.roll = 0.f;
-			state.head.yaw = P.r_float();
-			state.head.pitch = P.r_float();
-			state.head.roll = 0.f;
-			state.health = P.r_float();
-			state.aims = !!P.r_u8();
-			if (state.aims)
-			{
-				state.sight_enabled = !!P.r_u8();
-				for (Fquaternion& q : state.aim)
-				{
-					q.x = P.r_float();
-					q.y = P.r_float();
-					q.z = P.r_float();
-					q.w = P.r_float();
-				}
-			}
-			const u8 parts = P.r_u8();
-			for (u32 part = 0; part < MAX_PARTS; ++part)
-			{
-				state.motions[part] = part < parts ? P.r_u32() : NO_MOTION;
-				state.times[part] = part < parts ? P.r_float() : 0.f;
-			}
-			state.active_item = P.r_u16();
-			state.received = Device.dwTimeContinual;
+			read_state(P, g_states[id]);
 		}
 	}
 
@@ -621,8 +723,10 @@ namespace coop
 			for (const auto& [id, peer] : peers())
 				if (peer.level == Level().name())
 					g_others_here.push_back(peer.position);
-			send_states();
+			send_states(SEND_INTERVAL_MS);
 		}
+		else if (is_authority(Level().name()) && host_runs_world())
+			send_states(HOST_SEND_INTERVAL_MS);
 	}
 
 	void play_npc_shot(u16 npc_id)

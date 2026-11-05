@@ -1,0 +1,316 @@
+-- Co-op: the server's admin window, opened from the main menu by HOTKEY (modxml_coop_admin.script) while connected.
+-- The admin page's password unlocks it (asked once, kept per server in <appdata>\coop_admin.txt); then it shows the
+-- host, the world, who is online and where, the world's settings, rules and factions, the world's saves, and does
+-- what the admin page and the Telegram bot do (coop-server/src/server.js ADMIN_*, admin_commands.js).
+
+HOTKEY = DIK_keys.DIK_F10
+
+local FILE = "coop_admin.txt"
+local wnd = nil      -- the window, made on first use
+local entries = {}   -- what each line of the list is: { kind, key, value, min, max, name, revision, title }
+local logged_in = false
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+local function trim(s)
+	return string.match(s or "", "^%s*(.-)%s*$")
+end
+
+-- { [server] = password }, "server<tab>password" lines
+local function load_passwords()
+	local list = {}
+	local f = io.open(getFS():update_path("$app_data_root$", FILE), "r")
+	if f then
+		for line in f:lines() do
+			local server, password = string.match(line, "^([^\t]+)\t(.*)$")
+			if server then
+				list[server] = password
+			end
+		end
+		f:close()
+	end
+	return list
+end
+
+local function save_password(server, password)
+	local list = load_passwords()
+	list[server] = password
+	local f = io.open(getFS():update_path("$app_data_root$", FILE), "w")
+	if not f then
+		return
+	end
+	for s, p in pairs(list) do
+		if p then
+			f:write(s, "\t", p, "\n")
+		end
+	end
+	f:close()
+end
+
+local function command(...)
+	coop.admin_command(table.concat({ ... }, "\t"))
+end
+
+class "UICoopAdmin" (CUIScriptWnd)
+
+function UICoopAdmin:__init(owner) super()
+	self.owner = owner
+	self:InitControls()
+	self:InitCallBacks()
+end
+
+function UICoopAdmin:__finalize()
+end
+
+function UICoopAdmin:InitControls()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	local xml = CScriptXmlInit()
+	xml:ParseFile("ui_coop_admin.xml")
+
+	xml:InitStatic("background", self)
+	local form = xml:InitStatic("form", self)
+	xml:InitTextWnd("form:caption", form)
+	xml:InitFrame("form:list_frame", form)
+	self.list = xml:InitListBox("form:list", form)
+	self.list:ShowSelectedItem(true)
+	self:Register(self.list, "list")
+	self.cap_value = xml:InitTextWnd("form:cap_value", form)
+	self.edit_value = xml:InitEditBox("form:edit_value", form)
+	self:Register(self.edit_value, "edit_value")
+	self.status = xml:InitTextWnd("form:status", form)
+	self.btn_apply = xml:Init3tButton("form:btn_apply", form)
+	self:Register(self.btn_apply, "btn_apply")
+	for _, name in ipairs({ "btn_kick", "btn_rollback", "btn_save_world", "btn_restart_host", "btn_refresh", "btn_close" }) do
+		self:Register(xml:Init3tButton("form:" .. name, form), name)
+	end
+end
+
+function UICoopAdmin:InitCallBacks()
+	self:AddCallback("list", ui_events.LIST_ITEM_CLICKED, self.OnSelect, self)
+	self:AddCallback("btn_apply", ui_events.BUTTON_CLICKED, self.OnApply, self)
+	self:AddCallback("btn_kick", ui_events.BUTTON_CLICKED, self.OnKick, self)
+	self:AddCallback("btn_rollback", ui_events.BUTTON_CLICKED, self.OnRollback, self)
+	self:AddCallback("btn_save_world", ui_events.BUTTON_CLICKED, self.OnSaveWorld, self)
+	self:AddCallback("btn_restart_host", ui_events.BUTTON_CLICKED, self.OnRestartHost, self)
+	self:AddCallback("btn_refresh", ui_events.BUTTON_CLICKED, self.OnRefresh, self)
+	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
+end
+
+function UICoopAdmin:SetStatus(text)
+	self.status:SetText(text)
+end
+
+-- before the password is in: the edit box takes it, the button logs in
+function UICoopAdmin:ShowLogin()
+	logged_in = false
+	entries = {}
+	self.list:RemoveAll()
+	self.cap_value:SetText(tr("st_coop_admin_password"))
+	self.btn_apply:TextControl():SetText(tr("st_coop_admin_login"))
+	self.edit_value:SetText("")
+end
+
+function UICoopAdmin:Open()
+	self:ShowDialog(true)
+	self.owner:HideDialog()
+	self.owner:Show(false)
+	if not coop.connected() then
+		self:ShowLogin()
+		return self:SetStatus(tr("st_coop_admin_offline"))
+	end
+	-- the server lets in a connection, not a game: logged in again each time it opens
+	local password = load_passwords()[coop.server_address()]
+	logged_in = false
+	if password then
+		self.password = password
+		coop.admin_login(password)
+		self:SetStatus(tr("st_coop_admin_wait"))
+	else
+		self:ShowLogin()
+		self:SetStatus(tr("st_coop_admin_ask"))
+	end
+end
+
+function UICoopAdmin:Close()
+	self.owner:ShowDialog(true)
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	self.owner:Show(true)
+end
+
+local function add(list, text, entry)
+	list:AddTextItem(text)
+	entries[#entries + 1] = entry or {}
+end
+
+-- the server's state: "kind<tab>field..." lines (coop-server/src/protocol.js ADMIN_STATE)
+function UICoopAdmin:Fill(text)
+	if not logged_in then
+		logged_in = true
+		self.cap_value:SetText(tr("st_coop_admin_value"))
+		self.btn_apply:TextControl():SetText(tr("st_coop_admin_apply"))
+		if self.password then
+			save_password(coop.server_address(), self.password)
+		end
+		self:SetStatus(tr("st_coop_admin_hint"))
+	end
+	local selected = self.list:GetSelectedIndex()
+	local groups = { player = {}, world = {}, rules = {}, faction = {}, save = {} }
+	local host, world
+	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		local f = str_explode(line, "\t")
+		if f[1] == "host" then
+			host = f[2]
+		elseif f[1] == "world" then
+			world = f
+		elseif f[1] == "player" then
+			table.insert(groups.player, { kind = "player", name = f[2], level = f[3], ping = f[4], authority = f[5] == "1" })
+		elseif f[1] == "setting" then
+			table.insert(groups[f[2]], { kind = "setting", key = f[3], value = tonumber(f[4]), min = tonumber(f[5]),
+				max = tonumber(f[6]), title = f[7] })
+		elseif f[1] == "faction" then
+			table.insert(groups.faction, { kind = "faction", key = f[2], value = f[3] == "1", title = f[4] })
+		elseif f[1] == "save" then
+			table.insert(groups.save, { kind = "save", revision = tonumber(f[2]), time = tonumber(f[3]), title = f[4] })
+		end
+	end
+
+	entries = {}
+	self.list:RemoveAll()
+	add(self.list, tr("st_coop_admin_host", host or "?"))
+	add(self.list, world and tr("st_coop_admin_world", world[2]) or tr("st_coop_admin_no_world"))
+	add(self.list, tr("st_coop_admin_players", #groups.player))
+	for _, p in ipairs(groups.player) do
+		local where = p.level ~= "" and p.level or tr("st_coop_admin_in_menu")
+		add(self.list, string.format("   %s - %s%s%s", p.name, where, p.ping ~= "" and (", " .. p.ping .. " ms") or "",
+			p.authority and (", " .. tr("st_coop_admin_authority")) or ""), p)
+	end
+	local function settings(header, list)
+		add(self.list, tr(header))
+		for _, s in ipairs(list) do
+			local value = s.min and tostring(s.value) or tr(s.value == 1 and "st_coop_admin_yes" or "st_coop_admin_no")
+			add(self.list, string.format("   %s: %s%s", s.title, value, s.min and string.format(" (%s-%s)", s.min, s.max) or ""), s)
+		end
+	end
+	settings("st_coop_admin_world_settings", groups.world)
+	settings("st_coop_admin_rules", groups.rules)
+	add(self.list, tr("st_coop_admin_factions"))
+	for _, f in ipairs(groups.faction) do
+		add(self.list, string.format("   %s: %s", f.title, tr(f.value and "st_coop_admin_yes" or "st_coop_admin_no")), f)
+	end
+	add(self.list, tr("st_coop_admin_saves"))
+	for _, s in ipairs(groups.save) do
+		add(self.list, string.format("   #%d   %s   %s", s.revision, os.date("%d.%m %H:%M", s.time), s.title), s)
+	end
+	if selected >= 0 and selected < #entries then
+		self.list:SetSelectedIndex(selected)
+	end
+end
+
+function UICoopAdmin:Selected()
+	return entries[self.list:GetSelectedIndex() + 1] or {}
+end
+
+-- a number's value goes into the edit box to be changed
+function UICoopAdmin:OnSelect()
+	local e = self:Selected()
+	if e.kind == "setting" and e.min then
+		self.edit_value:SetText(tostring(e.value))
+	end
+end
+
+function UICoopAdmin:OnApply()
+	if not logged_in then
+		self.password = trim(self.edit_value:GetText())
+		if self.password == "" then
+			return self:SetStatus(tr("st_coop_admin_ask"))
+		end
+		coop.admin_login(self.password)
+		return self:SetStatus(tr("st_coop_admin_wait"))
+	end
+	local e = self:Selected()
+	if e.kind == "setting" and e.min then
+		command("set", e.key, trim(self.edit_value:GetText()))
+	elseif e.kind == "setting" then
+		command("set", e.key, e.value == 1 and "0" or "1")
+	elseif e.kind == "faction" then
+		command("faction", e.key, e.value and "off" or "on")
+	else
+		self:SetStatus(tr("st_coop_admin_pick_setting"))
+	end
+end
+
+local function ask(text, yes)
+	ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, text, yes, function() end)
+end
+
+function UICoopAdmin:OnKick()
+	local e = self:Selected()
+	if e.kind ~= "player" then
+		return self:SetStatus(tr("st_coop_admin_pick_player"))
+	end
+	ask(tr("st_coop_admin_kick_ask", e.name), function() command("kick", e.name) end)
+end
+
+function UICoopAdmin:OnRollback()
+	local e = self:Selected()
+	if e.kind ~= "save" then
+		return self:SetStatus(tr("st_coop_admin_pick_save"))
+	end
+	ask(tr("st_coop_admin_rollback_ask", e.revision, e.title), function() command("rollback", e.revision) end)
+end
+
+function UICoopAdmin:OnSaveWorld()
+	command("save")
+end
+
+function UICoopAdmin:OnRestartHost()
+	ask(tr("st_coop_admin_restart_ask"), function() command("restart_host") end)
+end
+
+function UICoopAdmin:OnRefresh()
+	if logged_in then
+		command("state")
+	end
+end
+
+function UICoopAdmin:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and (dik == DIK_keys.DIK_ESCAPE or dik == HOTKEY) then
+		self:Close()
+	end
+	return res
+end
+
+function is_shown()
+	return wnd ~= nil and wnd:IsShown()
+end
+
+-- the main menu (owner) opens it
+function open(owner)
+	if not (wnd and rawequal(wnd.owner, owner)) then -- engine objects have no == of their own
+		wnd = UICoopAdmin(owner)
+	end
+	wnd:Open()
+end
+
+-- from the engine (coop_net.cpp)
+function on_state(text)
+	if wnd then
+		wnd:Fill(text)
+	end
+end
+
+function on_result(text)
+	if not wnd then
+		return
+	end
+	if not logged_in then
+		save_password(coop.server_address(), nil) -- a wrong one kept: asked again
+		wnd:ShowLogin()
+	end
+	wnd:SetStatus(text)
+end

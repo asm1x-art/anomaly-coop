@@ -7,6 +7,8 @@
 #include "coop_facts.h"
 #include "Level.h"
 #include "Actor.h"
+#include "Inventory.h"
+#include "inventory_item.h"
 #include "ai_object_location.h"
 #include "ai_space.h"
 #include "script_engine.h"
@@ -74,6 +76,9 @@ namespace coop
 	static SCharacter g_record;
 	static u32 g_last_record = 0;
 	static xr_vector<u16> g_starter_kit;  // spawned while loading, shared once the level runs
+	static xr_vector<u8> g_things; // the things of the save our character went back to, coming with the world
+	static xr_vector<u16> g_made_again; // of those, the ones made again: for the others once the level runs
+	static bool g_send_states = false; // the others' copies of our things take their restored states then
 
 	// Anomaly writes a save's .scoc after the engine is done with the .scop: the upload waits for it
 	static const u32 UPLOAD_WAIT_MS = 10000;
@@ -171,7 +176,7 @@ namespace coop
 	// the server has a world we have never been in: a character is made first (Lua, the new game screen)
 	static bool needs_character()
 	{
-		return g_server_has_world && !g_has_record && !is_mine(g_server_owner) && !g_join_requested;
+		return g_server_has_world && !g_has_record && !is_mine(g_server_owner) && !g_join_requested && !is_host();
 	}
 
 	void set_world_seed(LPCSTR save_name)
@@ -236,6 +241,8 @@ namespace coop
 			file.clear();
 		forget_progress();
 		forget_facts();
+		drop_held_world_changes();
+		g_things.clear();
 		g_downloading = true;
 		NET_Packet R;
 		R.w_begin(M_WORLD_REQUEST);
@@ -286,6 +293,9 @@ namespace coop
 	void on_settings(NET_Packet& P)
 	{
 		P.r_stringZ(g_settings);
+		// the host saves the world as often as the server's config says (coop_sync.script's autosave)
+		if (is_host())
+			autosave_interval = iFloor(world_rule("autosave_minutes", float(autosave_interval)));
 	}
 
 	const xr_string& world_settings()
@@ -367,11 +377,11 @@ namespace coop
 		send(P);
 	}
 
-	void propose_rollback(u32 revision)
+	void load_save(u32 id)
 	{
 		NET_Packet P;
-		P.w_begin(M_ROLLBACK_PROPOSE);
-		P.w_u32(revision);
+		P.w_begin(M_LOAD_REQUEST);
+		P.w_u32(id);
 		send(P);
 	}
 
@@ -414,26 +424,81 @@ namespace coop
 		call_lua("_G.coop_on_saves", text.c_str());
 	}
 
-	void on_rollback_vote(NET_Packet& P)
+	void on_load_result(NET_Packet& P)
 	{
-		xr_string proposer, name, reason;
-		const u32 proposer_id = P.r_u32();
-		P.r_stringZ(proposer);
-		const u32 revision = P.r_u32();
-		const u32 time = P.r_u32();
-		P.r_stringZ(name);
-		P.r_stringZ(reason);
-		Msg("[coop] '%s' asks to take the world back to revision %u", proposer.c_str(), revision);
-		call_lua("_G.coop_on_rollback_vote", proposer_id, proposer.c_str(), revision, time, name.c_str(), reason.c_str());
+		const u8 result = P.r_u8();
+		const u32 id = P.r_u32();
+		call_lua("_G.coop_on_load_result", result, id);
 	}
 
-	void on_rollback_result(NET_Packet& P)
+	// our record, as M_CHARACTER carries it
+	static void write_record(NET_Packet& P)
 	{
-		xr_string who;
-		const u8 result = P.r_u8();
-		P.r_stringZ(who);
-		const u32 revision = P.r_u32();
-		call_lua("_G.coop_on_rollback_result", result, who.c_str(), revision);
+		P.w_stringZ(Level().name());
+		P.w_u16(g_actor->ai_location().game_vertex_id());
+		P.w_u32(g_actor->ai_location().level_vertex_id());
+		P.w_vec3(g_actor->Position());
+		P.w_float(Device.vCameraDirection.getH());
+		P.w_u32(g_actor->get_money());
+		P.w_float(g_actor->GetfHealth());
+		P.w_stringZ(g_actor->CharacterInfo().Community().id());
+	}
+
+	void on_snapshot_request(NET_Packet& P)
+	{
+		const u32 id = P.r_u32();
+		if (!g_in_world || !world_ready() || is_host())
+			return;
+		CMemoryWriter out;
+		NET_Packet record;
+		record.write_start();
+		write_record(record);
+		out.w_u32(record.B.count);
+		out.w(record.B.data, record.B.count);
+		CMemoryWriter progress;
+		write_progress(progress);
+		out.w_u32(progress.size());
+		out.w(progress.pointer(), progress.size());
+		u16 count = 0;
+		CMemoryWriter things;
+		for (PIItem item : g_actor->inventory().m_all)
+		{
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(item->object().ID(), true);
+			if (!object)
+				continue;
+			NET_Packet thing;
+			thing.write_start();
+			write_item_state(thing, object);
+			things.w_u16(u16(thing.B.count));
+			things.w(thing.B.data, thing.B.count);
+			++count;
+		}
+		out.w_u16(count);
+		out.w(things.pointer(), things.size());
+
+		const u32 total = out.size();
+		for (u32 offset = 0; offset < total; offset += CHUNK)
+		{
+			NET_Packet S;
+			S.w_begin(M_SNAPSHOT);
+			S.w_u32(id);
+			S.w_u32(total);
+			S.w_u32(offset);
+			S.w(out.pointer() + offset, _min(CHUNK, total - offset));
+			send(S);
+		}
+		Msg("[coop] our character saved (save %u): %u thing(s), %u bytes", id, count, total);
+	}
+
+	void on_snapshot_things(NET_Packet& P)
+	{
+		const u32 total = P.r_u32();
+		const u32 offset = P.r_u32();
+		const u32 size = P.r_elapsed();
+		if (!g_downloading || offset + size > total)
+			return;
+		g_things.resize(total);
+		P.r(g_things.data() + offset, size);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -591,6 +656,11 @@ namespace coop
 		return g_has_record ? g_record.community.c_str() : "";
 	}
 
+	bool world_downloading()
+	{
+		return g_downloading;
+	}
+
 	bool world_busy()
 	{
 		return g_downloading || g_load_pending || g_loading || (g_pGameLevel && !world_ready());
@@ -638,16 +708,11 @@ namespace coop
 
 	static void send_record()
 	{
+		if (is_host()) // a ghost, not a character
+			return;
 		NET_Packet P;
 		P.w_begin(M_CHARACTER);
-		P.w_stringZ(Level().name());
-		P.w_u16(g_actor->ai_location().game_vertex_id());
-		P.w_u32(g_actor->ai_location().level_vertex_id());
-		P.w_vec3(g_actor->Position());
-		P.w_float(Device.vCameraDirection.getH());
-		P.w_u32(g_actor->get_money());
-		P.w_float(g_actor->GetfHealth());
-		P.w_stringZ(g_actor->CharacterInfo().Community().id());
+		write_record(P);
 		send(P);
 	}
 
@@ -722,6 +787,15 @@ namespace coop
 			if (CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true))
 				share_object(item);
 		g_starter_kit.clear();
+		for (u16 id : g_made_again)
+			if (CSE_ALifeDynamicObject* item = ai().alife().objects().object(id, true))
+				share_object(item);
+		g_made_again.clear();
+		if (g_send_states)
+		{
+			g_send_states = false;
+			send_inventory_states();
+		}
 
 		if (Device.dwTimeContinual - g_last_record >= RECORD_INTERVAL_MS)
 		{
@@ -818,8 +892,32 @@ namespace coop
 		}
 	}
 
+	// the host's ghost stands on fake_start, Anomaly's empty start level (no smarts, no tasks there)
+	static void put_ghost()
+	{
+		CSE_ALifeCreatureActor* actor = find_actor();
+		const CGameGraph& graph = ai().game_graph();
+		for (GameGraph::_GRAPH_ID gvid = 0; actor && gvid < graph.header().vertex_count(); ++gvid)
+		{
+			const CGameGraph::CVertex* vertex = graph.vertex(gvid);
+			if (xr_strcmp(graph.header().level(vertex->level_id()).name(), "fake_start"))
+				continue;
+			actor->o_Position = vertex->level_point();
+			actor->m_tGraphID = gvid;
+			actor->m_tNodeID = vertex->level_vertex_id();
+			Msg("[coop] the host's ghost stands on fake_start (game vertex %u)", gvid);
+			return;
+		}
+		Msg("! [coop] no fake_start in this world: the host's ghost stays where the save's actor is");
+	}
+
 	void on_world_objects_loaded()
 	{
+		if (g_loading && is_host())
+		{
+			put_ghost();
+			return;
+		}
 		if (!g_loading || is_mine(g_loading_owner) || !(g_has_record || g_join_requested))
 			return;
 
@@ -861,13 +959,27 @@ namespace coop
 		}
 	}
 
+	static void put_character();
+
 	void on_world_loaded()
 	{
 		if (!g_loading)
 			return;
 		g_loading = false;
 		g_in_world = g_loading_revision;
+		put_character();
+		replay_journal(); // what changed since the save, onto the world with our character in it
+		if (!g_things.empty())
+		{
+			IReader things(g_things.data(), int(g_things.size())); // a snapshot's things may not fit a NET_Packet
+			restore_things(things, g_made_again);
+			g_things.clear();
+			g_send_states = true;
+		}
+	}
 
+	static void put_character()
+	{
 		apply_progress();
 		put_infos_on_load(); // after it: what the server knows of the world wins over both
 		name_actor();
@@ -878,15 +990,30 @@ namespace coop
 			return;
 		}
 
-		// The save's actor is the owner's: their things go to their shadow, ours come out of ours.
+		// The save's actor is the owner's: their things go to their shadow, ours come out of ours. The host's ghost
+		// has none and no shadow.
 		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
-		CSE_ALifeDynamicObject* owner_shadow = ai().alife().objects().object(shadow_of(g_loading_owner), true);
-		if (!actor || !owner_shadow)
+		if (!actor)
 		{
-			Msg("! [coop] can't swap characters: no actor or no shadow for '%s'", g_loading_owner.c_str());
+			Msg("! [coop] can't swap characters: no actor");
 			return;
 		}
-		move_inventory(actor, owner_shadow);
+		if (g_loading_owner != host_name() || !actor->children.empty())
+		{
+			CSE_ALifeDynamicObject* owner_shadow = ai().alife().objects().object(shadow_of(g_loading_owner), true);
+			if (!owner_shadow)
+			{
+				Msg("! [coop] can't swap characters: no shadow for '%s'", g_loading_owner.c_str());
+				return;
+			}
+			move_inventory(actor, owner_shadow);
+		}
+		if (is_host())
+		{
+			actor->m_dwMoney = 0;
+			Msg("[coop] world loaded, the host's ghost in place of '%s'", g_loading_owner.c_str());
+			return;
+		}
 
 		CSE_ALifeDynamicObject* my_shadow = ai().alife().objects().object(find_shadow_of(my_name()), true);
 		if (my_shadow)

@@ -171,6 +171,15 @@ PROTECT_API void CRenderDevice::Create()
 
 	if (b_is_Ready) return; // prevent double call
 
+	if (g_coop_headless)
+	{
+		// nothing is drawn: a small window that never shows
+		g_screenmode = 0;
+		psCurrentVidMode[0] = 640;
+		psCurrentVidMode[1] = 480;
+		b_is_Active = TRUE; // a window that never shows is never activated
+	}
+
 	u32 w, h;
 	GetMonitorResolution(w, h);
 	int monX, monY;

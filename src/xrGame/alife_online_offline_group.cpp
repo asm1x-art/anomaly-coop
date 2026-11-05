@@ -71,7 +71,9 @@ void CSE_ALifeOnlineOfflineGroup::update()
         if (!bfActive())
             return;
 
-        brain().update();
+        // co-op: an offline squad goes where the world's host takes it (coop_npc.h)
+        if (coop::moves_offline_squad(this))
+            brain().update();
 
         MEMBERS::iterator I = m_members.begin();
         MEMBERS::iterator E = m_members.end();

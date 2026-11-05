@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { startServer } from '../src/server.js';
-import { M, REFUSED, ROLLBACK, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
+import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, encode, createDecoder, encodeText, readStringZ, readStringsZ } from '../src/protocol.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +18,7 @@ function connect(port) {
   const queue = [];
   const waiters = [];
   // ROLES arrive on every join/leave; kept aside so tests can read the other messages in order
-  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], time: [] };
+  const client = { socket, roles: [], worldInfo: [], settings: [], groups: [], levels: [], hosts: [], time: [] };
   socket.on('data', createDecoder((type, payload) => {
     const msg = { type, payload: Buffer.from(payload) };
     if (type === M.ROLES) return client.roles.push(msg.payload.readUInt32LE(0));
@@ -26,6 +26,8 @@ function connect(port) {
     if (type === M.SETTINGS) return client.settings.push(readStringZ(msg.payload, 0));
     if (type === M.GROUPS) return client.groups.push(msg.payload);
     if (type === M.TIME) return client.time.push(timeOf(msg.payload));
+    if (type === M.LEVELS) return client.levels.push(parseLevels(msg.payload));
+    if (type === M.HOST) return client.hosts.push({ id: msg.payload.readUInt32LE(0), name: readStringZ(msg.payload, 4) });
     const w = waiters.shift();
     w ? w(msg) : queue.push(msg);
   }));
@@ -334,6 +336,231 @@ test('the longest-connected player is sim master, handed over when it leaves', a
   }
 });
 
+// like roundTrip, skipping whatever else came first
+async function settle(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  await until(c, M.PONG);
+}
+
+// level -> its authority's id
+function parseLevels(payload) {
+  const out = {};
+  let at = 1;
+  for (let i = 0; i < payload[0]; i++) {
+    const level = readStringZ(payload, at);
+    at = payload.indexOf(0, at) + 1;
+    out[level] = payload.readUInt32LE(at);
+    at += 4;
+  }
+  return out;
+}
+
+test('a level is run by the player who came to it first, then by the next to have come', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    const idB = (await b.next()).payload.readUInt32LE(0);
+
+    // b comes to Cordon first, though a has the lower id
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    a.send(M.ACTOR_STATE, actorState('l02_garbage', 0, 0, 0, 0));
+    await settle(b);
+    await settle(a);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(a);
+    await settle(b);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idB });
+    assert.deepEqual(b.levels.at(-1), { l01_escape: idB });
+
+    // b goes away and comes back: a has been there longer now
+    b.send(M.ACTOR_STATE, actorState('l02_garbage', 0, 0, 0, 0));
+    await settle(b);
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(b);
+    await settle(a);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idA });
+    const count = b.levels.length;
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 5, 0, 0, 0)); // moving about there changes nothing
+    await settle(b);
+    assert.equal(b.levels.length, count);
+
+    // a newcomer learns who runs what at once
+    const c = await connect(port);
+    c.send(M.HELLO, hello('третий'));
+    await c.next();
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), { l01_escape: idA });
+
+    // a goes to the menu, then b runs it; b leaves the server: nobody does
+    a.send(M.LEFT_WORLD);
+    await settle(a);
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), { l01_escape: idB });
+    b.socket.destroy();
+    assert.equal((await until(c, M.PEER_LEFT)).payload.readUInt32LE(0), idB);
+    await settle(c);
+    assert.deepEqual(c.levels.at(-1), {});
+    a.socket.destroy();
+    c.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function hostHello(name, secret) {
+  return Buffer.concat([hello(name), Buffer.from([1]), encodeText(secret), Buffer.from([0])]);
+}
+
+test('the host: let in by its secret, the sim master once in the world, never a player', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    await settle(a);
+    const idA = a.roles.at(-1);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: 0, name: '' });
+
+    const wrong = await connect(port);
+    wrong.send(M.HELLO, hostHello('host', 'beef'));
+    const refused = await wrong.next();
+    assert.equal(refused.type, M.REFUSED);
+    assert.equal(refused.payload[0], REFUSED.HOST);
+
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    const idH = (await h.next()).payload.readUInt32LE(0);
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: idH, name: 'host' });
+    assert.equal(a.roles.at(-1), idA); // not in the world yet
+    const second = await connect(port);
+    second.send(M.HELLO, hostHello('host2', 'f00d'));
+    assert.equal((await second.next()).payload[0], REFUSED.HOST);
+
+    // in the world: the sim master; nobody sees it on a level
+    h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    await settle(h);
+    await settle(a);
+    assert.equal(a.roles.at(-1), idH);
+    assert.deepEqual(a.levels.at(-1), { l01_escape: idA });
+    const status = server.coop.status();
+    assert.deepEqual(status.online.map((p) => p.name), ['artem']);
+    assert.equal(status.host.connected, true);
+    assert.equal(status.host.master, true);
+
+    // a newcomer doesn't see it either, and the host doesn't count against the player limit
+    const b = await player(port, 'друг');
+    await settle(b);
+    assert.equal(b.hosts.at(-1).id, idH);
+    assert.equal(b.roles.at(-1), idH);
+
+    h.socket.destroy();
+    await settle(a);
+    assert.deepEqual(a.hosts.at(-1), { id: 0, name: '' });
+    assert.equal(a.roles.at(-1), idA);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the host: its autosave interval with the settings; paused while no player is in the world', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d', autosaveMinutes: 7, pauseWhenEmpty: true });
+  const { port } = server.address();
+  try {
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    await settle(h);
+    assert.match(h.settings.at(-1), /^autosave_minutes=7$/m);
+    h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    assert.deepEqual([...(await until(h, M.PAUSED)).payload], [1, ...Buffer.from('server'), 0]);
+
+    const a = await player(port, 'artem');
+    await settle(a);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    assert.equal((await until(h, M.PAUSED)).payload[0], 0);
+    assert.ok(!(await drain(a)).includes(M.PAUSED)); // the players never hear of it
+    a.send(M.LEFT_WORLD);
+    assert.equal((await until(h, M.PAUSED)).payload[0], 1);
+    h.socket.destroy();
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the admin window: the admin password, then the admin page commands; the state after each', async () => {
+  const server = await startServer({ ...options(), adminPassword: 'секрет' });
+  const { port } = server.address();
+  const text = (msg) => readStringZ(msg.payload, 0);
+  const line = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ADMIN_COMMAND, line('save'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /пароль/);
+    a.send(M.ADMIN_LOGIN, line('не тот'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Неверный/);
+    a.send(M.ADMIN_LOGIN, line('секрет'));
+    const state = text(await until(a, M.ADMIN_STATE)).split('\n').map((l) => l.split('\t'));
+    assert.deepEqual(state.find((l) => l[0] === 'host'), ['host', 'нет: мир держит игра игрока']);
+    assert.deepEqual(state.find((l) => l[2] === 'group_max').slice(0, 4), ['setting', 'rules', 'group_max', '4']);
+    assert.deepEqual(state.filter((l) => l[0] === 'player').map((l) => l[1]), ['artem', 'друг']);
+    assert.deepEqual(state.find((l) => l[1] === 'monolith').slice(0, 3), ['faction', 'monolith', '1']);
+
+    a.send(M.ADMIN_COMMAND, line('set\tgroup_max\t3'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /3$/);
+    assert.equal(server.coop.settings().rules.group_max, 3);
+    assert.match(text(await until(a, M.ADMIN_STATE)), /setting\trules\tgroup_max\t3/);
+    a.send(M.ADMIN_COMMAND, line('faction\tmonolith\toff'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Монолит: нет/);
+    assert.ok(!server.coop.settings().factions.includes('monolith'));
+    a.send(M.ADMIN_COMMAND, line('kick\tдруг'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /Отключён: друг/);
+    await until(a, M.PEER_LEFT);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('a level NPC stream goes to the players on that level and the host only', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    const c = await player(port, 'третий');
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
+    c.send(M.ACTOR_STATE, actorState('l05_bar', 0, 0, 0, 0));
+    await settle(a);
+    await settle(b);
+    await settle(c);
+    await settle(h);
+    a.send(M.NPC_STATES, Buffer.concat([encodeText('l01_escape'), Buffer.from([0]), Buffer.from('npcs')]));
+    await settle(a);
+    assert.equal((await until(b, M.NPC_STATES)).payload.readUInt32LE(0), a.roles.at(-1));
+    await until(h, M.NPC_STATES);
+    assert.ok(!(await drain(c)).includes(M.NPC_STATES));
+    for (const x of [a, b, c, h]) x.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 test('script events reach others with the sender id', async () => {
   const server = await startServer(options());
   const { port } = server.address();
@@ -415,6 +642,7 @@ test('world: uploaded into an empty server, announced to all, downloaded in chun
         assert.equal(msg.payload.readUInt32LE(0), 0); // none kept for this player
         continue;
       }
+      if (msg.type === M.NAMES) continue; // the journal's names (here, no journal)
       assert.equal(msg.type, M.WORLD_CHUNK);
       msg.payload.copy(files[msg.payload[0]], msg.payload.readUInt32LE(1), 5);
     }
@@ -694,8 +922,29 @@ async function player(port, name) {
   return c;
 }
 
-test('saves: the master is whoever is in the world; it saves for players coming in, leaving and asking', async () => {
-  const server = await startServer(options());
+// the message types that came before a round trip's PONG
+async function drain(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const types = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return types;
+    types.push(msg.type);
+  }
+}
+
+function event(name, payload) {
+  return Buffer.concat([encodeText(name), Buffer.from([0]), encodeText(payload), Buffer.from([0])]);
+}
+
+function u16le(v) {
+  const b = Buffer.alloc(2);
+  b.writeUInt16LE(v, 0);
+  return b;
+}
+
+test('saves: the master saves when asked; a player coming in gets the last save and the journal since, nobody saves', async () => {
+  const server = await startServer({ ...options(), journalOverlapMs: 0 });
   const { port } = server.address();
   try {
     const menu = await player(port, 'menu');       // lowest id, stays in the main menu
@@ -706,89 +955,202 @@ test('saves: the master is whoever is in the world; it saves for players coming 
     await roundTrip(master);
     assert.equal(master.roles.at(-1), 2); // in the world: the master now, not the one in the menu
 
-    // a player coming in: the master saves first, then the newcomer gets that world
+    // world changes since the save are kept; Lua events only when they change the world
+    master.send(M.ITEM_PARENT, Buffer.from('item 1'));
+    master.send(M.SCRIPT_EVENT, event('news', 'hello'));
+    master.send(M.SCRIPT_EVENT, event('stash_opened', '77'));
+    master.send(M.ENTITY_DEATH, Buffer.from('death'));
+    master.send(M.NPC_STATES, Buffer.from('npcs'));
+    await roundTrip(master);
+
+    // a player coming in: the save and the journal at once, nobody saves
     const joiner = await player(port, 'joiner');
     joiner.send(M.WORLD_REQUEST);
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'join', who: 'joiner' });
-    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, '', 'join', 'joiner');
-    const done = await until(joiner, M.WORLD_DONE);
-    assert.equal(done.payload.readUInt32LE(done.payload.indexOf(0) + 1), 2);
+    const journal = [];
+    let names = null;
+    for (;;) {
+      const msg = await joiner.next();
+      if (msg.type === M.NAMES) names = msg.payload;
+      if (msg.type === M.JOURNAL) journal.push(msg.payload);
+      if (msg.type !== M.WORLD_DONE) continue;
+      assert.equal(msg.payload.readUInt32LE(msg.payload.indexOf(0) + 1), 1);
+      break;
+    }
+    const by = (type, payload, id = 2) => Buffer.concat([u16le(type), ...(id ? [u32le(id)] : []), payload]);
+    assert.deepEqual(journal, [by(M.ITEM_PARENT, Buffer.from('item 1')), by(M.SCRIPT_EVENT, event('stash_opened', '77')),
+      by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
+    assert.equal(names.readUInt16LE(0), 3);
+    assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['menu']);
+    assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
 
-    // asked by name
-    menu.send(M.SAVE_REQUEST, Buffer.from('Перед Баром\0', 'latin1').length ? Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]) : null);
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: 'Перед Баром', reason: 'named', who: 'menu' });
+    // the admin asks (players save their characters, not the world)
+    assert.ok(server.coop.saveWorld());
+    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'admin', who: 'admin' });
+    await uploadSave(master, [Buffer.from('w2'), Buffer.from('l2')], 1, '', 'admin', 'admin');
+    await roundTrip(master);
 
-    // a player in the world leaving
+    // a player in the world leaving: no save either; the new save started the journal again
     joiner.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
     await roundTrip(joiner);
     joiner.socket.destroy();
-    assert.deepEqual(saveNow(await until(master, M.SAVE_NOW)), { name: '', reason: 'leave', who: 'joiner' });
+    await until(master, M.PEER_LEFT);
+    assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
+    const late = await player(port, 'late');
+    late.send(M.WORLD_REQUEST);
+    const types = [];
+    for (let msg = await late.next(); msg.type !== M.WORLD_DONE; msg = await late.next()) types.push(msg.type);
+    assert.ok(!types.includes(M.JOURNAL));
 
-    menu.send(M.SAVES_REQUEST);
-    const saves = await until(menu, M.SAVES);
-    assert.equal(saves.payload.readUInt16LE(0), 2);
-    assert.equal(saves.payload.readUInt32LE(2), 2); // newest first
-    assert.deepEqual(readStringsZ(saves.payload, 10, 3), ['', 'join', 'joiner']);
+    assert.deepEqual(server.coop.status().saves.map((m) => [m.revision, m.reason]), [[2, 'admin'], [1, 'new']]);
     menu.socket.destroy();
     master.socket.destroy();
+    late.socket.destroy();
   } finally {
     server.close();
   }
 });
 
-test('rollback: everyone must agree; then all reload, characters go back, old games may not upload', async () => {
+test('the journal and the client ids outlive a server restart', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  let server = await startServer(options(dataDir));
+  try {
+    const a = await player(server.address().port, 'artem');
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    a.send(M.ITEM_PARENT, Buffer.from('item 1'));
+    await roundTrip(a);
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+  server = await startServer(options(dataDir));
+  try {
+    const b = await connect(server.address().port);
+    b.send(M.HELLO, hello('друг'));
+    assert.equal((await b.next()).payload.readUInt32LE(0), 2); // after artem's 1
+    b.send(M.WORLD_REQUEST);
+    const journal = [];
+    let names = null;
+    for (let msg = await b.next(); msg.type !== M.WORLD_DONE; msg = await b.next()) {
+      if (msg.type === M.JOURNAL) journal.push(msg.payload);
+      if (msg.type === M.NAMES) names = msg.payload;
+    }
+    assert.deepEqual(journal, [Buffer.concat([u16le(M.ITEM_PARENT), u32le(1), Buffer.from('item 1')])]);
+    assert.equal(names.readUInt16LE(0), 2);
+    assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['artem']);
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+function snapshot(record, progress, things) {
+  const sized = (b) => Buffer.concat([u32le(b.length), b]);
+  return Buffer.concat([sized(Buffer.from(record)), sized(Buffer.from(progress)), Buffer.from(things)]);
+}
+
+function sendSnapshot(c, saveId, data) {
+  for (let offset = 0; offset === 0 || offset < data.length; offset += 15000)
+    c.send(M.SNAPSHOT, Buffer.concat([u32le(saveId), u32le(data.length), u32le(offset), data.subarray(offset, offset + 15000)]));
+}
+
+// [{ id, name, reason, who }] of a SAVES
+function charSaves(payload) {
+  const out = [];
+  let at = 2;
+  for (let i = 0; i < payload.readUInt16LE(0); i++) {
+    const id = payload.readUInt32LE(at);
+    const [name, reason, who] = readStringsZ(payload, at + 8, 3);
+    at += 8 + [name, reason, who].reduce((n, t) => n + encodeText(t).length + 1, 0) + 4;
+    out.push({ id, name, reason, who });
+  }
+  return out;
+}
+
+// what a world download brings: the things of a save gone back to, the progress
+async function download(c) {
+  c.send(M.WORLD_REQUEST);
+  let things = null;
+  let progress = null;
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.WORLD_DONE) return { things, progress };
+    if (msg.type === M.SNAPSHOT_THINGS) {
+      things ??= Buffer.alloc(msg.payload.readUInt32LE(0));
+      msg.payload.copy(things, msg.payload.readUInt32LE(4), 8);
+    }
+    if (msg.type === M.PROGRESS && msg.payload.readUInt32LE(0)) {
+      progress ??= Buffer.alloc(msg.payload.readUInt32LE(0));
+      msg.payload.copy(progress, msg.payload.readUInt32LE(4), 8);
+    }
+  }
+}
+
+test('character saves: a snapshot of the character; going back puts it back, with its things, the world stays', async () => {
   const server = await startServer(options());
   const { port } = server.address();
+  const action = (kind, id) => Buffer.concat([Buffer.from([kind]), u32le(id), Buffer.from([0])]);
   try {
     const a = await player(port, 'artem');
     const b = await player(port, 'друг');
+    const idA = a.roles.at(-1) ?? 1;
     a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
-    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0)); // b votes: in the world
-    await until(a, M.PEER_STATE); // b's state reaches a in no fixed order with a's own replies
-    a.send(M.CHARACTER, Buffer.from('at the start'));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 1, 0, 0, 0));
     await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
-    a.send(M.CHARACTER, Buffer.from('much later'));
-    await uploadSave(a, [Buffer.from('w2'), Buffer.from('l2')], 1);
     await roundTrip(a);
+    await settle(b);
 
-    // a no ends it
-    a.send(M.ROLLBACK_PROPOSE, u32le(1));
-    const ask = await until(b, M.ROLLBACK_VOTE);
-    assert.equal(ask.payload.readUInt32LE(0), 1); // proposer id
-    b.send(M.ROLLBACK_ANSWER, Buffer.from([0]));
-    const no = await until(a, M.ROLLBACK_RESULT);
-    assert.equal(no.payload[0], ROLLBACK.DECLINED);
-    assert.equal(readStringZ(no.payload, 1), 'друг');
+    // alone: their own game makes it
+    a.send(M.SAVE_REQUEST, Buffer.concat([encodeText('Перед Баром'), Buffer.from([0])]));
+    const asked = await until(a, M.SNAPSHOT_REQUEST);
+    const id1 = asked.payload.readUInt32LE(0);
+    sendSnapshot(a, id1, snapshot('record 1', 'progress 1', Buffer.alloc(20000, 3)));
+    a.send(M.CHARACTER, Buffer.from('record later'));
+    await roundTrip(a);
+    a.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(a, M.SAVES)).payload), [{ id: id1, name: 'Перед Баром', reason: 'named', who: 'artem' }]);
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), []);
 
-    // all yes: back to save 1 as save 3
-    a.send(M.ROLLBACK_PROPOSE, u32le(1));
-    await until(b, M.ROLLBACK_VOTE);
-    b.send(M.ROLLBACK_ANSWER, Buffer.from([1]));
-    await until(b, M.WORLD_RELOAD);
-    const yes = await until(b, M.ROLLBACK_RESULT);
-    assert.equal(yes.payload[0], ROLLBACK.ACCEPTED);
-    assert.equal(yes.payload.readUInt32LE(yes.payload.indexOf(0, 1) + 1), 3);
+    // back to it: the record, a reload, and the things with the next download, once
+    a.send(M.LOAD_REQUEST, u32le(id1));
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record 1');
+    await until(a, M.WORLD_RELOAD);
+    const done = await until(a, M.LOAD_RESULT);
+    assert.equal(done.payload[0], LOAD.DONE);
+    const got = await download(a);
+    assert.deepEqual(got.things, Buffer.alloc(20000, 3));
+    assert.equal(got.progress.toString(), 'progress 1');
+    assert.equal((await download(a)).things, null);
+    assert.equal(server.coop.status().world.revision, 1); // the world didn't go back
+
+    // a group: its leader saves everyone in the world; the others don't, and can't load it
+    a.send(M.GROUP, action(GROUP.INVITE, 2));
+    await until(b, M.GROUP_INVITE);
+    b.send(M.GROUP, action(GROUP.ACCEPT, idA));
+    await settle(b);
+    b.send(M.SAVE_REQUEST, Buffer.from([0]));
+    assert.ok(!(await drain(b)).includes(M.SNAPSHOT_REQUEST));
+    a.send(M.SAVE_REQUEST, Buffer.from([0]));
+    const id2 = (await until(a, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0);
+    assert.equal((await until(b, M.SNAPSHOT_REQUEST)).payload.readUInt32LE(0), id2);
+    sendSnapshot(a, id2, snapshot('record a', '', 'things a'));
+    sendSnapshot(b, id2, snapshot('record b', 'progress b', 'things b'));
+    await roundTrip(a);
     await roundTrip(b);
-    assert.deepEqual(worldInfo(b.worldInfo.at(-1)), { has: true, owner: 'artem', revision: 3, creator: '' });
-    await until(a, M.WORLD_RELOAD); // the one who asked reloads too
-    await until(a, M.ROLLBACK_RESULT);
-
-    // the master's game still runs revision 1's successor: its upload is turned down until it reloads
-    await uploadSave(a, [Buffer.from('stale'), Buffer.from('x')], 1);
-    await roundTrip(a);
-    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 3);
-    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3);
-    await roundTrip(a);
-    assert.equal(worldInfo(a.worldInfo.at(-1)).revision, 4);
-
-    // characters went back with the world
-    const c = await connect(port);
-    c.send(M.HELLO, hello('artem'));
-    await c.next();
-    assert.equal((await c.next()).payload.toString(), 'at the start');
+    b.send(M.SAVES_REQUEST);
+    assert.deepEqual(charSaves((await until(b, M.SAVES)).payload), [{ id: id2, name: '', reason: 'group', who: 'artem' }]);
+    b.send(M.LOAD_REQUEST, u32le(id2));
+    assert.equal((await until(b, M.LOAD_RESULT)).payload[0], LOAD.LEADER_ONLY);
+    a.send(M.LOAD_REQUEST, u32le(999));
+    assert.equal((await until(a, M.LOAD_RESULT)).payload[0], LOAD.NO_SAVE);
+    a.send(M.LOAD_REQUEST, u32le(id2));
+    assert.equal((await until(b, M.CHARACTER)).payload.toString(), 'record b');
+    await until(b, M.WORLD_RELOAD);
+    assert.equal((await until(a, M.CHARACTER)).payload.toString(), 'record a');
+    assert.equal((await download(b)).things.toString(), 'things b');
+    assert.equal((await download(a)).progress.toString(), 'progress 1'); // none in the save: theirs stays
     a.socket.destroy();
     b.socket.destroy();
-    c.socket.destroy();
   } finally {
     server.close();
   }
@@ -826,7 +1188,7 @@ test('progress: asked of everyone in the world with each save, given back with t
     await roundTrip(a);
 
     // a save: everyone in the world is asked for their progress
-    b.send(M.SAVE_REQUEST, Buffer.from([0]));
+    assert.ok(server.coop.saveWorld());
     await until(a, M.PROGRESS_REQUEST); // the master too
     await until(a, M.SAVE_NOW);
     await until(b, M.PROGRESS_REQUEST);
@@ -841,30 +1203,21 @@ test('progress: asked of everyone in the world with each save, given back with t
     sendProgress(b, Buffer.alloc(0)); // nothing to keep: no change
     await roundTrip(b);
 
-    // b comes back: its latest progress comes with the world, before WORLD_DONE
+    // b comes back: its latest progress comes with the world, before WORLD_DONE (no save for leaving or coming)
     b.socket.destroy();
-    await until(a, M.SAVE_NOW); // b's leave save
-    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'leave', 'друг');
-    await roundTrip(a);
     const b2 = await player(port, 'друг');
     b2.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW); // join save
-    await uploadSave(a, [Buffer.from('w4'), Buffer.from('l4')], 3, '', 'join', 'друг');
     assert.deepEqual(await downloadProgress(b2), late);
 
     // a player without progress gets none
     const c = await player(port, 'третий');
     c.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w5'), Buffer.from('l5')], 4, '', 'join', 'третий');
     assert.equal(await downloadProgress(c), null);
 
     // back to revision 2: the progress kept with it
     assert.ok(server.coop.rollback(2));
     await until(b2, M.WORLD_RELOAD);
     b2.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w7'), Buffer.from('l7')], 6, '', 'join', 'друг');
     assert.deepEqual(await downloadProgress(b2), early);
     a.socket.destroy();
     b2.socket.destroy();
@@ -989,8 +1342,6 @@ test('facts: kept by the server, passed on when they change, given with the worl
 
     const c = await player(port, 'третий');
     c.send(M.WORLD_REQUEST);
-    await until(a, M.SAVE_NOW);
-    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2, '', 'join', 'третий');
     assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0',
       'once:create_squad(lazarus_dolg_squad,bar_dolg_general)': 'artem' });
 
@@ -1003,12 +1354,6 @@ test('facts: kept by the server, passed on when they change, given with the worl
     server.close();
   }
 });
-
-// everything sent before has been answered (other messages skipped)
-async function settle(c) {
-  c.send(M.PING, Buffer.alloc(4));
-  await until(c, M.PONG);
-}
 
 function timeSet(kind, ...values) {
   const parts = [Buffer.from([kind])];
@@ -1116,7 +1461,7 @@ test('clock: each save keeps the game time, a rollback takes the clock back to i
     await settle(a);
     assert.ok(a.time.at(-1).game >= 7_000_000 + 3600_000);
 
-    a.send(M.ROLLBACK_PROPOSE, u32le(1)); // alone: at once
+    assert.ok(server.coop.rollback(1)); // the admin's
     await until(a, M.WORLD_RELOAD);
     await settle(a);
     const t = a.time.at(-1);

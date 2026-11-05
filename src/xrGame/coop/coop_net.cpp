@@ -17,6 +17,7 @@
 #include "script_engine.h"
 #include "Level.h"
 #include "Actor.h"
+#include "../xrEngine/XR_IOConsole.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -58,6 +59,8 @@ namespace coop
 		u32 rtt() const { return m_rtt; }
 		const xr_string& refusal() const { return m_refusal; }
 		const xr_string& name() const { return m_name; }
+		const xr_string& server_host() const { return m_host; }
+		u16 server_port() const { return m_port; }
 		const peers_t& peers() const { return m_peers; }
 		void send(NET_Packet& P);
 		bool wait_for(const std::function<bool()>& done, u32 timeout_ms, std::initializer_list<u16> types);
@@ -101,9 +104,18 @@ namespace coop
 	public:
 		xr_vector<xr_vector<xr_string>> m_groups; // as the server has them
 		xr_vector<bool> m_group_story;            // each group shares its story
+		xr_map<shared_str, u32> m_authorities;    // level -> its authority, levels with players on them (M_LEVELS)
+		u32 m_host_id = 0;                        // the world's host (M_HOST), 0: none
+		xr_string m_host_name;
+		xr_map<u32, xr_string> m_names;           // every player and host of this server run (M_NAMES, M_PEER_STATE)
+		xr_vector<xr_vector<u8>> m_journal;       // M_JOURNAL: what came with the world to download
+
+		std::mutex& inbox_lock() { return m_inbox_lock; }
+		std::deque<xr_vector<u8>>& inbox() { return m_inbox; }
 	};
 
 	static CClient g_client;
+	static LPCSTR host_secret();
 
 	int debug_mode = 1; // on while we test: a friend's game logs everything without asking (coop_debug 0 to quiet it)
 
@@ -204,6 +216,11 @@ namespace coop
 		m_peers.clear();
 		m_left.clear();
 		m_groups.clear();
+		m_authorities.clear();
+		m_host_id = 0;
+		m_host_name.clear();
+		m_names.clear();
+		m_journal.clear();
 
 		// created here so that close() can always interrupt the worker, even mid-connect
 		m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -388,11 +405,13 @@ namespace coop
 		{
 			const u8 reason = P.r_u8();
 			const u16 value = P.r_u16();
-			m_refusal = reason == 0 ? "full" : reason == 2 ? "build" : "version";
+			m_refusal = reason == 0 ? "full" : reason == 2 ? "build" : reason == 3 ? "host" : "version";
 			if (reason == 0)
 				Msg("! [coop] the server is full: %u players at most", value);
 			else if (reason == 2)
 				Msg("! [coop] the server does not let build '%s' in: update the game with the launcher", build_id());
+			else if (reason == 3)
+				Msg("! [coop] the server turned the host away: a wrong secret, or it has a host already");
 			else
 				Msg("! [coop] the server speaks protocol %u, this game %u", value, PROTOCOL_VERSION);
 			break;
@@ -403,6 +422,7 @@ namespace coop
 			auto [it, inserted] = m_peers.try_emplace(id);
 			SPeer& peer = it->second;
 			P.r_stringZ(peer.name);
+			m_names[id] = peer.name;
 			P.r_stringZ(peer.level);
 			P.r_vec3(peer.position);
 			P.r_float(peer.yaw);
@@ -449,6 +469,55 @@ namespace coop
 			}
 			break;
 		}
+		case M_LEVELS:
+		{
+			xr_map<shared_str, u32> authorities;
+			for (u8 count = P.r_u8(); count; --count)
+			{
+				shared_str level;
+				P.r_stringZ(level);
+				authorities[level] = P.r_u32();
+			}
+			const shared_str ours = g_pGameLevel ? Level().name() : shared_str();
+			auto before = m_authorities.find(ours), now = authorities.find(ours);
+			const u32 was = before != m_authorities.end() ? before->second : 0;
+			const u32 is = now != authorities.end() ? now->second : 0;
+			if (ours.size() && is && is != was)
+			{
+				auto peer = m_peers.find(is);
+				Msg("[coop] authority of %s: %s", ours.c_str(), is == m_client_id ? "this client" :
+				    peer != m_peers.end() ? peer->second.name.c_str() : "another client");
+			}
+			m_authorities.swap(authorities);
+			break;
+		}
+		case M_NAMES:
+			for (u16 count = P.r_u16(); count; --count)
+			{
+				const u32 id = P.r_u32();
+				P.r_stringZ(m_names[id]);
+			}
+			break;
+		case M_JOURNAL:
+			if (world_downloading())
+				m_journal.emplace_back().assign(P.B.data + P.r_tell(), P.B.data + P.B.count);
+			break;
+		case M_ADMIN_STATE:
+		case M_ADMIN_RESULT:
+		{
+			xr_string text;
+			P.r_stringZ(text);
+			call_lua(type == M_ADMIN_STATE ? "_G.coop_on_admin_state" : "_G.coop_on_admin_result", text.c_str());
+			break;
+		}
+		case M_HOST:
+			m_host_id = P.r_u32();
+			P.r_stringZ(m_host_name);
+			if (m_host_id)
+				Msg("[coop] the world's host: '%s' (id=%u)%s", m_host_name.c_str(), m_host_id, m_host_id == m_client_id ? ", this game" : "");
+			else
+				Msg("[coop] the world has no host now");
+			break;
 		case M_SCRIPT_EVENT:
 			on_script_event(P);
 			break;
@@ -473,11 +542,14 @@ namespace coop
 		case M_SAVES:
 			on_saves(P);
 			break;
-		case M_ROLLBACK_VOTE:
-			on_rollback_vote(P);
+		case M_LOAD_RESULT:
+			on_load_result(P);
 			break;
-		case M_ROLLBACK_RESULT:
-			on_rollback_result(P);
+		case M_SNAPSHOT_REQUEST:
+			on_snapshot_request(P);
+			break;
+		case M_SNAPSHOT_THINGS:
+			on_snapshot_things(P);
 			break;
 		case M_WORLD_RELOAD:
 			on_world_reload();
@@ -590,6 +662,8 @@ namespace coop
 		P.w_u16(PROTOCOL_VERSION);
 		P.w_stringZ(m_name.c_str());
 		P.w_stringZ(build_id());
+		P.w_u8(is_host() ? 1 : 0);
+		P.w_stringZ(host_secret());
 		send(P);
 		m_hello_sent = true;
 	}
@@ -678,6 +752,12 @@ namespace coop
 			reset_id_blocks();
 			reset_world_sync();
 			reset_time();
+			// the host lives for its server: the server starts it again (a game left over would hold its folder)
+			if (is_host())
+			{
+				Msg("[coop] the host lost its server: quitting");
+				Console->Execute("quit");
+			}
 			return;
 		}
 
@@ -706,12 +786,15 @@ namespace coop
 			const bool from_sender = type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
 				type == M_SCRIPT_EVENT || type == M_OBJECT_STATE;
 			const bool world_change = from_sender || type == M_ENTITY_DEATH;
+			// relayed before the journal the world comes with: in it
+			if (world_change && world_downloading())
+				continue;
 			if (from_sender && msg.size() >= sizeof(u16) + sizeof(u32))
 			{
 				const u32 sender = *(const u32*)(msg.data() + sizeof(u16));
 				if (m_left.count(sender))
 					continue; // that player is gone: no shadow to apply it to
-				if (!m_peers.count(sender))
+				if (!m_peers.count(sender) && sender != m_host_id && !m_names.count(sender))
 					hold = true;
 			}
 			if (world_change && hold)
@@ -732,6 +815,7 @@ namespace coop
 		update_map_markers();
 		update_puppets();
 		update_npc_sync();
+		update_host_squads();
 		update_combat();
 		update_projectiles();
 		update_id_blocks();
@@ -816,6 +900,78 @@ namespace coop
 	bool auto_launch() { return strstr(Core.Params, "-coop_auto") != nullptr; }
 	const xr_string& my_name() { return g_client.name(); }
 
+	// -coop_host <secret>: Core.Params is lowercase, so is the secret the server made
+	static LPCSTR host_secret()
+	{
+		static string64 secret = "";
+		LPCSTR p = strstr(Core.Params, "-coop_host ");
+		if (p && !secret[0])
+			sscanf(p + xr_strlen("-coop_host "), "%63s", secret);
+		return secret;
+	}
+
+	bool is_host() { return g_coop_headless; }
+
+	LPCSTR player_name(u32 id)
+	{
+		if (id == my_id())
+			return my_name().c_str();
+		auto it = g_client.m_names.find(id);
+		return it != g_client.m_names.end() ? it->second.c_str() : is_host_id(id) ? host_name().c_str() : "";
+	}
+
+	LPCSTR server_address()
+	{
+		static string128 address;
+		xr_sprintf(address, "%s:%u", g_client.server_host().c_str(), g_client.server_port());
+		return g_client.server_port() ? address : "";
+	}
+
+	void admin_login(LPCSTR password)
+	{
+		NET_Packet P;
+		P.w_begin(M_ADMIN_LOGIN);
+		P.w_stringZ(password);
+		send(P);
+	}
+
+	void admin_command(LPCSTR command)
+	{
+		NET_Packet P;
+		P.w_begin(M_ADMIN_COMMAND);
+		P.w_stringZ(command);
+		send(P);
+	}
+
+	void take_journal(xr_vector<xr_vector<u8>>& out)
+	{
+		out.swap(g_client.m_journal);
+		g_client.m_journal.clear();
+	}
+
+	void defer_messages(xr_vector<xr_vector<u8>>& messages)
+	{
+		std::lock_guard<std::mutex> lock(g_client.inbox_lock());
+		g_client.inbox().insert(g_client.inbox().begin(), std::make_move_iterator(messages.begin()),
+		                        std::make_move_iterator(messages.end()));
+		messages.clear();
+	}
+
+	void drop_held_world_changes()
+	{
+		std::lock_guard<std::mutex> lock(g_client.inbox_lock());
+		auto& inbox = g_client.inbox();
+		inbox.erase(std::remove_if(inbox.begin(), inbox.end(), [](const xr_vector<u8>& msg) {
+			const u16 type = *(const u16*)msg.data();
+			return type == M_ITEM_PARENT || type == M_OBJECT_RELEASE || type == M_OBJECT_SPAWN ||
+				type == M_SCRIPT_EVENT || type == M_OBJECT_STATE || type == M_ENTITY_DEATH;
+		}), inbox.end());
+		g_client.m_journal.clear();
+	}
+	bool is_host_id(u32 id) { return id && id == g_client.m_host_id; }
+	bool host_runs_world() { return is_connected() && is_host_id(g_client.master()); }
+	const xr_string& host_name() { return g_client.m_host_name; }
+
 	bool is_sim_master()
 	{
 		return !is_connected() || g_client.master() == g_client.id();
@@ -826,15 +982,13 @@ namespace coop
 		if (!is_connected())
 			return true;
 
-		u32 owner = u32(-1);
+		auto it = g_client.m_authorities.find(level_name);
+		if (it != g_client.m_authorities.end())
+			return it->second == g_client.id();
+		// nobody there as the server knows: ours if we are on our way in, else the sim master's
 		if (g_pGameLevel && Level().name() == level_name)
-			owner = g_client.id();
-		for (const auto& [id, peer] : g_client.peers())
-			if (peer.level == level_name && id < owner)
-				owner = id;
-		if (owner == u32(-1))
-			owner = g_client.master();
-		return owner == g_client.id();
+			return true;
+		return is_sim_master();
 	}
 	const peers_t& peers() { return g_client.peers(); }
 
@@ -870,6 +1024,8 @@ namespace coop
 	{
 		if (id == my_id())
 			return &my_name();
+		if (is_host_id(id))
+			return &host_name();
 		auto peer = peers().find(id);
 		return peer != peers().end() ? &peer->second.name : nullptr;
 	}

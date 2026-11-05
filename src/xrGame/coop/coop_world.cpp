@@ -102,6 +102,14 @@ namespace coop
 		return level_running();
 	}
 
+	static bool g_replaying = false; // the journal goes into a world still loading: everything is offline
+
+	// world changes from the others are applied now
+	static bool can_apply()
+	{
+		return g_replaying || level_running();
+	}
+
 	static bool should_send()
 	{
 		return !g_applying && level_running() && is_connected();
@@ -122,8 +130,18 @@ namespace coop
 
 	static LPCSTR peer_name(u32 id)
 	{
-		auto peer = peers().find(id);
-		return peer != peers().end() ? peer->second.name.c_str() : "?";
+		LPCSTR name = player_name(id);
+		return *name ? name : "?";
+	}
+
+	// where a player's things are here: ours on our actor, another's in their shadow (also a player gone: the
+	// journal's changes are by ids of players who may have left, us among them in an earlier session)
+	static CSE_ALifeDynamicObject* things_of(u32 player)
+	{
+		LPCSTR name = player_name(player);
+		if (player == my_id() || my_name() == name)
+			return ai().alife().graph().actor();
+		return *name ? ai().alife().objects().object(shadow_of(name), true) : nullptr;
 	}
 
 	// the local object that matches a remote one, or null when the worlds differ
@@ -286,7 +304,7 @@ namespace coop
 		const bool placed = P.r_elapsed() > 0;
 		const SBodyPlace place = placed ? read_body_place(P) : SBodyPlace{};
 
-		if (!level_running())
+		if (!can_apply())
 			return;
 
 		CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
@@ -308,7 +326,7 @@ namespace coop
 		Msg("[coop] remote death of %s (id=%u)", creature->name_replace(), id);
 		g_remote_deaths.insert(id);
 
-		if (CEntity* entity = smart_cast<CEntity*>(Level().Objects.net_Find(id)))
+		if (CEntity* entity = g_pGameLevel ? smart_cast<CEntity*>(Level().Objects.net_Find(id)) : nullptr)
 		{
 			// online: the regular GE_DIE path, killed "by itself" like obj:kill(nil) does
 			if (!entity->AlreadyDie())
@@ -351,7 +369,7 @@ namespace coop
 	static void apply_vehicle_death(CSE_ALifeDynamicObject* object)
 	{
 		Msg("[coop] remote destruction of %s (id=%u)", object->name_replace(), object->ID);
-		CEntity* vehicle = smart_cast<CEntity*>(Level().Objects.net_Find(object->ID));
+		CEntity* vehicle = g_pGameLevel ? smart_cast<CEntity*>(Level().Objects.net_Find(object->ID)) : nullptr;
 		if (vehicle)
 		{
 			if (vehicle->getDestroy() || !vehicle->g_Alive())
@@ -419,7 +437,7 @@ namespace coop
 			Msg("[coop] took %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 	}
 
-	static void send_item_state(CSE_ALifeDynamicObject* object)
+	void write_item_state(NET_Packet& P, CSE_ALifeDynamicObject* object)
 	{
 		NET_Packet spawn;
 		object->Spawn_Write(spawn, FALSE);
@@ -434,14 +452,19 @@ namespace coop
 		if (ai().script_engine().functor("coop_sync.item_lua", item_lua))
 			lua = item_lua(object->ID);
 
-		NET_Packet P;
-		P.w_begin(M_OBJECT_STATE);
 		P.w_u16(u16(spawn.B.count));
 		P.w(spawn.B.data, spawn.B.count);
 		P.w_u16(u16(client_size));
 		if (client_size)
 			P.w(client.B.data + sizeof(u16), client_size);
 		P.w_stringZ(lua ? lua : "");
+	}
+
+	static void send_item_state(CSE_ALifeDynamicObject* object)
+	{
+		NET_Packet P;
+		P.w_begin(M_OBJECT_STATE);
+		write_item_state(P, object);
 		send(P);
 	}
 
@@ -463,6 +486,31 @@ namespace coop
 			Msg("[coop dbg] the state of our %u thing(s) sent", sent);
 	}
 
+	// state's condition, upgrades, ammo...: onto object, which stays where it is
+	static void take_state(CSE_ALifeDynamicObject* object, CSE_Abstract* state, const xr_vector<u8>& client, const xr_string& lua)
+	{
+		const GameGraph::_GRAPH_ID game_vertex = object->m_tGraphID;
+		const u32 level_vertex = object->m_tNodeID;
+		const float distance = object->m_fDistance;
+		NET_Packet packet;
+		packet.write_start(); // NET_Packet() leaves its size as the stack had it
+		state->STATE_Write(packet);
+		packet.r_pos = 0;
+		object->STATE_Read(packet, u16(packet.B.count));
+		packet.write_start();
+		state->UPDATE_Write(packet);
+		packet.r_pos = 0;
+		object->UPDATE_Read(packet);
+		object->m_tGraphID = game_vertex; // where it is stays ours
+		object->m_tNodeID = level_vertex;
+		object->m_fDistance = distance;
+		if (!client.empty())
+			object->client_data = client;
+		::luabind::functor<void> take_lua;
+		if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
+			take_lua(object->ID, lua.c_str());
+	}
+
 	void apply_object_state(NET_Packet& P)
 	{
 		P.r_u32(); // sender
@@ -477,7 +525,7 @@ namespace coop
 		xr_string lua;
 		P.r_stringZ(lua);
 
-		if (!level_running())
+		if (!can_apply())
 			return;
 		u16 type;
 		string256 section;
@@ -492,28 +540,7 @@ namespace coop
 		CSE_ALifeDynamicObject* object = local_object(state->ID, section);
 		// online here, its game object has the state; an offline copy (a shadow's) takes it
 		if (object && !object->m_bOnline)
-		{
-			const GameGraph::_GRAPH_ID game_vertex = object->m_tGraphID;
-			const u32 level_vertex = object->m_tNodeID;
-			const float distance = object->m_fDistance;
-			NET_Packet packet;
-			packet.write_start(); // NET_Packet() leaves its size as the stack had it
-			state->STATE_Write(packet);
-			packet.r_pos = 0;
-			object->STATE_Read(packet, u16(packet.B.count));
-			packet.write_start();
-			state->UPDATE_Write(packet);
-			packet.r_pos = 0;
-			object->UPDATE_Read(packet);
-			object->m_tGraphID = game_vertex; // where it is stays ours
-			object->m_tNodeID = level_vertex;
-			object->m_fDistance = distance;
-			if (!client.empty())
-				object->client_data = client;
-			::luabind::functor<void> take_lua;
-			if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
-				take_lua(object->ID, lua.c_str());
-		}
+			take_state(object, state, client, lua);
 		F_entity_Destroy(state);
 	}
 
@@ -597,7 +624,7 @@ namespace coop
 		P.r_stringZ(section);
 		const EPlace place = EPlace(P.r_u8());
 
-		if (!level_running())
+		if (!can_apply())
 			return;
 
 		CSE_ALifeDynamicObject* object = local_object(id, section);
@@ -628,15 +655,10 @@ namespace coop
 			break;
 		}
 		case ePlaceSenderActor:
-		{
-			auto peer = peers().find(sender);
-			if (peer == peers().end())
-				return skip("move", id, "unknown sender");
-			target = ai().alife().objects().object(shadow_of(peer->second.name), true);
+			target = things_of(sender);
 			if (!target)
-				return skip("move", id, "sender has no shadow");
+				return skip("move", id, "unknown sender");
 			break;
-		}
 		case ePlacePlayer:
 		{
 			const u32 receiver = P.r_u32();
@@ -646,12 +668,9 @@ namespace coop
 				Msg("[coop] '%s' gave us %s (id=%u)", peer_name(sender), object->name_replace(), id);
 				break;
 			}
-			auto peer = peers().find(receiver);
-			if (peer == peers().end())
-				return skip("move", id, "unknown receiver");
-			target = ai().alife().objects().object(shadow_of(peer->second.name), true);
+			target = things_of(receiver);
 			if (!target)
-				return skip("move", id, "receiver has no shadow");
+				return skip("move", id, "unknown receiver");
 			break;
 		}
 		default:
@@ -793,7 +812,7 @@ namespace coop
 		NET_Packet spawn;
 		spawn.construct(&P.B.data[P.r_tell()], size);
 
-		if (!level_running())
+		if (!can_apply())
 			return;
 
 		u16 type;
@@ -824,7 +843,7 @@ namespace coop
 		{
 			CSE_ALifeDynamicObject* parent = ai().alife().objects().object(object->ID_Parent, true);
 			if (is_actor(parent))
-				parent = ai().alife().objects().object(shadow_of(peer_name(sender)), true);
+				parent = things_of(sender);
 			if (!parent)
 			{
 				F_entity_Destroy(abstract);
@@ -920,7 +939,7 @@ namespace coop
 		shared_str section;
 		P.r_stringZ(section);
 
-		if (!level_running())
+		if (!can_apply())
 			return;
 
 		CSE_ALifeDynamicObject* object = local_object(id, section);
@@ -945,5 +964,102 @@ namespace coop
 		g_applying = true;
 		alife_rw().release(object, true);
 		g_applying = false;
+	}
+	void replay_journal()
+	{
+		xr_vector<xr_vector<u8>> journal, events;
+		take_journal(journal);
+		if (journal.empty())
+			return;
+		Msg("[coop] replaying %u change(s) made since the world's save", journal.size());
+		g_replaying = true;
+		for (xr_vector<u8>& msg : journal)
+		{
+			NET_Packet P;
+			P.construct(msg.data(), (u32)msg.size());
+			u16 type;
+			P.r_begin(type);
+			switch (type)
+			{
+			case M_ITEM_PARENT: apply_item_parent(P); break;
+			case M_OBJECT_RELEASE: apply_object_release(P); break;
+			case M_OBJECT_SPAWN: apply_object_spawn(P); break;
+			case M_OBJECT_STATE: apply_object_state(P); break;
+			case M_ENTITY_DEATH: apply_entity_death(P); break;
+			case M_SCRIPT_EVENT: events.push_back(std::move(msg)); break; // Lua's, once the level runs
+			default: Msg("! [coop] the journal has a message of type %u, skipped", type);
+			}
+		}
+		g_replaying = false;
+		defer_messages(events);
+	}
+	void restore_things(IReader& things, xr_vector<u16>& made)
+	{
+		CSE_ALifeCreatureActor* actor = ai().alife().graph().actor();
+		if (!actor)
+			return;
+		u32 restored = 0, elsewhere = 0;
+		for (u16 count = things.r_u16(); count; --count)
+		{
+			const u16 size = things.r_u16();
+			const int next = things.tell() + size;
+			const u16 spawn_size = things.r_u16();
+			NET_Packet spawn;
+			spawn.construct(things.pointer(), spawn_size);
+			spawn.r_pos = 0;
+			things.advance(spawn_size);
+			xr_vector<u8> client(things.r_u16());
+			if (!client.empty())
+				things.r(client.data(), int(client.size()));
+			xr_string lua;
+			things.r_stringZ(lua);
+			things.seek(next);
+
+			u16 type;
+			string256 section;
+			spawn.r_begin(type);
+			spawn.r_stringZ(section);
+			if (!pSettings->section_exist(section))
+				continue;
+			CSE_Abstract* state = F_entity_Create(section);
+			CSE_ALifeDynamicObject* thing = smart_cast<CSE_ALifeDynamicObject*>(state);
+			if (!thing || !smart_cast<CSE_ALifeInventoryItem*>(state))
+			{
+				F_entity_Destroy(state);
+				continue;
+			}
+			state->Spawn_Read(spawn);
+			CSE_ALifeDynamicObject* object = ai().alife().objects().object(thing->ID, true);
+			if (object && object->s_name == thing->s_name)
+			{
+				if (object->ID_Parent == actor->ID)
+				{
+					take_state(object, state, client, lua);
+					++restored;
+				}
+				else
+					++elsewhere;
+				F_entity_Destroy(state);
+				continue;
+			}
+			// gone from the world: made again on us, with its id unless something else has it now
+			thing->ID = alife_rw().server().PerformIDgen(object ? u16(-1) : thing->ID);
+			thing->ID_Parent = actor->ID;
+			thing->o_Position = actor->o_Position;
+			thing->m_tGraphID = actor->m_tGraphID;
+			thing->m_tNodeID = actor->m_tNodeID;
+			thing->m_bOnline = false;
+			if (!client.empty())
+				thing->client_data = client;
+			g_applying = true;
+			alife_rw().register_object(thing, true);
+			g_applying = false;
+			::luabind::functor<void> take_lua;
+			if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
+				take_lua(thing->ID, lua.c_str());
+			made.push_back(thing->ID);
+		}
+		Msg("[coop] our things as the save has them: %u back to its state, %u made again, %u elsewhere in the world now",
+		    restored, u32(made.size()), elsewhere);
 	}
 }
