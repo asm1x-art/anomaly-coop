@@ -1,10 +1,11 @@
 -- Where the player may climb onto a ledge (demonized_ledge_grabbing, GRA's mantling) and how high: the numbers and the
 -- places in mod_system_climb.ltx. No climbing while downed in co-op, on a forbidden level or in a forbidden zone.
+-- A climb only on a held jump (hold_time), whatever the mod's MCM page says about the input.
 
 local RULES = "climb_rules"
 local ZONES = "climb_forbidden_zones"
 
-local min_height, max_height, check_interval
+local min_height, max_height, check_interval, hold_time
 local forbidden_levels = {}
 local zones = {} -- { level, pos, radius }
 
@@ -12,6 +13,7 @@ local function load()
 	min_height = ini_sys:r_float_ex(RULES, "min_height") or 1.4
 	max_height = ini_sys:r_float_ex(RULES, "max_height") or 2.53
 	check_interval = ini_sys:r_float_ex(RULES, "check_interval") or 50
+	hold_time = ini_sys:r_float_ex(RULES, "hold_time") or 0.3
 	for name in string.gmatch(ini_sys:r_string_ex(RULES, "forbidden_levels") or "", "[^%s,]+") do
 		forbidden_levels[name] = true
 	end
@@ -61,18 +63,40 @@ function on_game_start()
 	load()
 	local precondition = m.checkClimbPrecondition
 	m.checkClimbPrecondition = function(...)
-		-- the ledge search at most every check_interval ms: the mod's settings come back from MCM on every change and
-		-- every level load (its load_settings), so the floor goes on here, just before its throttle is read
+		-- the mod's settings come back from MCM on every change and every level load (its load_settings), so ours go
+		-- on here, just before they are read: the ledge search at most every check_interval ms, a climb only on a
+		-- jump held for hold_time
 		local s = m.settings
-		if s and (s.throttleCheck or 0) < check_interval then
-			s.throttleCheck = check_interval
+		if s then
+			if (s.throttleCheck or 0) < check_interval then
+				s.throttleCheck = check_interval
+			end
+			s.inputMethod = "jumpHold"
+			s.climbOnHoldOnly = true
+			s.jumpTriggerTime = hold_time * 1000
 		end
 		return allowed() and precondition(...)
 	end
+	-- The mod sets itself up when the loading screen asks for a key (on_loading_screen_key_prompt), and a co-op
+	-- player's first coming into the world may have none of it: then no ledge was ever searched for. A second
+	-- after the actor's first update it is done here, if it hasn't been.
+	RegisterScriptCallback("actor_on_first_update", function()
+		m.initialized = nil
+		CreateTimeEvent("climb_rules", "set_up", 1, function()
+			if not m.initialized and db.actor then
+				m.actor_on_first_update()
+				if coop and get_console():get_integer("coop_debug") ~= 0 then
+					printf("[climb] the ledge grabbing set up here: no loading screen prompt came")
+				end
+			end
+			return true
+		end)
+	end)
 	m.getMinClimbHeight = function() return min_height end
 	m.getMaxClimbHeight = function() return max_height end
-	-- co-op: the others see our puppet in a jump while we climb (coop_puppet.cpp)
+	-- co-op: the others see our puppet climb while we do (coop_puppet.cpp), till we are up on the ledge
 	if coop and coop.set_climbing then
+		m.onClimbLanded = function() coop.set_climbing(false) end
 		RegisterScriptCallback("actor_on_climb_start", function() coop.set_climbing(true) end)
 		RegisterScriptCallback("actor_on_climb_end", function() coop.set_climbing(false) end)
 		RegisterScriptCallback("actor_on_first_update", function() coop.set_climbing(false) end) -- a level left mid-climb

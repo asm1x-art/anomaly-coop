@@ -557,9 +557,7 @@ namespace coop
 		torso.yaw = proxy.heading;
 		npc->XFORM().rotateY(proxy.heading);
 		npc->XFORM().translate_over(proxy.position);
-		if (CCharacterPhysicsSupport* physics = npc->character_physics_support())
-			if (CPHMovementControl* control = physics->movement())
-				control->SetPosition(proxy.position);
+		place_puppet_capsule(npc, proxy.position);
 		pose_proxy(npc, proxy, peer->second.look);
 		return true;
 	}

@@ -30,6 +30,10 @@ namespace coop
 	// per frame from CCustomMonster::UpdateCL: true when npc is a puppet, with where it is and faces
 	// (in place of its own movement and animation)
 	bool drive_npc_puppet(CCustomMonster* npc, Fvector& position, float& model_yaw, SRotation& torso);
+	// a puppet's or stand-in's character capsule to where the stream has it: moved only when it really moves, then
+	// still and asleep, as a standing NPC's is. Put back every frame, an awake capsule fell a little under gravity
+	// and came back up each time, and a player pressing against it saw the camera shake up and down
+	void place_puppet_capsule(CCustomMonster* npc, const Fvector& position);
 
 	void on_npc_shot(const CWeapon& weapon);       // weapon hook, the authority's side
 	void play_npc_shot(u16 npc_id);                // a puppet's weapon shows it
