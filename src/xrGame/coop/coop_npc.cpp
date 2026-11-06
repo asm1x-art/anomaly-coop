@@ -37,6 +37,7 @@ namespace coop
 	static const u16 NO_ITEM = u16(-1);
 	static const float SNAP_DISTANCE = 5.f;
 	static const float FOLLOW_RATE = 12.f;
+	static const float PUPPET_CAPSULE_SLACK = 0.01f; // a puppet's capsule is moved when it is this far off, m
 
 	struct SNpcState
 	{
@@ -186,6 +187,21 @@ namespace coop
 			blend.playing = TRUE;
 	}
 
+	void place_puppet_capsule(CCustomMonster* npc, const Fvector& position)
+	{
+		CCharacterPhysicsSupport* physics = npc->character_physics_support();
+		CPHMovementControl* control = physics ? physics->movement() : nullptr;
+		if (!control || !control->CharacterExist())
+			return;
+		Fvector at;
+		control->GetCharacterPosition(at);
+		if (at.distance_to(position) > PUPPET_CAPSULE_SLACK)
+			control->SetPosition(position);
+		control->SetVelocity(0.f, 0.f, 0.f);
+		if (control->IsCharacterEnabled())
+			control->DisableCharacter();
+	}
+
 	bool drive_npc_puppet(CCustomMonster* npc, Fvector& position, float& model_yaw, SRotation& torso)
 	{
 		if (is_proxy(npc))
@@ -229,9 +245,7 @@ namespace coop
 		npc->XFORM().rotateY(puppet.heading);
 		npc->XFORM().translate_over(puppet.position);
 		// the character capsule follows, or the player bumps into where it was
-		if (CCharacterPhysicsSupport* physics = npc->character_physics_support())
-			if (CPHMovementControl* control = physics->movement())
-				control->SetPosition(puppet.position);
+		place_puppet_capsule(npc, puppet.position);
 
 		npc->movement().m_body.current = npc->movement().m_body.target = state.body;
 		npc->SetfHealth(state.health);
