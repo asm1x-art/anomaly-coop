@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the world's news for the server's journal and the launchers (coop_news.script) -->
+<string_table>
+	<string id="st_coop_news_cooling_window">
+		<text>Окно для рейда — %s ч.</text>
+	</string>
+	<string id="st_coop_news_cooling_end">
+		<text>Охлаждение закончилось: Мозговыжигатель снова работает, окно для рейда закрыто.</text>
+	</string>
+	<string id="st_coop_news_surge">
+		<text>Приближается выброс — ищите укрытие!</text>
+	</string>
+	<string id="st_coop_news_surge_end">
+		<text>Выброс закончился.</text>
+	</string>
+	<string id="st_coop_news_psi">
+		<text>Начинается пси-шторм — ищите укрытие!</text>
+	</string>
+	<string id="st_coop_news_psi_end">
+		<text>Пси-шторм закончился.</text>
+	</string>
+</string_table>

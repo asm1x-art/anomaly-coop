@@ -140,6 +140,26 @@ local function level_caption(name)
 	return game.translate_string(l and l.original or name)
 end
 
+-- the server's journal hears each raid news from the game speaking for the world (coop_news); the first look only
+-- remembers where the list is
+local function tell_world()
+	if not (coop_news and coop_news.speaker()) then
+		return
+	end
+	local next_n = tonumber(shelter.state("raid_news_next", 1)) or 1
+	local told = load_var(db.actor, "raid_news_told", nil)
+	save_var(db.actor, "raid_news_told", next_n)
+	if not told then
+		return
+	end
+	for n = told, next_n - 1 do
+		local who, what, where = string.match(tostring(shelter.state("raid_news_" .. n, "") or ""), "^([^|]*)|([^|]*)|(.*)$")
+		if who then
+			coop_news.publish("raid", string.format(game.translate_string("st_raid_news_" .. what), who, level_caption(where)))
+		end
+	end
+end
+
 local function update_news()
 	if is_raid_level(level.name()) then
 		return
@@ -637,6 +657,7 @@ local function actor_on_update()
 	if now >= news_at then
 		news_at = now + NEWS_MS
 		update_news()
+		tell_world()
 	end
 end
 

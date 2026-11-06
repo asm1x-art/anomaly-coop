@@ -1,0 +1,64 @@
+-- The world's important news for the server's journal (coop-server news.js; the launchers show them and notify):
+-- only what every player has already been told in the game, never a timetable. The game that speaks for the world
+-- sends them - the sim master (the headless host when it runs the world); the server takes them from no one else.
+-- Each goes as the fact "news" = "<type>\t<the world's clock>\t<text>" (coop.report_fact): not a fact of the world,
+-- the server neither keeps it with the facts nor relays it. Which types the server keeps is its business
+-- (server.cfg news_types: trade and chatter are not kept).
+-- Types: cooling, cooling_end (raid_window), surge, surge_end, psi, psi_end (here, Anomaly's own callbacks),
+-- raid (raid.script), shelter, bar, trade (shelter_trade.script).
+
+local function on()
+	return coop and coop.connected and coop.connected()
+end
+
+-- this game speaks for the world
+function speaker()
+	return on() and coop.is_sim_master()
+end
+
+-- the world's clock as players see it on the PDA: "12.05 14:07"
+local function world_clock()
+	local Y, M, D, h, m = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	return string.format("%02d.%02d %02d:%02d", D, M, h, m)
+end
+
+local function clean(text)
+	return (string.gsub(tostring(text or ""), "[\t\r\n]+", " "))
+end
+
+function publish(kind, text)
+	if not speaker() then
+		return
+	end
+	text = clean(text)
+	if text == "" then
+		return
+	end
+	coop.report_fact("news", kind .. "\t" .. world_clock() .. "\t" .. text)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] news: %s %s", kind, text)
+	end
+end
+
+-- Anomaly's surge and psi storm say when they begin and end (surge_manager, psi_storm_manager): the master's are
+-- the world's (coop_time.script shares its timetable)
+local ANOMALIES = {
+	emission_start = { "surge", "st_coop_news_surge" },
+	emission_end = { "surge_end", "st_coop_news_surge_end" },
+	psi_storm_start = { "psi", "st_coop_news_psi" },
+	psi_storm_end = { "psi_end", "st_coop_news_psi_end" },
+}
+
+local function actor_on_interaction(typ, obj, name)
+	local n = typ == "anomalies" and ANOMALIES[name]
+	if n then
+		publish(n[1], game.translate_string(n[2]))
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	RegisterScriptCallback("actor_on_interaction", actor_on_interaction)
+end

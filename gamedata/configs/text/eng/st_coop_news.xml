@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the world's news for the server's journal and the launchers (coop_news.script) -->
+<string_table>
+	<string id="st_coop_news_cooling_window">
+		<text>The raid window is %s h.</text>
+	</string>
+	<string id="st_coop_news_cooling_end">
+		<text>The Cooling is over: the Brain Scorcher works again, the raid window is closed.</text>
+	</string>
+	<string id="st_coop_news_surge">
+		<text>An emission is coming - find cover!</text>
+	</string>
+	<string id="st_coop_news_surge_end">
+		<text>The emission is over.</text>
+	</string>
+	<string id="st_coop_news_psi">
+		<text>A psi storm is coming - find cover!</text>
+	</string>
+	<string id="st_coop_news_psi_end">
+		<text>The psi storm is over.</text>
+	</string>
+</string_table>

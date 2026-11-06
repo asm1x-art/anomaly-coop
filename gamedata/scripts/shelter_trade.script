@@ -143,6 +143,33 @@ local function my_name()
 	return in_coop() and coop.my_name and coop.my_name() or ""
 end
 
+-- the server's journal (coop_news) hears each news from the game speaking for the world: the shelter's and the bar's
+-- events as "shelter" / "bar", the trade's as "trade" (the server keeps what server.cfg news_types lists)
+local function news_kind(id)
+	if string.find(id, "^st_shelter_tr_") then
+		return "trade"
+	elseif string.find(id, "^st_shelter_ev_") then
+		return "bar"
+	end
+	return "shelter"
+end
+
+local function tell_world()
+	if not (coop_news and coop_news.speaker()) then
+		return
+	end
+	local seq, told = shelter.state("eco_news_seq", 0) or 0, load_var(db.actor, "shelter_eco_told", nil)
+	save_var(db.actor, "shelter_eco_told", seq)
+	if not told or told >= seq then
+		return
+	end
+	for _, e in ipairs(news_list()) do
+		if e.seq > told then
+			coop_news.publish(news_kind(e.id), news_text(e))
+		end
+	end
+end
+
 local function hear_news()
 	local seq, heard = shelter.state("eco_news_seq", 0) or 0, load_var(db.actor, "shelter_eco_heard", nil)
 	if not heard or heard > seq then
@@ -914,6 +941,7 @@ local function actor_on_update()
 	end
 	check_at = ms + CHECK_MS
 	hear_news()
+	tell_world()
 	if not master() then
 		return
 	end
