@@ -135,6 +135,8 @@ local function ctime(text)
 	return t
 end
 
+local taken = {} -- fact -> the master's timetable we took last
+
 -- mgr: the manager, last: its field with the last one's time
 local function sync_timetable(fact, mgr, last)
 	if not (mgr and mgr[last] and mgr._delta) then
@@ -146,9 +148,24 @@ local function sync_timetable(fact, mgr, last)
 	if mgr.started then
 		return -- ours runs; the next one is set when it ends
 	end
-	local when, delta = string.match(coop.fact(fact), "^([%d,]+)|(%d+)$")
+	-- each timetable the master publishes is taken once. One already due isn't taken: the master hasn't run it (the
+	-- host's ghost, a paused world), and ours would start it at once, skip it as missed («a surge happened in the
+	-- Zone»), set a timetable of its own, and take the master's again two seconds later: the news over and over
+	local value = coop.fact(fact)
+	if value == taken[fact] then
+		return
+	end
+	taken[fact] = value
+	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
 	local t = when and ctime(when)
-	if t and (stamp(mgr[last]) ~= when or mgr._delta ~= tonumber(delta)) then
+	if not t then
+		return
+	end
+	if game.get_game_time():diffSec(t) >= tonumber(delta) then
+		dbg("%s timetable not taken, already due: last %s, next in %s game s", fact, when, delta)
+		return
+	end
+	if stamp(mgr[last]) ~= when or mgr._delta ~= tonumber(delta) then
 		mgr[last] = t
 		mgr._delta = tonumber(delta)
 		dbg("%s timetable taken: last %s, next in %s game s", fact, when, delta)
@@ -219,6 +236,7 @@ function on_game_start()
 
 	RegisterScriptCallback("actor_on_first_update", function()
 		published = {}
+		taken = {}
 		next_check = 0
 	end)
 	RegisterScriptCallback("actor_on_update", check)
