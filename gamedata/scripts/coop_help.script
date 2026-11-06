@@ -53,7 +53,7 @@ local function our_tasks()
 			local target = t:get_map_object_id()
 			list[id] = {
 				title = game.translate_string(rtask.current_title or rtask.title or id),
-				target = target and target < NO_TARGET and target or nil,
+				target = target and target > 0 and target < NO_TARGET and target or nil, -- 0: the actor, no target
 				icon = rtask.icon,
 			}
 		end
@@ -83,7 +83,7 @@ end
 -- The helper: the copies
 
 local function valid_target(id)
-	return id and id < NO_TARGET and alife_object(id) ~= nil
+	return id and id > 0 and id < NO_TARGET and alife_object(id) ~= nil
 end
 
 local function title_of(h)
