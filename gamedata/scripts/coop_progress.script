@@ -167,6 +167,16 @@ function on_game_start()
 		return original(...)
 	end
 	RegisterScriptCallback("actor_on_first_update", function()
+		-- the faction whose routes are open from the start (txr_routes.scan_route): a character whose Lua progress
+		-- never reached the server (its game fell before the first save) came back without it, and those routes closed
+		if coop.connected() and not mlr_utils.load_var("routes_faction") then
+			local faction = alife_storage_manager.get_state().default_faction
+				or string.gsub(db.actor:character_community() or "", "^actor_", "")
+			if faction ~= "" then
+				mlr_utils.save_var("routes_faction", faction)
+				printf("[coop] routes_faction was missing: %s", faction)
+			end
+		end
 		local eq = pending_equipment
 		pending_equipment = nil
 		if eq then
