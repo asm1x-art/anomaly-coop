@@ -466,7 +466,7 @@ function on_game_start()
 	end
 	coop_sync.on_event("trade", on_trade)
 	RegisterScriptCallback("actor_on_update", function()
-		if #asks == 0 or session or not actor_menu.is_hud_free() then
+		if #asks == 0 or session or not coop_sync.hud_free() then
 			return
 		end
 		local ask = table.remove(asks, 1)

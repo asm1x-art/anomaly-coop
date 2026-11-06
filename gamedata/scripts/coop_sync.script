@@ -84,6 +84,65 @@ function send_event(name, ...)
 end
 
 ------------------------------------------------------------------------------------------------
+-- Free to show a yes/no box (a trade, a group invite, a story, a move with the group) or to save: no window
+-- holds the input, by the engine's word, not talking, not lying wounded. Anomaly's own actor_menu.is_hud_free()
+-- goes by Lua flags (_GUIs, the actor menu's mode, the NPC dialog's) that a window closed some other way leaves
+-- behind: a friend's game kept one for half an hour, so nothing asked of him showed, his autosaves waited, and
+-- with KEYS_UNLOCK off the scripts' keys were dead (F7, the wheel...) until the main menu. heal_stale_windows()
+-- puts such flags right.
+
+function hud_free()
+	if not db.actor or level.is_input_captured() or db.actor:is_talking() then
+		return false
+	end
+	if coop_death and coop_death.is_downed and coop_death.is_downed() then
+		return false
+	end
+	return true
+end
+
+local STALE_MS = 3000 -- the flags say a window is open, with none on screen, for so long: they are stale
+local stale_since = nil
+local in_main_menu = false -- the main menu's windows (MCM) register too, with no level dialog
+
+local function heal_stale_windows()
+	if in_main_menu or not hud_free() then
+		stale_since = nil
+		return
+	end
+	local stale = {}
+	for name in pairs(_GUIs or {}) do
+		if name ~= "Dialog" and not (_GUIs_keyfree and _GUIs_keyfree[name]) then
+			stale[#stale + 1] = name
+		end
+	end
+	local mode_stale = actor_menu.last_mode ~= 0
+	local dialog_stale = pda.dialog_closed ~= true or (_GUIs and _GUIs["Dialog"]) and true or false
+	if #stale == 0 and not mode_stale and not dialog_stale then
+		stale_since = nil
+		return
+	end
+	local now = time_global()
+	stale_since = stale_since or now
+	if now - stale_since < STALE_MS then
+		return
+	end
+	stale_since = nil
+	printf("! [coop] no window on screen, but Anomaly's flags say one is open: windows %s, actor menu mode %s, NPC dialog %s; put right",
+		#stale > 0 and table.concat(stale, ",") or "none", actor_menu.last_mode, dialog_stale and "open" or "closed")
+	for _, name in ipairs(stale) do
+		Unregister_UI(name)
+	end
+	if mode_stale then
+		actor_menu.actor_menu_mode(0) -- as the engine says when the inventory closes
+	end
+	if dialog_stale then
+		pda.dialog_closed = true -- as pda.actor_menu_mode(11) when the talk window closes (its news need the NPC)
+		Unregister_UI("Dialog")
+	end
+end
+
+------------------------------------------------------------------------------------------------
 -- World logic: authority only
 
 local function wrap_world_logic()
@@ -940,6 +999,13 @@ function on_game_start()
 	wrap_stashes()
 	wrap_saves()
 	watch_peers()
+	RegisterScriptCallback("actor_on_update", function()
+		if coop_on() then
+			heal_stale_windows()
+		end
+	end)
+	RegisterScriptCallback("main_menu_on_init", function() in_main_menu = true end)
+	RegisterScriptCallback("main_menu_on_quit", function() in_main_menu = false end)
 	keep_faction()
 	judge_stand_ins()
 	share_world_news()

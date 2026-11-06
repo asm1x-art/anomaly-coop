@@ -765,7 +765,7 @@ local function update()
 			printf("! [coop] %s: no word from the server, not done", key)
 		end
 	end
-	if #offers > 0 and actor_menu.is_hud_free() then
+	if #offers > 0 and coop_sync.hud_free() then
 		local o = table.remove(offers, 1)
 		ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, o.text, o.yes, o.no)
 	end
