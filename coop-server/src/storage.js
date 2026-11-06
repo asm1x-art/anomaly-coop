@@ -37,6 +37,8 @@ import { normalizeSettings } from './settings.js';
 //                            of an autosave (protocol.js AUTO_SAVE_NAME) auto: true, one per character
 //   journal.jsonl           the world changes since the last save (server.js), a { t, m: base64 } line each, so a
 //                            server started again still has them
+//   news.json               [{ id, type, world, text, time, from }]: the world's important news, the last ones
+//                            (news.js), for the launchers; gone with the world
 //   clients.json            { id: name }: every client id given out, so ids go on growing across runs (the journal's
 //                            changes are by id)
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
@@ -154,6 +156,9 @@ export function openStorage(dir) {
         return null;
       }
     },
+
+    loadNews: () => readJson('news.json', null),
+    saveNews: (list) => writeAtomic('news.json', JSON.stringify(list)),
 
     // id (the time it came, "2026-11-06_17-33-41" UTC, with -2, -3... when taken)
     saveCrash(name, report, files) {

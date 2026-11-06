@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isSea } from 'node:sea';
 import { RULE_LIMITS } from './settings.js';
+import { DEFAULT_NEWS_TYPES } from './news.js';
 
 // server.cfg: how the server runs (ports, password, where the world is kept, the host, the Telegram bot).
 // The world's own settings are not here: they are in data/settings.json, changed on the admin page or by the bot.
@@ -16,7 +17,7 @@ export const CONFIG_FILE = 'server.cfg';
 // section -> key -> default; the default's type is the value's
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4, builds_file: '',
-    allow_dev: false, crash_max_mb: 64 },
+    allow_dev: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') },
   host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
@@ -28,6 +29,7 @@ const LIMITS = {
   max_players: RULE_LIMITS.max_players,
   autosave_minutes: [0, 24 * 60], // 0: no autosaves
   crash_max_mb: [0, 1024], // 0: no crash reports from the launchers
+  news_keep: [0, 1000], // 0: no news journal
 };
 
 const ENV = { COOP_PORT: ['server', 'port'], COOP_HTTP_PORT: ['server', 'admin_port'], COOP_ADMIN_PASSWORD: ['server', 'admin_password'],
@@ -47,7 +49,9 @@ data_dir = data        # где хранится мир; путь от папк�
 max_players = 4        # игроков на сервере одновременно
 builds_file =          # builds.json лаунчера: пускать только выпущенные сборки; пусто — пускать все
 allow_dev = 0          # с builds_file: пускать и сборки «dev» (без лаунчера): 1 — да, 0 — нет
-crash_max_mb = 64      # отчёты о вылетах от лаунчеров (на порт админки, без пароля): размер одного, МБ; 0 — не принимать
+crash_max_mb = 64      # отчёты о вылетах и баги от лаунчеров (на порт админки, без пароля): размер одного, МБ; 0 — не принимать
+news_keep = 50         # журнал важных новостей мира для лаунчеров (data/news.json): сколько последних хранить; 0 — не вести
+news_types = ${DEFAULT_NEWS_TYPES.join(',')}  # какие новости важные (присылает хост или мастер симуляции)
 
 [host]
 game_dir =             # папка игры для хоста; пусто — без хоста (мир держит игрок, как раньше)

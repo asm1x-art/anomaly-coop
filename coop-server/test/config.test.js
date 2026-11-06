@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, EXAMPLE_CONFIG } from '../src/config.js';
+import { DEFAULT_NEWS_TYPES } from '../src/news.js';
 
 const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'coop-config-'));
 const load = (dir, options = {}) => loadConfig({ argv: [], env: {}, cwd: dir, packaged: false, ...options });
@@ -31,7 +32,7 @@ test('config: sections, comments, inline comments, types; data_dir from the conf
   assert.equal(c.created, false);
   assert.deepEqual(c.warnings, []);
   assert.deepEqual(c.server, { port: 7790, admin_port: 0, admin_password: 'pa#ss', data_dir: path.join(dir, 'world', 'data'), max_players: 4,
-    builds_file: '', allow_dev: false, crash_max_mb: 64 });
+    builds_file: '', allow_dev: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') });
   assert.deepEqual(c.host, { game_dir: path.resolve(dir, '../Anomaly'), exe: 'bin\\AnomalyDX11AVX.exe', args: '', autosave_minutes: 5, pause_when_empty: false });
   assert.deepEqual(c.telegram, { token: '123:ABC-def', admins: [111, 222, 333] });
 });

@@ -8,6 +8,9 @@ import { settingsText, FACTIONS } from './settings.js';
 import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
 import { createClock } from './clock.js';
 import { createBuildCheck } from './builds.js';
+import { createNews, NEWS_FACT, DEFAULT_NEWS_TYPES } from './news.js';
+
+const PUBLIC_NEWS = 30; // the newest news in the public status
 
 // hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
 // journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0).
@@ -15,8 +18,12 @@ import { createBuildCheck } from './builds.js';
 // for the in-game admin window too (null: the one made up in data/admin.json). builds: { file, allowDev } for
 // builds.js; none lets every build in
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
-  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {} } = {}) {
+  journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {},
+  news: newsConfig = {} } = {}) {
   const storage = openStorage(dataDir);
+  // the world's important news, for the launchers (news.js)
+  const news = createNews({ load: () => storage.loadNews(), save: (list) => storage.saveNews(list),
+    types: newsConfig.types ?? DEFAULT_NEWS_TYPES, keep: newsConfig.keep ?? 50 });
   const buildAllowed = createBuildCheck({ ...builds, log });
   const clock = createClock({ load: () => storage.loadClock(), save: (state) => storage.saveClock(state) });
   // id -> name: every player and the host so far, for the journal's ids; ids go on growing across runs
@@ -525,7 +532,7 @@ autosave_minutes=${autosaveMinutes}`));
             log(`[${id}] '${name}' turned away: ${players().length} of ${max} online`);
             return refuse(REFUSED.FULL, max);
           }
-          client = { send, name, state: null, host: isHost, socket };
+          client = { send, name, state: null, host: isHost, socket, since: Date.now() };
           clients.set(id, client);
           names.set(id, name);
           storage.saveClientNames(names);
@@ -611,6 +618,14 @@ autosave_minutes=${autosaveMinutes}`));
           break;
         case M.FACT: {
           const [key, value] = readStringsZ(payload, 0, 2);
+          // a news told to every player: for the journal, from the game speaking for the world only
+          if (key === NEWS_FACT) {
+            if (client.host || id === masterId()) {
+              const entry = news.add(value, client.name);
+              if (entry) log(`news (${entry.type}) from '${client.name}': ${entry.text.slice(0, 120)}`);
+            } else log(`[${id}] '${client.name}' sent a news, but neither hosts nor runs the world: ignored`);
+            break;
+          }
           // who brought a mechanic his tools: the first one stays (two finishing the task at once)
           if (key.startsWith('tool:') && value && storage.facts()[key]) break;
           // a claim: the first stays, and the claimer learns whether it is theirs
@@ -949,6 +964,21 @@ autosave_minutes=${autosaveMinutes}`));
         saves: storage.saves().reverse().slice(0, MAX_SAVES_LISTED),
       };
     },
+    // what anyone on the tunnel may see (admin.js GET /api/public/status): who is on, where and since when, the
+    // host, and the news already told in the world. No addresses, ids, saves or timetables.
+    publicStatus() {
+      const hostClient = hostId === null ? null : clients.get(hostId);
+      return {
+        protocol: PROTOCOL_VERSION,
+        time: Date.now(),
+        max_players: storage.settings().max_players ?? null,
+        host: hostProcess || hostClient ? { in_world: !!hostClient?.inWorld } : null,
+        paused: !!pausedBy,
+        players: players().map(([, c]) => ({ name: c.name, level: c.state ? readStringZ(c.state, 0) : null, since: c.since ?? null })),
+        news: news.list().slice(-PUBLIC_NEWS).map(({ id, type, world, text, time }) => ({ id, type, world, text, time })),
+      };
+    },
+    news: () => news.list(),
     // the world's pause, lifted without a vote (a vote nobody could answer...)
     resume() {
       if (!pausedBy) return false;
@@ -965,10 +995,11 @@ autosave_minutes=${autosaveMinutes}`));
     logs: () => storage.logs(),
     facts: () => storage.facts(),
     logFile: (player, file) => storage.logFile(player, file),
-    // a crash report from a launcher (admin.js): kept and logged
+    // a crash or bug report from a launcher (admin.js): kept and logged
     saveCrash(report, files) {
       const id = storage.saveCrash(report.player, report, files);
-      log(`crash report from '${report.player}': ${report.code}${report.meaning ? ` (${report.meaning})` : ''}, ${files.length} file(s)`
+      const what = report.kind === 'bug' ? 'bug report' : `crash report`;
+      log(`${what} from '${report.player}': ${report.code || '-'}${report.meaning ? ` (${report.meaning})` : ''}, ${files.length} file(s)`
         + `${report.comment ? `: "${report.comment.slice(0, 120)}"` : ''}`);
       return id;
     },
@@ -988,6 +1019,7 @@ autosave_minutes=${autosaveMinutes}`));
       if (players().length) return false;
       if (hostId !== null) clients.get(hostId).socket.destroy();
       storage.resetWorld();
+      news.clear();
       clock.clear();
       journal = [];
       idLeases.clear();

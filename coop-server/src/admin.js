@@ -5,9 +5,11 @@ import zlib from 'node:zlib';
 import { isSea, getAsset } from 'node:sea';
 import { FACTIONS } from './settings.js';
 
-// The admin page: world settings, allowed factions, who is online, world reset, crash reports.
-// HTTP basic auth, any user name, the server's admin password. One route without it: POST /crash-report, the
-// launchers' crash reports (the admin port is reached through the tunnel, like the game's): see readCrashReport.
+// The admin page: world settings, allowed factions, who is online, world reset, crash and bug reports.
+// HTTP basic auth, any user name, the server's admin password. Two routes without it (the admin port is reached
+// through the tunnel, like the game's): POST /crash-report, the launchers' crash and bug reports (see
+// readCrashReport), and GET /api/public/status, who is on and the world's news for the launchers (server.js
+// publicStatus: no addresses, saves or timetables).
 
 // packaged (tools/server/build.mjs), the page is inside the executable
 const PAGE = isSea() ? Buffer.from(getAsset('admin.html')) : fs.readFileSync(new URL('./admin.html', import.meta.url));
@@ -20,8 +22,9 @@ const CRASH_HEADER_LIMIT = 64 * 1024;
 const CRASH_PER_HOUR = 10; // reports from one address
 
 // A launcher's crash report (launcher/src-tauri/src/crash.rs): "ACR1", u32 LE length of a JSON header, the header
-// ({ player, server, time, exit_code, code, meaning, hint, comment, build_id, release, launcher,
-// files: [{ name, size, raw, cut }], skipped }), then each file gzipped, in the header's order.
+// ({ kind, player, server, time, exit_code, code, meaning, hint, comment, build_id, release, launcher,
+// files: [{ name, size, raw, cut }], skipped }), then each file gzipped, in the header's order. kind "bug": a
+// bug the player reported (comment: what happened; a screenshot and the last log), else a crash.
 // Returns { report, files: [{ name, data }] } or throws with an HTTP status.
 export function readCrashReport(body, maxBytes) {
   const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -58,6 +61,7 @@ export function readCrashReport(body, maxBytes) {
   if (at !== body.length) throw fail(400, 'bad file sizes');
   const exit = Number.isSafeInteger(header.exit_code) ? header.exit_code : null;
   const report = {
+    kind: header.kind === 'bug' ? 'bug' : 'crash',
     player, server: text(header.server, 120), time: Number.isSafeInteger(header.time) ? header.time : null,
     exit_code: exit, code: text(header.code, 32), meaning: text(header.meaning, 120), hint: text(header.hint, 400),
     comment: text(header.comment, 4000), build_id: text(header.build_id, 64), release: text(header.release, 64),
@@ -141,6 +145,7 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
 
   const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/crash-report' && crashLimit > 0) return takeCrash(req, res);
+    if (req.method === 'GET' && req.url.split('?')[0] === '/api/public/status') return reply(res, 200, coop.publicStatus());
     if (!authorized(req)) {
       res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Anomaly co-op", charset="UTF-8"' });
       res.end();

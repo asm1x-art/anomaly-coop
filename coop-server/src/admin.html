@@ -35,6 +35,9 @@
   ul.players { list-style: none; margin: 0 0 16px; padding: 0; }
   ul.players li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
   ul.players li:first-child { border-top: 0; }
+  .filter { display: flex; gap: 16px; margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .filter label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .tag.bug { background: var(--muted); }
   .tag { font-size: 12px; color: var(--accent-text); background: var(--accent); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
   .level { color: var(--muted); font-size: 13px; }
   .empty { color: var(--muted); }
@@ -109,8 +112,13 @@
   </section>
 
   <section>
-    <h2>Отчёты о вылетах</h2>
-    <p class="note">Их присылает лаунчер, когда игра вылетела и игрок согласился: код ошибки, что он делал, лог этой сессии, дамп и отчёт Windows. Последние 30 у каждого игрока.</p>
+    <h2>Вылеты и баги</h2>
+    <p class="note">Их присылает лаунчер: о вылете — когда игра вылетела и игрок согласился (код ошибки, что он делал, лог этой сессии, дамп и отчёт Windows); о баге — по кнопке «Сообщить о баге» (описание, скриншот, последний лог). Последние 30 у каждого игрока.</p>
+    <div class="filter" id="crash-filter">
+      <label><input type="radio" name="crash-kind" value="" checked> все</label>
+      <label><input type="radio" name="crash-kind" value="crash"> вылеты</label>
+      <label><input type="radio" name="crash-kind" value="bug"> баги</label>
+    </div>
     <ul class="saves" id="crashes"></ul>
   </section>
 
@@ -313,14 +321,19 @@
       list.append(li);
     }
   }
+  let crashKind = '';
+  document.querySelectorAll('input[name=crash-kind]').forEach((r) => {
+    r.onchange = () => { crashKind = r.value; renderCrashes().catch(() => {}); };
+  });
   async function renderCrashes() {
-    const crashes = await api('GET', '/api/crashes');
+    const all = await api('GET', '/api/crashes');
+    const crashes = all.filter((c) => !crashKind || (c.kind ?? 'crash') === crashKind);
     const list = $('crashes');
     list.replaceChildren();
     if (!crashes.length) {
       const li = document.createElement('li');
       li.className = 'empty';
-      li.textContent = 'Вылетов не было';
+      li.textContent = crashKind === 'bug' ? 'Сообщений о багах нет' : crashKind === 'crash' ? 'Вылетов не было' : 'Ни вылетов, ни багов';
       list.append(li);
     }
     for (const c of crashes) {
@@ -329,8 +342,12 @@
       const what = document.createElement('span');
       what.className = 'what';
       const head = document.createElement('b');
-      head.textContent = `${c.player} · ${c.code || 'без кода'}${c.meaning ? ` — ${c.meaning}` : ''}`;
-      what.append(head);
+      const bug = c.kind === 'bug';
+      head.textContent = bug ? `${c.player} · баг` : `${c.player} · ${c.code || 'без кода'}${c.meaning ? ` — ${c.meaning}` : ''}`;
+      const tag = document.createElement('span');
+      tag.className = bug ? 'tag bug' : 'tag';
+      tag.textContent = bug ? 'баг' : 'вылет';
+      what.append(head, tag);
       const info = [c.release && `сборка ${c.release}`, c.build_id && c.build_id.slice(0, 8), c.launcher && `лаунчер ${c.launcher}`, c.hint]
         .filter(Boolean).join(' · ');
       if (info) what.append(document.createElement('br'), info);

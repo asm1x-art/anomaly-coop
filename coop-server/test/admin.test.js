@@ -220,3 +220,58 @@ test('crash reports off (crash_max_mb = 0): the route asks for the password like
     s.close();
   }
 });
+
+const factPayload = (key, value) => Buffer.concat([encodeText(key), Buffer.from([0]), encodeText(value), Buffer.from([0])]);
+const settle = () => new Promise((r) => setTimeout(r, 150));
+
+test('public status: no password; who is on, where and since when; only the world master\'s important news', async () => {
+  const s = await start();
+  try {
+    const port = s.game.address().port;
+    const master = await join(port, 'Мастер');
+    const other = await join(port, 'Друг');
+    master.write(encode(M.ACTOR_STATE, Buffer.concat([encodeText('l01_escape'), Buffer.from([0]), Buffer.alloc(16)])));
+    master.write(encode(M.FACT, factPayload('news', 'cooling\t12.05 14:00\tМастер: Мозговыжигатель остывает, окно рейда открыто')));
+    master.write(encode(M.FACT, factPayload('news', 'trade\t12.05 14:01\tСидорович завёз патроны'))); // not important
+    other.write(encode(M.FACT, factPayload('news', 'surge\t12.05 14:02\tвыброс!'))); // not the master: ignored
+    master.write(encode(M.FACT, factPayload('news', 'cooling\t12.05 14:00\tМастер: Мозговыжигатель остывает, окно рейда открыто'))); // again
+    await settle();
+    const res = await fetch(s.base + '/api/public/status');
+    assert.equal(res.status, 200);
+    const st = await res.json();
+    assert.equal(st.protocol, PROTOCOL_VERSION);
+    assert.deepEqual(st.players.map((p) => [p.name, p.level]), [['Мастер', 'l01_escape'], ['Друг', null]]);
+    assert.ok(st.players.every((p) => p.since > 0 && p.since <= Date.now()));
+    assert.equal('id' in st.players[0] || 'ping' in st.players[0] || 'from' in st.players[0], false);
+    assert.deepEqual(st.news.map((n) => [n.type, n.world, n.text]), [['cooling', '12.05 14:00', 'Мастер: Мозговыжигатель остывает, окно рейда открыто']]);
+    assert.equal('from' in st.news[0], false);
+    // not a fact of the world
+    assert.equal(s.game.coop.facts().news, undefined);
+    // kept across a restart: data/news.json
+    assert.equal(JSON.parse(fs.readFileSync(path.join(s.dataDir, 'news.json'), 'utf8')).length, 1);
+    // the rest of the admin API still asks for the password
+    assert.equal((await fetch(s.base + '/api/state')).status, 401);
+    master.destroy();
+    other.destroy();
+  } finally {
+    s.close();
+  }
+});
+
+test('bug reports: the crash receiver takes kind "bug", listed with it; a report without kind is a crash', async () => {
+  const s = await start(() => {}, { crashMaxMb: 1 });
+  try {
+    const post = (body) => fetch(s.base + '/crash-report', { method: 'POST', body });
+    const png = crypto.randomBytes(5000);
+    assert.equal((await post(crashReport({ kind: 'bug', player: 'Тестер', comment: 'дверь в баре не открывается', launcher: '0.3.0' },
+      [{ name: 'screenshot.png', data: png }, { name: 'xray_tester.log', data: Buffer.from('log') }]))).status, 200);
+    assert.equal((await post(crashReport({ player: 'Тестер', code: '0xC0000005' }, []))).status, 200);
+    const list = await (await s.call('GET', '/api/crashes')).json();
+    assert.deepEqual(list.map((c) => c.kind).sort(), ['bug', 'crash']);
+    const bug = list.find((c) => c.kind === 'bug');
+    assert.equal(bug.comment, 'дверь в баре не открывается');
+    assert.deepEqual(bug.files.map((f) => f.name), ['screenshot.png', 'xray_tester.log']);
+  } finally {
+    s.close();
+  }
+});

@@ -16,7 +16,8 @@ const server = await startServer({ port: config.server.port, dataDir: config.ser
   autosaveMinutes: hostSecret ? config.host.autosave_minutes : null, pauseWhenEmpty: !!hostSecret && config.host.pause_when_empty,
   adminPassword: config.server.admin_password || null,
   // builds_file: the launcher's builds.json, only those builds get in (and "dev" ones with allow_dev)
-  builds: { file: config.server.builds_file || null, allowDev: config.server.allow_dev } });
+  builds: { file: config.server.builds_file || null, allowDev: config.server.allow_dev },
+  news: { keep: config.server.news_keep, types: config.server.news_types.split(/[\s,]+/).filter(Boolean) } });
 if (hostSecret) {
   const host = startHost({ gameDir: config.host.game_dir, exe: config.host.exe, args: config.host.args,
     port: config.server.port, secret: hostSecret, events: server.coop.events });
