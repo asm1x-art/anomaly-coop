@@ -1,0 +1,14 @@
+; Aim fixes to the GRA weapon pack's MAS configs (the repo's own, like mod_system_gra_fixes.ltx). Named to come after
+; mod_system_zzzzzzzzzzz_bas_mas_pos.ltx, whose values it corrects.
+
+; RD-74M ISG: the alternative aim (its canted red dot) had the dot's window above and left of the screen's centre: the
+; dot was on the window's edge and slid out of it with the sway. Moved 1 cm down and 4 mm right, rotation as it was
+![wpn_ak74_isg_hud]
+        aim_hud_offset_alt_pos           = -0.0768, -0.0574, -0.031075
+        aim_hud_offset_alt_pos_16x9      = -0.0768, -0.0574, -0.031075
+
+; ACOG (Pizza's Ultimate Sight model): MAS gave it the alternative aim of a scope with a canted side sight, but this
+; ACOG has none: the alternative aim rolled the gun 60 degrees with nothing to look through. Without it the
+; alternative aim is the weapon's own (the ISG's canted red dot), or none
+![acog]
+        use_alt_aim_hud                  = false

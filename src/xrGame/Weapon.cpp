@@ -2465,19 +2465,21 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		Fvector curr_offs, curr_rot, curr_aim_rot;
 		curr_aim_rot.set(0, 0, 0);
 
+		// MAS's way (offsets relative to the sight's mount) only with MAS's sights: a MAS weapon's variant with its sight
+		// built in (the 3D scopes' wpn_dvl10_marchf...) has none, and its own HUD section's offsets are a plain weapon's;
+		// taken MAS's way, the gun sat aside and askew when aiming
+		const bool mas_aim = m_modular_attachments && m_scopes.size();
 		// a MAS weapon's own second sight (the RD-74M ISG's canted red dot): when the attached sight has no second aim of
 		// its own (MAS's placeholder for none has none), the alternative aim takes the weapon's aim_hud_offset_alt_* the
-		// way a weapon without MAS does: the pack's MAS configs keep those values as they were without MAS. It used the
-		// sight's (zero) or the main aim, and the alternative aim looked the same as the main one
-		const bool weapon_alt_aim = idx == 3 && m_modular_attachments && !g_player_hud->m_adjust_mode
-			&& hi->m_measures.m_hands_offset[0][3].square_magnitude() > 0.f
+		// way a weapon without MAS does. It used the sight's (zero) or the main aim, and looked the same as the main one
+		const bool weapon_alt_aim = idx == 3 && mas_aim && hi->alt_aim_offset_pos().square_magnitude() > 0.f
 			&& !(si && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false));
 		if (weapon_alt_aim)
 		{
-			curr_offs = hi->m_measures.m_hands_offset[0][3];
-			curr_rot = hi->m_measures.m_hands_offset[1][3];
+			curr_offs = hi->alt_aim_offset_pos();
+			curr_rot = hi->alt_aim_offset_rot();
 		}
-		else if ((idx == 1 || idx == 3) && m_modular_attachments) {
+		else if ((idx == 1 || idx == 3) && mas_aim) {
 			if (si) {
 				curr_offs.set(hi->attach_base_offset_pos());
 				curr_rot.set(hi->attach_base_offset_rot());
