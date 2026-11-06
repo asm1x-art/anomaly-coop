@@ -161,13 +161,17 @@ local function wrap_world_logic()
 		end
 	end)
 
-	-- world items lying around the level
-	wrap(game_setup, "try_spawn_world_item", "game_setup", function(original, ...)
+	-- world items lying around: one taken is put out again elsewhere (the authority's), and the new game's lay-out of
+	-- them on every level (ignore = true) is the host's alone, once for the world (wrap_world_setup)
+	wrap(game_setup, "try_spawn_world_item", "game_setup", function(original, ignore, ...)
 		if not coop_on() then
-			return original(...)
+			return original(ignore, ...)
 		end
-		if is_authority(level.name()) then
-			return shared(original, ...)
+		if ignore and not coop.is_host() then
+			return
+		end
+		if coop.is_host() or is_authority(level.name()) then
+			return shared(original, ignore, ...)
 		end
 	end)
 
@@ -178,6 +182,99 @@ local function wrap_world_logic()
 				return original(...)
 			end
 		end)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- The new game's set-up of the world (game_setup's first actor update: the all.spawn's items and mines released, every
+-- stash emptied, ~2000 random items laid out on all levels) is made once for the world and marked in its Lua state
+-- (item_removal_done). The host's ghost stands on fake_start, a "test mode" game_setup skips, so a world the host
+-- started never got the mark, and every player's game loading it made the set-up again: its stash clearing took the
+-- other players' things out of their shadows (whole inventories gone) and ~2900 releases and spawns went out at once.
+-- A player's game never makes it; the host makes it once, for a world that never had it.
+
+local function upvalue(fn, wanted)
+	for i = 1, 255 do
+		local name, value = debug.getupvalue(fn, i)
+		if not name then
+			return
+		end
+		if name == wanted then
+			return value
+		end
+	end
+end
+
+-- the set-up's first step releases these: any left, it never ran on this world
+local function world_set_up()
+	local ini = ini_file("items\\settings\\dynamic_item_spawn.ltx")
+	local sim = alife()
+	for id = 1, 65534 do
+		local se_obj = sim:object(id)
+		if se_obj and ini:line_exist("replace_items", se_obj:name()) then
+			return false
+		end
+	end
+	return true
+end
+
+local function set_up_world()
+	local m_data = alife_storage_manager.get_state()
+	if not m_data or m_data.item_removal_done then
+		return
+	end
+	if world_set_up() then
+		m_data.item_removal_done = true
+		printf("[coop] the world's items were laid out before: marked as done")
+		return
+	end
+	local setup = upvalue(game_setup.on_game_start, "actor_on_first_update")
+	if type(setup) ~= "function" then
+		printf("! [coop] game_setup's new game set-up not found: the world's items stay as they are")
+		return
+	end
+	printf("[coop] the world's new game set-up: items laid out on all levels, once for the world")
+	local test_mode = _G.IsTestMode
+	_G.IsTestMode = function()
+		return false
+	end
+	local ok, err = pcall(setup)
+	_G.IsTestMode = test_mode
+	if not ok then
+		printf("! [coop] the world's new game set-up failed: %s", tostring(err))
+	end
+end
+
+local function wrap_world_setup()
+	local before_load = alife_storage_manager.on_before_load_state
+	alife_storage_manager.on_before_load_state = function(...)
+		if coop_on() and not coop.is_host() then
+			local m_data = alife_storage_manager.get_state()
+			if m_data and not m_data.item_removal_done then
+				m_data.item_removal_done = true
+				printf("[coop] the world's new game set-up is the host's: not made here")
+			end
+		end
+		return before_load(...)
+	end
+	RegisterScriptCallback("actor_on_first_update", function()
+		if coop_on() and coop.is_host() then
+			set_up_world()
+		end
+	end)
+
+	-- what another player carries is in their shadow here: no script of ours takes it away (a release goes to everyone)
+	local alife_release_ = _G.alife_release
+	_G.alife_release = function(se_obj, ...)
+		if coop_on() and se_obj then
+			local se = type(se_obj.id) == "function" and alife_object(se_obj:id()) or se_obj
+			local holder = se and se.parent_id and se.parent_id ~= 65535 and alife_object(se.parent_id)
+			if holder and holder:section_name() == "coop_shadow_box" then
+				printf("! [coop] %s (%s) is another player's: not released", se:section_name(), se.id)
+				return nil
+			end
+		end
+		return alife_release_(se_obj, ...)
 	end
 end
 
@@ -933,6 +1030,7 @@ function on_game_start()
 		return -- not the co-op engine
 	end
 	wrap_world_logic()
+	wrap_world_setup()
 	wrap_corpse_loot()
 	wrap_squads()
 	wrap_mutant_loot()
