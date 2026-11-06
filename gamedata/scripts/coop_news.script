@@ -49,9 +49,12 @@ local ANOMALIES = {
 	psi_storm_end = { "psi_end", "st_coop_news_psi_end" },
 }
 
+local QUIET_MS = 20000 -- a game that has just loaded the world settles a surge it missed: that was told long ago
+local started_at = nil
+
 local function actor_on_interaction(typ, obj, name)
 	local n = typ == "anomalies" and ANOMALIES[name]
-	if n then
+	if n and started_at and time_global() - started_at >= QUIET_MS then
 		publish(n[1], game.translate_string(n[2]))
 	end
 end
@@ -60,5 +63,8 @@ function on_game_start()
 	if not coop then
 		return -- not the co-op engine
 	end
+	RegisterScriptCallback("actor_on_first_update", function()
+		started_at = time_global()
+	end)
 	RegisterScriptCallback("actor_on_interaction", actor_on_interaction)
 end
