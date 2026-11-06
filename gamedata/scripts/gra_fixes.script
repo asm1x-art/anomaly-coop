@@ -2,13 +2,15 @@
 -- repo's own, like configs\mod_system_gra_fixes.ltx)
 
 -- The pack's scopes (Shader 3D Scopes, Pizza's, MAS) draw their lenses and reticles only with the engine's 3D shader
--- scopes on (r__3Dfakescope, off by default): without it an ACOG is an empty tube. GRA turned it on in its graphics
--- preset script, left out of the pack as it forces a dozen other settings; this turns it on once per game, so the
--- option can still be turned off in the settings.
-local scopes_on
--- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (its user.ltx): with the
--- vanilla 0.45 hands and guns sit in the face. Set once per game the same way.
-local hud_fov_set
+-- scopes on (r__3Dfakescope): without it a sniper scope or an ACOG is an empty see-through tube, as their 2D scope
+-- textures are cleared. The engine has it on by default now, but a user.ltx written before keeps the old 0: this turns
+-- it on at every game start. It used to be once per game, remembered in the save: a save made on another computer (a
+-- co-op world is one) carried the mark, and the option stayed off there.
+-- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (the engine's default now):
+-- with vanilla's 0.45, which an older user.ltx keeps, hands and guns sit in the face. It's set while the field of view
+-- is still the vanilla one, so a value chosen in the settings stays; nothing goes into the save.
+local VANILLA_HUD_FOV = 0.45
+local GRA_HUD_FOV = 0.64
 -- A scope with a second sight (an ACOG's, a Razor HD's alternative aim) switches on the engine's wpn_func (V here); GRA
 -- had Alt with the aim button for it, so it's that too: Alt while aiming changes the sight; Alt + the aim button from
 -- the hip takes the other sight and aims through it.
@@ -37,29 +39,17 @@ local function on_before_key_press(key, bind, dis, flags)
 end
 
 function actor_on_first_update()
-	if not scopes_on then
-		exec_console_cmd("r__3Dfakescope 1")
-		scopes_on = true
+	exec_console_cmd("r__3Dfakescope 1")
+	if math.abs(get_console():get_float("hud_fov") - VANILLA_HUD_FOV) < 0.001 then
+		exec_console_cmd("hud_fov " .. GRA_HUD_FOV)
+		-- Focused Zoom read the field of view at its game start and puts it back at every aim's end: it reads it anew
+		if focused_zoom_mcm and focused_zoom_mcm.on_option_change then
+			focused_zoom_mcm.on_option_change()
+		end
 	end
-	if not hud_fov_set then
-		exec_console_cmd("hud_fov 0.64")
-		hud_fov_set = true
-	end
-end
-
-function save_state(m_data)
-	m_data.gra_3d_scopes_on = scopes_on
-	m_data.gra_hud_fov_set = hud_fov_set
-end
-
-function load_state(m_data)
-	scopes_on = m_data.gra_3d_scopes_on
-	hud_fov_set = m_data.gra_hud_fov_set
 end
 
 function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
-	RegisterScriptCallback("save_state", save_state)
-	RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)
 end

@@ -995,7 +995,8 @@ public:
 	}
 };
 
-ENGINE_API float psHUD_FOV_def = 0.45f;
+// the GRA weapon pack's HUD positions (MRAA, 3D scopes) are made for 0.64 (vanilla's 0.45 puts guns in the face)
+ENGINE_API float psHUD_FOV_def = 0.64f;
 ENGINE_API float psHUD_FOV = psHUD_FOV_def;
 
 //extern int psSkeletonUpdate;

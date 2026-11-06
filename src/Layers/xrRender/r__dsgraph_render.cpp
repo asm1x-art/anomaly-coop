@@ -615,6 +615,10 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 				RCache.set_RT(RImplementation.Target->rt_ssfx_motion_vectors->pRT, 3);
 		}
 		mapScopeHUD.clear();
+		// the 3D scopes' reticles are drawn and cleared by phase_3DSSReticle, which runs only with the option on: off, they
+		// piled up here every frame a scoped weapon was in the hands
+		if (!scope_3D_fake_enabled)
+			mapScopeHUDSorted.clear();
 #endif
 
 		if (mapCamAttached.size())
