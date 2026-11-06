@@ -2,13 +2,13 @@
 -- repo's own, like configs\mod_system_gra_fixes.ltx)
 
 -- The pack's scopes (Shader 3D Scopes, Pizza's, MAS) draw their lenses and reticles only with the engine's 3D shader
--- scopes on (r__3Dfakescope, off by default): without it a sniper scope or an ACOG is an empty see-through tube, as
--- their 2D scope textures are cleared. GRA turned it on in its graphics preset script, left out of the pack as it
--- forces a dozen other settings; this turns it on at every game start. It used to be once per game, remembered in the
--- save: a save made on another computer (a co-op world is one) carried the mark, and the option stayed off there.
--- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (its user.ltx): with the
--- vanilla 0.45 hands and guns sit in the face. It's set while the field of view is still the vanilla one, so a value
--- chosen in the settings stays; nothing goes into the save, as user.ltx is the computer's own.
+-- scopes on (r__3Dfakescope): without it a sniper scope or an ACOG is an empty see-through tube, as their 2D scope
+-- textures are cleared. The engine has it on by default now, but a user.ltx written before keeps the old 0: this turns
+-- it on at every game start. It used to be once per game, remembered in the save: a save made on another computer (a
+-- co-op world is one) carried the mark, and the option stayed off there.
+-- The pack's weapon positions (MRAA, 3D scopes) are made for GRA's HUD field of view, 0.64 (the engine's default now):
+-- with vanilla's 0.45, which an older user.ltx keeps, hands and guns sit in the face. It's set while the field of view
+-- is still the vanilla one, so a value chosen in the settings stays; nothing goes into the save.
 local VANILLA_HUD_FOV = 0.45
 local GRA_HUD_FOV = 0.64
 -- A scope with a second sight (an ACOG's, a Razor HD's alternative aim) switches on the engine's wpn_func (V here); GRA
