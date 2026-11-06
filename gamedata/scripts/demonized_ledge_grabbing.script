@@ -239,6 +239,7 @@ function initializeGizmos()
 	end
 end
 function actor_on_first_update()
+	initialized = true -- co-op: climb_rules.script sets the mod up itself when this never came (no loading screen prompt)
 	savedActorPos = db.actor:position()
 	savedActorDir = db.actor:direction()
 	savedSpeedPos = db.actor:position()
@@ -1162,6 +1163,7 @@ function tryToClimb(fromStanding)
 				db.actor:set_actor_direction(-camDirHPB.x)
 				db.actor:set_actor_position(p)
 				level.remove_cam_custom_position_direction()
+				if onClimbLanded then onClimbLanded() end -- co-op: up on the ledge (actor_on_climb_end comes 0.5 s later)
 				game.stop_hud_motion()
 
 				local unstuckFunc
@@ -1437,7 +1439,40 @@ function onScreenCheck()
     return false
 end
 
+-- co-op (climb_rules.script): with settings.climbOnHoldOnly a climb starts only once the jump has been held for
+-- settings.jumpTriggerTime, never on the press itself. The ledge in front at the press is kept for that moment:
+-- the jump has lifted the actor by then, and the ledges searched from there are higher ones.
+local pressedLedge
+
+local function restorePressedLedge()
+	local l = pressedLedge
+	pressedLedge = nil
+	if savedClimbPos or not l then return end
+	local pos = db.actor:position()
+	local dx, dz = pos.x - l.collision.x, pos.z - l.collision.z
+	if sqrt(dx * dx + dz * dz) > settings.climbTriggerDistance + 0.5 or l.climb.y < pos.y + 0.2 then return end
+	savedClimbPos, savedClimbNormal, savedInterPos, savedCollisionPos = l.climb, l.normal, l.inter, l.collision
+end
+
 function checkJump(pressed)
+	if settings.climbOnHoldOnly then
+		if pressed == true then
+			pressedLedge = savedClimbPos and {
+				climb = savedClimbPos, normal = savedClimbNormal, inter = savedInterPos, collision = savedCollisionPos
+			}
+		elseif key_state(settings.keybind) ~= 1 then
+			pressedLedge = nil
+			UnregisterScriptCallback("actor_on_update", checkJump)
+		elseif (time_global() - savedJumpPressedTime) > settings.jumpTriggerTime then
+			-- held: climb onto what is in front, as long as the key is down
+			restorePressedLedge()
+			if tryToClimb(savedSpeed.y < 0.001) then
+				UnregisterScriptCallback("actor_on_update", checkJump)
+			end
+		end
+		return
+	end
+
 	if pressed == true then
 		-- If savedClimbPos is similar to camera height or below it - init climb immediately
 		if savedClimbPos and (savedClimbPos.y < device().cam_pos.y or similar(savedClimbPos.y, device().cam_pos.y, 0.35)) then

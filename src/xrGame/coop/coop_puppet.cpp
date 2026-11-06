@@ -146,11 +146,23 @@ namespace coop
 		g_climbing = climbing;
 	}
 
-	// a climbing player's puppet and stand-in hang in a jump: the climb moves the actor without a motion of its own
-	static u16 climbing_motion()
+	static u16 motion_named(LPCSTR name)
 	{
 		const xr_vector<shared_str>& names = puppet_motion_names();
-		static const u16 index = u16(std::find(names.begin(), names.end(), shared_str("norm_jump_idle")) - names.begin());
+		return u16(std::find(names.begin(), names.end(), shared_str(name)) - names.begin());
+	}
+
+	// a climbing player's puppet and stand-in climb as the actor does up a ladder: the climb onto a ledge moves the
+	// actor without a motion of its own
+	static u16 climbing_legs()
+	{
+		static const u16 index = motion_named("cl_run_fwd_0");
+		return index;
+	}
+
+	static u16 climbing_torso()
+	{
+		static const u16 index = motion_named("cl_torso_0_aim_0");
 		return index;
 	}
 
@@ -186,10 +198,19 @@ namespace coop
 		P.w_float(torso.pitch);
 		P.w_float(torso.roll);
 
-		const u16 whole = g_downed ? downed_motion() : g_climbing ? climbing_motion() : u16(-1);
-		P.w_u16(whole != u16(-1) ? whole : motion_index(actor->m_current_legs));
-		P.w_u16(whole != u16(-1) ? whole : motion_index(actor->m_current_torso));
-		P.w_u16(whole != u16(-1) ? whole : motion_index(actor->m_current_head));
+		u16 legs_motion = motion_index(actor->m_current_legs);
+		u16 torso_motion = motion_index(actor->m_current_torso);
+		u16 head_motion = motion_index(actor->m_current_head);
+		if (g_downed)
+			legs_motion = torso_motion = head_motion = downed_motion();
+		else if (g_climbing)
+		{
+			legs_motion = climbing_legs();
+			torso_motion = climbing_torso();
+		}
+		P.w_u16(legs_motion);
+		P.w_u16(torso_motion);
+		P.w_u16(head_motion);
 		static CBlend* torso_blend = nullptr;
 		static u8 torso_seq = 0;
 		if (actor->m_current_torso_blend != torso_blend)
