@@ -432,11 +432,13 @@ void CWeapon::SetUIScope(LPCSTR scope_texture)
 }
 
 BOOL useSeparateUBGLKeybind = TRUE;
+// a MAS weapon with a built-in sight (the 3D scopes' variants, wpn_dvl10_marchf...) has the sight permanent and no
+// sight section: GetScopeName() is empty there, and reading it crashed on the wpn_func key (V, or Alt while aiming)
 void CWeapon::SwitchZoomType()
 {
 	if (!useSeparateUBGLKeybind)
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
 		{
             SetZoomTypeAndParams(1);
 		}
@@ -454,7 +456,7 @@ void CWeapon::SwitchZoomType()
 	}
     else
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
 		{
 			SetZoomTypeAndParams(1);
 		}
@@ -2463,7 +2465,19 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		Fvector curr_offs, curr_rot, curr_aim_rot;
 		curr_aim_rot.set(0, 0, 0);
 
-		if ((idx == 1 || idx == 3) && m_modular_attachments) {
+		// a MAS weapon's own second sight (the RD-74M ISG's canted red dot): when the attached sight has no second aim of
+		// its own (MAS's placeholder for none has none), the alternative aim takes the weapon's aim_hud_offset_alt_* the
+		// way a weapon without MAS does: the pack's MAS configs keep those values as they were without MAS. It used the
+		// sight's (zero) or the main aim, and the alternative aim looked the same as the main one
+		const bool weapon_alt_aim = idx == 3 && m_modular_attachments && !g_player_hud->m_adjust_mode
+			&& hi->m_measures.m_hands_offset[0][3].square_magnitude() > 0.f
+			&& !(si && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false));
+		if (weapon_alt_aim)
+		{
+			curr_offs = hi->m_measures.m_hands_offset[0][3];
+			curr_rot = hi->m_measures.m_hands_offset[1][3];
+		}
+		else if ((idx == 1 || idx == 3) && m_modular_attachments) {
 			if (si) {
 				curr_offs.set(hi->attach_base_offset_pos());
 				curr_rot.set(hi->attach_base_offset_rot());

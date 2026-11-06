@@ -42,6 +42,10 @@ function actor_on_first_update()
 	exec_console_cmd("r__3Dfakescope 1")
 	if math.abs(get_console():get_float("hud_fov") - VANILLA_HUD_FOV) < 0.001 then
 		exec_console_cmd("hud_fov " .. GRA_HUD_FOV)
+		-- Focused Zoom read the field of view at its game start and puts it back at every aim's end: it reads it anew
+		if focused_zoom_mcm and focused_zoom_mcm.on_option_change then
+			focused_zoom_mcm.on_option_change()
+		end
 	end
 end
 
