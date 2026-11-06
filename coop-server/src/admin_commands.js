@@ -17,6 +17,7 @@ export const RULE_TITLES = {
   tool_discount_1: 'Скидка за инструменты: грубая, %', tool_discount_2: 'Скидка за инструменты: тонкая, %',
   tool_discount_3: 'Скидка за инструменты: калибровка, %', tool_group_share: 'Доля скидки для группы, %',
   story_rewards_all: 'Награда за общий сюжет — всем',
+  help_rewards_all: 'Награда за «Помочь с:» — всем',
 };
 // a rule the bot has no title for still shows, under its key
 export const RULES = Object.entries(DEFAULT_SETTINGS.rules).map(([key, value]) =>

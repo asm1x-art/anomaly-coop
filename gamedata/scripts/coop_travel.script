@@ -224,7 +224,7 @@ function on_game_start()
 		end
 	end)
 	RegisterScriptCallback("actor_on_update", function()
-		if #pending == 0 or not actor_menu.is_hud_free() then
+		if #pending == 0 or not coop_sync.hud_free() then
 			return
 		end
 		local offer = table.remove(pending, 1)

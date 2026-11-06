@@ -386,11 +386,36 @@ function on_xml_read()
 		end
 	end
 
-	-- a quickload would leave the shared world (and disconnect, see coop_save.cpp)
+	-- the quick save key in the shared world is always ours (modxml_coop_saves: our character, a group's leader the
+	-- group). Anomaly's lets it through only with its HUD flags free, and else the engine makes a save of its own:
+	-- with a flag left stuck the key did nothing a player could see
+	local quick_save = level_input.action_quick_save
+	level_input.action_quick_save = function(...)
+		if not (coop.connected() and coop.world_status() == "exists" and db.actor) then
+			return quick_save(...)
+		end
+		if not (db.actor:alive() and coop_sync.hud_free()) then
+			actor_menu.set_msg(1, game.translate_string("st_coop_saves_busy"), 3)
+			return true
+		end
+		local flags = { ret = false }
+		SendScriptCallback("on_before_save_input", flags, 2, game.translate_string("st_ui_save"))
+		return true
+	end
+
+	-- a quickload would leave the shared world (and disconnect, see coop_save.cpp): the key opens our character's saves
+	-- instead, to go back to one there (ui_coop_saves.script)
 	local quick_load = level_input.action_quick_load
 	level_input.action_quick_load = function(...)
 		if coop.connected() and coop.world_status() == "exists" then
-			actor_menu.set_msg(1, "В кооперативе быстрая загрузка отключена.", 4)
+			local menu = coop_sync.main_menu() -- the pause menu's key too (ui_main_menu)
+			if ui_coop_saves.is_shown() then
+				return true
+			elseif menu then
+				ui_coop_saves.open(menu)
+			elseif db.actor and coop_sync.hud_free() then
+				ui_coop_saves.open(nil)
+			end
 			return true
 		end
 		return quick_load(...)

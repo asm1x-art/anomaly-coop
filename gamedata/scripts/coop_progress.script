@@ -11,7 +11,7 @@ local PERSONAL = {
 	"disguise_npcs_memory", "disguise_state", "drink", "game_statistics", "jobs_guide",
 	"lttz_hb_last_stash_time", "lttz_hb_next_stash_time", "mlr", "multifetch_data", "new_mines", "psy_table", "PsyAntenna", "pump_station_def_csky",
 	"recover_mutant_data_mdata", "RF_freq", "RF_targets", "sleep", "start_wpn_ammo", "stealth_kills",
-	"task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
+	"coop_help", "task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
 }
 
 -- the actor's variables (save_var(db.actor, ...)) that are facts about the world: the save's stay
@@ -167,6 +167,16 @@ function on_game_start()
 		return original(...)
 	end
 	RegisterScriptCallback("actor_on_first_update", function()
+		-- the faction whose routes are open from the start (txr_routes.scan_route): a character whose Lua progress
+		-- never reached the server (its game fell before the first save) came back without it, and those routes closed
+		if coop.connected() and not mlr_utils.load_var("routes_faction") then
+			local faction = alife_storage_manager.get_state().default_faction
+				or string.gsub(db.actor:character_community() or "", "^actor_", "")
+			if faction ~= "" then
+				mlr_utils.save_var("routes_faction", faction)
+				printf("[coop] routes_faction was missing: %s", faction)
+			end
+		end
 		local eq = pending_equipment
 		pending_equipment = nil
 		if eq then

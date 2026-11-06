@@ -32,6 +32,7 @@ public:
 	virtual void Show(bool status);
 
 	void CaptureFocus(bool bCapture);
+	bool HasInputFocus() const { return m_bInputFocus; }
 	void SetNextFocusCapturer(CUICustomEdit* next_capturer) { m_next_focus_capturer = next_capturer; };
 
 	void ClearText();

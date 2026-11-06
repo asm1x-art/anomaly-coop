@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS = {
     tool_discount_3: 30, // calibration
     tool_group_share: 50, // % of that discount for the bringer's group
     story_rewards_all: false, // a group sharing its story: a step's reward for every member, not only who handed it in
+    help_rewards_all: false, // «Помочь с:» (coop_help.script): a member's task handed in, its giver's reward for every helper too
   },
 };
 

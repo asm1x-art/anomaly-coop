@@ -28,6 +28,7 @@
 #include "UILogsWnd.h"
 
 #include "UIScriptWnd.h"
+#include "UICustomEdit.h"
 
 #include "Actor.h"
 #include "Inventory.h"
@@ -508,10 +509,25 @@ void CUIPdaWnd::Enable(bool status)
 	inherited::Enable(status);
 }
 
+// a text box of a tab (a script tab's, e.g. the co-op Group tab's money) that has the keyboard
+static bool text_box_typing(CUIWindow* w)
+{
+	while (w->GetKeyboardCapturer())
+		w = w->GetKeyboardCapturer();
+	CUICustomEdit* edit = smart_cast<CUICustomEdit*>(w);
+	return edit && edit->HasInputFocus();
+}
+
 bool CUIPdaWnd::OnKeyboardAction(int dik, EUIMessages keyboard_action)
 {
 	if (IsShown() && (keyboard_action == WINDOW_KEY_PRESSED || keyboard_action == WINDOW_KEY_RELEASED))
 	{
+		// Co-op: while typing in a text box it gets every key, pressed and released, but Esc. Before, the 3D PDA
+		// sent presses and releases to the PDA item, so the box only saw the hold, which repeated every frame:
+		// a light touch typed (or erased) dozens of digits
+		if (get_binded_action(dik) != kQUIT && text_box_typing(this))
+			return inherited::OnKeyboardAction(dik, keyboard_action);
+
 		if (!psActorFlags.test(AF_3D_PDA) && keyboard_action == WINDOW_KEY_PRESSED)
 		{
 			EGameActions action = get_binded_action(dik);

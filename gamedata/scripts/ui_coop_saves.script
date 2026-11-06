@@ -108,16 +108,22 @@ function UICoopSaves:Open()
 	self:Fill()
 	self:SetStatus(not may_save() and "st_coop_saves_leader" or #saves > 0 and "st_coop_saves_hint" or "st_coop_saves_loading")
 	self:ShowDialog(true)
-	self.owner:HideDialog()
-	self.owner:Show(false)
+	if self.owner then
+		self.owner:HideDialog()
+		self.owner:Show(false)
+	end
 end
 
 function UICoopSaves:Close()
-	self.owner:ShowDialog(true)
+	if self.owner then
+		self.owner:ShowDialog(true)
+	end
 	if self:IsShown() then
 		self:HideDialog()
 	end
-	self.owner:Show(true)
+	if self.owner then
+		self.owner:Show(true)
+	end
 end
 
 function UICoopSaves:Update()
@@ -167,7 +173,7 @@ function is_shown()
 	return wnd ~= nil and wnd:IsShown()
 end
 
--- the pause menu (owner) opens it
+-- the pause menu (owner) opens it, or the quick load key in the world (no owner: modxml_coop_menu.script)
 function open(owner)
 	if not (wnd and rawequal(wnd.owner, owner)) then -- engine objects have no == of their own
 		wnd = UICoopSaves(owner)

@@ -148,6 +148,27 @@
 	<string id="st_coop_group_invited">
 		<text>Приглашение отправлено: %s</text>
 	</string>
+	<string id="st_coop_wheel_trade_d">
+		<text>Предложить обмен вещами и деньгами</text>
+	</string>
+	<string id="st_coop_wheel_invite_d">
+		<text>Позвать игрока в свою группу</text>
+	</string>
+	<string id="st_coop_wheel_kick_d">
+		<text>Убрать игрока из группы (вы лидер)</text>
+	</string>
+	<string id="st_coop_wheel_leave_d">
+		<text>Покинуть группу</text>
+	</string>
+	<string id="st_coop_wheel_notes_d">
+		<text>Отдать копию своих заметок и записок из ПДА</text>
+	</string>
+	<string id="st_coop_wheel_routes_d">
+		<text>Отдать копию открытых вами переходов между локациями</text>
+	</string>
+	<string id="st_coop_wheel_story_d">
+		<text>Предложить свой прогресс сюжета: игрок решит, принять ли</text>
+	</string>
 	<string id="st_coop_wheel_trade">
 		<text>Обмен</text>
 	</string>
@@ -301,6 +322,9 @@
 	<string id="st_coop_saves_saving">
 		<text>Сохраняю персонажа...</text>
 	</string>
+	<string id="st_coop_saves_busy">
+		<text>Сейчас не сохранить: закройте окна, встаньте на ноги.</text>
+	</string>
 	<string id="st_coop_saves_leader">
 		<text>В группе сохраняет и загружает её лидер.</text>
 	</string>
@@ -444,6 +468,15 @@
 	</string>
 	<string id="st_coop_choice_go">
 		<text>Продолжить с выбранного</text>
+	</string>
+	<string id="st_coop_help_title">
+		<text>Помочь с: %s (%s)</text>
+	</string>
+	<string id="st_coop_help_descr">
+		<text>%s взял задание «%s». Помогите ему: награду у заказчика получит он.</text>
+	</string>
+	<string id="st_coop_rolled_back_rank">
+		<text>Помочь было некому: вы вернулись к своему последнему сохранению. Потеряно ранга: %d.</text>
 	</string>
 	<string id="st_coop_rolled_back_save">
 		<text>Помочь было некому: персонаж возвращается к своему последнему сохранению.</text>

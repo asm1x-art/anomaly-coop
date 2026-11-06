@@ -588,11 +588,9 @@ local function step(kind, data)
 	coop_sync.send_event("story_step", kind, coop_sync.serialize(data))
 end
 
--- a step's reward of the group's member's step, if the server says the others get it
-local function reward_of(rtask)
-	if not (rtask and rtask.on_complete and coop_rules.flag("story_rewards_all", false)) or shelters(rtask.id) then
-		return
-	end
+-- a task's on_complete with its rewards alone (REWARD_EFFECTS): nothing else of it happens again here. Also for the
+-- help tasks' rewards (coop_help.script)
+function rewards_only(condlist, id)
 	local kept = {}
 	for name, f in pairs(xr_effects) do
 		if type(f) == "function" and not REWARD_EFFECTS[name] then
@@ -600,13 +598,21 @@ local function reward_of(rtask)
 			xr_effects[name] = function() end
 		end
 	end
-	local ok, err = pcall(xr_logic.pick_section_from_condlist, db.actor, db.actor, rtask.on_complete)
+	local ok, err = pcall(xr_logic.pick_section_from_condlist, db.actor, db.actor, condlist)
 	for name, f in pairs(kept) do
 		xr_effects[name] = f
 	end
 	if not ok then
-		printf("! [coop] the reward of %s: %s", rtask.id, tostring(err))
+		printf("! [coop] the reward of %s: %s", id, tostring(err))
 	end
+end
+
+-- a step's reward of the group's member's step, if the server says the others get it
+local function reward_of(rtask)
+	if not (rtask and rtask.on_complete and coop_rules.flag("story_rewards_all", false)) or shelters(rtask.id) then
+		return
+	end
+	rewards_only(rtask.on_complete, rtask.id)
 end
 
 -- a member did that step: ours closes, with its reward if the server says so
@@ -765,7 +771,7 @@ local function update()
 			printf("! [coop] %s: no word from the server, not done", key)
 		end
 	end
-	if #offers > 0 and actor_menu.is_hud_free() then
+	if #offers > 0 and coop_sync.hud_free() then
 		local o = table.remove(offers, 1)
 		ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, o.text, o.yes, o.no)
 	end

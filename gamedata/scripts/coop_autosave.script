@@ -60,7 +60,7 @@ function unsafe(now)
 		return "dead or down"
 	elseif db.actor.health < num("health_min", 0.3) then
 		return "low health"
-	elseif not actor_menu.is_hud_free() or device():is_paused() then
+	elseif not coop_sync.hud_free() or device():is_paused() then
 		return "a menu"
 	elseif now - hit_at < num("hit_quiet_s", 15) * 1000 then
 		return "hit lately"

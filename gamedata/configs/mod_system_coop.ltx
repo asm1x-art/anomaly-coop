@@ -396,3 +396,8 @@ low_reserve        = 128 ; free ids in our blocks below which the next block is 
 new_character_ids  = 768 ; a new character's first entry asks for blocks until it holds this many free ids
 usage_log_s        = 300 ; real s: how often "ids: N of 65535 taken in the world" goes to the log (and once on coming in)
 usage_warn_percent = 90  ; from this share of ids taken that line is a warning ("! [coop] ids: ...")
+
+; Co-op: a group member's tasks come to the others as "Помочь с: ..." (coop_help.script)
+[coop_help]
+enabled = true
+sync_ms = 2000      ; how often a player's own tasks are compared with what the group was told
