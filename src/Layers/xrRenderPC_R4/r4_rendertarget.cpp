@@ -400,6 +400,13 @@ CRenderTarget::CRenderTarget()
 		render_scale_swap_in(render_w, render_h);
 	}
 
+	// the textures' LOD bias follows the world's size: as sharp as at the screen's size (r__upscale_mipbias)
+	r__upscale_mip_bias = render_w < display_w ? log2f(float(render_w) / float(display_w)) : 0.f;
+	r_apply_texture_mip_bias();
+	if (r__upscale_mip_bias != 0.f)
+		Msg("* textures' mip bias %.2f for the world at %ux%u (r__upscale_mipbias %d)", r__upscale_mip_bias, render_w, render_h,
+		    ps_r__upscale_mipbias);
+
 	if (ps_r_ssao_mode != 2/*hdao*/)
 		ps_r_ssao = _min(ps_r_ssao, 3);
 

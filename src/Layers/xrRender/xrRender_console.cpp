@@ -150,6 +150,8 @@ float ps_r__ssaHZBvsTEX = 96.f; //RO
 int ps_r__tf_Anisotropic = 8;
 float ps_r__tf_Mipbias = 0.0f;
 float ps_r__render_scale = 1.0f;
+int ps_r__upscale_mipbias = 1;
+float r__upscale_mip_bias = 0.f;
 float ps_r2_sun_cascade_min_fov = 60.0f;
 // R1
 float ps_r1_ssaLOD_A = 64.f;
@@ -528,6 +530,32 @@ int opt_dynamic = 2;
 #include "../xrRenderDX10/StateManager/dx10SamplerStateCache.h"
 #endif	//	USE_DX10
 
+float r_texture_mip_bias()
+{
+	return ps_r__tf_Mipbias + (ps_r__upscale_mipbias ? r__upscale_mip_bias : 0.f);
+}
+
+void r_apply_texture_mip_bias()
+{
+#if defined(USE_DX10) || defined(USE_DX11)
+	if (HW.pDevice)
+		SSManager.SetMipLODBias(r_texture_mip_bias());
+#endif
+}
+
+// r__upscale_mipbias: on/off takes effect at once
+class CCC_upscale_mipbias : public CCC_Integer
+{
+public:
+	CCC_upscale_mipbias(LPCSTR N, int* V) : CCC_Integer(N, V, 0, 1) {}
+
+	virtual void Execute(LPCSTR args)
+	{
+		CCC_Integer::Execute(args);
+		r_apply_texture_mip_bias();
+	}
+};
+
 class CCC_ssfx_cascades : public CCC_Vector3
 {
 public:
@@ -633,7 +661,7 @@ public:
 		//	TODO: DX10: Implement mip bias control
 		//VERIFY(!"apply not implmemented.");
 		//Done. Thanks for reminding me.
-		SSManager.SetMipLODBias(*value);
+		r_apply_texture_mip_bias();
 #else	//	USE_DX10
 		for (u32 i = 0; i < HW.Caps.raster.dwStages; i++)
 			CHK_DX(HW.pDevice->SetSamplerState( i, D3DSAMP_MIPMAPLODBIAS, *((LPDWORD) value)));
@@ -1343,6 +1371,7 @@ void xrRender_initconsole()
 	CMD2(CCC_tf_MipBias, "r__tf_mipbias", &ps_r__tf_Mipbias); // {-3 +3}
 	CMD4(CCC_Float, "r2_sun_cascade_min_fov", &ps_r2_sun_cascade_min_fov, 1.f, 120.f); // the sun cascades fitted to at least this fov; 1 = off
 	CMD4(CCC_Float, "r__render_scale", &ps_r__render_scale, 0.5f, 1.f); // the world at this share of the screen's size; vid_restart
+	CMD2(CCC_upscale_mipbias, "r__upscale_mipbias", &ps_r__upscale_mipbias); // textures as sharp as at the screen's size when the world is drawn smaller
 
 	// R1
 	CMD4(CCC_Float, "r1_ssa_lod_a", &ps_r1_ssaLOD_A, 16, 96);
