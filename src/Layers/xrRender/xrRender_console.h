@@ -103,6 +103,7 @@ extern ECORE_API float r__upscale_mip_bias; // that bias for the frame's size no
 float r_texture_mip_bias(); // r__tf_mipbias plus it
 void r_apply_texture_mip_bias(); // to the samplers
 extern ECORE_API int ps_r__taa_jitter; // test: jitter the camera (r4_taa.h) even without an upscaler
+extern ECORE_API int ps_r__dlss_mv_debug; // test: show DLSS's motion vectors (red/green: the motion, blue: a model's own)
 extern ECORE_API float ps_r2_sun_cascade_min_fov; // the sun cascades are fitted to at least this field of view (zoomed scopes) // the world drawn at this share of the screen's size, stretched (vid_restart)
 
 enum

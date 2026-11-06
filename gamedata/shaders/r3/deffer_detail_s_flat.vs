@@ -45,6 +45,7 @@ O.N = lerp(orig, mul((float3x3)m_WV,  v.pos), 0.25);
 
 	O.position	= float4	(Pe, 		c0.w		);
 
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return O;
 }
 FXVS;

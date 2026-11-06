@@ -1,6 +1,8 @@
 #ifndef	common_iostructs_h_included
 #define	common_iostructs_h_included
 
+#include "dlss_mv.h"
+
 ////////////////////////////////////////////////////////////////
 //	This file contains io structs:
 //	v_name	:	input for vertex shader.
@@ -308,6 +310,10 @@ struct v2p_bumped
 #ifdef USE_LM_HEMI
 		float2	lmh	: TEXCOORD6;	// lm-hemi
 #endif
+#ifdef DLSS_MV
+	float4	vel_curr: TEXCOORD7;	// dlss_mv.h: where the vertex is now (clip space, no jitter)
+	float4	vel_prev: TEXCOORD8;	// and where it was a frame ago
+#endif
 	float4	hpos	: SV_Position;
 };
 
@@ -328,6 +334,10 @@ struct p_bumped
 #ifdef USE_LM_HEMI
 		float2	lmh	: TEXCOORD6;	// lm-hemi
 #endif
+#ifdef DLSS_MV
+	float4	vel_curr: TEXCOORD7;	// dlss_mv.h: where the vertex is now (clip space, no jitter)
+	float4	vel_prev: TEXCOORD8;	// and where it was a frame ago
+#endif
 };
 ////////////////////////////////////////////////////////////////
 //	Defer flat
@@ -346,6 +356,10 @@ struct	v2p_flat
 #ifdef USE_LM_HEMI
 	float2	lmh		: TEXCOORD4;	// lm-hemi
 #endif
+#ifdef DLSS_MV
+	float4	vel_curr: TEXCOORD7;	// dlss_mv.h: where the vertex is now (clip space, no jitter)
+	float4	vel_prev: TEXCOORD8;	// and where it was a frame ago
+#endif
 	float4	hpos	: SV_Position;
 };
 
@@ -363,6 +377,10 @@ struct	p_flat
 #endif
 #ifdef USE_LM_HEMI
 	float2	lmh		: TEXCOORD4;	// lm-hemi
+#endif
+#ifdef DLSS_MV
+	float4	vel_curr: TEXCOORD7;	// dlss_mv.h: where the vertex is now (clip space, no jitter)
+	float4	vel_prev: TEXCOORD8;	// and where it was a frame ago
 #endif
 };
 

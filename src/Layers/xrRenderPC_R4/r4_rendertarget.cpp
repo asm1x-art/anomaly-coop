@@ -26,6 +26,8 @@
 #include "blender_nightvision.h"
 #include "blender_lut.h"
 #include "blender_render_scale.h"
+#include "blender_dlss.h"
+#include "r4_taa.h"
 
 // HDR10
 #include "blender_hdr10_bloom.h"
@@ -623,6 +625,13 @@ CRenderTarget::CRenderTarget()
 		{
 			rt_render_scale.create(r2_RT_render_scale, w, h, D3DFMT_A8R8G8B8, 1);
 			rt_render_scale_z.create(r2_RT_render_scale_z, w, h, D3DFMT_D24S8);
+		}
+
+		// DLSS's motion vectors and depth (the G-buffer's shaders write them when o.dlss_mv)
+		if (RImplementation.o.dlss_mv)
+		{
+			rt_dlss_mv.create(r2_RT_dlss_mv, w, h, D3DFMT_G16R16F);
+			rt_dlss_depth.create(r2_RT_dlss_depth, w, h, D3DFMT_R32F);
 		}
 
 		// TODO: R11G11B10F? needs another horrible hack + cast + update to converter function
@@ -1371,6 +1380,12 @@ CRenderTarget::CRenderTarget()
 	else
 		b_render_scale = nullptr;
 
+	if (rt_dlss_mv)
+	{
+		b_dlss = xr_new<CBlender_dlss>();
+		s_dlss.create(b_dlss, "r2\\dlss");
+	}
+
 	//
 	dwWidth = Device.dwWidth;
 	dwHeight = Device.dwHeight;
@@ -1398,6 +1413,71 @@ bool CRenderTarget::scale_begin()
 bool CRenderTarget::taa_wanted() const
 {
 	return ps_r__taa_jitter != 0;
+}
+
+bool CRenderTarget::mv_wanted() const
+{
+	return rt_dlss_mv && ps_r__dlss_mv_debug;
+}
+
+void CRenderTarget::phase_dlss_mv()
+{
+	if (!rt_dlss_mv)
+		return;
+	PIX_EVENT(phase_dlss_mv);
+
+	// Device's size is the render size here (scale_begin); its matrices are without the jitter again
+	const float w = float(Device.dwWidth), h = float(Device.dwHeight);
+
+	// this frame's projection as it was drawn (with the jitter): each pixel's ray goes through the surface it shows
+	Fmatrix pj = g_taa.proj;
+	if (g_taa.on)
+	{
+		pj._31 += g_taa.ndc.x;
+		pj._32 += g_taa.ndc.y;
+	}
+	Fmatrix vp, vp_prev;
+	vp.mul(g_taa.proj, Device.mView);
+	if (g_taa.prev_valid)
+		vp_prev.mul(g_taa.prev_proj, g_taa.prev_view);
+	else
+		vp_prev = vp;
+
+	u32 Offset;
+	const u32 C = color_rgba(255, 255, 255, 255);
+	FVF::TL* pv = (FVF::TL*)RCache.Vertex.Lock(4, g_menu->vb_stride, Offset);
+	pv->set(0.f, h, 0.f, 1.f, C, 0.f, 1.f);
+	pv++;
+	pv->set(0.f, 0.f, 0.f, 1.f, C, 0.f, 0.f);
+	pv++;
+	pv->set(w, h, 0.f, 1.f, C, 1.f, 1.f);
+	pv++;
+	pv->set(w, 0.f, 0.f, 1.f, C, 1.f, 0.f);
+	pv++;
+	RCache.Vertex.Unlock(4, g_menu->vb_stride);
+
+	u_setrt(rt_dlss_mv, rt_dlss_depth, (ID3DDepthStencilView*)NULL);
+	RCache.set_CullMode(CULL_NONE);
+	RCache.set_Stencil(FALSE);
+	RCache.set_Element(s_dlss->E[0]);
+	RCache.set_Geometry(g_menu);
+	RCache.set_c("m_dlss_inv_v", Device.mInvView);
+	RCache.set_c("m_dlss_vp", vp);
+	RCache.set_c("m_dlss_vp_prev", vp_prev);
+	RCache.set_c("dlss_proj", 1.f / pj._11, 1.f / pj._22, pj._31, pj._32);
+	RCache.set_c("dlss_depth", pj._33, pj._43, w, h);
+	RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
+
+	// the test view over the frame: red/green the motion, blue where a model gave its own
+	if (ps_r__dlss_mv_debug)
+	{
+		u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, NULL);
+		RCache.set_Element(s_dlss->E[1]);
+		RCache.set_Geometry(g_menu);
+		RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
+	}
+
+	u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, HW.pBaseZB);
 }
 
 void CRenderTarget::scale_end()
@@ -1514,6 +1594,7 @@ CRenderTarget::~CRenderTarget()
 	xr_delete(b_heatvision); //--DSR-- HeatVision
 	xr_delete(b_lut);
 	xr_delete(b_render_scale);
+	xr_delete(b_dlss);
 	xr_delete(b_smaa);
 
 	// [ SSS Stuff ]

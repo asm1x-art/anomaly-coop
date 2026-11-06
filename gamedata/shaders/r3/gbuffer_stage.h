@@ -7,6 +7,9 @@ struct f_deffer
 	float4 position : SV_Target0; //XY - Normal, Z - Depth, W - Hemi/M_ID
 	float4 C : SV_Target1; //XYZ - Albedo, W - Specular
     float4 H : SV_Target2;
+#ifdef DLSS_MV
+	float4 Velocity : SV_Target3; // dlss_mv.h: the screen motion (models only; 0 = the camera's)
+#endif
 #ifdef EXTEND_F_DEFFER
 	uint mask : SV_COVERAGE;
 #endif
@@ -110,6 +113,9 @@ f_deffer pack_gbuffer( float4 norm, float4 pos, float4 col, uint imask )
         res.H = float4(L_hotness.x, 0.0, 0.0, 1.0);
     else
         res.H = float4(0.0, 0.0, 0.0, 0.0);
+#ifdef DLSS_MV
+	res.Velocity = 0; // a shader with motion of its own sets it after (DLSS_MV_WRITE)
+#endif
 
 #ifdef EXTEND_F_DEFFER
    res.mask = imask;

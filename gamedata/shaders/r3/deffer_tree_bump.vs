@@ -79,6 +79,7 @@ v2p_bumped 	main 	(v_tree I)
 	O.tcdbump		= O.tcdh * dt_params;		// dt tc
 #endif
 
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return O;
 }
 FXVS;

@@ -59,12 +59,13 @@ v2p_bumped _main( v_model I )
 	O.tcdbump		= O.tcdh * dt_params;		// dt tc
 #endif
 
+	DLSS_MV_SET(O, skin_P_prev); // dlss_mv.h: where the vertex was a frame ago (skin.h)
 	return	O;
 }
 
 /////////////////////////////////////////////////////////////////////////
 #ifdef 	SKIN_NONE
-v2p_bumped	main(v_model v) 		{ return _main(v); 		}
+v2p_bumped	main(v_model v) 		{ SKIN_PREV_NONE(v.P); return _main(v); 		}
 #endif
 
 #ifdef 	SKIN_0

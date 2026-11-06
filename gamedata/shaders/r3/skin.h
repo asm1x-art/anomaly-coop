@@ -80,6 +80,25 @@ float4 	skinning_pos 	(float4 pos, float4 m0, float4 m1, float4 m2)
 		);
 }
 
+#ifdef DLSS_MV
+// dlss_mv.h: the bones a frame ago (the engine fills them, CSkeletonX::_Render) and the vertex skinned with them
+float4 	sbones_array_prev	[256-22];
+static float4 skin_P_prev;
+float4 	skin_prev_pos	(float4 pos, int4 id, float4 w)
+{
+	float4 m0 = sbones_array_prev[id.x+0]*w.x + sbones_array_prev[id.y+0]*w.y + sbones_array_prev[id.z+0]*w.z + sbones_array_prev[id.w+0]*w.w;
+	float4 m1 = sbones_array_prev[id.x+1]*w.x + sbones_array_prev[id.y+1]*w.y + sbones_array_prev[id.z+1]*w.z + sbones_array_prev[id.w+1]*w.w;
+	float4 m2 = sbones_array_prev[id.x+2]*w.x + sbones_array_prev[id.y+2]*w.y + sbones_array_prev[id.z+2]*w.z + sbones_array_prev[id.w+2]*w.w;
+	return skinning_pos(pos, m0, m1, m2);
+}
+#define SKIN_PREV(pos, id, w)	skin_P_prev = skin_prev_pos(pos, id, w)
+#define SKIN_PREV_NONE(pos)		skin_P_prev = u_position(pos)
+#else
+#define SKIN_PREV(pos, id, w)
+#define SKIN_PREV_NONE(pos)
+#endif
+
+
 v_model skinning_0	(v_model_skinned_0	v)
 {
 	//	Swizzle for D3DCOLOUR format
@@ -94,6 +113,7 @@ v_model skinning_0	(v_model_skinned_0	v)
 	o.T 		= unpack_normal(v.T);
 	o.B 		= unpack_normal(v.B);
 	o.tc 		= v.tc;
+	SKIN_PREV_NONE(v.P);
 	return o;
 }
 v_model skinning_1 	(v_model_skinned_1	v)
@@ -116,6 +136,7 @@ v_model skinning_1 	(v_model_skinned_1	v)
 	o.T 		= skinning_dir(v.T, m0,m1,m2 );
 	o.B 		= skinning_dir(v.B, m0,m1,m2 );
 	o.tc 		= v.tc;
+	SKIN_PREV(v.P, int4(mid, mid, mid, mid), float4(1, 0, 0, 0));
 	return o;
 }
 v_model skinning_2 	(v_model_skinned_2	v)
@@ -148,6 +169,7 @@ v_model skinning_2 	(v_model_skinned_2	v)
 	o.T 		= skinning_dir(v.T, m0,m1,m2 );
 	o.B 		= skinning_dir(v.B, m0,m1,m2 );
 	o.tc 		= v.tc;
+	SKIN_PREV(v.P, int4(id_0, id_1, id_0, id_0), float4(1 - w, w, 0, 0));
 	return o;
 }
 v_model skinning_3 	(v_model_skinned_3	v)
@@ -198,6 +220,7 @@ v_model skinning_3 	(v_model_skinned_3	v)
 	o.rgb_tint	= float3	(2,0,0)	;
 	if (id_0==id_1)	o.rgb_tint	= float3(1,2,0);
 #endif
+	SKIN_PREV(v.P, int4(id_0, id_1, id_2, id_0), float4(w0, w1, w2, 0));
 	return o;
 }
 v_model skinning_4 	(v_model_skinned_4	v)
@@ -247,6 +270,7 @@ v_model skinning_4 	(v_model_skinned_4	v)
 	o.B 		= skinning_dir(v.B, m0,m1,m2 );
 	o.tc 		= v.tc;
 
+	SKIN_PREV(v.P, int4(id[0], id[1], id[2], id[3]), float4(w[0], w[1], w[2], w[3]));
 	return o;
 }
 

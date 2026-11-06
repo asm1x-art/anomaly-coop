@@ -4,6 +4,9 @@
 
 #include "stdafx.h"
 #pragma hdrstop
+#if defined(USE_DX11)
+#include "../xrRenderPC_R4/r4_taa.h"
+#endif
 
 #pragma warning(disable:4995)
 #include <d3dx9.h>
@@ -61,7 +64,9 @@ void CSkeletonX::_Render(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCount)
 	Fmatrix p_WV, p_WVP;
 
 #ifdef USE_DX11 //
-	if (RImplementation.o.ssfx_motionvectors)
+	// motion vectors (SSS, or DLSS's: r4_taa.h): the last frame's world matrix and bones
+	const bool motion_vectors = RImplementation.o.ssfx_motionvectors || g_taa.mv;
+	if (motion_vectors)
 	{
 		if (Device.dwFrame > Parent->CurrentFrame)
 		{
@@ -113,6 +118,11 @@ void CSkeletonX::_Render(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCount)
 			Fmatrix W;
 			W.mul_43(RCache.xforms.m_w, Parent->LL_GetTransform_R(u16(RMS_boneid)));
 			RCache.set_xform_world(W);
+#ifdef USE_DX11
+			// setting the world matrix put the current one in m_wvp_prev too (R_xforms::set_W): the last frame's again
+			if (g_taa.mv && !RImplementation.o.ssfx_motionvectors)
+				RCache.set_c("m_wvp_prev", p_WVP);
+#endif
 			//
 			RCache.set_Geometry(hGeom);
 			RCache.Render(D3DPT_TRIANGLELIST, 0, 0, vCount, iOffset, pCount);
@@ -138,7 +148,7 @@ void CSkeletonX::_Render(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCount)
 				RCache.set_ca(&*array, id + 2, M._13, M._23, M._33, M._43);
 
 #ifdef USE_DX11
-				if (RImplementation.o.ssfx_motionvectors) 
+				if (motion_vectors && array_prev)
 				{
 					// Save previous transform
 					Fmatrix& Mprev = Parent->LL_GetBoneInstance(u16(mid)).mRenderTransform_prev;

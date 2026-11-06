@@ -58,6 +58,7 @@ v2p_flat 	main (v_detail v)
 # endif
 	O.position	= float4	(Pe, 		c0.w		);
 
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return O;
 }
 FXVS;

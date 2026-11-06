@@ -61,6 +61,7 @@ v2p_bumped main( v_in I )
 #ifdef	USE_LM_HEMI
 	O.lmh 			= unpack_tc_lmap	(I.lmh);
 #endif
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return	O;
 }
 

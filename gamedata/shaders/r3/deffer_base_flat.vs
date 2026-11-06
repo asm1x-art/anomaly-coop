@@ -37,6 +37,7 @@ v2p_flat main ( v_in I )
 	O.lmh 		= unpack_tc_lmap( I.lmh );
 #endif
 
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return	O;
 }
 FXVS;

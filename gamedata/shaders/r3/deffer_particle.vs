@@ -29,6 +29,8 @@ v2p_particle main( vv I )
 	O.tcdbump	= O.tcdh * dt_params;			// dt tc
 #endif
 
+	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
+
 	v2p_particle	pp;
 	pp.color = I.c;
 	pp.base = O;

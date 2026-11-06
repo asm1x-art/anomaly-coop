@@ -35,5 +35,6 @@ f_deffer main ( p_bumped I )
 //								float4 	(I.position.xyz, ms),
 								float4	(S.base.xyz, 								S.gloss	) );
 
+  DLSS_MV_WRITE(O, I); // dlss_mv.h
   return O;
 }

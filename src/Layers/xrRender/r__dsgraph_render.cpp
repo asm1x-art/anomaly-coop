@@ -8,6 +8,9 @@
 #include "../../xrEngine/CustomHUD.h"
 
 #include "FBasicVisual.h"
+#if defined(USE_DX11)
+#include "../xrRenderPC_R4/r4_taa.h"
+#endif
 
 using namespace R_dsgraph;
 
@@ -588,9 +591,13 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 	Device.mFullTransform = Device.mFullTransformHud;
 	RCache.set_xform_project(Device.mProjectHud);
 
-	// Apply HUD Matrix
-	Fmatrix Pold_prev = Device.mProject_prev;
+	// Apply HUD Matrix (the last frame's: the HUD's own, without the upscaler's jitter, r4_taa.h)
+	Fmatrix Pold_prev = RCache.xforms.m_p_prev;
+#if defined(USE_DX11)
+	RCache.set_xform_project_prev(g_taa.mv ? g_taa.project_hud() : Device.mProjectHud);
+#else
 	RCache.set_xform_project_prev(Device.mProjectHud);
+#endif
 
 	// Rendering
 	rmNear();
@@ -609,7 +616,7 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 			
 			mapScopeHUD.traverseLR(sorted_L1);
 
-			if (!RImplementation.o.ssfx_motionvectors)
+			if (!RImplementation.o.ssfx_motionvectors && !RImplementation.o.dlss_mv)
 				RCache.set_RT(NULL, 3);
 			else
 				RCache.set_RT(RImplementation.Target->rt_ssfx_motion_vectors->pRT, 3);
