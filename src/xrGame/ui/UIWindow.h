@@ -189,6 +189,7 @@ public:
 	CUIWindow* GetMessageTarget();
 
 	void SetKeyboardCapture(CUIWindow* pChildWindow, bool capture_status);
+	CUIWindow* GetKeyboardCapturer() const { return m_pKeyboardCapturer; }
 
 	//обработка сообщений не предусмотреных стандартными обработчиками
 	//ф-ция должна переопределяться
