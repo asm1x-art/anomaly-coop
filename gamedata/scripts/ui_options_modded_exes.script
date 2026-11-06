@@ -115,6 +115,62 @@ function on_xml_read()
 			end
 		end
 
+		-- NVIDIA DLSS (engine: r__dlss_mode, r__dlss_status), after SMAA in Video > Advanced; when it can't run, the reason
+		local advanced = nil
+		for _, top in ipairs(ui_options.options) do
+			if top.id == "video" and top.gr then
+				for _, sub in ipairs(top.gr) do
+					if sub.id == "advanced" then advanced = sub; break end
+				end
+				break
+			end
+		end
+		if advanced and advanced.gr and get_console():get_string("r__dlss_status") ~= "" then
+			local already_present = false
+			local smaa_idx = nil
+			for i, row in ipairs(advanced.gr) do
+				if row.id == "dlss_mode" then
+					already_present = true
+					break
+				end
+				if row.id == "smaa" then
+					smaa_idx = i
+				end
+			end
+			if not already_present and smaa_idx then
+				local rows = {
+					{
+						id      = "dlss_mode",
+						type    = "list",
+						val     = 0,
+						cmd     = "r__dlss_mode",
+						content = {
+							{"off", "st_opt_off"},
+							{"dlaa", "ui_mm_dlss_dlaa"},
+							{"quality", "ui_mm_dlss_quality"},
+							{"balanced", "ui_mm_dlss_balanced"},
+							{"performance", "ui_mm_dlss_performance"},
+							{"ultra_performance", "ui_mm_dlss_ultra_performance"},
+						},
+						vid     = true,
+						precondition = {dlss_available},
+					},
+				}
+				for _, reason in ipairs({"not_nvidia", "unsupported", "old_driver", "no_dll", "msaa", "hdr10", "init_failed", "no_sdk"}) do
+					rows[#rows + 1] = {
+						id           = "dlss_off_" .. reason,
+						type         = "desc",
+						text         = "ui_mm_dlss_off_" .. reason,
+						clr          = {255, 200, 200, 200},
+						precondition = {dlss_unavailable, reason},
+					}
+				end
+				for i, row in ipairs(rows) do
+					table.insert(advanced.gr, smaa_idx + i, row)
+				end
+				need_init_opt_coder = true
+			end
+		end
 		if need_init_opt_coder and ui_options.init_opt_coder then
 			ui_options.init_opt_coder()
 		end
