@@ -47,4 +47,7 @@
 	<string id="ui_mm_dlss_off_no_sdk">
 		<text>NVIDIA DLSS недоступен: эта сборка игры собрана без DLSS.</text>
 	</string>
+	<string id="ui_mm_dlss_attribution">
+		<text>»спользует NVIDIAЃ DLSS. NVIDIA, NVIDIA RTX, GeForce RTX и DLSS Ч товарные знаки NVIDIA Corporation.</text>
+	</string>
 </string_table>

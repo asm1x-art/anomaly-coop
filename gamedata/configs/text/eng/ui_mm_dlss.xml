@@ -47,4 +47,7 @@
 	<string id="ui_mm_dlss_off_no_sdk">
 		<text>NVIDIA DLSS is unavailable: this build of the game has no DLSS.</text>
 	</string>
+	<string id="ui_mm_dlss_attribution">
+		<text>Uses NVIDIA® DLSS. NVIDIA, NVIDIA RTX, GeForce RTX and DLSS are trademarks of NVIDIA Corporation.</text>
+	</string>
 </string_table>
