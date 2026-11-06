@@ -179,17 +179,23 @@ local function recover()
 	xr_effects.enable_ui(db.actor, nil)
 end
 
+-- a lone death costs rank_loss % of the rank, back to our own save or to the save point alike
+local function lose_rank()
+	local rank = db.actor:character_rank()
+	local lost = math.floor(rank * coop_rules.number("rank_loss", 10) / 100)
+	if lost > 0 then
+		db.actor:set_character_rank(rank - lost)
+	end
+	return lost
+end
+
 -- no own save: back where we were when the world was last saved
 local function back_to_save_point()
 	coop.fell()
 	stand(1)
 	recover()
 	db.actor.power = 1
-	local rank = db.actor:character_rank()
-	local lost = math.floor(rank * coop_rules.number("rank_loss", 10) / 100)
-	if lost > 0 then
-		db.actor:set_character_rank(rank - lost)
-	end
+	local lost = lose_rank()
 	news(fmt("st_coop_rolled_back", lost))
 	coop_sync.send_event("rolled_back", coop.my_name())
 	printf("[coop] back to the save point, %s rank lost", lost)
@@ -375,6 +381,17 @@ function on_game_start()
 		-- save may have been made while something was killing us
 		if coop.downed(coop.my_id()) then
 			recover()
+			-- the rank as our save has it, less the death's; said once the HUD is up (news at the first update
+			-- don't show), the others told as for a death without a save
+			local lost = lose_rank()
+			printf("[coop] back to our own save after a lone death, %s rank lost", lost)
+			coop_sync.send_event("rolled_back", coop.my_name())
+			CreateTimeEvent("coop_death", "rank_news", 2, function()
+				if db.actor then
+					news(fmt("st_coop_rolled_back_rank", lost))
+				end
+				return true
+			end)
 		else
 			-- a save made during arszi_psy's death scene keeps its flag, and NPCs never see us as an enemy then
 			local m_data = {}
