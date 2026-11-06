@@ -8,7 +8,7 @@ import zlib from 'node:zlib';
 import { startServer } from '../src/server.js';
 import { startAdmin } from '../src/admin.js';
 import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
-import { normalizeSettings, DEFAULT_SETTINGS } from '../src/settings.js';
+import { normalizeSettings, DEFAULT_SETTINGS, settingsText } from '../src/settings.js';
 
 // seed(dataDir): files the server finds when it starts
 async function start(seed = () => {}) {
@@ -45,6 +45,15 @@ test('settings are normalized: bad values fall back, unknown factions dropped, n
   assert.equal('extra' in s.world, false);
   assert.deepEqual(s.factions, ['dolg']);
   assert.deepEqual(normalizeSettings({ factions: [] }).factions, DEFAULT_SETTINGS.factions);
+});
+
+test('the help tasks reward rule: off by default, kept when set, sent to the game as 1/0', () => {
+  assert.equal(DEFAULT_SETTINGS.rules.help_rewards_all, false);
+  const s = normalizeSettings({ rules: { help_rewards_all: true } });
+  assert.equal(s.rules.help_rewards_all, true);
+  assert.equal(normalizeSettings({ rules: { help_rewards_all: 'yes' } }).rules.help_rewards_all, false);
+  assert.match(settingsText(s), /^help_rewards_all=1$/m);
+  assert.match(settingsText(normalizeSettings()), /^help_rewards_all=0$/m);
 });
 
 test('admin: password required, settings saved and kept, players listed', async () => {

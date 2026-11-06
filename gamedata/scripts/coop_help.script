@@ -1,7 +1,7 @@
 -- Co-op: in a group, each member's tasks come to the others as «Помочь с: <task>» (the user's design, Notion
 -- "Личный прогресс"). Such a copy is only a pointer: its title says whose task it is, its spot on the map follows the
 -- owner's target, it ends done when the owner hands the task in, and goes quietly when the owner drops it, fails it,
--- or leaves the group. The giver's reward is the owner's alone.
+-- or leaves the group. The giver's reward is the owner's, the helpers' too if the server's rule help_rewards_all says so.
 -- Story tasks go along the group's common story when the leader turned it on (coop_story.script): copied then only
 -- with it off. Tasks the helper holds too are not copied. [coop_help] in mod_system_coop.ltx.
 --
@@ -148,12 +148,28 @@ local function update_copy(key, h, entry)
 	end
 end
 
+-- the giver's reward for helping too, when the server's rule says so (help_rewards_all): the task's on_complete with
+-- its rewards alone (coop_story.rewards_only), as the group's story steps get theirs
+local function reward(h)
+	if not coop_rules.flag("help_rewards_all", false) then
+		return
+	end
+	local condlist = task_manager.task_ini:r_string_to_condlist(h.id, "on_complete")
+	if condlist then
+		coop_story.rewards_only(condlist, h.id)
+		printf("[coop] helped %s with %s: the giver's reward", h.owner, h.id)
+	end
+end
+
 -- the copy ends at its next check (the engine asks is_done / is_gone)
 local function finish(key, state)
 	local h = helps[key]
 	if h and not h.state then
 		h.state = state
 		debug("%s: %s", key, state)
+		if state == "done" then
+			reward(h)
+		end
 	end
 end
 
