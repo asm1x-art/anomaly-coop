@@ -16,7 +16,7 @@ export const CONFIG_FILE = 'server.cfg';
 // section -> key -> default; the default's type is the value's
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4, builds_file: '',
-    allow_dev: false },
+    allow_dev: false, crash_max_mb: 64 },
   host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
@@ -27,6 +27,7 @@ const LIMITS = {
   admin_port: [0, 65535], // 0: no admin page
   max_players: RULE_LIMITS.max_players,
   autosave_minutes: [0, 24 * 60], // 0: no autosaves
+  crash_max_mb: [0, 1024], // 0: no crash reports from the launchers
 };
 
 const ENV = { COOP_PORT: ['server', 'port'], COOP_HTTP_PORT: ['server', 'admin_port'], COOP_ADMIN_PASSWORD: ['server', 'admin_password'],
@@ -46,6 +47,7 @@ data_dir = data        # где хранится мир; путь от папк�
 max_players = 4        # игроков на сервере одновременно
 builds_file =          # builds.json лаунчера: пускать только выпущенные сборки; пусто — пускать все
 allow_dev = 0          # с builds_file: пускать и сборки «dev» (без лаунчера): 1 — да, 0 — нет
+crash_max_mb = 64      # отчёты о вылетах от лаунчеров (на порт админки, без пароля): размер одного, МБ; 0 — не принимать
 
 [host]
 game_dir =             # папка игры для хоста; пусто — без хоста (мир держит игрок, как раньше)

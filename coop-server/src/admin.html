@@ -68,6 +68,9 @@
   ul.saves li { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
   ul.saves li:first-child { border-top: 0; }
   ul.saves .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  ul.saves li.crash { align-items: flex-start; }
+  ul.saves li.crash q { color: var(--muted); }
+  ul.saves a { color: var(--accent); }
   ul.saves .when { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   ul.saves button { padding: 4px 10px; font-size: 13px; }
   #msg.error { color: var(--danger); }
@@ -103,6 +106,12 @@
     <h2>Логи игроков</h2>
     <p class="note">Логи и дампы вылетов, которые игры прислали сами: при каждом подключении игра отправляет то, что ещё не отправляла (прошлые сессии). Текущую сессию — консольной командой <code>coop_send_logs</code>. Последние 50 у каждого игрока.</p>
     <ul class="saves" id="logs"></ul>
+  </section>
+
+  <section>
+    <h2>Отчёты о вылетах</h2>
+    <p class="note">Их присылает лаунчер, когда игра вылетела и игрок согласился: код ошибки, что он делал, лог этой сессии, дамп и отчёт Windows. Последние 30 у каждого игрока.</p>
+    <ul class="saves" id="crashes"></ul>
   </section>
 
   <section>
@@ -304,6 +313,48 @@
       list.append(li);
     }
   }
+  async function renderCrashes() {
+    const crashes = await api('GET', '/api/crashes');
+    const list = $('crashes');
+    list.replaceChildren();
+    if (!crashes.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Вылетов не было';
+      list.append(li);
+    }
+    for (const c of crashes) {
+      const li = document.createElement('li');
+      li.className = 'crash';
+      const what = document.createElement('span');
+      what.className = 'what';
+      const head = document.createElement('b');
+      head.textContent = `${c.player} · ${c.code || 'без кода'}${c.meaning ? ` — ${c.meaning}` : ''}`;
+      what.append(head);
+      const info = [c.release && `сборка ${c.release}`, c.build_id && c.build_id.slice(0, 8), c.launcher && `лаунчер ${c.launcher}`, c.hint]
+        .filter(Boolean).join(' · ');
+      if (info) what.append(document.createElement('br'), info);
+      if (c.comment) {
+        const q = document.createElement('q');
+        q.textContent = c.comment;
+        what.append(document.createElement('br'), q);
+      }
+      what.append(document.createElement('br'));
+      c.files.forEach((f, i) => {
+        const link = document.createElement('a');
+        link.href = `/api/crash-file?player=${encodeURIComponent(c.player)}&id=${encodeURIComponent(c.id)}&file=${encodeURIComponent(f.name)}`;
+        link.textContent = f.name;
+        what.append(i ? ' · ' : '', link, ` ${size(f.size)}${f.cut ? ' (конец)' : ''}`);
+      });
+      if (!c.files.length) what.append('без файлов');
+      if (c.skipped?.length) what.append(` · не влезло: ${c.skipped.join(', ')}`);
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = new Date(c.received).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      li.append(what, when);
+      list.append(li);
+    }
+  }
   async function rollbackTo(save) {
     if (!confirm(`Вернуть мир и персонажей к сохранению №${save.revision}? Игроки в игре загрузят его заново.`)) return;
     try {
@@ -409,7 +460,8 @@
   refresh(true);
   setInterval(refresh, 5000);
   renderLogs().catch(() => {});
-  setInterval(() => renderLogs().catch(() => {}), 30000);
+  renderCrashes().catch(() => {});
+  setInterval(() => { renderLogs().catch(() => {}); renderCrashes().catch(() => {}); }, 30000);
 </script>
 </body>
 </html>

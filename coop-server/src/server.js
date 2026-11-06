@@ -965,6 +965,15 @@ autosave_minutes=${autosaveMinutes}`));
     logs: () => storage.logs(),
     facts: () => storage.facts(),
     logFile: (player, file) => storage.logFile(player, file),
+    // a crash report from a launcher (admin.js): kept and logged
+    saveCrash(report, files) {
+      const id = storage.saveCrash(report.player, report, files);
+      log(`crash report from '${report.player}': ${report.code}${report.meaning ? ` (${report.meaning})` : ''}, ${files.length} file(s)`
+        + `${report.comment ? `: "${report.comment.slice(0, 120)}"` : ''}`);
+      return id;
+    },
+    crashes: () => storage.crashes(),
+    crashFile: (player, id, file) => storage.crashFile(player, id, file),
     adminPassword: () => storage.adminPassword(),
     saveSettings(settings) {
       storage.saveSettings(settings);

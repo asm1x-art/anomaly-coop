@@ -17,6 +17,10 @@ import { normalizeSettings } from './settings.js';
 //                            a copy, a rollback brings it back
 //   logs/<hex name>/<file>   the logs and crash dumps a player's game sent, the last MAX_LOGS (not the world's:
 //                            a reset keeps them)
+//   crashes/<hex name>/<id>/ a crash report the launcher sent on the player's consent (admin.js POST /crash-report):
+//                            report.json { player, time, code, meaning, comment, build_id, release, launcher, files,
+//                            skipped, received, from } and the files unpacked; the last MAX_CRASHES per player, a
+//                            reset keeps them
 //   progress/<hex name>.bin  a player's own progress (tasks, story, rank...) as the client sent it; saves keep a
 //                            copy of the folder (saves/<revision>/progress/), a rollback brings it back
 //   settings.json           world settings and allowed factions (settings.js), set on the admin page
@@ -37,6 +41,7 @@ import { normalizeSettings } from './settings.js';
 //                            changes are by id)
 export const WORLD_FILES = ['world.scop', 'world.scoc'];
 export const MAX_LOGS = 50; // per player
+export const MAX_CRASHES = 30; // crash reports per player
 export const MAX_TAKEN = 2000; // where a character took its things from, per character
 
 export function openStorage(dir) {
@@ -145,6 +150,54 @@ export function openStorage(dir) {
     logFile(name, f) {
       try {
         return fs.readFileSync(file(path.join('logs', playerDir(name), safeName(f))));
+      } catch {
+        return null;
+      }
+    },
+
+    // id (the time it came, "2026-11-06_17-33-41" UTC, with -2, -3... when taken)
+    saveCrash(name, report, files) {
+      const dir = path.join('crashes', playerDir(name));
+      fs.mkdirSync(file(dir), { recursive: true });
+      const stamp = new Date(report.received).toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+      let id = stamp;
+      for (let n = 2; fs.existsSync(file(path.join(dir, id))); n++) id = `${stamp}-${n}`;
+      const at = path.join(dir, id);
+      fs.mkdirSync(file(at + '.tmp'), { recursive: true });
+      const names = [];
+      for (const f of files) {
+        let n = safeName(f.name);
+        while (names.includes(n) || n === 'report.json') n = '_' + n;
+        names.push(n);
+        fs.writeFileSync(file(path.join(at + '.tmp', n)), f.data);
+      }
+      const meta = { ...report, files: report.files.map((f, i) => ({ ...f, name: names[i] })) };
+      fs.writeFileSync(file(path.join(at + '.tmp', 'report.json')), JSON.stringify(meta, null, 1));
+      fs.renameSync(file(at + '.tmp'), file(at));
+      const kept = fs.readdirSync(file(dir)).filter((d) => !d.endsWith('.tmp')).sort().reverse();
+      for (const old of kept.slice(MAX_CRASHES)) fs.rmSync(file(path.join(dir, old)), { recursive: true, force: true });
+      return id;
+    },
+    // [{ id, player, time, code, meaning, comment, ..., files }], newest first
+    crashes() {
+      if (!fs.existsSync(file('crashes'))) return [];
+      const list = [];
+      for (const dir of fs.readdirSync(file('crashes'))) {
+        for (const id of fs.readdirSync(file(path.join('crashes', dir)))) {
+          if (id.endsWith('.tmp')) continue;
+          try {
+            const meta = JSON.parse(fs.readFileSync(file(path.join('crashes', dir, id, 'report.json')), 'utf8'));
+            list.push({ ...meta, id, player: Buffer.from(dir, 'hex').toString('utf8') });
+          } catch {
+            // half written or not a report
+          }
+        }
+      }
+      return list.sort((a, b) => b.received - a.received);
+    },
+    crashFile(name, id, f) {
+      try {
+        return fs.readFileSync(file(path.join('crashes', playerDir(name), safeName(id), safeName(f))));
       } catch {
         return null;
       }
