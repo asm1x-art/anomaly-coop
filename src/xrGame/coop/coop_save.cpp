@@ -815,6 +815,10 @@ namespace coop
 	{
 		if (is_host()) // a ghost, not a character
 			return;
+		// no actor yet: the game closed while the level was still coming up (the world is ours from the alife load
+		// on); the server keeps the record it had
+		if (!g_actor)
+			return;
 		NET_Packet P;
 		P.w_begin(M_CHARACTER);
 		write_record(P);
