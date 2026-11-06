@@ -103,7 +103,12 @@ end
 
 local STALE_MS = 3000 -- the flags say a window is open, with none on screen, for so long: they are stale
 local stale_since = nil
-local in_main_menu = false -- the main menu's windows (MCM) register too, with no level dialog
+local in_main_menu = nil -- the main menu while it is up: its windows (MCM) register too, with no level dialog
+
+-- the main menu's window while it is up, else nil
+function main_menu()
+	return in_main_menu
+end
 
 local function heal_stale_windows()
 	if in_main_menu or not hud_free() then
@@ -1004,8 +1009,8 @@ function on_game_start()
 			heal_stale_windows()
 		end
 	end)
-	RegisterScriptCallback("main_menu_on_init", function() in_main_menu = true end)
-	RegisterScriptCallback("main_menu_on_quit", function() in_main_menu = false end)
+	RegisterScriptCallback("main_menu_on_init", function(menu) in_main_menu = menu end)
+	RegisterScriptCallback("main_menu_on_quit", function() in_main_menu = nil end)
 	keep_faction()
 	judge_stand_ins()
 	share_world_news()
