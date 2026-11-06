@@ -39,6 +39,12 @@ XRCORE_API void log_vminfo()
 
 size_t xrMemory::mem_usage()
 {
+	// _heapwalk does not lock the heap between its steps: a block another thread frees under the walk (a level's
+	// collision tree is built in the background while the loading stages log "phase cmem") reads as a bad node, and
+	// that was a fatal error for a number that only goes to the log. The heap is locked for the walk (the CRT's heap
+	// is the process heap); a walk that still stops early is only logged.
+	HANDLE heap = GetProcessHeap();
+	HeapLock(heap);
 	_HEAPINFO hinfo = {};
 	int status;
 	size_t bytesUsed = 0;
@@ -47,21 +53,10 @@ size_t xrMemory::mem_usage()
 		if (hinfo._useflag == _USEDENTRY)
 			bytesUsed += hinfo._size;
 	}
-	switch (status)
-	{
-	case _HEAPEMPTY:
-		break;
-	case _HEAPEND:
-		break;
-	case _HEAPBADPTR:
-		FATAL("bad pointer to heap");
-		break;
-	case _HEAPBADBEGIN:
-		FATAL("bad start of heap");
-		break;
-	case _HEAPBADNODE:
-		FATAL("bad node in heap");
-		break;
-	}
+	HeapUnlock(heap);
+	if (status != _HEAPEMPTY && status != _HEAPEND)
+		Msg("! xrMemory::mem_usage: the heap walk stopped early (%s), %lld K counted",
+			status == _HEAPBADPTR ? "bad pointer to heap" : status == _HEAPBADBEGIN ? "bad start of heap" :
+			status == _HEAPBADNODE ? "bad node in heap" : "unknown status", bytesUsed / 1024);
 	return bytesUsed;
 }
