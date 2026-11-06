@@ -252,6 +252,9 @@ void r_taa_frame_begin(bool jitter, bool mv, u32 render_w, u32 render_h, float r
 	g_taa.proj_hud = Device.mProjectHud;
 	g_taa.full_hud = Device.mFullTransformHud;
 
+	// a camera that jumped (a teleport, a cut) leaves nothing on the screen to carry over: the upscaler starts anew
+	g_taa.cut = g_taa.prev_valid && g_taa.prev_pos.distance_to_sqr(Device.vCameraPosition) > _sqr(ps_r__dlss_reset_distance);
+
 	if (mv)
 	{
 		// the models' last-frame matrices (CSkeletonX) go from the last main frame's camera, not the scope's
@@ -299,6 +302,7 @@ void r_taa_frame_end()
 	if (Device.m_SecondViewport.IsSVPFrame())
 		return;
 	g_taa.frame++;
+	g_taa.prev_pos = Device.vCameraPosition;
 	g_taa.prev_view = Device.mView;
 	g_taa.prev_proj = g_taa.proj;
 	g_taa.prev_proj_hud = g_taa.proj_hud;

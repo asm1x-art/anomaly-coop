@@ -22,6 +22,7 @@ struct r_taa_jitter
 	Fmatrix prev_view, prev_proj, prev_proj_hud;
 	bool prev_valid = false;
 	u32 frame = 0; // main frames drawn (the scope's frames in between don't count)
+	Fvector prev_pos = {0.f, 0.f, 0.f}; // the last main frame's camera position
 	bool cut = false; // the camera jumped since the last main frame (a teleport): the upscaler's history is not this scene
 
 	const Fmatrix& project() const { return applied ? proj : Device.mProject; }

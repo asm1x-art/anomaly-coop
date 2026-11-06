@@ -125,7 +125,8 @@ function on_xml_read()
 				break
 			end
 		end
-		if advanced and advanced.gr and get_console():get_string("r__dlss_status") ~= "" then
+		local dlss_status = get_console():get_string("r__dlss_status") -- nil with an exe without DLSS
+		if advanced and advanced.gr and dlss_status and dlss_status ~= "" then
 			local already_present = false
 			local smaa_idx = nil
 			for i, row in ipairs(advanced.gr) do
