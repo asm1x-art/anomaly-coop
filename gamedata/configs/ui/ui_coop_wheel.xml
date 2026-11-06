@@ -1,46 +1,51 @@
 <w>
-	<!-- Co-op: what to do with another player (coop_wheel.script), laid out as the companions' wheel -->
+	<!-- Co-op: what to do with another player (coop_wheel.script): our modern dark wheel, its art from
+	     tools/coop/wheel_ui.py (gamedata/textures/ui/coop/wheel_*.dds). The icons go over the buttons; the hint in
+	     the middle names what the button under the cursor does -->
 	<wheel x="292" y="164" width="440" height="420" stretch="1">
 		<background x="0" y="0" width="440" height="420" stretch="1">
-			<texture>ui_hud2_wheel_ammo</texture>
+			<texture>ui\coop\wheel_bg</texture>
 		</background>
 
-		<box_trade x="225" y="288" width="100" height="100" stretch="1"/>
-		<btn_trade x="225" y="288" width="100" height="100" stretch="1">
-			<texture>ui_companion_trade_btn</texture>
+		<btn_trade x="170" y="15" width="100" height="100" stretch="1">
+			<texture>ui\coop\wheel_btn</texture>
 		</btn_trade>
+		<icon_trade x="192" y="37" width="56" height="56" stretch="1"/>
 
-		<box_group x="107" y="46" width="100" height="100" stretch="1"/>
-		<btn_group x="107" y="46" width="100" height="100" stretch="1">
-			<texture>ui_companion_movement_btn</texture>
+		<btn_group x="308" y="115" width="100" height="100" stretch="1">
+			<texture>ui\coop\wheel_btn</texture>
 		</btn_group>
+		<icon_group x="330" y="137" width="56" height="56" stretch="1"/>
 
-		<box_notes x="114" y="288" width="100" height="100" stretch="1"/>
-		<btn_notes x="114" y="288" width="100" height="100" stretch="1">
-			<texture>ui_companion_loot_btn</texture>
-		</btn_notes>
-
-		<box_routes x="233" y="46" width="100" height="100" stretch="1"/>
-		<btn_routes x="233" y="46" width="100" height="100" stretch="1">
-			<texture>ui_companion_distance_btn</texture>
+		<btn_routes x="255" y="277" width="100" height="100" stretch="1">
+			<texture>ui\coop\wheel_btn</texture>
 		</btn_routes>
+		<icon_routes x="277" y="299" width="56" height="56" stretch="1"/>
 
-		<box_story x="39" y="164" width="100" height="100" stretch="1"/>
-		<btn_story x="39" y="164" width="100" height="100" stretch="1">
-			<texture>ui_companion_stealth_btn</texture>
+		<btn_notes x="85" y="277" width="100" height="100" stretch="1">
+			<texture>ui\coop\wheel_btn</texture>
+		</btn_notes>
+		<icon_notes x="107" y="299" width="56" height="56" stretch="1"/>
+
+		<btn_story x="32" y="115" width="100" height="100" stretch="1">
+			<texture>ui\coop\wheel_btn</texture>
 		</btn_story>
+		<icon_story x="54" y="137" width="56" height="56" stretch="1"/>
 
-		<hint x="140" y="185" width="160" height="70" stretch="1">
-			<text complex_mode="1" r="200" g="200" b="200" align="c" vert_align="c" font="letterica18"/>
+		<hint x="140" y="160" width="160" height="40" stretch="1">
+			<text complex_mode="0" r="226" g="236" b="236" align="c" vert_align="c" font="letterica18"/>
 		</hint>
+		<hint_desc x="146" y="198" width="148" height="66" stretch="1">
+			<text complex_mode="1" r="150" g="170" b="175" align="c" vert_align="t" font="letterica16"/>
+		</hint_desc>
 	</wheel>
 
 	<info x="341" y="589" width="341" height="60" stretch="1">
 		<background x="0" y="0" width="341" height="60" stretch="1">
-			<texture>ui_hud2_wheel_extent</texture>
+			<texture>ui\coop\wheel_plate</texture>
 		</background>
 		<name x="20" y="14" width="300" height="33" stretch="1">
-			<text complex_mode="1" r="200" g="150" b="100" align="c" vert_align="c" font="letterica18"/>
+			<text complex_mode="1" r="46" g="196" b="170" align="c" vert_align="c" font="letterica18"/>
 		</name>
 	</info>
 </w>

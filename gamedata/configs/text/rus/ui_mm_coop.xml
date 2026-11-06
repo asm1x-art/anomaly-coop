@@ -148,6 +148,27 @@
 	<string id="st_coop_group_invited">
 		<text>Приглашение отправлено: %s</text>
 	</string>
+	<string id="st_coop_wheel_trade_d">
+		<text>Предложить обмен вещами и деньгами</text>
+	</string>
+	<string id="st_coop_wheel_invite_d">
+		<text>Позвать игрока в свою группу</text>
+	</string>
+	<string id="st_coop_wheel_kick_d">
+		<text>Убрать игрока из группы (вы лидер)</text>
+	</string>
+	<string id="st_coop_wheel_leave_d">
+		<text>Покинуть группу</text>
+	</string>
+	<string id="st_coop_wheel_notes_d">
+		<text>Отдать копию своих заметок и записок из ПДА</text>
+	</string>
+	<string id="st_coop_wheel_routes_d">
+		<text>Отдать копию открытых вами переходов между локациями</text>
+	</string>
+	<string id="st_coop_wheel_story_d">
+		<text>Предложить свой прогресс сюжета: игрок решит, принять ли</text>
+	</string>
 	<string id="st_coop_wheel_trade">
 		<text>Обмен</text>
 	</string>

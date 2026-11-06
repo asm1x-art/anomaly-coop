@@ -148,6 +148,27 @@
 	<string id="st_coop_group_invited">
 		<text>Invite sent: %s</text>
 	</string>
+	<string id="st_coop_wheel_trade_d">
+		<text>Offer a trade of things and money</text>
+	</string>
+	<string id="st_coop_wheel_invite_d">
+		<text>Invite the player to your group</text>
+	</string>
+	<string id="st_coop_wheel_kick_d">
+		<text>Put the player out of the group (you lead it)</text>
+	</string>
+	<string id="st_coop_wheel_leave_d">
+		<text>Leave the group</text>
+	</string>
+	<string id="st_coop_wheel_notes_d">
+		<text>Give a copy of your PDA notes and letters</text>
+	</string>
+	<string id="st_coop_wheel_routes_d">
+		<text>Give a copy of the routes between levels you opened</text>
+	</string>
+	<string id="st_coop_wheel_story_d">
+		<text>Offer your story progress: they decide whether to take it</text>
+	</string>
 	<string id="st_coop_wheel_trade">
 		<text>Trade</text>
 	</string>
