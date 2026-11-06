@@ -976,6 +976,13 @@ local function judge_stand_ins()
 	end
 
 	RegisterScriptCallback("on_enemy_eval", function(obj, enemy, flags)
+		-- an NPC without its script storage (not bound yet, or being released around a player's death and comeback):
+		-- is_enemy would index a nil storage and crash, so no enemy for it this time
+		if not db.storage[obj:id()] then
+			flags.override = true
+			flags.result = false
+			return
+		end
 		-- a player lying wounded is left be (coop_death.script)
 		local peer = enemy:id() == AC_ID and coop.my_id() or coop.stand_in_peer(enemy:id())
 		if peer ~= 0 and coop.downed(peer) then
