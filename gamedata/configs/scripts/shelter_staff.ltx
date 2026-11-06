@@ -1,4 +1,5 @@
 ; those living in the shelter (shelter_base.script): they hold their place
+; and take no human for an enemy (shelter_assault.script: the army's men with the loners and the rest)
 [logic]
 active = beh@staff
 
@@ -16,3 +17,4 @@ help_wounded_enabled = false
 corpse_detection_enabled = false
 use_camp = false
 invulnerable = true
+combat_ignore_cond = {=shelter_staff_peace} true, false

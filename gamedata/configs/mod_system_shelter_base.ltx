@@ -103,3 +103,31 @@ npc             = sim_default_freedom_4, sim_default_freedom_3, sim_default_free
 [shelter_perim_patrol]:online_offline_group
 faction         = dolg
 npc             = sim_default_duty_3, sim_default_duty_3, sim_default_duty_2
+
+; the Hospital's assault group in the shelter (scripts\shelter_assault.script; the raid's side: mod_system_raid.ltx
+; [raid_rescue_medic], where they stand: its staff_places). Till the medic treats them (a dialog, for treat_items) the
+; fighters are at arrive_health. A suit given to one of them (the dialog opens his things) becomes his look:
+; [shelter_assault_dress] (suit section = model) first, else the suit's model from death_outfits.ltx found in one of
+; dress_folders, in that order. Treated, a fighter's dialog sends the fighters to the post at the shelter's entrance on
+; l10_radar: squad guard_squad at guard_smart, the jobs shelter_door_* (configs\scripts\shelter_perimeter.ltx, made by
+; tools\shelter\perimeter_posts.py), each with his main gun and guard_ammo boxes for it. The medic stays. actor_goodwill:
+; their personal goodwill to the actor (the army hates most factions); they make a truce with the perimeter's squads.
+[shelter_assault]
+target          = medic
+arrive_health   = 0.5
+treat_items     = medkit_army:2, bandage:4
+actor_goodwill  = 5000
+dress_folders   = stalker_soldier, stalker_neutral, stalker_dolg, stalker_freedom, stalker_merc, stalker_nebo, stalker_ecologist, stalker_bandit, stalker_monolith, stalker_hero
+guard_squad     = shelter_assault_guard
+guard_smart     = rad_after_valley
+guard_ammo      = 3
+
+; a suit's look for the group, if the game's own isn't wanted: suit section = model, e.g.
+; military_outfit = actors\stalker_soldier\stalker_soldier_4_skat
+[shelter_assault_dress]
+
+; the post at the entrance: made empty, its men added one by one (shelter_assault.script)
+[shelter_assault_guard]:online_offline_group
+faction         = army
+npc_random      = raid_rescue_assault_soldier_1
+npc_in_squad    = 0, 0
