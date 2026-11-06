@@ -11,7 +11,7 @@ local PERSONAL = {
 	"disguise_npcs_memory", "disguise_state", "drink", "game_statistics", "jobs_guide",
 	"lttz_hb_last_stash_time", "lttz_hb_next_stash_time", "mlr", "multifetch_data", "new_mines", "psy_table", "PsyAntenna", "pump_station_def_csky",
 	"recover_mutant_data_mdata", "RF_freq", "RF_targets", "sleep", "start_wpn_ammo", "stealth_kills",
-	"task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
+	"coop_help", "task_chimera_scan", "task_info", "task_objects", "tasks_fetch_ids", "tasks_rioc", "tasks_veh_destroy",
 }
 
 -- the actor's variables (save_var(db.actor, ...)) that are facts about the world: the save's stay

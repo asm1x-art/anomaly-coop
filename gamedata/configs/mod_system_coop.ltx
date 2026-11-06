@@ -388,3 +388,8 @@ health_min      = 0.3   ; at least this much health (0..1)
 in_raid         = false ; true: autosaves on the raid's levels too
 news            = true  ; a news line «Автосохранение» when it is made
 news_ms         = 4000  ; how long the news line shows (real ms)
+
+; Co-op: a group member's tasks come to the others as "Помочь с: ..." (coop_help.script)
+[coop_help]
+enabled = true
+sync_ms = 2000      ; how often a player's own tasks are compared with what the group was told

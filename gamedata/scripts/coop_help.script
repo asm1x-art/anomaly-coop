@@ -1,0 +1,269 @@
+-- Co-op: in a group, each member's tasks come to the others as «Помочь с: <task>» (the user's design, Notion
+-- "Личный прогресс"). Such a copy is only a pointer: its title says whose task it is, its spot on the map follows the
+-- owner's target, it ends done when the owner hands the task in, and goes quietly when the owner drops it, fails it,
+-- or leaves the group. The giver's reward is the owner's alone.
+-- Story tasks go along the group's common story when the leader turned it on (coop_story.script): copied then only
+-- with it off. Tasks the helper holds too are not copied. [coop_help] in mod_system_coop.ltx.
+--
+-- Events "help": "list" (the owner's tasks in progress: id -> { title, target, icon }, sent when they change and to a
+-- member who asks), "done" / "gone" (a task of the owner's ended), "ask" (a member wants the owner's list again).
+
+local S = "coop_help"
+local PREFIX = "coop_help_"
+local SPOT = "secondary_task_location"
+local ICON = "ui_pda2_mtask_overlay"
+local NO_TARGET = 65535
+
+local helps = {}      -- our copies, key (task id here) -> { owner, id, title, target, icon, state }; kept in m_data
+local told = nil      -- serialized list last sent to the group, nil: send again
+local told_group = "" -- the group it was sent to
+local next_sync = 0
+
+local function enabled()
+	return ini_sys:r_bool_ex(S, "enabled", true)
+end
+
+local function tr(id, ...)
+	return strformat(game.translate_string(id), ...)
+end
+
+local function debug(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop help] " .. fmt, ...)
+	end
+end
+
+local function in_group_with(name)
+	return name ~= coop.my_name() and coop_group.has(name) and coop_group.has(coop.my_name())
+end
+
+local function key_of(owner, id)
+	return PREFIX .. owner .. "_" .. id
+end
+
+----------------------------------------------------------------------------------------------------
+-- The owner: our tasks in progress, told to the group
+
+local function our_tasks()
+	local list = {}
+	local story_shared = coop.group_story()
+	for id, rtask in pairs(task_manager.get_task_manager().task_info) do
+		local t = db.actor:get_task(id, true)
+		if t and not string.find(id, "^" .. PREFIX) and not (rtask.storyline and story_shared) then
+			local target = t:get_map_object_id()
+			list[id] = {
+				title = game.translate_string(rtask.current_title or rtask.title or id),
+				target = target and target < NO_TARGET and target or nil,
+				icon = rtask.icon,
+			}
+		end
+	end
+	return list
+end
+
+local function sync_ours()
+	local group = coop.group()
+	local names = table.concat(group, ",")
+	if #group < 2 then
+		told, told_group = nil, names
+		return
+	end
+	if names ~= told_group then
+		told, told_group = nil, names -- someone came in: the whole list again
+	end
+	local text = coop_sync.serialize(our_tasks())
+	if text ~= told then
+		told = text
+		coop_sync.send_event("help", "list", text)
+		debug("our tasks told to the group (%s characters)", #text)
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- The helper: the copies
+
+local function valid_target(id)
+	return id and id < NO_TARGET and alife_object(id) ~= nil
+end
+
+local function title_of(h)
+	return tr("st_coop_help_title", h.title, h.owner)
+end
+
+-- the task marked active in the PDA: a copy coming in must not take that from the player's own
+local function active_task()
+	for id in pairs(task_manager.get_task_manager().task_info) do
+		local t = db.actor:get_task(id, true)
+		if t and db.actor:is_active_task(t) then
+			return t
+		end
+	end
+	for key in pairs(helps) do
+		local t = db.actor:get_task(key, true)
+		if t and db.actor:is_active_task(t) then
+			return t
+		end
+	end
+end
+
+local function give(key, h)
+	local active = active_task()
+	local t = CGameTask()
+	t:set_id(key)
+	t:set_type(task.additional)
+	t:set_title(title_of(h))
+	t:set_description(tr("st_coop_help_descr", h.owner, h.title))
+	t:set_priority(0)
+	t:set_icon_name(h.icon or ICON)
+	t:add_complete_func("coop_help.is_done")
+	t:add_fail_func("coop_help.is_gone")
+	if valid_target(h.target) then
+		t:set_map_location(SPOT)
+		t:set_map_object_id(h.target)
+	end
+	db.actor:give_task(t, 0, false, 0)
+	if active then
+		db.actor:set_active_task(active)
+	end
+	debug("%s: helping %s with %s", key, h.owner, h.id)
+end
+
+local function update_copy(key, h, entry)
+	local t = db.actor:get_task(key, true)
+	if not t then
+		return
+	end
+	if entry.title ~= h.title then
+		h.title = entry.title
+		t:set_title(title_of(h))
+		t:set_description(tr("st_coop_help_descr", h.owner, h.title))
+	end
+	if entry.target ~= h.target then
+		h.target = entry.target
+		if valid_target(h.target) then
+			t:change_map_location(SPOT, h.target)
+		else
+			t:remove_map_locations(false)
+		end
+	end
+end
+
+-- the copy ends at its next check (the engine asks is_done / is_gone)
+local function finish(key, state)
+	local h = helps[key]
+	if h and not h.state then
+		h.state = state
+		debug("%s: %s", key, state)
+	end
+end
+
+local function on_list(owner, text)
+	local list = coop_sync.deserialize(text)
+	if type(list) ~= "table" then
+		return
+	end
+	for id, entry in pairs(list) do
+		local key = key_of(owner, id)
+		local h = helps[key]
+		if h then
+			update_copy(key, h, entry)
+		elseif not db.actor:get_task(id, true) then -- one we hold ourselves needs no copy
+			h = { owner = owner, id = id, title = entry.title, target = entry.target, icon = entry.icon }
+			helps[key] = h
+			give(key, h)
+		end
+	end
+	for key, h in pairs(helps) do
+		if h.owner == owner and not list[h.id] then
+			finish(key, "gone") -- ended while we didn't hear of it, or dropped
+		end
+	end
+end
+
+local function drop_strangers()
+	for key, h in pairs(helps) do
+		if not in_group_with(h.owner) then
+			finish(key, "gone")
+		end
+	end
+end
+
+-- the engine's checks of our copies
+function is_done(key)
+	return helps[key] ~= nil and helps[key].state == "done"
+end
+
+function is_gone(key)
+	return helps[key] ~= nil and helps[key].state == "gone"
+end
+
+----------------------------------------------------------------------------------------------------
+
+local function on_help(sender, payload)
+	if not (db.actor and enabled() and in_group_with(sender)) then
+		return
+	end
+	local kind, text = string.match(payload, "^([^\t]*)\t?(.*)$")
+	if kind == "list" then
+		on_list(sender, text)
+	elseif kind == "done" or kind == "gone" then
+		finish(key_of(sender, text), kind)
+	elseif kind == "ask" then
+		told = nil -- our list again at the next sync
+	end
+end
+
+local function update()
+	if not (coop and coop.connected() and enabled()) then
+		return
+	end
+	local now = time_global()
+	if now < next_sync then
+		return
+	end
+	next_sync = now + (ini_sys:r_float_ex(S, "sync_ms") or 2000)
+	sync_ours()
+	drop_strangers()
+end
+
+function on_game_start()
+	if not (coop and coop.group and coop_sync and coop_group and task_manager) then
+		return -- not the co-op engine
+	end
+	coop_sync.on_event("help", on_help)
+
+	-- the engine's word on a task's state: ours ended (the group's copies end too), a copy ended (forgotten)
+	local task_callback = task_manager.task_callback
+	task_manager.task_callback = function(tsk, state)
+		local id = tsk and tsk:get_id()
+		if id and string.find(id, "^" .. PREFIX) then
+			if state == task.completed or state == task.fail then
+				helps[id] = nil
+			end
+			return -- not task_manager's
+		end
+		if id and coop.connected() and enabled() and #coop.group() > 1 then
+			if state == task.completed then
+				coop_sync.send_event("help", "done", id)
+			elseif state == task.fail then
+				coop_sync.send_event("help", "gone", id)
+			end
+		end
+		return task_callback(tsk, state)
+	end
+
+	RegisterScriptCallback("save_state", function(m_data)
+		m_data.coop_help = helps
+	end)
+	RegisterScriptCallback("load_state", function(m_data)
+		helps = m_data.coop_help or {}
+	end)
+	RegisterScriptCallback("actor_on_first_update", function()
+		told = nil
+		next_sync = 0
+		if coop.connected() then
+			coop_sync.send_event("help", "ask") -- the others' lists, for copies that may have ended meanwhile
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+end
