@@ -1,4 +1,4 @@
--- The Hospital's assault group in the shelter (docs/coop/shelter.md, "Events"; settings: [shelter_assault] in
+-- The Hospital's assault group in the shelter (https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5, "Events"; settings: [shelter_assault] in
 -- mod_system_shelter_base.ltx, the raid's side: raid_rescue.script, mod_system_raid.ltx [raid_rescue_medic]).
 -- Those who came out of the raid stand on the lower floor by the hermetic gate, the lift's side (raid_rescue spawns
 -- them as staff: rescue_staff_ids_medic). The fighters are still wounded (arrive_health) till the medic Shov treats
