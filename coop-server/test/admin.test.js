@@ -5,17 +5,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { startServer } from '../src/server.js';
-import { startAdmin } from '../src/admin.js';
+import { startAdmin, CRASH_MAGIC } from '../src/admin.js';
 import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
 import { normalizeSettings, DEFAULT_SETTINGS } from '../src/settings.js';
 
 // seed(dataDir): files the server finds when it starts
-async function start(seed = () => {}) {
+async function start(seed = () => {}, adminOptions = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-admin-'));
   seed(dataDir);
   const game = await startServer({ port: 0, host: '127.0.0.1', dataDir, log: () => {} });
-  const admin = await startAdmin({ port: 0, host: '127.0.0.1', password: 'secret', coop: game.coop, log: () => {} });
+  const admin = await startAdmin({ port: 0, host: '127.0.0.1', password: 'secret', coop: game.coop, log: () => {}, ...adminOptions });
   const base = `http://127.0.0.1:${admin.address().port}`;
   const call = (method, url, body, password = 'secret') => fetch(base + url, {
     method,
@@ -25,7 +26,7 @@ async function start(seed = () => {}) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return { game, admin, dataDir, call, close: () => { game.close(); admin.close(); } };
+  return { game, admin, dataDir, call, base, close: () => { game.close(); admin.close(); } };
 }
 
 function join(port, name) {
@@ -152,6 +153,60 @@ test('logs: a game sends them in packed chunks; listed newest first and download
     assert.deepEqual(Buffer.from(await res.arrayBuffer()), big);
     assert.equal((await s.call('GET', `/api/log?player=x&file=nope.log`)).status, 404);
     socket.destroy();
+  } finally {
+    s.close();
+  }
+});
+
+// as launcher/src-tauri/src/crash.rs writes it
+function crashReport(header, files) {
+  const packed = files.map((f) => zlib.gzipSync(f.data));
+  const json = Buffer.from(JSON.stringify({ ...header, files: files.map((f, i) => ({ name: f.name, size: packed[i].length, raw: f.data.length })) }));
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(json.length, 0);
+  return Buffer.concat([Buffer.from(CRASH_MAGIC), len, json, ...packed]);
+}
+
+test('crash reports: taken without the password, listed and downloaded with it, bad ones refused', async () => {
+  const s = await start(() => {}, { crashMaxMb: 1 });
+  try {
+    const post = (body) => fetch(s.base + '/crash-report', { method: 'POST', body });
+    const log = Buffer.from('[17:00:00] load level\n'.repeat(500) + 'FATAL ERROR\n');
+    const dump = crypto.randomBytes(20000);
+    const header = { player: 'Тема Ливси', server: '10.10.0.1:7777', time: 1800000000, exit_code: -1073740940, code: '0xC0000374',
+      meaning: 'повреждение кучи', comment: 'шёл на Агропром', build_id: 'c99183a2e17a5a59', release: '2026.11.06-1', launcher: '0.2.0' };
+    let res = await post(crashReport(header, [{ name: 'xray_artem.log', data: log }, { name: '../evil.mdmp', data: dump }]));
+    assert.equal(res.status, 200);
+    const { id } = await res.json();
+    const list = await (await s.call('GET', '/api/crashes')).json();
+    assert.equal(list.length, 1);
+    assert.equal(list[0].id, id);
+    assert.deepEqual([list[0].player, list[0].code, list[0].comment, list[0].from], ['Тема Ливси', '0xC0000374', 'шёл на Агропром', '127.0.0.1']);
+    assert.deepEqual(list[0].files.map((f) => [f.name, f.size]), [['xray_artem.log', log.length], ['evil.mdmp', dump.length]]);
+    const file = (name) => s.call('GET', `/api/crash-file?player=${encodeURIComponent('Тема Ливси')}&id=${id}&file=${name}`);
+    assert.deepEqual(Buffer.from(await (await file('evil.mdmp')).arrayBuffer()), dump);
+    assert.deepEqual(Buffer.from(await (await file('xray_artem.log')).arrayBuffer()), log);
+    assert.equal((await file('report.json')).status, 200);
+    assert.equal((await s.call('GET', '/api/crashes', null, 'wrong')).status, 401);
+    // not a report, sizes that don't add up, no player, too big
+    assert.equal((await post(Buffer.from('hello world'))).status, 400);
+    const cut = crashReport(header, [{ name: 'a.log', data: log }]);
+    assert.equal((await post(cut.subarray(0, cut.length - 3))).status, 400);
+    assert.equal((await post(crashReport({ ...header, player: ' ' }, []))).status, 400);
+    assert.equal((await post(crashReport(header, [{ name: 'big.mdmp', data: crypto.randomBytes(1100 * 1024) }]))).status, 413);
+    // ten an hour from one address
+    for (let i = 1; i < 10; i++) assert.equal((await post(crashReport(header, []))).status, 200);
+    assert.equal((await post(crashReport(header, []))).status, 429);
+    assert.equal((await (await s.call('GET', '/api/crashes')).json()).length, 10);
+  } finally {
+    s.close();
+  }
+});
+
+test('crash reports off (crash_max_mb = 0): the route asks for the password like any other', async () => {
+  const s = await start(() => {}, { crashMaxMb: 0 });
+  try {
+    assert.equal((await fetch(s.base + '/crash-report', { method: 'POST', body: crashReport({ player: 'x' }, []) })).status, 401);
   } finally {
     s.close();
   }

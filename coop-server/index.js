@@ -37,7 +37,7 @@ if (config.server.admin_port) {
     password = admin.password;
     console.log(admin.created ? `admin page password: ${password} (kept in data/admin.json)` : 'admin page password: see data/admin.json');
   }
-  await startAdmin({ port: config.server.admin_port, password, coop: server.coop });
+  await startAdmin({ port: config.server.admin_port, password, coop: server.coop, crashMaxMb: config.server.crash_max_mb });
 } else console.log('admin page off (admin_port = 0)');
 
 const { token, admins } = config.telegram;
