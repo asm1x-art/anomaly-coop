@@ -503,7 +503,7 @@ local function spawn_wave(t, squad, at)
 	wave.scripted_target = tostring(squad.id)
 	shelter.set_state("rescue_wave_" .. t, wave.id)
 	say("st_raid_rescue_wave_" .. t)
-	printf("raid_rescue: %s wave of %s at %.1f,%.1f,%.1f", t, wave:npc_count(), pos.x, pos.y, pos.z)
+	printf("raid_rescue: %s wave of %s at %s", t, wave:npc_count(), string.format("%.1f, %.1f, %.1f", pos.x, pos.y, pos.z))
 end
 
 local function follow(t, squad)
@@ -522,9 +522,19 @@ local function wave(t, squad)
 	end
 	local id = tonumber(shelter.state("rescue_wave_" .. t, nil))
 	if id then
-		if not raid_monolith.squad_alive(id) then
+		local wave_squad = raid_monolith.squad_alive(id)
+		if not wave_squad then
 			shelter.set_state("rescue_wave_" .. t, nil)
 			follow(t, squad)
+			return
+		end
+		-- a squad sent at a squad walks online only to the graph point nearest to it (here ~35 m short, behind the
+		-- walls): each man not fighting yet is told where one of the group is, and goes for him
+		local group = online_members(squad)
+		for _, npc in ipairs(online_members(wave_squad)) do
+			if #group > 0 and not npc:best_enemy() then
+				npc:make_object_visible_somewhen(group[math.random(#group)])
+			end
 		end
 		return
 	end
