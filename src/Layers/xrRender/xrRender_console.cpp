@@ -154,6 +154,10 @@ int ps_r__upscale_mipbias = 1;
 float r__upscale_mip_bias = 0.f;
 int ps_r__taa_jitter = 0;
 int ps_r__dlss_mv_debug = 0;
+u32 ps_r__dlss_mode = 0;
+xr_token dlss_mode_token[] = {
+	{"off", 0}, {"dlaa", 1}, {"quality", 2}, {"balanced", 3}, {"performance", 4}, {"ultra_performance", 5}, {nullptr, 0}
+};
 float ps_r2_sun_cascade_min_fov = 60.0f;
 // R1
 float ps_r1_ssaLOD_A = 64.f;
@@ -544,6 +548,19 @@ void r_apply_texture_mip_bias()
 		SSManager.SetMipLODBias(r_texture_mip_bias());
 #endif
 }
+
+#if defined(USE_DX11)
+// r__dlss_status: why DLSS can or cannot run here (read-only; the options menu reads it)
+const char* r_dlss_status_name();
+class CCC_dlss_status : public IConsole_Command
+{
+public:
+	CCC_dlss_status(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { Msg("r__dlss_status %s", r_dlss_status_name()); }
+	virtual void Status(TStatus& S) { xr_strcpy(S, r_dlss_status_name()); }
+	virtual void Save(IWriter* F) {}
+};
+#endif
 
 // r__upscale_mipbias: on/off takes effect at once
 class CCC_upscale_mipbias : public CCC_Integer
@@ -1376,6 +1393,10 @@ void xrRender_initconsole()
 	CMD2(CCC_upscale_mipbias, "r__upscale_mipbias", &ps_r__upscale_mipbias); // textures as sharp as at the screen's size when the world is drawn smaller
 	CMD4(CCC_Integer, "r__taa_jitter", &ps_r__taa_jitter, 0, 1); // test: the camera's sub-pixel jitter without an upscaler (the picture shivers)
 	CMD4(CCC_Integer, "r__dlss_mv_debug", &ps_r__dlss_mv_debug, 0, 1); // test: DLSS's motion vectors on the screen (the shaders for them: from game start)
+	CMD3(CCC_Token, "r__dlss_mode", &ps_r__dlss_mode, dlss_mode_token); // NVIDIA DLSS: off/dlaa/quality/balanced/performance/ultra_performance; vid_restart
+#if defined(USE_DX11)
+	CMD1(CCC_dlss_status, "r__dlss_status"); // ok, or why DLSS can't run (not_nvidia, unsupported, old_driver, no_dll, msaa, hdr10, ...)
+#endif
 
 	// R1
 	CMD4(CCC_Float, "r1_ssa_lod_a", &ps_r1_ssaLOD_A, 16, 96);

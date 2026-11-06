@@ -298,6 +298,7 @@ void r_taa_frame_end()
 {
 	if (Device.m_SecondViewport.IsSVPFrame())
 		return;
+	g_taa.frame++;
 	g_taa.prev_view = Device.mView;
 	g_taa.prev_proj = g_taa.proj;
 	g_taa.prev_proj_hud = g_taa.proj_hud;
@@ -318,7 +319,7 @@ void CRender::Render()
 	if (g_taa.mv && m_bSceneDrawn)
 		Target->phase_dlss_mv();
 	if (scaled)
-		Target->scale_end();
+		Target->scale_end(g_taa.on && g_taa.mv && m_bSceneDrawn);
 	r_taa_frame_end();
 }
 

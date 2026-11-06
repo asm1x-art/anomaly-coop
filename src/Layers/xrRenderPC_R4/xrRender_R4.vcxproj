@@ -476,6 +476,7 @@
     <ClInclude Include="blender_lut.h" />
     <ClInclude Include="blender_render_scale.h" />
     <ClInclude Include="blender_dlss.h" />
+    <ClInclude Include="dlss.h" />
     <ClInclude Include="r4_taa.h" />
     <ClInclude Include="blender_nightvision.h" />
     <ClInclude Include="blender_gasmask_drops.h" />
@@ -676,6 +677,7 @@
     <ClCompile Include="blender_lut.cpp" />
     <ClCompile Include="blender_render_scale.cpp" />
     <ClCompile Include="blender_dlss.cpp" />
+    <ClCompile Include="dlss.cpp" />
     <ClCompile Include="blender_nightvision.cpp" />
     <ClCompile Include="blender_gasmask_drops.cpp" />
     <ClCompile Include="blender_gasmask_dudv.cpp" />

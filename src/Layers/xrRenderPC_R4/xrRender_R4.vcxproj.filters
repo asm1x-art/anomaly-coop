@@ -783,6 +783,9 @@
     <ClInclude Include="blender_dlss.h">
       <Filter>Shading templates</Filter>
     </ClInclude>
+    <ClInclude Include="dlss.h">
+      <Filter>Core</Filter>
+    </ClInclude>
     <ClInclude Include="blender_smaa.h">
       <Filter>Shading templates</Filter>
     </ClInclude>
@@ -1462,6 +1465,9 @@
     </ClCompile>
     <ClCompile Include="blender_dlss.cpp">
       <Filter>Shading templates</Filter>
+    </ClCompile>
+    <ClCompile Include="dlss.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\xrRender\rendertarget_phase_lut.cpp">
       <Filter>Core_Target</Filter>

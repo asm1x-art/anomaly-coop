@@ -40,3 +40,5 @@ compressor/mod/
 *~
 
 __pycache__/
+# NVIDIA DLSS SDK: fetched by tools/dlss/get_dlss_sdk.ps1, not redistributed here (NVIDIA RTX SDKs licence)
+src/3rd party/nvngx_dlss/

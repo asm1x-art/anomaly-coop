@@ -19,6 +19,9 @@
 
 #include "D3DX10Core.h"
 #include "r4_taa.h"
+#include "dlss.h"
+
+const char* r_dlss_status_name() { return dlss::status_name(dlss::get_status()); }
 
 CRender RImplementation;
 
@@ -527,8 +530,11 @@ void CRender::create()
 	Msg("- SSS MOTION BLUR SHADER INSTALLED %i", o.ssfx_motionblur);
 	Msg("- SSS TAA SHADER INSTALLED %i", o.ssfx_taa);
 
+	// NVIDIA DLSS (dlss.h): can it run here
+	dlss::init(o.dx10_msaa, o.dx11_hdr10);
+
 	// DLSS's motion vectors written by the G-buffer shaders (dlss_mv.h); DLSS doesn't run with MSAA or HDR10
-	o.dlss_mv = ps_r__dlss_mv_debug && !o.dx10_msaa && !o.dx11_hdr10 && FS.exist(fn, "$game_shaders$", "r3\\dlss_mv", ".h");
+	o.dlss_mv = (dlss::available() || ps_r__dlss_mv_debug) && !o.dx10_msaa && !o.dx11_hdr10 && FS.exist(fn, "$game_shaders$", "r3\\dlss_mv", ".h");
 	Msg("- DLSS motion vectors in the G-buffer %i", o.dlss_mv);
 
 	// constants
@@ -590,6 +596,7 @@ void CRender::destroy()
 	HWOCC.occq_destroy();
 	xr_delete(Models);
 	xr_delete(Target);
+	dlss::shutdown();
 	PSLibrary.OnDestroy();
 	Device.seqFrame.Remove(this);
 	r_dsgraph_destroy();

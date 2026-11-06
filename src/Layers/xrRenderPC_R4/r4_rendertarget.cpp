@@ -28,6 +28,7 @@
 #include "blender_render_scale.h"
 #include "blender_dlss.h"
 #include "r4_taa.h"
+#include "dlss.h"
 
 // HDR10
 #include "blender_hdr10_bloom.h"
@@ -391,11 +392,18 @@ CRenderTarget::CRenderTarget()
 	// they are made), but the ones filled by copying the screen (the PDA's, the second viewport's)
 	display_w = Device.dwWidth;
 	display_h = Device.dwHeight;
-	const bool scaled = ps_r__render_scale < 0.999f && !RImplementation.o.dx10_msaa && !RImplementation.o.dx11_hdr10;
+	// NVIDIA DLSS (dlss.h): the render size NGX recommends for the mode; r__render_scale doesn't count then
+	u32 dlss_w = 0, dlss_h = 0;
+	const bool use_dlss = ps_r__dlss_mode != dlss::mode_off && RImplementation.o.dlss_mv && dlss::available() &&
+		dlss::optimal_size(ps_r__dlss_mode, display_w, display_h, dlss_w, dlss_h);
+	if (ps_r__dlss_mode != dlss::mode_off && !use_dlss)
+		Msg("! r__dlss_mode: DLSS can't run here (%s)", dlss::status_name(dlss::get_status()));
+	const bool scaled = use_dlss ||
+		ps_r__render_scale < 0.999f && !RImplementation.o.dx10_msaa && !RImplementation.o.dx11_hdr10;
 	if (ps_r__render_scale < 0.999f && !scaled)
 		Msg("! r__render_scale: off with MSAA or HDR10");
-	render_w = scaled ? _max(u32(64), u32(display_w * ps_r__render_scale) & ~1u) : display_w;
-	render_h = scaled ? _max(u32(64), u32(display_h * ps_r__render_scale) & ~1u) : display_h;
+	render_w = use_dlss ? dlss_w : scaled ? _max(u32(64), u32(display_w * ps_r__render_scale) & ~1u) : display_w;
+	render_h = use_dlss ? dlss_h : scaled ? _max(u32(64), u32(display_h * ps_r__render_scale) & ~1u) : display_h;
 	if (scaled)
 	{
 		Msg("* r__render_scale %.2f: the world at %ux%u, the screen %ux%u", ps_r__render_scale, render_w, render_h,
@@ -403,8 +411,11 @@ CRenderTarget::CRenderTarget()
 		render_scale_swap_in(render_w, render_h);
 	}
 
-	// the textures' LOD bias follows the world's size: as sharp as at the screen's size (r__upscale_mipbias)
+	// the textures' LOD bias follows the world's size: as sharp as at the screen's size (r__upscale_mipbias); with DLSS
+	// one level more, as NVIDIA recommends (it gathers the detail over the frames)
 	r__upscale_mip_bias = render_w < display_w ? log2f(float(render_w) / float(display_w)) : 0.f;
+	if (use_dlss)
+		r__upscale_mip_bias -= 1.f;
 	r_apply_texture_mip_bias();
 	if (r__upscale_mip_bias != 0.f)
 		Msg("* textures' mip bias %.2f for the world at %ux%u (r__upscale_mipbias %d)", r__upscale_mip_bias, render_w, render_h,
@@ -633,6 +644,9 @@ CRenderTarget::CRenderTarget()
 			rt_dlss_mv.create(r2_RT_dlss_mv, w, h, D3DFMT_G16R16F);
 			rt_dlss_depth.create(r2_RT_dlss_depth, w, h, D3DFMT_R32F);
 		}
+		// DLSS's output at the screen's size (DLSS writes it as an unordered-access view)
+		if (use_dlss)
+			rt_dlss_out.create(r2_RT_dlss_out, display_w, display_h, D3DFMT_A8R8G8B8, 1, true);
 
 		// TODO: R11G11B10F? needs another horrible hack + cast + update to converter function
 		if (RImplementation.o.dx11_hdr10) {
@@ -1380,6 +1394,10 @@ CRenderTarget::CRenderTarget()
 	else
 		b_render_scale = nullptr;
 
+	// the DLSS feature for these sizes
+	dlss_on = use_dlss && rt_dlss_out && dlss::create_feature(ps_r__dlss_mode, render_w, render_h, display_w, display_h);
+	dlss_history = false;
+
 	if (rt_dlss_mv)
 	{
 		b_dlss = xr_new<CBlender_dlss>();
@@ -1410,14 +1428,19 @@ bool CRenderTarget::scale_begin()
 	return true;
 }
 
+u32 CRenderTarget::dlss_frame_index()
+{
+	return g_taa.frame;
+}
+
 bool CRenderTarget::taa_wanted() const
 {
-	return ps_r__taa_jitter != 0;
+	return ps_r__taa_jitter != 0 || dlss_on;
 }
 
 bool CRenderTarget::mv_wanted() const
 {
-	return rt_dlss_mv && ps_r__dlss_mv_debug;
+	return rt_dlss_mv && (ps_r__dlss_mv_debug || dlss_on);
 }
 
 void CRenderTarget::phase_dlss_mv()
@@ -1480,7 +1503,7 @@ void CRenderTarget::phase_dlss_mv()
 	u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, HW.pBaseZB);
 }
 
-void CRenderTarget::scale_end()
+void CRenderTarget::scale_end(bool dlss_wanted)
 {
 	if (!g_render_scale_on)
 		return;
@@ -1489,6 +1512,21 @@ void CRenderTarget::scale_end()
 
 	// the scaled frame stretched over the whole screen (the UI goes on top of it after)
 	u_setrt(Device.dwWidth, Device.dwHeight, HW.pBaseRT, NULL, NULL, NULL);
+
+	// DLSS (with none of its inputs bound as a target now): the frame at the render size + the ones before -> the
+	// screen's size. Its history goes on only if the last main frame went through it too (not after the menu, a loading
+	// screen, a level change...)
+	bool upscaled = false;
+	if (dlss_on && dlss_wanted)
+	{
+		PIX_EVENT(DLSS);
+		const bool reset = !dlss_history || dlss_frame_index() != dlss_frame + 1 || g_taa.cut;
+		upscaled = dlss::evaluate(rt_render_scale->pSurface, rt_dlss_mv->pSurface, rt_dlss_depth->pSurface,
+		                          rt_dlss_out->pSurface, render_w, render_h, g_taa.px.x, g_taa.px.y, reset,
+		                          _max(Device.fTimeDelta * 1000.f, 1.f));
+		dlss_history = upscaled;
+		dlss_frame = dlss_frame_index();
+	}
 	set_viewport_size(HW.pContext, float(Device.dwWidth), float(Device.dwHeight));
 	RCache.set_CullMode(CULL_NONE);
 	RCache.set_Stencil(FALSE);
@@ -1507,7 +1545,10 @@ void CRenderTarget::scale_end()
 	pv->set(w, 0.f, 0.f, 1.f, C, 1.f, 0.f);
 	pv++;
 	RCache.Vertex.Unlock(4, g_menu->vb_stride);
-	RCache.set_Shader(s_render_scale);
+	if (upscaled)
+		RCache.set_Element(s_dlss->E[2]); // DLSS's picture, already the screen's size
+	else
+		RCache.set_Shader(s_render_scale);
 	RCache.set_Geometry(g_menu);
 	RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
 
@@ -1595,6 +1636,7 @@ CRenderTarget::~CRenderTarget()
 	xr_delete(b_lut);
 	xr_delete(b_render_scale);
 	xr_delete(b_dlss);
+	dlss::release_feature();
 	xr_delete(b_smaa);
 
 	// [ SSS Stuff ]
