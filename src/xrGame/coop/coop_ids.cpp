@@ -69,6 +69,50 @@ namespace coop
 		}
 	}
 
+	// An id whose object the client hasn't destroyed yet (a bolt of an NPC gone offline this frame): a new object
+	// with it fails to spawn ("Object with ID already exists"), and a stand-in failing so corrupted the heap. Such
+	// ids go back to the end of the block's line.
+	static u16 take_from_block(xrServer& server, u16 block)
+	{
+		for (u32 tries = server.free_ids_in_block(block); tries; --tries)
+		{
+			const u16 id = server.PerformIDgenFromBlock(block);
+			if (id == NO_BLOCK || !g_pGameLevel || !Level().Objects.net_Find(id))
+				return id;
+			server.FreeID(id, Device.TimerAsync());
+		}
+		return NO_BLOCK;
+	}
+
+	static u16 take_from_blocks(xrServer& server)
+	{
+		for (u32 min_free : {REUSE_MIN_FREE, 1u})
+			for (u16 block : g_blocks)
+			{
+				if (server.free_ids_in_block(block) < min_free)
+					continue;
+				const u16 id = take_from_block(server, block);
+				if (id != NO_BLOCK)
+					return id;
+			}
+		return NO_BLOCK;
+	}
+
+	// A burst (a new character's game re-making ~2000 world items in one frame) uses our blocks up before the
+	// next grant comes with the frame's messages. The local generator would then hand out ids of other players'
+	// blocks, and their own objects with those ids clash with ours: wait for the grant right here instead.
+	static void wait_for_block(const xrServer& server)
+	{
+		if (!g_request_pending)
+			send_request(server);
+		if (!wait_for_messages([] { return !g_request_pending; }, WAIT_MS, {M_ID_BLOCK_GRANT}))
+		{
+			Msg("! [coop] no new id block from the server in time");
+			g_gave_up_waiting = true;
+			g_request_pending = false; // update_id_blocks asks again
+		}
+	}
+
 	u16 allocate_id(xrServer& server)
 	{
 		// a new game that is yet to become the world on an empty server makes its objects as usual
@@ -78,22 +122,26 @@ namespace coop
 		if (g_blocks.empty() && !g_gave_up_waiting && !g_server_exhausted)
 			acquire_first_block(server);
 
-		for (u32 min_free : {REUSE_MIN_FREE, 1u})
-			for (u16 block : g_blocks)
+		u16 id = take_from_blocks(server);
+		if (id == NO_BLOCK && !g_blocks.empty() && !g_gave_up_waiting && !g_server_exhausted && is_connected())
+		{
+			wait_for_block(server);
+			id = take_from_blocks(server);
+		}
+
+		if (id != NO_BLOCK)
+		{
+			if (!g_first_logged)
 			{
-				if (server.free_ids_in_block(block) < min_free)
-					continue;
-				u16 id = server.PerformIDgenFromBlock(block);
-				if (id != u16(-1))
-				{
-					if (!g_first_logged)
-					{
-						Msg("[coop] first new id from a leased block: %u", id);
-						g_first_logged = true;
-					}
-					return id;
-				}
+				Msg("[coop] first new id from a leased block: %u", id);
+				g_first_logged = true;
 			}
+			// ask for the next block now, not on the next frame: a burst may need it before then
+			if (!g_request_pending && !g_server_exhausted && is_connected() && ai().get_alife() &&
+			    free_in_owned_blocks(server) < LOW_RESERVE)
+				send_request(server);
+			return id;
+		}
 
 		// the object still gets created, but another client may reuse this id for something else
 		if (++g_fallbacks <= 10)
