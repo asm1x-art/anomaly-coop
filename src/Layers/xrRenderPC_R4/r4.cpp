@@ -18,6 +18,10 @@
 #include "../../xrCore/ShaderSourceCRC.h"
 
 #include "D3DX10Core.h"
+#include "r4_taa.h"
+#include "dlss.h"
+
+const char* r_dlss_status_name() { return dlss::status_name(dlss::get_status()); }
 
 CRender RImplementation;
 
@@ -129,6 +133,18 @@ static class cl_pos_decompress_params : public R_constant_setup
 		             (2.0f * VertTan) / (float)Device.dwHeight);
 	}
 } binder_pos_decompress_params;
+
+// dlss_mv.h: this frame's camera jitter in clip space (r4_taa.h), taken back out of the models' motion
+static class cl_dlss_jitter : public R_constant_setup
+{
+	virtual void setup(R_constant* C)
+	{
+		if (g_taa.on)
+			RCache.set_c(C, g_taa.ndc.x, g_taa.ndc.y, 0.f, 0.f);
+		else
+			RCache.set_c(C, 0.f, 0.f, 0.f, 0.f);
+	}
+} binder_dlss_jitter;
 
 static class cl_pos_decompress_params2 : public R_constant_setup
 {
@@ -514,6 +530,13 @@ void CRender::create()
 	Msg("- SSS MOTION BLUR SHADER INSTALLED %i", o.ssfx_motionblur);
 	Msg("- SSS TAA SHADER INSTALLED %i", o.ssfx_taa);
 
+	// NVIDIA DLSS (dlss.h): can it run here
+	dlss::init(o.dx10_msaa, o.dx11_hdr10);
+
+	// DLSS's motion vectors written by the G-buffer shaders (dlss_mv.h); DLSS doesn't run with MSAA or HDR10
+	o.dlss_mv = (dlss::available() || ps_r__dlss_mv_debug) && !o.dx10_msaa && !o.dx11_hdr10 && FS.exist(fn, "$game_shaders$", "r3\\dlss_mv", ".h");
+	Msg("- DLSS motion vectors in the G-buffer %i", o.dlss_mv);
+
 	// constants
 	CResourceManager* RM = dxRenderDeviceRender::Instance().Resources;
 	RM->RegisterConstantSetup("parallax", &binder_parallax);
@@ -522,6 +545,7 @@ void CRender::create()
 	RM->RegisterConstantSetup("m_AlphaRef", &binder_alpha_ref);
 	RM->RegisterConstantSetup("pos_decompression_params", &binder_pos_decompress_params);
 	RM->RegisterConstantSetup("pos_decompression_params2", &binder_pos_decompress_params2);
+	RM->RegisterConstantSetup("m_dlss_jitter", &binder_dlss_jitter);
 	RM->RegisterConstantSetup("triLOD", &binder_LOD);
 	RM->RegisterConstantSetup("hmodel_stuff", &binder_meatchunks_stuff);
 
@@ -572,6 +596,7 @@ void CRender::destroy()
 	HWOCC.occq_destroy();
 	xr_delete(Models);
 	xr_delete(Target);
+	dlss::shutdown();
 	PSLibrary.OnDestroy();
 	Device.seqFrame.Remove(this);
 	r_dsgraph_destroy();
@@ -1861,6 +1886,16 @@ HRESULT CRender::shader_compile(
 	def_it++;
 	sh_name[len] = '1';
 	++len;
+
+	// DLSS's motion vectors (dlss_mv.h); the cache name gets a letter only then, the other builds keep theirs
+	if (o.dlss_mv)
+	{
+		defines[def_it].Name = "DLSS_MV";
+		defines[def_it].Definition = "1";
+		def_it++;
+		sh_name[len] = 'M';
+		++len;
+	}
 
 	//Be carefull!!!!! this should be at the end to correctly generate
 	//compiled shader name;

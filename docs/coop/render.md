@@ -32,6 +32,17 @@
   - бой 8 на 8: 80–130 fps. Отрисовка в основном потоке 3–4 мс, ИИ сталкеров 2.5, кости 1.0, Lua-обработчики 0.8. Второй поток ~7.5 мс за кадр простаивает.
 - Открыто: редкий рывок 0.6–0.8 с в `accum_direct_cascade`; один рывок 0.78 с в очереди таймеров Lua.
 
+## 6. NVIDIA DLSS (ветка dlss, 2026-11-06)
+
+Этапы (каждый — свой коммит): mip bias → дрожание камеры → векторы движения → NGX DLSS → меню → доводка. Разбор с объяснениями — Notion «Движок: DLSS и FSR3 — разбор кода».
+
+- **Консоль.** `r__dlss_mode off|dlaa|quality|balanced|performance|ultra_performance` (+ `vid_restart`, по умолчанию off, сохраняется в user.ltx). `r__dlss_status` — только чтение: `ok` или причина (`not_nvidia`, `unsupported`, `old_driver`, `no_dll`, `msaa`, `hdr10`, `init_failed`, `no_sdk`, `headless`). Отладка: `r__taa_jitter 1` (дрожание без апскейлера), `r__dlss_mv_debug 1` (векторы движения на экране; шейдеры для них — с запуска игры), `r__upscale_mipbias 0/1`, `r__dlss_reset_distance` (м за кадр: дальше — сброс истории DLSS, телепорт).
+- **Меню.** Видео → Дополнительно, после SMAA (`ui_options_modded_exes.script`, тексты `configs/text/*/ui_mm_dlss.xml`). Если DLSS не может работать, вместо пункта — строка с причиной.
+- **SDK.** В репозитории его нет (лицензия NVIDIA). `tools/dlss/get_dlss_sdk.ps1` кладёт SDK 310.9.16 в `src/3rd party/nvngx_dlss` (gitignore). Без него движок собирается с DLSS off (`no_sdk`). В игру: `nvngx_dlss.dll` и `LICENSE.txt` (как `DLSS-LICENSE.txt`) рядом с exe.
+- **Кадр.** `CRender::Render`: `scale_begin` → `r_taa_frame_begin` (дрожание Halton 2,3 в `Device.mProject`/`mProjectHud`, матрицы прошлого кадра) → `Render_scene` → `r_taa_jitter_end` → `phase_dlss_mv` (векторы + глубина из G-буфера) → `scale_end` (DLSS → `rt_dlss_out` → на экран) → `r_taa_frame_end`. UI — после, в полном разрешении.
+- **Векторы движения.** Модели (`deffer_model_*.vs`, кости прошлого кадра `sbones_array_prev`, `m_wvp_prev`) пишут свои в 4-ю цель G-буфера (`rt_ssfx_motion_vectors`, формат SSS). Остальное — по глубине и прошлой камере (`dlss_mv.ps`). Шейдеры G-буфера — копии ванильных Anomaly 1.5.3 с правками под `#ifdef DLSS_MV` (движок задаёт его, когда DLSS может работать).
+- **Вход DLSS** — готовая картинка после тонмапинга и пост-эффектов (режим LDR, без экспозиции). SMAA, TAA SSS и AA комбайна при DLSS выключены. MSAA и HDR10 с DLSS не работают.
+
 ## Дальше
 LTCG, затем дорогие части боя: отрисовка, ИИ, кости (перенос во второй поток или пул). Потом перенос из OGSR и IX-Ray: отчёт `study_anim_light.md` (папка H:/stalker-test/ref).
 

@@ -15,6 +15,9 @@
 #include "../../xrEngine/shader_bus.h"
 
 #include "dxRenderDeviceRender.h"
+#if defined(USE_DX11)
+#include "../xrRenderPC_R4/r4_taa.h"
+#endif
 
 // matrices
 #define	BIND_DECLARE(xf)	\
@@ -1163,7 +1166,8 @@ static class ssfx_jitter : public R_constant_setup
 		float JitterY = 0;
 
 #if defined(USE_DX11)
-		if (ps_ssfx_taa.x > 0 && RImplementation.o.ssfx_taa)
+		// not with our own jitter (r4_taa.h, already in the projection) on top of it
+		if (ps_ssfx_taa.x > 0 && RImplementation.o.ssfx_taa && !g_taa.on)
 		{
 			static Fvector2 TAA_Offset[4] = 
 			{

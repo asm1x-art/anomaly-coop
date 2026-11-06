@@ -4,6 +4,7 @@
 #include "../../xrEngine/environment.h"
 
 #include "../xrRender/dxEnvironmentRender.h"
+#include "r4_taa.h"
 
 #define STENCIL_CULL 0
 
@@ -44,6 +45,8 @@ void CRenderTarget::phase_combine()
 	PIX_EVENT(phase_combine);
 	
 	bool ssfx_PrevPos_Requiered = false;
+	// DLSS anti-aliases this frame: SMAA, SSS's TAA and the combine's edge AA stay off (r4_taa.h)
+	const bool dlss_aa = dlss_on && g_taa.on;
 
 	//	TODO: DX10: Remove half poxel offset
 	bool _menu_pp = g_pGamePersistent ? g_pGamePersistent->OnRenderPPUI_query() : false;
@@ -93,8 +96,8 @@ void CRenderTarget::phase_combine()
 			saved_position.set(Device.vCameraPosition);
 
 			Matrix_previous.mul(m_saved_viewproj, Device.mInvView);
-			Matrix_current.set(Device.mProject);
-			m_saved_viewproj.set(Device.mFullTransform);
+			Matrix_current.set(g_taa.project()); // without the jitter (r4_taa.h)
+			m_saved_viewproj.set(g_taa.full_transform());
 		}
 		float scale = ps_r2_mblur / 2.f;
 		m_blur_scale.set(scale, -scale).div(12.f);
@@ -575,14 +578,14 @@ void CRenderTarget::phase_combine()
 	}
 
     //SMAA
-	if (ps_smaa_quality)
+	if (ps_smaa_quality && !dlss_aa)
 	{
         //PIX_EVENT(SMAA);
         phase_smaa();
         RCache.set_Stencil(FALSE);
     }    
 	
-	if (RImplementation.o.ssfx_taa && ps_ssfx_taa.x > 0)
+	if (RImplementation.o.ssfx_taa && ps_ssfx_taa.x > 0 && !dlss_aa)
 	{
 		phase_ssfx_taa();
 	}
@@ -683,7 +686,7 @@ void CRenderTarget::phase_combine()
 		// Draw COLOR
 		if (!RImplementation.o.dx10_msaa)
 		{
-			if (ps_r2_ls_flags.test(R2FLAG_AA)) RCache.set_Element(s_combine->E[bDistort ? 3 : 1]);
+			if (ps_r2_ls_flags.test(R2FLAG_AA) && !dlss_aa) RCache.set_Element(s_combine->E[bDistort ? 3 : 1]);
 				// look at blender_combine.cpp
 			else RCache.set_Element(s_combine->E[bDistort ? 4 : 2]); // look at blender_combine.cpp
 		}

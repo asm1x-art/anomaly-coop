@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!-- NVIDIA DLSS in the video options (ui_options_modded_exes.script) -->
+<string_table>
+	<string id="ui_mm_video_advanced_dlss_mode">
+		<text>NVIDIA DLSS</text>
+	</string>
+	<string id="ui_mm_video_advanced_dlss_mode_desc">
+		<text>NVIDIA DLSS anti-aliasing and upscaling (GeForce RTX cards). DLAA: anti-aliasing at full resolution, the best quality. Quality, Balanced, Performance, Ultra Performance: the world is drawn at a lower resolution and rebuilt to the screen's; easier on the video card (not on the CPU: no extra frames in fights). MSAA, SMAA and TAA don't work with DLSS. Applied with a video restart.</text>
+	</string>
+	<string id="ui_mm_dlss_dlaa">
+		<text>DLAA</text>
+	</string>
+	<string id="ui_mm_dlss_quality">
+		<text>Quality</text>
+	</string>
+	<string id="ui_mm_dlss_balanced">
+		<text>Balanced</text>
+	</string>
+	<string id="ui_mm_dlss_performance">
+		<text>Performance</text>
+	</string>
+	<string id="ui_mm_dlss_ultra_performance">
+		<text>Ultra Performance</text>
+	</string>
+	<string id="ui_mm_dlss_off_not_nvidia">
+		<text>NVIDIA DLSS is unavailable: it needs an NVIDIA GeForce RTX video card.</text>
+	</string>
+	<string id="ui_mm_dlss_off_unsupported">
+		<text>NVIDIA DLSS is unavailable: this video card doesn't support it (GeForce RTX needed).</text>
+	</string>
+	<string id="ui_mm_dlss_off_old_driver">
+		<text>NVIDIA DLSS is unavailable: update the NVIDIA video driver.</text>
+	</string>
+	<string id="ui_mm_dlss_off_no_dll">
+		<text>NVIDIA DLSS is unavailable: nvngx_dlss.dll is missing from the game's bin folder.</text>
+	</string>
+	<string id="ui_mm_dlss_off_msaa">
+		<text>NVIDIA DLSS is unavailable with MSAA on: turn MSAA off and restart the game.</text>
+	</string>
+	<string id="ui_mm_dlss_off_hdr10">
+		<text>NVIDIA DLSS is unavailable with HDR10 output on.</text>
+	</string>
+	<string id="ui_mm_dlss_off_init_failed">
+		<text>NVIDIA DLSS is unavailable: NVIDIA NGX did not start (see the game's log).</text>
+	</string>
+	<string id="ui_mm_dlss_off_no_sdk">
+		<text>NVIDIA DLSS is unavailable: this build of the game has no DLSS.</text>
+	</string>
+	<string id="ui_mm_dlss_attribution">
+		<text>Uses NVIDIA® DLSS. NVIDIA, NVIDIA RTX, GeForce RTX and DLSS are trademarks of NVIDIA Corporation.</text>
+	</string>
+</string_table>

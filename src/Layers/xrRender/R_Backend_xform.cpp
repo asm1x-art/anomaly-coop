@@ -2,6 +2,9 @@
 #pragma hdrstop
 
 #include "r_backend_xform.h"
+#if defined(USE_DX11)
+#include "../xrRenderPC_R4/r4_taa.h"
+#endif
 
 void R_xforms::set_W(const Fmatrix& m)
 {
@@ -14,6 +17,12 @@ void R_xforms::set_W(const Fmatrix& m)
 	m_bInvWValid = false;
 	if (c_invw) apply_invw();
 	RCache.set_xform(D3DTS_WORLD, m);
+#if defined(USE_DX11)
+	// DLSS's motion vectors (r4_taa.h): an object's last world matrix is taken for its current one (the camera's motion
+	// only); skinned models set their own (CSkeletonX). Otherwise m_wvp_prev would hold whatever object came before.
+	if (g_taa.mv && !RImplementation.o.ssfx_motionvectors)
+		set_W_prev(m);
+#endif
 }
 
 void R_xforms::set_V(const Fmatrix& m)

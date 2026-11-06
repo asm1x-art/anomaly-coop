@@ -74,6 +74,7 @@ public:
 		u32 ssfx_motionblur : 1;
 		u32 ssfx_taa : 1;
 		u32 ssfx_motionvectors : 1;
+		u32 dlss_mv : 1; // the G-buffer shaders write motion vectors (DLSS_MV, dlss_mv.h): DLSS can run, or r__dlss_mv_debug
 		u32 ssfx_glass : 1;
 
 		u32 bug : 1;
@@ -196,6 +197,7 @@ public:
 
 	bool m_bMakeAsyncSS;
 	bool m_bFirstFrameAfterReset; // Determines weather the frame is the first after resetting device.
+	bool m_bSceneDrawn = false; // Render_scene drew the level this frame (not the menu): the G-buffer is fresh
 	xr_vector<sun::cascade> m_sun_cascades;
 
 private:

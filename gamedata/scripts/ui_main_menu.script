@@ -56,6 +56,17 @@ function main_menu:InitControls()
 	end
 	_ver:TextControl():SetText		(game.translate_string("ui_st_game_version") .. flavor_name .. (DEV_DEBUG and " (Debug mode - Press F1 for help)" or ""))
 
+	-- NVIDIA DLSS attribution (NVIDIA RTX SDKs licence, supplement 7.1(b)): the SDK named with NVIDIA's marks, in text,
+	-- one line above the version, whenever the exe has DLSS in it (r__dlss_status other than no_sdk)
+	local dlss_status = get_console():get_string("r__dlss_status")
+	if dlss_status and dlss_status ~= "" and dlss_status ~= "no_sdk" then
+		local _dlss = xml:InitStatic	("static_version",self)
+		local pos = _ver:GetWndPos()
+		_dlss:SetWndPos					(vector2():set(pos.x, pos.y - 18))
+		_dlss:TextControl():SetTextColor(GetARGB(140, 190, 190, 190))
+		_dlss:TextControl():SetText		(game.translate_string("ui_mm_dlss_attribution"))
+	end
+
 	--local _disc = xml:InitStatic    ("static_disclaimer",self)
 	--_disc:TextControl():SetTextColor(GetARGB(223, 223, 223, 223))
 	--_disc:TextControl():SetText     (game.translate_string("ui_mm_disclaimer"))

@@ -235,6 +235,18 @@ public:
 	ref_rt rt_render_scale;
 	ref_rt rt_render_scale_z;
 	u32 render_w = 0, render_h = 0;
+	u32 display_w = 0, display_h = 0; // the screen's size
+
+	// DLSS: motion vectors and depth at the render size (phase_dlss_mv), its output at the screen's size
+	ref_rt rt_dlss_mv;
+	ref_rt rt_dlss_depth;
+	ref_rt rt_dlss_out;
+	IBlender* b_dlss = nullptr;
+	ref_shader s_dlss;
+	bool dlss_on = false; // DLSS upscales this size's frames (dlss.h)
+	bool dlss_history = false; // its last frame was the one before this
+	u32 dlss_frame = 0; // the main frame it last made (r_taa_jitter::frame)
+	static u32 dlss_frame_index();
 
 	ref_shader s_ssfx_dumb;
 
@@ -475,7 +487,14 @@ public:
 
 	// render scale: true when the frame is now drawn at the render size (and scale_end must follow)
 	bool scale_begin();
-	void scale_end();
+	// dlss_wanted: this frame is the main view's, jittered, with motion vectors: DLSS makes the screen's picture
+	void scale_end(bool dlss_wanted = false);
+	// the frame is jittered (r4_taa.h): r__taa_jitter for a test, or for the upscaler
+	bool taa_wanted() const;
+	// the frame makes motion vectors (r4_taa.h): r__dlss_mv_debug, or for the upscaler
+	bool mv_wanted() const;
+	// motion vectors and depth for DLSS from the G-buffer; r__dlss_mv_debug draws them over the frame
+	void phase_dlss_mv();
 
 	// HDR10
 	void phase_hdr10_bloom();

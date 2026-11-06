@@ -75,6 +75,9 @@
 #define		r2_RT_scopert		"$user$scopeRT" //crookr
 #define		r2_RT_render_scale	"$user$render_scale"	// the frame at the render scale, before it is stretched to the screen
 #define		r2_RT_render_scale_z "$user$render_scale_z"	// its depth buffer
+#define		r2_RT_dlss_mv		"$user$dlss_mv"		// DLSS: motion vectors, render pixels to where each was a frame ago (R16G16F)
+#define		r2_RT_dlss_depth	"$user$dlss_depth"	// DLSS: depth 0..1 (R32F)
+#define		r2_RT_dlss_out		"$user$dlss_out"	// DLSS: its output at the screen's size
 #define		r2_RT_heat			"$user$heat" //--DSR-- HeatVision
 
 #define		r2_RT_smaa_edgetex "$user$smaa_edgetex"

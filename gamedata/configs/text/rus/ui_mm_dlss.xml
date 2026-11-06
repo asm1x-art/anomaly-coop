@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!-- NVIDIA DLSS in the video options (ui_options_modded_exes.script) -->
+<string_table>
+	<string id="ui_mm_video_advanced_dlss_mode">
+		<text>NVIDIA DLSS</text>
+	</string>
+	<string id="ui_mm_video_advanced_dlss_mode_desc">
+		<text>Сглаживание и масштабирование NVIDIA DLSS (видеокарты GeForce RTX). DLAA: сглаживание в полном разрешении, лучшее качество. Качество, Баланс, Производительность, Ультрапроизводительность: мир рисуется в меньшем разрешении и восстанавливается до экранного, видеокарте легче (процессору нет: в боях кадров не прибавит). С DLSS не работают MSAA, SMAA и TAA. Меняется с перезапуском видео.</text>
+	</string>
+	<string id="ui_mm_dlss_dlaa">
+		<text>DLAA</text>
+	</string>
+	<string id="ui_mm_dlss_quality">
+		<text>Качество</text>
+	</string>
+	<string id="ui_mm_dlss_balanced">
+		<text>Баланс</text>
+	</string>
+	<string id="ui_mm_dlss_performance">
+		<text>Производительность</text>
+	</string>
+	<string id="ui_mm_dlss_ultra_performance">
+		<text>Ультрапроизводительность</text>
+	</string>
+	<string id="ui_mm_dlss_off_not_nvidia">
+		<text>NVIDIA DLSS недоступен: нужна видеокарта NVIDIA GeForce RTX.</text>
+	</string>
+	<string id="ui_mm_dlss_off_unsupported">
+		<text>NVIDIA DLSS недоступен: эта видеокарта его не поддерживает (нужна GeForce RTX).</text>
+	</string>
+	<string id="ui_mm_dlss_off_old_driver">
+		<text>NVIDIA DLSS недоступен: обновите драйвер видеокарты NVIDIA.</text>
+	</string>
+	<string id="ui_mm_dlss_off_no_dll">
+		<text>NVIDIA DLSS недоступен: в папке игры bin нет файла nvngx_dlss.dll.</text>
+	</string>
+	<string id="ui_mm_dlss_off_msaa">
+		<text>NVIDIA DLSS недоступен при включённом MSAA: выключите MSAA и перезапустите игру.</text>
+	</string>
+	<string id="ui_mm_dlss_off_hdr10">
+		<text>NVIDIA DLSS недоступен при включённом выводе HDR10.</text>
+	</string>
+	<string id="ui_mm_dlss_off_init_failed">
+		<text>NVIDIA DLSS недоступен: не удалось запустить NVIDIA NGX (подробности в логе игры).</text>
+	</string>
+	<string id="ui_mm_dlss_off_no_sdk">
+		<text>NVIDIA DLSS недоступен: эта сборка игры собрана без DLSS.</text>
+	</string>
+	<string id="ui_mm_dlss_attribution">
+		<text>Использует NVIDIA® DLSS. NVIDIA, NVIDIA RTX, GeForce RTX и DLSS — товарные знаки NVIDIA Corporation.</text>
+	</string>
+</string_table>

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "r4_taa.h"
 
 // startup
 void CRenderTarget::phase_scene_prepare()
@@ -17,6 +18,10 @@ void CRenderTarget::phase_scene_prepare()
 		//--DSR-- HeatVision_start
 		HW.pContext->ClearRenderTargetView(rt_Heat->pRT, ColorRGBA);
 		//--DSR-- HeatVision_end
+
+		// DLSS's motion vectors: only the models write them, the rest stays 0 (the camera's motion, dlss_mv.h)
+		if (g_taa.mv && !RImplementation.o.ssfx_motionvectors)
+			HW.pContext->ClearRenderTargetView(rt_ssfx_motion_vectors->pRT, ColorRGBA);
 
 		if (!RImplementation.o.dx10_msaa)
 			HW.pContext->ClearDepthStencilView(HW.pBaseZB, D3D_CLEAR_DEPTH | D3D_CLEAR_STENCIL, 1.0f, 0);

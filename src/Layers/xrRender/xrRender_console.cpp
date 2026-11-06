@@ -150,6 +150,16 @@ float ps_r__ssaHZBvsTEX = 96.f; //RO
 int ps_r__tf_Anisotropic = 8;
 float ps_r__tf_Mipbias = 0.0f;
 float ps_r__render_scale = 1.0f;
+int ps_r__upscale_mipbias = 1;
+float r__upscale_mip_bias = 0.f;
+int ps_r__taa_jitter = 0;
+int ps_r__dlss_mv_debug = 0;
+u32 ps_r__dlss_mode = 0;
+float ps_r__dlss_reset_distance = 5.f;
+int ps_r__dlss_jitter_conf = 0;
+xr_token dlss_mode_token[] = {
+	{"off", 0}, {"dlaa", 1}, {"quality", 2}, {"balanced", 3}, {"performance", 4}, {"ultra_performance", 5}, {nullptr, 0}
+};
 float ps_r2_sun_cascade_min_fov = 60.0f;
 // R1
 float ps_r1_ssaLOD_A = 64.f;
@@ -529,6 +539,45 @@ int opt_dynamic = 2;
 #include "../xrRenderDX10/StateManager/dx10SamplerStateCache.h"
 #endif	//	USE_DX10
 
+float r_texture_mip_bias()
+{
+	return ps_r__tf_Mipbias + (ps_r__upscale_mipbias ? r__upscale_mip_bias : 0.f);
+}
+
+void r_apply_texture_mip_bias()
+{
+#if defined(USE_DX10) || defined(USE_DX11)
+	if (HW.pDevice)
+		SSManager.SetMipLODBias(r_texture_mip_bias());
+#endif
+}
+
+#if defined(USE_DX11)
+// r__dlss_status: why DLSS can or cannot run here (read-only; the options menu reads it)
+const char* r_dlss_status_name();
+class CCC_dlss_status : public IConsole_Command
+{
+public:
+	CCC_dlss_status(LPCSTR N) : IConsole_Command(N) { bEmptyArgsHandled = TRUE; }
+	virtual void Execute(LPCSTR args) { Msg("r__dlss_status %s", r_dlss_status_name()); }
+	virtual void Status(TStatus& S) { xr_strcpy(S, r_dlss_status_name()); }
+	virtual void Save(IWriter* F) {}
+};
+#endif
+
+// r__upscale_mipbias: on/off takes effect at once
+class CCC_upscale_mipbias : public CCC_Integer
+{
+public:
+	CCC_upscale_mipbias(LPCSTR N, int* V) : CCC_Integer(N, V, 0, 1) {}
+
+	virtual void Execute(LPCSTR args)
+	{
+		CCC_Integer::Execute(args);
+		r_apply_texture_mip_bias();
+	}
+};
+
 class CCC_ssfx_cascades : public CCC_Vector3
 {
 public:
@@ -634,7 +683,7 @@ public:
 		//	TODO: DX10: Implement mip bias control
 		//VERIFY(!"apply not implmemented.");
 		//Done. Thanks for reminding me.
-		SSManager.SetMipLODBias(*value);
+		r_apply_texture_mip_bias();
 #else	//	USE_DX10
 		for (u32 i = 0; i < HW.Caps.raster.dwStages; i++)
 			CHK_DX(HW.pDevice->SetSamplerState( i, D3DSAMP_MIPMAPLODBIAS, *((LPDWORD) value)));
@@ -1344,6 +1393,15 @@ void xrRender_initconsole()
 	CMD2(CCC_tf_MipBias, "r__tf_mipbias", &ps_r__tf_Mipbias); // {-3 +3}
 	CMD4(CCC_Float, "r2_sun_cascade_min_fov", &ps_r2_sun_cascade_min_fov, 1.f, 120.f); // the sun cascades fitted to at least this fov; 1 = off
 	CMD4(CCC_Float, "r__render_scale", &ps_r__render_scale, 0.5f, 1.f); // the world at this share of the screen's size; vid_restart
+	CMD2(CCC_upscale_mipbias, "r__upscale_mipbias", &ps_r__upscale_mipbias); // textures as sharp as at the screen's size when the world is drawn smaller
+	CMD4(CCC_Integer, "r__taa_jitter", &ps_r__taa_jitter, 0, 1); // test: the camera's sub-pixel jitter without an upscaler (the picture shivers)
+	CMD4(CCC_Integer, "r__dlss_mv_debug", &ps_r__dlss_mv_debug, 0, 1); // test: DLSS's motion vectors on the screen (the shaders for them: from game start)
+	CMD3(CCC_Token, "r__dlss_mode", &ps_r__dlss_mode, dlss_mode_token); // NVIDIA DLSS: off/dlaa/quality/balanced/performance/ultra_performance; vid_restart
+	CMD4(CCC_Integer, "r__dlss_jitter_conf", &ps_r__dlss_jitter_conf, 0, 3); // test: the jitter's signs as DLSS is told them (0: as drawn, 1: -x, 2: -y, 3: both)
+	CMD4(CCC_Float, "r__dlss_reset_distance", &ps_r__dlss_reset_distance, 1.f, 100.f); // the camera moved farther in one frame (a teleport): DLSS forgets the frames before
+#if defined(USE_DX11)
+	CMD1(CCC_dlss_status, "r__dlss_status"); // ok, or why DLSS can't run (not_nvidia, unsupported, old_driver, no_dll, msaa, hdr10, ...)
+#endif
 
 	// R1
 	CMD4(CCC_Float, "r1_ssa_lod_a", &ps_r1_ssaLOD_A, 16, 96);

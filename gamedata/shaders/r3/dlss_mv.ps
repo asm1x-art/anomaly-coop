@@ -1,0 +1,64 @@
+#include "common.h"
+
+// DLSS's motion vectors and depth (engine: CRenderTarget::phase_dlss_mv), at the render size.
+// For each pixel: where its surface was on the screen a frame ago, in render pixels, from this pixel to there (as DLSS
+// takes it). Models wrote their own motion into the G-buffer (dlss_mv.h); the rest (the level, grass, trees, the sky)
+// moved with the camera only: their point is rebuilt from the depth and projected with the last frame's camera.
+// Depth: the depth buffer as drawn (0 near, 1 far); without the render-scale target (r__dlss_mv_debug alone,
+// dlss_mv_nohw.ps) rebuilt from the G-buffer.
+
+uniform float4x4 m_dlss_inv_v;		// view -> world, this frame
+uniform float4x4 m_dlss_vp;			// world -> clip, this frame, without the jitter
+uniform float4x4 m_dlss_vp_prev;	// the same a frame ago
+uniform float4 dlss_proj;			// 1/P._11, 1/P._22, P._31, P._32 of this frame's projection with the jitter
+uniform float4 dlss_depth;			// P._33, P._43, render width, height
+Texture2D s_dlss_obj;				// the G-buffer's motion (xy: uv now - uv a frame ago; w = 1: a model's own)
+#ifndef DLSS_NO_HW_DEPTH
+Texture2D s_dlss_hwdepth;			// the depth buffer as drawn: the HUD is in 0..0.02 (the near range, rmNear)
+#endif
+
+struct dlss_mv_out
+{
+	float2 mv : SV_Target0;
+	float depth : SV_Target1;
+};
+
+float2 clip_to_uv(float4 c)
+{
+	return float2(c.x / c.w * 0.5f + 0.5f, 0.5f - c.y / c.w * 0.5f);
+}
+
+dlss_mv_out main(float2 tc : TEXCOORD0, float4 col : COLOR, float4 pos2d : SV_Position)
+{
+	dlss_mv_out o;
+	int3 px = int3(pos2d.xy, 0);
+	float z = s_position.Load(px).z;
+	float4 obj = s_dlss_obj.Load(px);
+
+	// the pixel's ray in view space (the jittered projection: the ray the surface was really drawn along)
+	float2 ndc = float2(pos2d.x / dlss_depth.z * 2.f - 1.f, 1.f - pos2d.y / dlss_depth.w * 2.f);
+	float3 ray = float3((ndc.x - dlss_proj.z) * dlss_proj.x, (ndc.y - dlss_proj.w) * dlss_proj.y, 1.f);
+
+	bool sky = z <= 0.0001f; // nothing in the G-buffer: the sky, infinitely far (only the camera's turn moves it)
+	float4 W = sky ? float4(mul((float3x3)m_dlss_inv_v, ray), 0.f) : float4(mul(m_dlss_inv_v, float4(ray * z, 1.f)).xyz, 1.f);
+
+	float4 cur = mul(m_dlss_vp, W);
+	float4 prev = mul(m_dlss_vp_prev, W);
+	float2 d = (cur.w > 0.0001f && prev.w > 0.0001f) ? clip_to_uv(prev) - clip_to_uv(cur) : 0;
+	if (obj.w > 0.5f)
+		d = -obj.xy;
+
+#ifndef DLSS_NO_HW_DEPTH
+	// the depth buffer has what the G-buffer doesn't: the HUD's see-through parts (sight glass, reticles) drawn after it.
+	// They go with the camera: no motion of their own on the screen
+	float hwz = s_dlss_hwdepth.Load(px).x;
+	if (hwz < 0.02f && obj.w < 0.5f)
+		d = 0;
+	o.mv = d * dlss_depth.zw;
+	o.depth = hwz;
+#else
+	o.mv = d * dlss_depth.zw;
+	o.depth = sky ? 1.f : saturate(dlss_depth.x + dlss_depth.y / z);
+#endif
+	return o;
+}

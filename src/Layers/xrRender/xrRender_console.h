@@ -96,6 +96,17 @@ extern ECORE_API float ps_r__ssaHZBvsTEX;
 extern ECORE_API int ps_r__tf_Anisotropic;
 extern ECORE_API float ps_r__tf_Mipbias;
 extern ECORE_API float ps_r__render_scale;
+// The world drawn smaller than the screen (render scale, DLSS): the textures' LOD bias goes down with it, log2(render/screen)
+// (DLSS: one more), so they keep the screen's detail. r__upscale_mipbias 0 turns it off.
+extern ECORE_API int ps_r__upscale_mipbias;
+extern ECORE_API float r__upscale_mip_bias; // that bias for the frame's size now (set by CRenderTarget)
+float r_texture_mip_bias(); // r__tf_mipbias plus it
+void r_apply_texture_mip_bias(); // to the samplers
+extern ECORE_API int ps_r__taa_jitter; // test: jitter the camera (r4_taa.h) even without an upscaler
+extern ECORE_API int ps_r__dlss_mv_debug; // test: show DLSS's motion vectors (red/green: the motion, blue: a model's own)
+extern ECORE_API u32 ps_r__dlss_mode; // NVIDIA DLSS (dlss.h: dlss::mode), takes effect with vid_restart
+extern ECORE_API int ps_r__dlss_jitter_conf; // test: flip the jitter's signs DLSS is told (1: x, 2: y, 3: both)
+extern ECORE_API float ps_r__dlss_reset_distance; // metres the camera may move in one frame before DLSS starts anew
 extern ECORE_API float ps_r2_sun_cascade_min_fov; // the sun cascades are fitted to at least this field of view (zoomed scopes) // the world drawn at this share of the screen's size, stretched (vid_restart)
 
 enum
