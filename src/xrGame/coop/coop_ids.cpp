@@ -8,7 +8,6 @@
 
 namespace coop
 {
-	static const u32 LOW_RESERVE = 128; // ask for another block when fewer free ids than this are left
 	static const u16 NO_BLOCK = u16(-1);
 	static const u32 WAIT_MS = 2000; // for the first block, see acquire_first_block
 	// A block hands out the id freed longest ago, so one nearly used up hands out ids freed moments ago, while their
@@ -23,6 +22,42 @@ namespace coop
 	static u32 g_fallbacks = 0;     // new ids that had to come from the local generator
 	static bool g_first_logged = false;
 	static bool g_gave_up_waiting = false; // don't stall every spawn if the server didn't answer
+	static u32 g_entry_goal = 0;          // a new character's first entry: free ids to hold, then low_reserve again
+	static u32 g_next_usage_log = 0;      // Device.dwTimeGlobal of the next "ids taken in the world" line, 0: at once
+
+	// [coop_ids] in gamedata/configs/mod_system_coop.ltx
+	struct SIdSettings
+	{
+		u32 low_reserve = 128;        // ask for another block when fewer free ids than this are left
+		u32 new_character_ids = 768;  // a new character's first entry asks for blocks until it has this many free
+		u32 usage_log_ms = 300000;    // how often the ids taken in the world go to the log
+		u32 usage_warn_percent = 90;  // from this share taken the line is a warning
+	};
+
+	static const SIdSettings& settings()
+	{
+		static SIdSettings s;
+		static bool read = false;
+		if (!read && pSettings)
+		{
+			read = true;
+			LPCSTR SECTION = "coop_ids";
+			if (pSettings->section_exist(SECTION))
+			{
+				s.low_reserve = READ_IF_EXISTS(pSettings, r_u32, SECTION, "low_reserve", s.low_reserve);
+				s.new_character_ids = READ_IF_EXISTS(pSettings, r_u32, SECTION, "new_character_ids", s.new_character_ids);
+				s.usage_log_ms = READ_IF_EXISTS(pSettings, r_u32, SECTION, "usage_log_s", s.usage_log_ms / 1000) * 1000;
+				s.usage_warn_percent = READ_IF_EXISTS(pSettings, r_u32, SECTION, "usage_warn_percent", s.usage_warn_percent);
+			}
+		}
+		return s;
+	}
+
+	// free ids to keep in our blocks: more on a new character's first entry
+	static u32 reserve()
+	{
+		return _max(settings().low_reserve, g_entry_goal);
+	}
 
 	static xrServer* local_server()
 	{
@@ -35,6 +70,24 @@ namespace coop
 		for (u16 block : g_blocks)
 			count += server.free_ids_in_block(block);
 		return count;
+	}
+
+	static u32 free_in_world(const xrServer& server)
+	{
+		u32 count = 0;
+		for (u32 block = 0; block < xrServer::id_block_count(); ++block)
+			count += server.free_ids_in_block(block);
+		return count;
+	}
+
+	// ids 0..65534: a world whose objects take them all can't make another one
+	static void log_id_usage(const xrServer& server, LPCSTR when)
+	{
+		const u32 all = xrServer::id_block_count() * 256 - 1;
+		const u32 taken = all - _min(all, free_in_world(server));
+		const bool warn = taken * 100 >= all * settings().usage_warn_percent;
+		Msg("%s[coop] ids: %u of %u taken in the world (%.1f%%), %u block(s) leased to us with %u free (%s)",
+		    warn ? "! " : "", taken, all, taken * 100.f / all, g_blocks.size(), free_in_owned_blocks(server), when);
 	}
 
 	static void send_request(const xrServer& server)
@@ -138,7 +191,7 @@ namespace coop
 			}
 			// ask for the next block now, not on the next frame: a burst may need it before then
 			if (!g_request_pending && !g_server_exhausted && is_connected() && ai().get_alife() &&
-			    free_in_owned_blocks(server) < LOW_RESERVE)
+			    free_in_owned_blocks(server) < reserve())
 				send_request(server);
 			return id;
 		}
@@ -171,14 +224,32 @@ namespace coop
 		    server ? server->free_ids_in_block(block) : 0);
 	}
 
+	void want_new_character_ids()
+	{
+		g_entry_goal = settings().new_character_ids;
+	}
+
 	void update_id_blocks()
 	{
-		if (g_request_pending || g_server_exhausted || !is_connected())
-			return;
-
 		// before A-Life has loaded the save every block looks free, and the server would pick blindly
 		xrServer* server = local_server();
-		if (!server || !ai().get_alife() || free_in_owned_blocks(*server) >= LOW_RESERVE)
+		if (!server || !ai().get_alife() || !is_connected())
+			return;
+
+		if (Device.dwTimeGlobal >= g_next_usage_log)
+		{
+			log_id_usage(*server, g_next_usage_log ? "every few minutes" : "coming into the world");
+			g_next_usage_log = Device.dwTimeGlobal + settings().usage_log_ms;
+		}
+
+		const u32 free = free_in_owned_blocks(*server);
+		if (g_entry_goal && free >= g_entry_goal)
+		{
+			Msg("[coop] new character: %u free ids in %u block(s) for the first entry", free, g_blocks.size());
+			g_entry_goal = 0;
+		}
+
+		if (g_request_pending || g_server_exhausted || free >= reserve())
 			return;
 
 		send_request(*server);
@@ -192,6 +263,8 @@ namespace coop
 		g_fallbacks = 0;
 		g_first_logged = false;
 		g_gave_up_waiting = false;
+		g_entry_goal = 0;
+		g_next_usage_log = 0;
 	}
 
 	void print_id_status()
@@ -203,11 +276,8 @@ namespace coop
 			return;
 		}
 
-		u32 world_free = 0;
-		for (u32 block = 0; block < xrServer::id_block_count(); ++block)
-			world_free += server->free_ids_in_block(block);
-
 		Msg("[coop]   id blocks: %u leased, %u free ids in them; world: %u of %u ids free; %u ids from local generator",
-		    g_blocks.size(), free_in_owned_blocks(*server), world_free, xrServer::id_block_count() * 256 - 1, g_fallbacks);
+		    g_blocks.size(), free_in_owned_blocks(*server), free_in_world(*server), xrServer::id_block_count() * 256 - 1,
+		    g_fallbacks);
 	}
 }

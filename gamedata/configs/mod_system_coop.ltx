@@ -388,3 +388,11 @@ health_min      = 0.3   ; at least this much health (0..1)
 in_raid         = false ; true: autosaves on the raid's levels too
 news            = true  ; a news line «Автосохранение» when it is made
 news_ms         = 4000  ; how long the news line shows (real ms)
+
+; Co-op: object ids (src/xrGame/coop/coop_ids.cpp). The server leases each player blocks of 256 ids, so new objects in
+; different games never get the same id; a world has 65535 of them (0..65534) for all its objects.
+[coop_ids]
+low_reserve        = 128 ; free ids in our blocks below which the next block is asked for
+new_character_ids  = 768 ; a new character's first entry asks for blocks until it holds this many free ids
+usage_log_s        = 300 ; real s: how often "ids: N of 65535 taken in the world" goes to the log (and once on coming in)
+usage_warn_percent = 90  ; from this share of ids taken that line is a warning ("! [coop] ids: ...")
