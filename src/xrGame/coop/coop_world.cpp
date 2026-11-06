@@ -468,8 +468,15 @@ namespace coop
 		{
 			if (is_actor(&parent))
 			{
-				local_objects().erase(item->base()->ID);
-				send_spawn(smart_cast<CSE_ALifeDynamicObject*>(item->base()));
+				// Picked up off the ground, the item gets its parent only after this (xrServer::Process_event_ownership):
+				// sent without one, it lay on the ground in the other games, another player took it there, and it left
+				// our inventory for theirs (an item gone from under the inventory's Drop button).
+				CSE_ALifeDynamicObject* object = smart_cast<CSE_ALifeDynamicObject*>(item->base());
+				const u16 parent_was = object->ID_Parent;
+				object->ID_Parent = parent.ID;
+				local_objects().erase(object->ID);
+				send_spawn(object);
+				object->ID_Parent = parent_was;
 			}
 			return;
 		}

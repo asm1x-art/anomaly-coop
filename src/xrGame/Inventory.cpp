@@ -380,6 +380,11 @@ bool CInventory::Slot(u16 slot_id, PIItem pIItem, bool bNotActivate, bool strict
 		return false;
 	}
 
+	// A strict placement (an item's own saved place, as it comes into an inventory) never takes a slot another item
+	// holds: that one would stay in the inventory with no place, shown nowhere. The caller puts this one elsewhere.
+	if (strict_placement && m_slots[slot_id].m_pIItem && m_slots[slot_id].m_pIItem != pIItem)
+		return false;
+
 	m_slots[slot_id].m_pIItem = pIItem;
 
 	//удалить из рюкзака или пояса

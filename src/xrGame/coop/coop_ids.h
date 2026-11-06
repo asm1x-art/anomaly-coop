@@ -14,6 +14,7 @@ namespace coop
 
 	void on_id_block_granted(NET_Packet& P);
 	void update_id_blocks(); // per frame: keeps a reserve of free ids by asking for more blocks
+	void want_new_character_ids(); // a new character's first entry: a bigger reserve ([coop_ids] new_character_ids)
 	void reset_id_blocks();  // on disconnect
 	void print_id_status();
 }

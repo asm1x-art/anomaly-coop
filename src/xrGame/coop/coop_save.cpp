@@ -5,6 +5,7 @@
 #include "coop_world.h"
 #include "coop_progress.h"
 #include "coop_facts.h"
+#include "coop_ids.h"
 #include "Level.h"
 #include "Actor.h"
 #include "Inventory.h"
@@ -751,6 +752,7 @@ namespace coop
 		g_join_start.yaw = 0.f;
 		g_join_requested = true;
 		g_new_character = true;
+		want_new_character_ids();
 		request_world();
 	}
 
