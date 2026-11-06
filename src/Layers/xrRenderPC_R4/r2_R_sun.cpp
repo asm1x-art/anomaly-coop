@@ -5,6 +5,7 @@
 #include "../xrRender/FBasicVisual.h"
 
 #include "r4_R_sun_support.h"
+#include "r4_taa.h"
 
 const float tweak_COP_initial_offs = 1200.f;
 const float tweak_ortho_xform_initial_offs = 1000.f; //. ?
@@ -1134,7 +1135,7 @@ void CRender::render_sun_cascade(u32 cascade_ind)
 	// calculate view-frustum bounds in world space
 	Fmatrix ex_project, ex_full, ex_full_inverse;
 	{
-		ex_project = Device.mProject;
+		ex_project = g_taa.project(); // without the upscaler's jitter: the cascades must not shiver with it
 		// A zoomed scope narrows the camera (a 6x optic: under 10 degrees). The cascades, fitted to that frustum, then
 		// put the weapon in hand on the very back edge of the near one, and its shadow flips as the camera moves a
 		// little. They are fitted to at least r2_sun_cascade_min_fov (the projection widened; near and far planes kept).

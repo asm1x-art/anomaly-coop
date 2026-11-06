@@ -6,6 +6,7 @@
 #include "../../xrEngine/xr_object.h"
 
 #include "../xrRender/QueryHelper.h"
+#include "r4_taa.h"
 
 IC bool pred_sp_sort(ISpatial* _1, ISpatial* _2)
 {
@@ -222,11 +223,74 @@ void CRender::render_menu()
 
 extern u32 g_r;
 
+r_taa_jitter g_taa;
+
+// The Halton low-discrepancy sequence: index >= 1, base 2 for x and 3 for y
+static float halton(u32 index, u32 base)
+{
+	float f = 1.f, r = 0.f;
+	while (index > 0)
+	{
+		f /= float(base);
+		r += f * float(index % base);
+		index /= base;
+	}
+	return r;
+}
+
+void r_taa_jitter_begin(bool wanted, u32 render_w, u32 render_h, float ratio)
+{
+	g_taa.on = false;
+	g_taa.applied = false;
+	// the second viewport (a scope's picture) is a frame of its own and is not upscaled
+	if (!wanted || Device.m_SecondViewport.IsSVPFrame() || !render_w || !render_h)
+		return;
+
+	// NVIDIA: at least 8 phases per (screen / render)^2, 16 at the least, 32 or more preferred
+	g_taa.phases = u32(_max(32.f, ceilf(8.f * ratio * ratio)));
+	const u32 i = Device.dwFrame % g_taa.phases + 1;
+	g_taa.px.set(halton(i, 2) - 0.5f, halton(i, 3) - 0.5f);
+	g_taa.ndc.set(2.f * g_taa.px.x / float(render_w), -2.f * g_taa.px.y / float(render_h));
+
+	g_taa.proj = Device.mProject;
+	g_taa.full = Device.mFullTransform;
+	g_taa.proj_hud = Device.mProjectHud;
+	g_taa.full_hud = Device.mFullTransformHud;
+
+	// clip.x += ndc.x * clip.w (a perspective projection's w is the view depth, row 3 multiplies it)
+	Device.mProject._31 += g_taa.ndc.x;
+	Device.mProject._32 += g_taa.ndc.y;
+	Device.mProjectHud._31 += g_taa.ndc.x;
+	Device.mProjectHud._32 += g_taa.ndc.y;
+	Device.mFullTransform.mul(Device.mProject, Device.mView);
+	Device.mFullTransformHud.mul(Device.mProjectHud, Device.mView);
+	RCache.set_xform_project(Device.mProject);
+
+	g_taa.on = true;
+	g_taa.applied = true;
+}
+
+void r_taa_jitter_end()
+{
+	if (!g_taa.applied)
+		return;
+	g_taa.applied = false;
+	Device.mProject = g_taa.proj;
+	Device.mFullTransform = g_taa.full;
+	Device.mProjectHud = g_taa.proj_hud;
+	Device.mFullTransformHud = g_taa.full_hud;
+	RCache.set_xform_project(Device.mProject);
+}
+
 void CRender::Render()
 {
 	// render scale: the whole frame at the render size, then stretched onto the screen (the UI comes after)
 	const bool scaled = Target->scale_begin();
+	// the camera shifted by a fraction of a pixel for the upscaler (r4_taa.h); Device's size is the render size here
+	r_taa_jitter_begin(Target->taa_wanted(), Device.dwWidth, Device.dwHeight,
+	                   float(Target->display_w) / float(_max(Device.dwWidth, u32(1))));
 	Render_scene();
+	r_taa_jitter_end();
 	if (scaled)
 		Target->scale_end();
 }
@@ -549,8 +613,8 @@ void CRender::Render_scene()
 			if (!Device.m_SecondViewport.IsSVPFrame())
 			{
 				Target->Matrix_previous.mul(mm_saved_viewproj, Device.mInvView);
-				Target->Matrix_current.set(Device.mProject);
-				mm_saved_viewproj.set(Device.mFullTransform);
+				Target->Matrix_current.set(g_taa.project()); // without the jitter (r4_taa.h)
+				mm_saved_viewproj.set(g_taa.full_transform());
 			}
 		}
 

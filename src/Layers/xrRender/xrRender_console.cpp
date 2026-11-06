@@ -152,6 +152,7 @@ float ps_r__tf_Mipbias = 0.0f;
 float ps_r__render_scale = 1.0f;
 int ps_r__upscale_mipbias = 1;
 float r__upscale_mip_bias = 0.f;
+int ps_r__taa_jitter = 0;
 float ps_r2_sun_cascade_min_fov = 60.0f;
 // R1
 float ps_r1_ssaLOD_A = 64.f;
@@ -1372,6 +1373,7 @@ void xrRender_initconsole()
 	CMD4(CCC_Float, "r2_sun_cascade_min_fov", &ps_r2_sun_cascade_min_fov, 1.f, 120.f); // the sun cascades fitted to at least this fov; 1 = off
 	CMD4(CCC_Float, "r__render_scale", &ps_r__render_scale, 0.5f, 1.f); // the world at this share of the screen's size; vid_restart
 	CMD2(CCC_upscale_mipbias, "r__upscale_mipbias", &ps_r__upscale_mipbias); // textures as sharp as at the screen's size when the world is drawn smaller
+	CMD4(CCC_Integer, "r__taa_jitter", &ps_r__taa_jitter, 0, 1); // test: the camera's sub-pixel jitter without an upscaler (the picture shivers)
 
 	// R1
 	CMD4(CCC_Float, "r1_ssa_lod_a", &ps_r1_ssaLOD_A, 16, 96);

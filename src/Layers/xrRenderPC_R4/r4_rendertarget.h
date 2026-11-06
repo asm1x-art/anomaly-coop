@@ -235,6 +235,7 @@ public:
 	ref_rt rt_render_scale;
 	ref_rt rt_render_scale_z;
 	u32 render_w = 0, render_h = 0;
+	u32 display_w = 0, display_h = 0; // the screen's size
 
 	ref_shader s_ssfx_dumb;
 
@@ -476,6 +477,8 @@ public:
 	// render scale: true when the frame is now drawn at the render size (and scale_end must follow)
 	bool scale_begin();
 	void scale_end();
+	// the frame is jittered (r4_taa.h): r__taa_jitter for a test, or for the upscaler
+	bool taa_wanted() const;
 
 	// HDR10
 	void phase_hdr10_bloom();

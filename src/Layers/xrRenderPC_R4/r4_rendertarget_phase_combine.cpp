@@ -4,6 +4,7 @@
 #include "../../xrEngine/environment.h"
 
 #include "../xrRender/dxEnvironmentRender.h"
+#include "r4_taa.h"
 
 #define STENCIL_CULL 0
 
@@ -93,8 +94,8 @@ void CRenderTarget::phase_combine()
 			saved_position.set(Device.vCameraPosition);
 
 			Matrix_previous.mul(m_saved_viewproj, Device.mInvView);
-			Matrix_current.set(Device.mProject);
-			m_saved_viewproj.set(Device.mFullTransform);
+			Matrix_current.set(g_taa.project()); // without the jitter (r4_taa.h)
+			m_saved_viewproj.set(g_taa.full_transform());
 		}
 		float scale = ps_r2_mblur / 2.f;
 		m_blur_scale.set(scale, -scale).div(12.f);

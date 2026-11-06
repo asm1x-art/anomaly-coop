@@ -387,7 +387,8 @@ CRenderTarget::CRenderTarget()
 
 	// Render scale: every buffer of the frame is made at the render size (the device's size is swapped for it while
 	// they are made), but the ones filled by copying the screen (the PDA's, the second viewport's)
-	const u32 display_w = Device.dwWidth, display_h = Device.dwHeight;
+	display_w = Device.dwWidth;
+	display_h = Device.dwHeight;
 	const bool scaled = ps_r__render_scale < 0.999f && !RImplementation.o.dx10_msaa && !RImplementation.o.dx11_hdr10;
 	if (ps_r__render_scale < 0.999f && !scaled)
 		Msg("! r__render_scale: off with MSAA or HDR10");
@@ -1392,6 +1393,11 @@ bool CRenderTarget::scale_begin()
 	HW.pBaseZB = rt_render_scale_z->pZRT;
 	g_render_scale_on = true;
 	return true;
+}
+
+bool CRenderTarget::taa_wanted() const
+{
+	return ps_r__taa_jitter != 0;
 }
 
 void CRenderTarget::scale_end()
