@@ -444,9 +444,9 @@ local function tend(t, squad)
 				axr_companions.set_companion_to_wait_state(npc)
 			end
 		end
-		if ph == "wounded" and not se_load_var(npc:id(), npc:name(), "rescue_wounded") then
+		-- wounded till the medicine: kept there (an NPC heals by himself within a minute)
+		if ph == "wounded" and npc.health > setting_num(t, "wounded_health", 0.35) then
 			npc:set_health_ex(setting_num(t, "wounded_health", 0.35))
-			se_save_var(npc:id(), npc:name(), "rescue_wounded", true)
 		end
 	end
 end
