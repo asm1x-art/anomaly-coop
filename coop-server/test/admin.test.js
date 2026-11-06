@@ -240,6 +240,7 @@ test('public status: no password; who is on, where and since when; only the worl
     assert.equal(res.status, 200);
     const st = await res.json();
     assert.equal(st.protocol, PROTOCOL_VERSION);
+    assert.equal(st.max_players, 4);
     assert.deepEqual(st.players.map((p) => [p.name, p.level]), [['Мастер', 'l01_escape'], ['Друг', null]]);
     assert.ok(st.players.every((p) => p.since > 0 && p.since <= Date.now()));
     assert.equal('id' in st.players[0] || 'ping' in st.players[0] || 'from' in st.players[0], false);

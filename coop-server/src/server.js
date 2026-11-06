@@ -971,7 +971,7 @@ autosave_minutes=${autosaveMinutes}`));
       return {
         protocol: PROTOCOL_VERSION,
         time: Date.now(),
-        max_players: storage.settings().max_players ?? null,
+        max_players: storage.settings().rules?.max_players ?? null,
         host: hostProcess || hostClient ? { in_world: !!hostClient?.inWorld } : null,
         paused: !!pausedBy,
         players: players().map(([, c]) => ({ name: c.name, level: c.state ? readStringZ(c.state, 0) : null, since: c.since ?? null })),
