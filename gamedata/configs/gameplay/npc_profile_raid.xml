@@ -7,4 +7,20 @@
 	<character id="raid_monolith_scientist">
 		<class>raid_monolith_scientist</class>
 	</character>
+	<!-- the Hospital's assault group (character_desc_raid.xml) -->
+	<character id="raid_assault_medic">
+		<class>raid_assault_medic</class>
+	</character>
+	<character id="raid_assault_commander">
+		<class>raid_assault_commander</class>
+	</character>
+	<character id="raid_assault_mg">
+		<class>raid_assault_mg</class>
+	</character>
+	<character id="raid_assault_soldier_1">
+		<class>raid_assault_soldier_1</class>
+	</character>
+	<character id="raid_assault_soldier_2">
+		<class>raid_assault_soldier_2</class>
+	</character>
 </xml>

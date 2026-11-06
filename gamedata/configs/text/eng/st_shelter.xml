@@ -1677,4 +1677,52 @@
 	<string id="st_shelter_entrance_spot">
 		<text>Shelter "Radar-1": the way in at the end of the tunnel</text>
 	</string>
+	<string id="shelter_assault_treat_0">
+		<text>Shov, the men need help.</text>
+	</string>
+	<string id="st_shelter_assault_treat_need">
+		<text>I'll see to them. I need: %s. Got it?</text>
+	</string>
+	<string id="shelter_assault_treat_2">
+		<text>Here.</text>
+	</string>
+	<string id="shelter_assault_treat_3">
+		<text>Not yet.</text>
+	</string>
+	<string id="shelter_assault_treat_4">
+		<text>Done. They'll be on their feet in a couple of hours.</text>
+	</string>
+	<string id="st_shelter_assault_treated">
+		<text>Shov has seen to the wounded: the men are fit again.</text>
+	</string>
+	<string id="shelter_assault_dress_0">
+		<text>Let's sort out your gear.</text>
+	</string>
+	<string id="shelter_assault_dress_1">
+		<text>Sure. Show me what you've got.</text>
+	</string>
+	<string id="st_shelter_assault_dressed">
+		<text>%s has changed his suit.</text>
+	</string>
+	<string id="st_shelter_assault_no_look">
+		<text>%s: he can't wear that, take it back.</text>
+	</string>
+	<string id="shelter_assault_guard_0">
+		<text>There's a job. The shelter's entrance needs guarding.</text>
+	</string>
+	<string id="shelter_assault_guard_1">
+		<text>We owe you. Where do we stand?</text>
+	</string>
+	<string id="shelter_assault_guard_2">
+		<text>Up top, at the gate. Hold a post there.</text>
+	</string>
+	<string id="shelter_assault_guard_3">
+		<text>Rest for now.</text>
+	</string>
+	<string id="shelter_assault_guard_4">
+		<text>Yes, sir. Moving out. Shov stays here.</text>
+	</string>
+	<string id="st_shelter_assault_to_guard">
+		<text>The assault group now guards the shelter's entrance.</text>
+	</string>
 </string_table>

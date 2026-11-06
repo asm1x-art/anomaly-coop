@@ -138,4 +138,142 @@
 #include "gameplay\character_dialogs.xml"
 		<terrain_sect>stalker_terrain</terrain_sect>
 	</specific_character>
+	<!-- the Hospital's assault group (scripts\raid_rescue.script, shelter_assault.script): army in SKAT-9 suits, the
+	     game's own models of the suit (death_outfits.ltx: military_outfit). No medicine on them: they get it from the
+	     actor. Their dialogs first: the medicine in the raid; help, gear and the post in the shelter -->
+	<specific_character id="raid_assault_medic" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_npc_u_stalker_militari_1</icon>
+		<bio></bio>
+		<class>raid_assault_medic</class>
+		<community>army</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="2000" max="5000" infinitive="0"/>
+		<rank min="15000" max="20000" />
+		<reputation min="0" max="1500" />
+		<snd_config>characters_voice\human\military_1\</snd_config>
+		<visual>actors\stalker_soldier\stalker_militari_1</visual>
+		<supplies>
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_army.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+		<actor_dialog>raid_assault_medicine</actor_dialog>
+		<actor_dialog>shelter_assault_treat</actor_dialog>
+		<actor_dialog>shelter_assault_dress</actor_dialog>
+		<actor_dialog>shelter_assault_guard</actor_dialog>
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_assault_commander" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_neutral_tactic</icon>
+		<bio></bio>
+		<class>raid_assault_commander</class>
+		<community>army</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="2000" max="5000" infinitive="0"/>
+		<rank min="30000" max="40000" />
+		<reputation min="0" max="1500" />
+		<snd_config>characters_voice\human\military_3\</snd_config>
+		<visual>actors\stalker_soldier\stalker_soldier_4_helm_tactic</visual>
+		<supplies>
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_army.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+		<actor_dialog>raid_assault_medicine</actor_dialog>
+		<actor_dialog>shelter_assault_treat</actor_dialog>
+		<actor_dialog>shelter_assault_dress</actor_dialog>
+		<actor_dialog>shelter_assault_guard</actor_dialog>
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_assault_mg" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_inGame2_neutral_tactic</icon>
+		<bio></bio>
+		<class>raid_assault_mg</class>
+		<community>army</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="2000" max="5000" infinitive="0"/>
+		<rank min="15000" max="20000" />
+		<reputation min="0" max="1500" />
+		<snd_config>characters_voice\human\military_3\</snd_config>
+		<visual>actors\stalker_soldier\stalker_soldier_4_helm_battle</visual>
+		<supplies>
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_army.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+		<actor_dialog>raid_assault_medicine</actor_dialog>
+		<actor_dialog>shelter_assault_treat</actor_dialog>
+		<actor_dialog>shelter_assault_dress</actor_dialog>
+		<actor_dialog>shelter_assault_guard</actor_dialog>
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_assault_soldier_1" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_npc_u_stalker_militari_1</icon>
+		<bio></bio>
+		<class>raid_assault_soldier_1</class>
+		<community>army</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="2000" max="5000" infinitive="0"/>
+		<rank min="15000" max="20000" />
+		<reputation min="0" max="1500" />
+		<snd_config>characters_voice\human\military_3\</snd_config>
+		<visual>actors\stalker_soldier\stalker_soldier_4_skat</visual>
+		<supplies>
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_army.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+		<actor_dialog>raid_assault_medicine</actor_dialog>
+		<actor_dialog>shelter_assault_treat</actor_dialog>
+		<actor_dialog>shelter_assault_dress</actor_dialog>
+		<actor_dialog>shelter_assault_guard</actor_dialog>
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
+	<specific_character id="raid_assault_soldier_2" team_default="1">
+		<name>GENERATE_NAME_stalker</name>
+		<icon>ui_npc_u_stalker_militari_2</icon>
+		<bio></bio>
+		<class>raid_assault_soldier_2</class>
+		<community>army</community>
+		<crouch_type>-1</crouch_type>
+		<map_icon x="1" y="0"></map_icon>
+		<money min="2000" max="5000" infinitive="0"/>
+		<rank min="15000" max="20000" />
+		<reputation min="0" max="1500" />
+		<snd_config>characters_voice\human\military_3\</snd_config>
+		<visual>actors\stalker_soldier\stalker_soldier_4</visual>
+		<supplies>
+[spawn] 
+
+#include "gameplay\supplies\character_items_2.xml"
+#include "gameplay\supplies\character_food_army.xml"
+		</supplies>
+#include "gameplay\character_criticals.xml"
+		<actor_dialog>raid_assault_medicine</actor_dialog>
+		<actor_dialog>shelter_assault_treat</actor_dialog>
+		<actor_dialog>shelter_assault_dress</actor_dialog>
+		<actor_dialog>shelter_assault_guard</actor_dialog>
+#include "gameplay\character_dialogs.xml"
+		<terrain_sect>stalker_terrain</terrain_sect>
+	</specific_character>
 </xml>

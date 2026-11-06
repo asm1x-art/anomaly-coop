@@ -174,6 +174,10 @@ npc_in_squad    = 3, 3
 >files = npc_profile_raid
 >specific_characters_files = character_desc_raid
 
+; the Hospital's assault group's dialogs, in the raid and in the shelter (raid_rescue.script, shelter_assault.script)
+![dialogs]
+>files = dialogs_raid
+
 [raid_monolith_alpha_npc]:sim_default_monolith_4
 character_profile = raid_monolith_alpha
 spec_rank       = master
@@ -223,6 +227,8 @@ signal_first_seconds = 3   ; radio signals after landing
 signal_seconds  = 9
 signal_show_seconds = 15
 targets         = scientists, medic, frame, sect
+; tests: the Hospital's assault group never dies (in the raid, in the shelter, on the perimeter)
+rescue_squad_immortal = false
 
 [raid_rescue_scientists]
 level           = raid_limansk
@@ -234,15 +240,35 @@ squad           = raid_rescue_scientists_squad
 staff           = raid_rescue_npc_biologist, raid_rescue_npc_physicist, raid_rescue_npc_materials
 staff_places    = 16.56, 1.32, -10.94 | 15.2, 1.32, -9.6 | 18.0, 1.32, -12.2
 
+; the Hospital's assault group (target "medic", the name kept for old saves): five soldiers in SKAT-9 with the medic
+; Shov, pinned down halfway through the catacombs. Drawn only once the lift down is repaired (requires: a world state).
+; They are wounded (wounded_health) and wait for medicine: the actor gives them "medicine" in a dialog (shared out among
+; them; healed_health after). Then a Monolith wave (wave_squad) comes after wave_delay seconds from one of wave_from
+; ("x, y, z, level vertex | ..."): at least wave_min_distance from the actor and out of their sight, or after
+; wave_wait_max seconds the farthest; they hold the place till it is dead, then follow. key_role dead = lost; the others
+; may die, those who reach the exit come. actor_goodwill: their personal goodwill to the actor (the army hates most
+; factions). In the shelter (shelter_assault.script) at staff_places: x, y, z, level vertex each, on the lower floor by
+; the hermetic gate, the lift's side.
 [raid_rescue_medic]
 level           = raid_hospital
 position        = -94.5, 25.06, 648.2
 node            = 1114
 smart           = raid_katacomb_smart_terrain
 siege           = raid_monolith_far, raid_monolith_sniper
-squad           = raid_rescue_medic_squad
-staff           = raid_rescue_npc_medic
-staff_places    = 2.34, 3.38, 3.5
+squad           = raid_rescue_assault_squad
+requires        = lift_low_repaired
+key_role        = medic
+actor_goodwill  = 5000
+medicine        = medkit_army:3, bandage:5
+wounded_health  = 0.35
+healed_health   = 0.8
+wave_squad      = raid_rescue_medic_wave
+wave_from       = -82.60, 24.97, 712.60, 4869 | -80.50, 24.95, 728.00, 5553 | -98.00, 25.14, 732.20, 578
+wave_delay      = 20
+wave_min_distance = 40
+wave_wait_max   = 60
+staff           = raid_rescue_assault_medic, raid_rescue_assault_commander, raid_rescue_assault_mg, raid_rescue_assault_soldier_1, raid_rescue_assault_soldier_2
+staff_places    = -34.30, -20.84, -10.50, 984 | -35.00, -21.47, -7.70, 979 | -32.90, -20.84, -6.30, 1008 | -32.20, -21.47, -8.40, 1014 | -30.80, -20.91, -10.50, 1029
 
 [raid_rescue_frame]
 level           = raid_limansk
@@ -273,8 +299,48 @@ character_profile = shelter_scientist
 spec_rank       = master
 rescue_name     = st_raid_rescue_name_materials
 
+; the medic alone, before the assault group: kept for old saves, where he may live in the shelter
 [raid_rescue_npc_medic]:sim_default_stalker_3
 rescue_name     = st_raid_rescue_name_medic
+rescue_role     = medic
+
+; the assault group: army, SKAT-9 suits (gameplay\character_desc_raid.xml); rescue_role: who is who, one each
+; (shelter_assault.script); the machine gunner's PKM: items\settings\npc_loadouts\mod_npc_loadouts_raid.ltx
+[raid_rescue_assault_squad]:online_offline_group
+faction         = army
+npc             = raid_rescue_assault_medic, raid_rescue_assault_commander, raid_rescue_assault_mg, raid_rescue_assault_soldier_1, raid_rescue_assault_soldier_2
+
+[raid_rescue_assault_medic]:sim_default_military_3
+character_profile = raid_assault_medic
+rescue_name     = st_raid_rescue_name_medic
+rescue_role     = medic
+
+[raid_rescue_assault_commander]:sim_default_military_4
+character_profile = raid_assault_commander
+rescue_name     = st_raid_assault_name_commander
+rescue_role     = commander
+
+[raid_rescue_assault_mg]:sim_default_military_3
+character_profile = raid_assault_mg
+rescue_name     = st_raid_assault_name_mg
+rescue_role     = mg
+
+[raid_rescue_assault_soldier_1]:sim_default_military_3
+character_profile = raid_assault_soldier_1
+rescue_name     = st_raid_assault_name_soldier_1
+rescue_role     = soldier_1
+
+[raid_rescue_assault_soldier_2]:sim_default_military_3
+character_profile = raid_assault_soldier_2
+rescue_name     = st_raid_assault_name_soldier_2
+rescue_role     = soldier_2
+
+; the Monolith's wave on the group once it has the medicine: npc_random ranks, npc_in_squad how many; their guns:
+; [loadout_raid_rescue_wave] in mod_npc_loadouts_raid.ltx
+[raid_rescue_medic_wave]:online_offline_group
+faction         = monolith
+npc_random      = sim_default_monolith_2, sim_default_monolith_3, sim_default_monolith_3, sim_default_monolith_4
+npc_in_squad    = 4, 5
 
 ; the incubator's frame, on the commander at the Monolith's building site
 [raid_incubator_frame]:tch_quest

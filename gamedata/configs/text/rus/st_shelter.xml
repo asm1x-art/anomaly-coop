@@ -1677,4 +1677,52 @@
 	<string id="st_shelter_entrance_spot">
 		<text>Убежище «Радар-1»: вход в конце тоннеля</text>
 	</string>
+	<string id="shelter_assault_treat_0">
+		<text>Шов, ребятам нужна помощь.</text>
+	</string>
+	<string id="st_shelter_assault_treat_need">
+		<text>Займусь. Нужно: %s. Принёс?</text>
+	</string>
+	<string id="shelter_assault_treat_2">
+		<text>Держи.</text>
+	</string>
+	<string id="shelter_assault_treat_3">
+		<text>Пока нет.</text>
+	</string>
+	<string id="shelter_assault_treat_4">
+		<text>Сделаю. Через пару часов будут на ногах.</text>
+	</string>
+	<string id="st_shelter_assault_treated">
+		<text>Шов занялся ранеными: бойцы снова в строю.</text>
+	</string>
+	<string id="shelter_assault_dress_0">
+		<text>Давай подберём тебе снаряжение.</text>
+	</string>
+	<string id="shelter_assault_dress_1">
+		<text>Давай. Показывай, что есть.</text>
+	</string>
+	<string id="st_shelter_assault_dressed">
+		<text>%s переоделся.</text>
+	</string>
+	<string id="st_shelter_assault_no_look">
+		<text>%s: в этом бойцу не ходить, заберите.</text>
+	</string>
+	<string id="shelter_assault_guard_0">
+		<text>Есть дело. Вход в убежище нужно охранять.</text>
+	</string>
+	<string id="shelter_assault_guard_1">
+		<text>Мы у вас в долгу. Где стоять?</text>
+	</string>
+	<string id="shelter_assault_guard_2">
+		<text>Наверху, у ворот. Встаньте там постом.</text>
+	</string>
+	<string id="shelter_assault_guard_3">
+		<text>Пока отдыхайте.</text>
+	</string>
+	<string id="shelter_assault_guard_4">
+		<text>Есть. Выдвигаемся. Шов остаётся здесь.</text>
+	</string>
+	<string id="st_shelter_assault_to_guard">
+		<text>Штурмовая группа встала на охрану входа в убежище.</text>
+	</string>
 </string_table>

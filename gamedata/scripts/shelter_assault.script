@@ -1,0 +1,386 @@
+-- The Hospital's assault group in the shelter (docs/coop/shelter.md, "Events"; settings: [shelter_assault] in
+-- mod_system_shelter_base.ltx, the raid's side: raid_rescue.script, mod_system_raid.ltx [raid_rescue_medic]).
+-- Those who came out of the raid stand on the lower floor by the hermetic gate, the lift's side (raid_rescue spawns
+-- them as staff: rescue_staff_ids_medic). The fighters are still wounded (arrive_health) till the medic Shov treats
+-- them for treat_items (a dialog). Anyone of them can be given things: the dialog opens their inventory; a suit given
+-- becomes his look (the suit itself goes: a dead man drops the suit of his look). Treated, a fighter's dialog sends the
+-- fighters to the post at the shelter's entrance on l10_radar (a squad of their own at guard_smart, the jobs
+-- shelter_door_* of configs\scripts\shelter_perimeter.ltx, shelter_base.script); the medic stays and keeps his work.
+-- The world's (shelter.state): assault_treated, assault_guard (the post's squad id), assault_visual_<section>.
+
+local S = "shelter_assault"
+local LEVEL = "bunker_a1"
+local CHECK_MS = 2000
+
+local function text(key)
+	return ini_sys:r_string_ex(S, key)
+end
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function list(s)
+	local out = {}
+	for _, v in ipairs(str_explode(s or "", ",")) do
+		if v ~= "" then
+			out[#out + 1] = v
+		end
+	end
+	return out
+end
+
+local function say(id, ...)
+	local s = game.translate_string(id)
+	actor_menu.set_msg(1, select("#", ...) > 0 and string.format(s, ...) or s, 6)
+end
+
+local function target()
+	return text("target") or "medic"
+end
+
+local function role_of(section)
+	return ini_sys:r_string_ex(section, "rescue_role")
+end
+
+-- those of the group in the shelter: { section, id, role }
+local function members()
+	local out = {}
+	for _, entry in ipairs(list(tostring(shelter.state("rescue_staff_ids_" .. target(), "") or ""))) do
+		local p = str_explode(entry, ":")
+		local id = tonumber(p[2])
+		if id then
+			out[#out + 1] = { section = p[1], id = id, role = role_of(p[1]) }
+		end
+	end
+	return out
+end
+
+local function member(npc)
+	local id = npc and npc:id()
+	for _, m in ipairs(members()) do
+		if m.id == id then
+			return m
+		end
+	end
+end
+
+local function fighters()
+	local out = {}
+	for _, m in ipairs(members()) do
+		if m.role ~= "medic" then
+			out[#out + 1] = m
+		end
+	end
+	return out
+end
+
+function treated()
+	return shelter.state("assault_treated", false)
+end
+
+function guard_squad()
+	return raid_monolith.squad_alive(tonumber(shelter.state("assault_guard", nil)))
+end
+
+-- "section:count, ..." in [shelter_assault]
+local function parts(key)
+	local out = {}
+	for _, entry in ipairs(list(text(key))) do
+		local p = str_explode(entry, ":")
+		out[#out + 1] = { section = p[1], count = tonumber(p[2]) or 1 }
+	end
+	return out
+end
+
+local function carried(key)
+	local found = {}
+	for _, p in ipairs(parts(key)) do
+		local n = 0
+		db.actor:iterate_inventory(function(_, item)
+			if n < p.count and item:section() == p.section then
+				n = n + 1
+				found[#found + 1] = item
+			end
+		end, db.actor)
+		if n < p.count then
+			return nil
+		end
+	end
+	return found
+end
+
+-------------------------------------------------------------------------------
+-- a suit's look: [shelter_assault_dress] (suit = model) first, else a model of that suit in the game's death_outfits.ltx
+-- (outfit_by_visual: model name = suit[, helmet]) found in one of dress_folders, the army's first; with the helmet given
+-- too, a model with that helmet first
+
+local function exists(path)
+	return getFS():exist("$game_meshes$", path .. ".ogf") ~= nil
+end
+
+local function look_of(outfit, helmet)
+	local own = ini_sys:r_string_ex("shelter_assault_dress", outfit)
+	if own then
+		return own
+	end
+	local ini = itms_manager.ini_death
+	local names = {}
+	for i = 0, ini:line_count("outfit_by_visual") - 1 do
+		local _, name, value = ini:r_line_ex("outfit_by_visual", i, "", "")
+		local p = str_explode(value or "", ",")
+		if p[1] == outfit then
+			local rank = (helmet and p[2] == helmet) and 0 or (not p[2] or p[2] == "") and 1 or 2
+			names[#names + 1] = { name = name, rank = rank, i = i }
+		end
+	end
+	table.sort(names, function(a, b) return a.rank < b.rank or a.rank == b.rank and a.i < b.i end)
+	for _, n in ipairs(names) do
+		for _, folder in ipairs(list(text("dress_folders"))) do
+			local path = "actors\\" .. folder .. "\\" .. n.name
+			if exists(path) then
+				return path, n.rank == 0
+			end
+		end
+	end
+end
+
+local dressing = {} -- this game's: the NPCs whose things one opened
+
+-- a suit in his things: his look, the suit (and the helmet it took) gone
+local function dress(npc, m)
+	local outfit, helmet
+	npc:iterate_inventory(function(_, item)
+		if IsOutfit(item) and not outfit then
+			outfit = item
+		elseif IsHeadgear and IsHeadgear(item) and not helmet then
+			helmet = item
+		end
+	end, npc)
+	if not outfit then
+		return
+	end
+	local look, with_helmet = look_of(outfit:section(), helmet and helmet:section())
+	if not look then
+		say("st_shelter_assault_no_look", ui_item.get_sec_name(outfit:section()))
+		dressing[npc:id()] = nil
+		return
+	end
+	shelter.set_state("assault_visual_" .. m.section, look)
+	npc:set_visual_name(look)
+	alife_release_id(outfit:id())
+	if with_helmet and helmet then
+		alife_release_id(helmet:id())
+	end
+	say("st_shelter_assault_dressed", npc:character_name())
+end
+
+-------------------------------------------------------------------------------
+-- dialogs (gameplay\dialogs_raid.xml)
+
+local function npc_of(a, b)
+	return dialogs.who_is_npc(a, b)
+end
+
+function dlg_in_shelter(a, b)
+	return level.name() == LEVEL and member(npc_of(a, b)) ~= nil
+end
+
+function dlg_can_treat(a, b)
+	local m = level.name() == LEVEL and member(npc_of(a, b))
+	return m and m.role == "medic" and not treated() and #fighters() > 0 or false
+end
+
+function dlg_treat_text()
+	local t = {}
+	for _, p in ipairs(parts("treat_items")) do
+		t[#t + 1] = ui_item.get_sec_name(p.section) .. " x" .. p.count
+	end
+	return string.format(game.translate_string("st_shelter_assault_treat_need"), table.concat(t, ", "))
+end
+
+function dlg_has_treat_items()
+	return carried("treat_items") ~= nil
+end
+
+function dlg_treat()
+	local items = carried("treat_items")
+	if not items then
+		return
+	end
+	for _, item in ipairs(items) do
+		news_manager.relocate_item(db.actor, "out", item:section(), 1)
+		alife_release(item)
+	end
+	shelter.set_state("assault_treated", true)
+	say("st_shelter_assault_treated")
+end
+
+function dlg_dress(a, b)
+	local npc = npc_of(a, b)
+	dressing[npc:id()] = true
+	axr_companions.start_trade(a, b)
+end
+
+function dlg_can_guard(a, b)
+	local m = level.name() == LEVEL and member(npc_of(a, b))
+	return m and m.role ~= "medic" and treated() and not shelter.state("assault_guard", nil) or false
+end
+
+-- the fighters to the post: a squad of their own at guard_smart, each with his name, look and main gun; those in the
+-- shelter go
+local function main_gun(id)
+	local npc = level.object_by_id(id)
+	local gun = npc and npc:best_weapon()
+	return gun and IsWeapon(gun) and not IsMelee(gun) and gun:section() or nil
+end
+
+local function to_guard()
+	if shelter.state("assault_guard", nil) then
+		return
+	end
+	local smart = SIMBOARD.smarts_by_names[text("guard_smart") or ""]
+	local going = fighters()
+	if not smart or #going == 0 then
+		return
+	end
+	local pos, lv, gv = smart.position, smart.m_level_vertex_id, smart.m_game_vertex_id
+	local squad = alife_create(text("guard_squad"), pos, lv, gv)
+	if not squad then
+		return
+	end
+	squad:create_npc(smart)
+	local goodwill = num("actor_goodwill", 5000)
+	for _, m in ipairs(going) do
+		local gun = main_gun(m.id)
+		local id = squad:add_squad_member(m.section, pos, lv, gv)
+		local se = id and alife():object(id)
+		if se then
+			SIMBOARD:setup_squad_and_group(se)
+			SendScriptCallback("squad_on_npc_creation", squad, se, smart)
+			se:set_character_name(game.translate_string(ini_sys:r_string_ex(m.section, "rescue_name")))
+			se:force_set_goodwill(goodwill, 0)
+			if gun then
+				alife_create_item(gun, se)
+				shelter.set_state("perim_arm_" .. se.id, gun)
+				local ammo = list(ini_sys:r_string_ex(gun, "ammo_class"))[1]
+				for _ = 1, ammo and num("guard_ammo", 3) or 0 do
+					alife_create_item(ammo, se)
+				end
+			end
+		end
+	end
+	if squad:npc_count() == 0 then
+		SIMBOARD:remove_squad(squad)
+		return
+	end
+	SIMBOARD:assign_squad_to_smart(squad, smart.id)
+	squad:set_squad_relation()
+	squad:refresh()
+	squad.scripted_target = smart:name()
+	shelter.set_state("assault_guard", squad.id)
+	local stay = {}
+	for _, m in ipairs(members()) do
+		if m.role == "medic" then
+			stay[#stay + 1] = m.section .. ":" .. m.id
+		else
+			shelter_base.remove_staff(m.id)
+			local se = alife():object(m.id)
+			if se then
+				alife_release(se)
+			end
+		end
+	end
+	shelter.set_state("rescue_staff_ids_" .. target(), table.concat(stay, ","))
+	shelter_base.perimeter_truce()
+	say("st_shelter_assault_to_guard")
+	printf("shelter_assault: %s to the post", squad:npc_count())
+end
+
+function dlg_to_guard()
+	CreateTimeEvent(S, "guard", 0.5, function()
+		if db.actor:is_talking() then
+			return false
+		end
+		shelter.everyones(to_guard)
+		return true
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- every few seconds on every game: relation to one's actor, immortality (tests), wounds, looks
+
+local function befriend(npc)
+	local goodwill = num("actor_goodwill", 5000)
+	if npc:goodwill(db.actor) < goodwill then
+		npc:force_set_goodwill(goodwill, db.actor)
+	end
+	raid_rescue.protect(npc)
+end
+
+local function look(npc, section)
+	local v = shelter.state("assault_visual_" .. section, nil)
+	if v and npc:get_visual_name() ~= v then
+		npc:set_visual_name(v)
+	end
+end
+
+local function tend_shelter()
+	for _, m in ipairs(members()) do
+		local npc = level.object_by_id(m.id)
+		if npc and npc:alive() then
+			befriend(npc)
+			if m.role ~= "medic" then
+				local h = treated() and 1 or num("arrive_health", 0.5)
+				if math.abs(npc.health - h) > 0.01 then
+					npc:set_health_ex(h)
+				end
+			end
+			if dressing[m.id] then
+				dress(npc, m)
+			end
+			look(npc, m.section)
+		end
+	end
+end
+
+local function tend_guard()
+	local squad = guard_squad()
+	if not squad then
+		return
+	end
+	for k in squad:squad_members() do
+		local npc = level.object_by_id(k.id)
+		local se = k.object or alife():object(k.id)
+		if npc and npc:alive() and se then
+			befriend(npc)
+			look(npc, se:section_name())
+		end
+	end
+end
+
+local check_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < check_at then
+		return
+	end
+	check_at = now + CHECK_MS
+	if level.name() == LEVEL then
+		tend_shelter()
+	else
+		tend_guard()
+	end
+end
+
+-- in the shelter the staff take no human for an enemy (scripts\shelter_staff.ltx): the army hates the technician's
+-- loners, and they all stand there unhurt anyway
+local function staff_peace(enemy, npc)
+	return enemy ~= nil and IsStalker(enemy) and enemy:id() ~= AC_ID
+end
+
+function on_game_start()
+	xr_conditions.shelter_staff_peace = staff_peace
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+end
