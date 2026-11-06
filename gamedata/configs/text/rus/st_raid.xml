@@ -112,7 +112,7 @@
 		<text>Слабый сигнал бедствия. Группа учёных где-то в середине города.</text>
 	</string>
 	<string id="st_raid_rescue_signal_medic">
-		<text>Слабый сигнал из катакомб Госпиталя. Раненый врач просит помощи.</text>
+		<text>Сигнал из катакомб Госпиталя: штурмовая группа военных зажата Монолитом. Есть раненые, с ними врач.</text>
 	</string>
 	<string id="st_raid_rescue_signal_frame">
 		<text>Переговоры Монолита. На стройке командир с ценным грузом.</text>
@@ -121,7 +121,7 @@
 		<text>Учёные идут за вами. Выведите их к выходу.</text>
 	</string>
 	<string id="st_raid_rescue_joined_medic">
-		<text>Врач идёт за вами. Выведите его к выходу.</text>
+		<text>Штурмовая группа идёт за вами. Выведите их к выходу.</text>
 	</string>
 	<string id="st_raid_rescue_done_frame">
 		<text>Каркас инкубатора у вас.</text>
@@ -136,7 +136,7 @@
 		<text>%s: группа учёных выведена (%s).</text>
 	</string>
 	<string id="st_raid_news_rescued_medic">
-		<text>%s: врач выведен (%s).</text>
+		<text>%s: штурмовая группа с врачом выведена (%s).</text>
 	</string>
 	<string id="st_raid_news_rescued_frame">
 		<text>%s: каркас инкубатора добыт (%s).</text>
@@ -145,7 +145,7 @@
 		<text>%s: группу учёных спасти не удалось (%s).</text>
 	</string>
 	<string id="st_raid_news_lost_medic">
-		<text>%s: врача спасти не удалось (%s).</text>
+		<text>%s: штурмовую группу с врачом спасти не удалось (%s).</text>
 	</string>
 	<string id="st_raid_rescue_name_biologist">
 		<text>Д-р Вальтер</text>
@@ -254,5 +254,44 @@
 	</string>
 	<string id="st_raid_doc_synthesis_descr">
 		<text>Флешка учёного Монолита: протоколы опытов с артефактами. Данные зашифрованы, но ценятся всё равно.</text>
+	</string>
+	<string id="st_raid_rescue_wounded_medic">
+		<text>Штурмовая группа ранена и сама не дойдёт. Поговорите с ними: нужна медицина.</text>
+	</string>
+	<string id="st_raid_rescue_wave_medic">
+		<text>Монолит идёт на шум! Держите позицию вместе с группой.</text>
+	</string>
+	<string id="st_raid_rescue_arrived_medic">
+		<text>Штурмовая группа выведена: %d из %d.</text>
+	</string>
+	<string id="st_raid_assault_need">
+		<text>Двое тяжёлые, остальные еле стоят. Без медицины не дойдём. Нужно: %s. Есть?</text>
+	</string>
+	<string id="raid_assault_medicine_0">
+		<text>Держитесь. Что с вами?</text>
+	</string>
+	<string id="raid_assault_medicine_2">
+		<text>Держите, вот медицина.</text>
+	</string>
+	<string id="raid_assault_medicine_3">
+		<text>Пока нет. Найду — вернусь.</text>
+	</string>
+	<string id="raid_assault_medicine_4">
+		<text>Спасибо, сталкер. Тихо... Слышишь? Монолит идёт на шум. Держим позицию, отобьёмся — пойдём за тобой.</text>
+	</string>
+	<string id="raid_assault_medicine_5">
+		<text>Давай быстрее. Долго мы тут не протянем.</text>
+	</string>
+	<string id="st_raid_assault_name_commander">
+		<text>Капитан Ремезов</text>
+	</string>
+	<string id="st_raid_assault_name_mg">
+		<text>Сержант Бойко «Шмель»</text>
+	</string>
+	<string id="st_raid_assault_name_soldier_1">
+		<text>Ефрейтор Лысенко</text>
+	</string>
+	<string id="st_raid_assault_name_soldier_2">
+		<text>Рядовой Гуров</text>
 	</string>
 </string_table>

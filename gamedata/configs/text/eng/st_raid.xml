@@ -112,7 +112,7 @@
 		<text>A faint distress signal. A group of scientists somewhere mid-town.</text>
 	</string>
 	<string id="st_raid_rescue_signal_medic">
-		<text>A faint signal from the Hospital's catacombs. A wounded doctor asks for help.</text>
+		<text>A signal from the Hospital's catacombs: an army assault group pinned down by the Monolith. Wounded, a medic with them.</text>
 	</string>
 	<string id="st_raid_rescue_signal_frame">
 		<text>Monolith talk. A commander with valuable cargo at the building site.</text>
@@ -121,7 +121,7 @@
 		<text>The scientists follow you. Lead them to the exit.</text>
 	</string>
 	<string id="st_raid_rescue_joined_medic">
-		<text>The doctor follows you. Lead him to the exit.</text>
+		<text>The assault group follows you. Lead them to the way out.</text>
 	</string>
 	<string id="st_raid_rescue_done_frame">
 		<text>You have the incubator frame.</text>
@@ -136,7 +136,7 @@
 		<text>%s: the scientists are out (%s).</text>
 	</string>
 	<string id="st_raid_news_rescued_medic">
-		<text>%s: the doctor is out (%s).</text>
+		<text>%s: the assault group and its medic are out (%s).</text>
 	</string>
 	<string id="st_raid_news_rescued_frame">
 		<text>%s: the incubator frame is taken (%s).</text>
@@ -145,7 +145,7 @@
 		<text>%s: the scientists were not saved (%s).</text>
 	</string>
 	<string id="st_raid_news_lost_medic">
-		<text>%s: the doctor was not saved (%s).</text>
+		<text>%s: the assault group and its medic were lost (%s).</text>
 	</string>
 	<string id="st_raid_rescue_name_biologist">
 		<text>Dr. Walter</text>
@@ -254,5 +254,44 @@
 	</string>
 	<string id="st_raid_doc_synthesis_descr">
 		<text>A Monolith scientist's flash drive: protocols of experiments with artefacts. Encrypted, but valuable all the same.</text>
+	</string>
+	<string id="st_raid_rescue_wounded_medic">
+		<text>The assault group is wounded and can't walk. Talk to them: they need medicine.</text>
+	</string>
+	<string id="st_raid_rescue_wave_medic">
+		<text>The Monolith heard you! Hold the place with the group.</text>
+	</string>
+	<string id="st_raid_rescue_arrived_medic">
+		<text>The assault group is out: %d of %d.</text>
+	</string>
+	<string id="st_raid_assault_need">
+		<text>Two are badly hurt, the rest barely stand. We won't make it without medicine. We need: %s. Got it?</text>
+	</string>
+	<string id="raid_assault_medicine_0">
+		<text>Hold on. What happened?</text>
+	</string>
+	<string id="raid_assault_medicine_2">
+		<text>Here, take the medicine.</text>
+	</string>
+	<string id="raid_assault_medicine_3">
+		<text>Not yet. I'll find it and come back.</text>
+	</string>
+	<string id="raid_assault_medicine_4">
+		<text>Thanks, stalker. Quiet... Hear that? The Monolith is coming. We hold here; once they're beaten, we follow you.</text>
+	</string>
+	<string id="raid_assault_medicine_5">
+		<text>Be quick. We won't last long here.</text>
+	</string>
+	<string id="st_raid_assault_name_commander">
+		<text>Captain Remezov</text>
+	</string>
+	<string id="st_raid_assault_name_mg">
+		<text>Sergeant Boyko "Bumblebee"</text>
+	</string>
+	<string id="st_raid_assault_name_soldier_1">
+		<text>Lance Corporal Lysenko</text>
+	</string>
+	<string id="st_raid_assault_name_soldier_2">
+		<text>Private Gurov</text>
 	</string>
 </string_table>

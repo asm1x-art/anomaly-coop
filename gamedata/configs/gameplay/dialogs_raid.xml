@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- The Hospital's assault group (character_desc_raid.xml puts these on its five): the medicine in the raid
+     (scripts\raid_rescue.script), help, gear and the post at the entrance in the shelter (scripts\shelter_assault.script).
+     Phrase 0 is the actor's. -->
+<game_dialogs>
+	<!-- in the raid, wounded: what they need; given, the wave comes -->
+	<dialog id="raid_assault_medicine">
+		<precondition>raid_rescue.dlg_wounded</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>raid_assault_medicine_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<script_text>raid_rescue.dlg_need_text</script_text>
+				<next>2</next>
+				<next>3</next>
+			</phrase>
+			<phrase id="2">
+				<precondition>raid_rescue.dlg_has_medicine</precondition>
+				<text>raid_assault_medicine_2</text>
+				<action>raid_rescue.dlg_give_medicine</action>
+				<next>4</next>
+			</phrase>
+			<phrase id="3">
+				<text>raid_assault_medicine_3</text>
+				<next>5</next>
+			</phrase>
+			<phrase id="4">
+				<text>raid_assault_medicine_4</text>
+			</phrase>
+			<phrase id="5">
+				<text>raid_assault_medicine_5</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- in the shelter, the medic: the fighters' wounds, with what he asks for -->
+	<dialog id="shelter_assault_treat">
+		<precondition>shelter_assault.dlg_can_treat</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_assault_treat_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<script_text>shelter_assault.dlg_treat_text</script_text>
+				<next>2</next>
+				<next>3</next>
+			</phrase>
+			<phrase id="2">
+				<precondition>shelter_assault.dlg_has_treat_items</precondition>
+				<text>shelter_assault_treat_2</text>
+				<action>shelter_assault.dlg_treat</action>
+				<next>4</next>
+			</phrase>
+			<phrase id="3">
+				<text>shelter_assault_treat_3</text>
+			</phrase>
+			<phrase id="4">
+				<text>shelter_assault_treat_4</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- in the shelter, any of them: their things (a suit given changes the look) -->
+	<dialog id="shelter_assault_dress">
+		<precondition>shelter_assault.dlg_in_shelter</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_assault_dress_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_assault_dress_1</text>
+				<action>shelter_assault.dlg_dress</action>
+			</phrase>
+		</phrase_list>
+	</dialog>
+
+	<!-- in the shelter, a fighter: once they are treated, to the post at the entrance -->
+	<dialog id="shelter_assault_guard">
+		<precondition>shelter_assault.dlg_can_guard</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>shelter_assault_guard_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>shelter_assault_guard_1</text>
+				<next>2</next>
+				<next>3</next>
+			</phrase>
+			<phrase id="2">
+				<text>shelter_assault_guard_2</text>
+				<action>shelter_assault.dlg_to_guard</action>
+				<next>4</next>
+			</phrase>
+			<phrase id="3">
+				<text>shelter_assault_guard_3</text>
+			</phrase>
+			<phrase id="4">
+				<text>shelter_assault_guard_4</text>
+			</phrase>
+		</phrase_list>
+	</dialog>
+</game_dialogs>

@@ -1,14 +1,21 @@
 -- The raid's random rescue events (docs/coop/shelter.md, "Events"; settings: mod_system_raid.ltx [raid_rescue] and
 -- [raid_rescue_<target>]). At each cycle (raid_window) one comes with chance, never two cycles running, with every target
--- not yet done, one drawn: only it is on in that cycle; one learns of it from a radio signal right on setting out, nothing shows on the raid app's map.
+-- not yet done (and whose "requires" state is set: the Hospital's group only once the lift down is repaired), one drawn:
+-- only it is on in that cycle; one learns of it from a radio signal right on setting out, nothing shows on the raid app's map.
 -- Out of the raid with a target not done, the event is over, and the next cycle has none.
--- People (scientists, medic): a Monolith siege at the smart nearby; with it dead and the actor at the place, they appear
--- and follow as companions; they don't go on to further levels. Out to the shelter with all of them alive = done; they
--- then live in the shelter (staff). One of them dead, or the raider dead: lost till a later event.
+-- People (scientists, the assault group): a Monolith siege at the smart nearby; with it dead and the actor at the place,
+-- they appear and follow as companions; they don't go on to further levels. Out to the shelter = done; they then live
+-- in the shelter (staff). The scientists: one of them dead, or the raider dead: lost till a later event.
+-- The Hospital's assault group (target "medic"): five soldiers in SKAT-9 suits with the medic Shov, wounded. They wait
+-- where they are till the actor gives them medicine (a dialog, dialogs_raid.xml; "medicine"), then a Monolith wave comes
+-- for them (wave_*) and they hold the place; with the wave dead they follow. The medic ("key_role") dead = lost; the
+-- others may die: those who reach the exit come to the shelter (shelter_assault.script).
+-- rescue_squad_immortal: none of the assault group dies (raid, shelter, perimeter), for tests.
 -- A thing (frame): on the commander of the siege; taken = done.
 -- The world's (shelter.state): rescue_active (targets, comma-separated), rescue_done_<t>, rescue_lost_<t>,
 -- rescue_siege_<t> (squad ids), rescue_people_<t> (squad id), rescue_count_<t>, rescue_pending, rescue_skip_next,
--- rescue_staff_<t>.
+-- rescue_staff_<t>, rescue_staff_ids_<t> ("section:id" of those in the shelter), rescue_phase_<t> (wounded, wave,
+-- follow), rescue_wave_<t> (the wave's squad id), rescue_arrived_<t> (roles that reached the exit).
 
 local S = "raid_rescue"
 local CHECK_MS = 2000
@@ -16,6 +23,10 @@ local SHELTER_LEVEL = "bunker_a1"
 
 local function setting(t, key)
 	return ini_sys:r_string_ex("raid_rescue_" .. t, key)
+end
+
+local function setting_num(t, key, default)
+	return ini_sys:r_float_ex("raid_rescue_" .. t, key) or default
 end
 
 local function list(s)
@@ -45,6 +56,12 @@ local function open(t)
 	return not done(t) and not shelter.state("rescue_lost_" .. t, false)
 end
 
+-- a target may be drawn only with its "requires" state set (the world's)
+local function allowed(t)
+	local need = setting(t, "requires")
+	return not need or shelter.state(need, false) and true or false
+end
+
 local function ids_of(key)
 	local out = {}
 	for _, s in ipairs(list(tostring(shelter.state(key, "") or ""))) do
@@ -53,13 +70,75 @@ local function ids_of(key)
 	return out
 end
 
-local function say(id)
-	actor_menu.set_msg(1, game.translate_string(id), 8)
+local function say(id, ...)
+	local s = game.translate_string(id)
+	actor_menu.set_msg(1, select("#", ...) > 0 and string.format(s, ...) or s, 8)
 end
 
 local function people_squad(t)
 	return raid_monolith.squad_alive(tonumber(shelter.state("rescue_people_" .. t, nil)))
 end
+
+local function phase(t)
+	return shelter.state("rescue_phase_" .. t, nil)
+end
+
+-- the roles of a squad's living members (rescue_role of their sections)
+local function roles_alive(squad)
+	local out = {}
+	for k in squad:squad_members() do
+		local se = k.object or alife():object(k.id)
+		local role = se and ini_sys:r_string_ex(se:section_name(), "rescue_role")
+		if role then
+			out[#out + 1] = role
+		end
+	end
+	return out
+end
+
+-- still a rescue: with a key role, that one alive; without, all of them
+local function group_ok(t, squad)
+	if not squad then
+		return false
+	end
+	local key = setting(t, "key_role")
+	if key then
+		for _, role in ipairs(roles_alive(squad)) do
+			if role == key then
+				return true
+			end
+		end
+		return false
+	end
+	return squad:npc_count() >= (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0)
+end
+
+-------------------------------------------------------------------------------
+-- immortal for tests: [raid_rescue] rescue_squad_immortal; the assault group in the raid, the shelter and on the
+-- perimeter (shelter_assault.script calls protect for its own). Hits on them are dropped and the engine's flag is set.
+
+local protected = {}
+
+function immortal()
+	return ini_sys:r_bool_ex(S, "rescue_squad_immortal", false)
+end
+
+function protect(npc)
+	if immortal() then
+		protected[npc:id()] = true
+		if not npc:invulnerable() then
+			npc:invulnerable(true)
+		end
+	end
+end
+
+local function npc_on_before_hit(npc, shit, bone_id, flags)
+	if protected[npc:id()] and immortal() then
+		flags.ret_value = false
+	end
+end
+
+-------------------------------------------------------------------------------
 
 -- squads to go, removed once off the raid level: a release just before a level change is lost (the game's release queue)
 local function gone_later(squad)
@@ -89,8 +168,14 @@ local function remove_people(t)
 	if squad then
 		gone_later(squad)
 	end
+	local wave = raid_monolith.squad_alive(tonumber(shelter.state("rescue_wave_" .. t, nil)))
+	if wave then
+		gone_later(wave)
+	end
 	shelter.set_state("rescue_people_" .. t, nil)
 	shelter.set_state("rescue_count_" .. t, nil)
+	shelter.set_state("rescue_phase_" .. t, nil)
+	shelter.set_state("rescue_wave_" .. t, nil)
 end
 
 local function clear(t)
@@ -122,7 +207,7 @@ function new_cycle()
 	local left, target = {}, ""
 	if not had and math.random() < (ini_sys:r_float_ex(S, "chance") or 0.4) then
 		for _, t in ipairs(list(ini_sys:r_string_ex(S, "targets"))) do
-			if not done(t) then
+			if not done(t) and allowed(t) then
 				left[#left + 1] = t
 			end
 		end
@@ -130,6 +215,21 @@ function new_cycle()
 	end
 	shelter.set_state("rescue_active", target)
 	printf("raid_rescue: new cycle, target: %s", target)
+end
+
+-- tests: t is the target of the next raid now, if it may be drawn at all (not done, its "requires" set)
+function force(t)
+	if done(t) or not allowed(t) then
+		printf("raid_rescue: %s can't be drawn now (done: %s, allowed: %s)", t, tostring(done(t)), tostring(allowed(t)))
+		return false
+	end
+	for _, a in ipairs(active()) do
+		clear(a)
+	end
+	shelter.set_state("rescue_skip_next", nil)
+	shelter.set_state("rescue_active", t)
+	printf("raid_rescue: %s forced", t)
+	return true
 end
 
 -- the sieges on a raid level, as one goes onto it (before it loads)
@@ -164,7 +264,8 @@ local function siege_dead(t)
 	return true
 end
 
--- the people appear and follow (as axr_companions.setup_companion_task makes a task's companions)
+-- the people appear and follow (as axr_companions.setup_companion_task makes a task's companions); wounded ones wait
+-- for medicine first
 local function spawn_people(t)
 	local pos, node = point(t, "position"), tonumber(setting(t, "node"))
 	local gvid = db.actor:game_vertex_id()
@@ -176,6 +277,7 @@ local function spawn_people(t)
 	squad:set_squad_relation()
 	axr_companions.companion_squads[squad.id] = squad
 	local count = 0
+	local goodwill = tonumber(setting(t, "actor_goodwill"))
 	for k in squad:squad_members() do
 		local se = k.object or alife():object(k.id)
 		if se then
@@ -184,13 +286,22 @@ local function spawn_people(t)
 			se_save_var(se.id, se:name(), "companion", true)
 			se_save_var(se.id, se:name(), "companion_cannot_dismiss", true)
 			se_save_var(se.id, se:name(), "companion_cannot_teleport", false)
+			if goodwill then
+				se:force_set_goodwill(goodwill, 0)
+			end
 			SIMBOARD:setup_squad_and_group(se)
 		end
 	end
 	shelter.set_state("rescue_people_" .. t, squad.id)
 	shelter.set_state("rescue_count_" .. t, count)
-	say("st_raid_rescue_joined_" .. t)
-	printf("raid_rescue: %s follow (%s)", t, count)
+	if setting(t, "medicine") then
+		shelter.set_state("rescue_phase_" .. t, "wounded")
+		say("st_raid_rescue_wounded_" .. t)
+	else
+		shelter.set_state("rescue_phase_" .. t, "follow")
+		say("st_raid_rescue_joined_" .. t)
+	end
+	printf("raid_rescue: %s appear (%s)", t, count)
 end
 
 local function lose(t)
@@ -207,7 +318,7 @@ local function finish(t)
 	printf("raid_rescue: %s done", t)
 end
 
--- people following on this level: they don't go further
+-- people with the actor on this level: they don't go further
 function escorting(level_name)
 	for _, t in ipairs(active()) do
 		if setting(t, "level") == level_name and shelter.state("rescue_people_" .. t, nil) then
@@ -217,13 +328,18 @@ function escorting(level_name)
 	return false
 end
 
--- out of the raid from a level: those following are saved, unless the raider died
+-- out of the raid from a level: those following are saved, unless the raider died or they weren't following yet
 function on_exit(level_name, died)
 	for _, t in ipairs(active()) do
 		if setting(t, "level") == level_name and shelter.state("rescue_people_" .. t, nil) then
 			local squad = people_squad(t)
-			local whole = squad and squad:npc_count() >= (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0)
-			if whole and not died then
+			local following = (phase(t) or "follow") == "follow"
+			if following and group_ok(t, squad) and not died then
+				local roles = roles_alive(squad)
+				shelter.set_state("rescue_arrived_" .. t, table.concat(roles, ","))
+				if setting(t, "key_role") then
+					say("st_raid_rescue_arrived_" .. t, #roles, tonumber(shelter.state("rescue_count_" .. t, #roles)) or #roles)
+				end
 				remove_people(t)
 				finish(t)
 			else
@@ -267,13 +383,242 @@ local function area_clear(pos)
 	return clear
 end
 
+-------------------------------------------------------------------------------
+-- the wounded group: the medicine, the wave
+
+-- "section:count, ..." of the medicine
+local function medicine(t)
+	local out = {}
+	for _, entry in ipairs(list(setting(t, "medicine"))) do
+		local p = str_explode(entry, ":")
+		out[#out + 1] = { section = p[1], count = tonumber(p[2]) or 1 }
+	end
+	return out
+end
+
+-- the actor's items of the medicine, nil if some are missing
+local function medicine_carried(t)
+	local found = {}
+	for _, m in ipairs(medicine(t)) do
+		local n = 0
+		db.actor:iterate_inventory(function(_, item)
+			if n < m.count and item:section() == m.section then
+				n = n + 1
+				found[#found + 1] = item
+			end
+		end, db.actor)
+		if n < m.count then
+			return nil
+		end
+	end
+	return found
+end
+
+-- the online members, alive
+local function online_members(squad)
+	local out = {}
+	for k in squad:squad_members() do
+		local npc = level.object_by_id(k.id)
+		if npc and npc:alive() then
+			out[#out + 1] = npc
+		end
+	end
+	return out
+end
+
+local wave_at = {} -- the wave's time, this game's: set as the medicine is given, or at the first check after a load
+
+-- every check, on the game of the one there: relation, immortality, wounds, waiting
+local function tend(t, squad)
+	local ph = phase(t)
+	local goodwill = tonumber(setting(t, "actor_goodwill"))
+	for _, npc in ipairs(online_members(squad)) do
+		if goodwill and npc:goodwill(db.actor) < goodwill then
+			npc:force_set_goodwill(goodwill, db.actor)
+		end
+		if setting(t, "key_role") then
+			protect(npc)
+		end
+		if ph == "wounded" or ph == "wave" then
+			if not npc:has_info("npcx_beh_wait") then
+				axr_companions.set_companion_to_wait_state(npc)
+			end
+		end
+		if ph == "wounded" and not se_load_var(npc:id(), npc:name(), "rescue_wounded") then
+			npc:set_health_ex(setting_num(t, "wounded_health", 0.35))
+			se_save_var(npc:id(), npc:name(), "rescue_wounded", true)
+		end
+	end
+end
+
+-- the actor's eyes see a man standing at pos (nothing static between)
+local function seen(pos)
+	local from = db.actor:position():add(vector():set(0, 1.6, 0))
+	local dir = vector():set(pos.x, pos.y + 1.4, pos.z):sub(from)
+	local dist = dir:magnitude()
+	if dist < 0.1 then
+		return true
+	end
+	dir:normalize()
+	return not ray_pick(from, dir, dist, rq_target.rqtStatic, nil):query()
+end
+
+-- where the wave comes from: one of wave_from ("x, y, z, level vertex | ...") at least wave_min_distance from the actor
+-- and out of their sight; none such for wave_wait_max seconds: the one farthest from the actor
+local function wave_point(t, now)
+	local fits, far, far_d = {}, nil, -1
+	for _, s in ipairs(str_explode(setting(t, "wave_from") or "", "|")) do
+		local p = str_explode(s, ",")
+		local pos, lv = vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3])), tonumber(p[4])
+		local d = pos:distance_to(db.actor:position())
+		if d >= setting_num(t, "wave_min_distance", 40) and not seen(pos) then
+			fits[#fits + 1] = { pos, lv }
+		end
+		if d > far_d then
+			far, far_d = { pos, lv }, d
+		end
+	end
+	if #fits > 0 then
+		return fits[math.random(#fits)]
+	end
+	if now >= wave_at[t] + setting_num(t, "wave_wait_max", 60) * 1000 then
+		return far
+	end
+end
+
+local function spawn_wave(t, squad, at)
+	local pos, lv = at[1], at[2]
+	local gv = raid.vertex_of(level.name(), pos) or db.actor:game_vertex_id()
+	local wave = alife_create(setting(t, "wave_squad"), pos, lv, gv)
+	if not wave then
+		return
+	end
+	wave:create_npc(nil, pos, lv, gv)
+	for k in wave:squad_members() do
+		local se = k.object or alife():object(k.id)
+		if se then
+			SIMBOARD:setup_squad_and_group(se)
+		end
+	end
+	wave.scripted_target = tostring(squad.id)
+	shelter.set_state("rescue_wave_" .. t, wave.id)
+	say("st_raid_rescue_wave_" .. t)
+	printf("raid_rescue: %s wave of %s at %.1f,%.1f,%.1f", t, wave:npc_count(), pos.x, pos.y, pos.z)
+end
+
+local function follow(t, squad)
+	shelter.set_state("rescue_phase_" .. t, "follow")
+	for _, npc in ipairs(online_members(squad)) do
+		axr_companions.set_companion_to_follow_state(npc)
+	end
+	say("st_raid_rescue_joined_" .. t)
+	printf("raid_rescue: %s follow", t)
+end
+
+-- the wave: after wave_delay, then held off; without wave_squad they follow at once
+local function wave(t, squad)
+	if not setting(t, "wave_squad") then
+		return follow(t, squad)
+	end
+	local id = tonumber(shelter.state("rescue_wave_" .. t, nil))
+	if id then
+		if not raid_monolith.squad_alive(id) then
+			shelter.set_state("rescue_wave_" .. t, nil)
+			follow(t, squad)
+		end
+		return
+	end
+	local now = time_global()
+	wave_at[t] = wave_at[t] or now + setting_num(t, "wave_delay", 20) * 1000
+	if now < wave_at[t] then
+		return
+	end
+	local at = wave_point(t, now)
+	if at then
+		spawn_wave(t, squad, at)
+	end
+end
+
+local function group_target(npc)
+	local se = npc and alife_object(npc:id())
+	local squad_id = se and se.group_id
+	for _, t in ipairs(active()) do
+		if squad_id and squad_id ~= 65535 and tonumber(shelter.state("rescue_people_" .. t, nil)) == squad_id then
+			return t
+		end
+	end
+end
+
+local function wounded_target()
+	for _, t in ipairs(active()) do
+		if phase(t) == "wounded" then
+			return t
+		end
+	end
+end
+
+-- dialogs (gameplay\dialogs_raid.xml)
+function dlg_wounded(a, b)
+	local t = group_target(dialogs.who_is_npc(a, b))
+	return t ~= nil and phase(t) == "wounded"
+end
+
+function dlg_need_text()
+	local t = wounded_target()
+	local parts = {}
+	for _, m in ipairs(t and medicine(t) or {}) do
+		parts[#parts + 1] = ui_item.get_sec_name(m.section) .. " x" .. m.count
+	end
+	return string.format(game.translate_string("st_raid_assault_need"), table.concat(parts, ", "))
+end
+
+function dlg_has_medicine(a, b)
+	local t = group_target(dialogs.who_is_npc(a, b))
+	return t ~= nil and medicine_carried(t) ~= nil
+end
+
+function dlg_no_medicine(a, b)
+	return not dlg_has_medicine(a, b)
+end
+
+-- the medicine goes to them, shared out; their wounds dressed to healed_health; then the wave
+function dlg_give_medicine(a, b)
+	local t = group_target(dialogs.who_is_npc(a, b))
+	local squad = t and people_squad(t)
+	local items = t and medicine_carried(t)
+	if not (squad and items) then
+		return
+	end
+	local members = online_members(squad)
+	for i, item in ipairs(items) do
+		local to = members[(i - 1) % math.max(1, #members) + 1]
+		news_manager.relocate_item(db.actor, "out", item:section(), 1)
+		if to then
+			db.actor:transfer_item(item, to)
+		else
+			alife_release(item)
+		end
+	end
+	for _, npc in ipairs(members) do
+		npc:set_health_ex(setting_num(t, "healed_health", 0.8))
+	end
+	shelter.set_state("rescue_phase_" .. t, "wave")
+	wave_at[t] = time_global() + setting_num(t, "wave_delay", 20) * 1000
+	printf("raid_rescue: %s got the medicine", t)
+end
+
 local function check(level_name)
 	for _, t in ipairs(active()) do
 		if setting(t, "level") == level_name and open(t) and setting(t, "squad") then
 			if shelter.state("rescue_people_" .. t, nil) then
 				local squad = people_squad(t)
-				if not squad or squad:npc_count() < (tonumber(shelter.state("rescue_count_" .. t, 0)) or 0) then
+				if not group_ok(t, squad) then
 					lose(t)
+				else
+					tend(t, squad)
+					if phase(t) == "wave" then
+						wave(t, squad)
+					end
 				end
 			elseif siege_dead(t) and db.actor:position():distance_to(point(t, "position")) < (ini_sys:r_float_ex(S, "reveal") or 15)
 				and area_clear(point(t, "position")) then
@@ -296,23 +641,38 @@ local function actor_on_item_take(item)
 	end
 end
 
--- those saved, in the shelter: each once for the world
+-- those saved, in the shelter: each once for the world. staff_places: "x, y, z[, level vertex]" each (the vertex given:
+-- level.vertex_id finds another floor's on bunker_a1). With rescue_arrived_<t> only those roles come.
 local function spawn_staff(t)
 	local gvid = db.actor:game_vertex_id()
 	local places = str_explode(setting(t, "staff_places") or "", "|")
-	for i, section in ipairs(list(setting(t, "staff"))) do
-		local p = str_explode(places[i] or "", ",")
-		local lvid = p[3] and level.vertex_id(vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3])))
-		if lvid and lvid < 4294967295 then
-			local se = alife_create(section, level.vertex_position(lvid), lvid, gvid)
-			if se then
-				se:set_character_name(game.translate_string(ini_sys:r_string_ex(section, "rescue_name")))
-				shelter_base.add_staff(se.id)
-			end
-		else
-			printf("! raid_rescue: no AI vertex for %s", section)
+	local arrived = shelter.state("rescue_arrived_" .. t, nil)
+	local roles
+	if arrived then
+		roles = {}
+		for _, r in ipairs(list(tostring(arrived))) do
+			roles[r] = true
 		end
 	end
+	local ids = {}
+	for i, section in ipairs(list(setting(t, "staff"))) do
+		local role = ini_sys:r_string_ex(section, "rescue_role")
+		if not (roles and role) or roles[role] then
+			local p = str_explode(places[i] or "", ",")
+			local lvid = tonumber(p[4]) or (p[3] and level.vertex_id(vector():set(tonumber(p[1]), tonumber(p[2]), tonumber(p[3]))))
+			if lvid and lvid < 4294967295 then
+				local se = alife_create(section, level.vertex_position(lvid), lvid, gvid)
+				if se then
+					se:set_character_name(game.translate_string(ini_sys:r_string_ex(section, "rescue_name")))
+					shelter_base.add_staff(se.id)
+					ids[#ids + 1] = section .. ":" .. se.id
+				end
+			else
+				printf("! raid_rescue: no AI vertex for %s", section)
+			end
+		end
+	end
+	shelter.set_state("rescue_staff_ids_" .. t, table.concat(ids, ","))
 	shelter.set_state("rescue_staff_" .. t, true)
 end
 
@@ -374,4 +734,5 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_update", actor_on_update)
 	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
 	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("npc_on_before_hit", npc_on_before_hit)
 end

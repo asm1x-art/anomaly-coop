@@ -1,0 +1,19 @@
+; The raid's rescue of the Hospital's assault group (scripts\raid_rescue.script, mod_system_raid.ltx): the machine
+; gunner's PKM, the Monolith wave's guns. Lines: weapon:attachments:ammo type:chance (npc_loadouts.ltx explains them);
+; a slot may name an existing list (monolith_veteran_primary, monolith_master_primary...).
+![loadouts_per_name]
+raid_rescue_assault_mg = loadout_raid_assault_mg
+
+![loadouts_per_squad]
+raid_rescue_medic_wave = loadout_raid_rescue_wave
+
+[loadout_raid_assault_mg]
+primary   = raid_assault_mg_primary
+secondary = army_veteran_secondary
+
+[raid_assault_mg_primary]
+wpn_pkm:0:0:100
+
+[loadout_raid_rescue_wave]
+primary   = monolith_veteran_primary
+secondary = monolith_veteran_secondary

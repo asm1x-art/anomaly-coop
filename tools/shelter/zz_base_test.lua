@@ -2,7 +2,8 @@
 -- game): keys for going through проверки.md without waiting game weeks. A test mode: switched on in the F7 menu (tab
 -- "toggle", "Тест: База"); the keys and what they do show at the left edge while it is on (the author's keyboard has
 -- no numpad):
--- PgUp the window of "Cooling" now     PgDn the next rescue target for the next raid, in turn
+-- PgUp the window of "Cooling" now     PgDn the next rescue target for the next raid, in turn (raid_rescue.force: not
+--      one that may not be drawn yet, the Hospital's group before the lift down is repaired)
 -- Del  scientists and medic saved, Shurup hired, parts for all the base's work (the staff come at the next load of the
 --      shelter)
 -- Ins  the next crisis, in turn         End  the Scorcher on or off
@@ -34,9 +35,11 @@ local function press(dik)
 		local t = TARGETS[turn_target]
 		shelter.set_state("rescue_done_" .. t, nil)
 		shelter.set_state("rescue_lost_" .. t, nil)
-		shelter.set_state("rescue_skip_next", nil)
-		shelter.set_state("rescue_active", t)
-		msg("Цель следующего рейда: " .. t)
+		if raid_rescue.force(t) then
+			msg("Цель следующего рейда: " .. t)
+		else
+			msg("Цель " .. t .. " сейчас не выпадает (группе в Госпитале нужен починенный лифт вниз)")
+		end
 	elseif dik == k.DIK_NUMPAD3 then
 		shelter.set_state("rescue_done_scientists", true)
 		shelter.set_state("rescue_done_medic", true)
