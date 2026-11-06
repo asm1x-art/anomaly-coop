@@ -156,6 +156,7 @@ int ps_r__taa_jitter = 0;
 int ps_r__dlss_mv_debug = 0;
 u32 ps_r__dlss_mode = 0;
 float ps_r__dlss_reset_distance = 5.f;
+int ps_r__dlss_jitter_conf = 0;
 xr_token dlss_mode_token[] = {
 	{"off", 0}, {"dlaa", 1}, {"quality", 2}, {"balanced", 3}, {"performance", 4}, {"ultra_performance", 5}, {nullptr, 0}
 };
@@ -1395,6 +1396,7 @@ void xrRender_initconsole()
 	CMD4(CCC_Integer, "r__taa_jitter", &ps_r__taa_jitter, 0, 1); // test: the camera's sub-pixel jitter without an upscaler (the picture shivers)
 	CMD4(CCC_Integer, "r__dlss_mv_debug", &ps_r__dlss_mv_debug, 0, 1); // test: DLSS's motion vectors on the screen (the shaders for them: from game start)
 	CMD3(CCC_Token, "r__dlss_mode", &ps_r__dlss_mode, dlss_mode_token); // NVIDIA DLSS: off/dlaa/quality/balanced/performance/ultra_performance; vid_restart
+	CMD4(CCC_Integer, "r__dlss_jitter_conf", &ps_r__dlss_jitter_conf, 0, 3); // test: the jitter's signs as DLSS is told them (0: as drawn, 1: -x, 2: -y, 3: both)
 	CMD4(CCC_Float, "r__dlss_reset_distance", &ps_r__dlss_reset_distance, 1.f, 100.f); // the camera moved farther in one frame (a teleport): DLSS forgets the frames before
 #if defined(USE_DX11)
 	CMD1(CCC_dlss_status, "r__dlss_status"); // ok, or why DLSS can't run (not_nvidia, unsupported, old_driver, no_dll, msaa, hdr10, ...)

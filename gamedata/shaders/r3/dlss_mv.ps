@@ -4,7 +4,8 @@
 // For each pixel: where its surface was on the screen a frame ago, in render pixels, from this pixel to there (as DLSS
 // takes it). Models wrote their own motion into the G-buffer (dlss_mv.h); the rest (the level, grass, trees, the sky)
 // moved with the camera only: their point is rebuilt from the depth and projected with the last frame's camera.
-// Depth: 0 at the near plane, 1 at the far one and for the sky.
+// Depth: the depth buffer as drawn (0 near, 1 far); without the render-scale target (r__dlss_mv_debug alone,
+// dlss_mv_nohw.ps) rebuilt from the G-buffer.
 
 uniform float4x4 m_dlss_inv_v;		// view -> world, this frame
 uniform float4x4 m_dlss_vp;			// world -> clip, this frame, without the jitter
@@ -12,6 +13,9 @@ uniform float4x4 m_dlss_vp_prev;	// the same a frame ago
 uniform float4 dlss_proj;			// 1/P._11, 1/P._22, P._31, P._32 of this frame's projection with the jitter
 uniform float4 dlss_depth;			// P._33, P._43, render width, height
 Texture2D s_dlss_obj;				// the G-buffer's motion (xy: uv now - uv a frame ago; w = 1: a model's own)
+#ifndef DLSS_NO_HW_DEPTH
+Texture2D s_dlss_hwdepth;			// the depth buffer as drawn: the HUD is in 0..0.02 (the near range, rmNear)
+#endif
 
 struct dlss_mv_out
 {
@@ -44,7 +48,17 @@ dlss_mv_out main(float2 tc : TEXCOORD0, float4 col : COLOR, float4 pos2d : SV_Po
 	if (obj.w > 0.5f)
 		d = -obj.xy;
 
+#ifndef DLSS_NO_HW_DEPTH
+	// the depth buffer has what the G-buffer doesn't: the HUD's see-through parts (sight glass, reticles) drawn after it.
+	// They go with the camera: no motion of their own on the screen
+	float hwz = s_dlss_hwdepth.Load(px).x;
+	if (hwz < 0.02f && obj.w < 0.5f)
+		d = 0;
+	o.mv = d * dlss_depth.zw;
+	o.depth = hwz;
+#else
 	o.mv = d * dlss_depth.zw;
 	o.depth = sky ? 1.f : saturate(dlss_depth.x + dlss_depth.y / z);
+#endif
 	return o;
 }

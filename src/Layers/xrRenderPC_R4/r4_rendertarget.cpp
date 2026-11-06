@@ -406,7 +406,7 @@ CRenderTarget::CRenderTarget()
 	render_h = use_dlss ? dlss_h : scaled ? _max(u32(64), u32(display_h * ps_r__render_scale) & ~1u) : display_h;
 	if (scaled)
 	{
-		Msg("* r__render_scale %.2f: the world at %ux%u, the screen %ux%u", ps_r__render_scale, render_w, render_h,
+		Msg("* %s: the world at %ux%u, the screen %ux%u", use_dlss ? "DLSS" : "r__render_scale", render_w, render_h,
 		    display_w, display_h);
 		render_scale_swap_in(render_w, render_h);
 	}
@@ -1400,7 +1400,7 @@ CRenderTarget::CRenderTarget()
 
 	if (rt_dlss_mv)
 	{
-		b_dlss = xr_new<CBlender_dlss>();
+		b_dlss = xr_new<CBlender_dlss>(rt_render_scale_z ? true : false);
 		s_dlss.create(b_dlss, "r2\\dlss");
 	}
 
@@ -1521,8 +1521,10 @@ void CRenderTarget::scale_end(bool dlss_wanted)
 	{
 		PIX_EVENT(DLSS);
 		const bool reset = !dlss_history || dlss_frame_index() != dlss_frame + 1 || g_taa.cut;
+		const float jx = (ps_r__dlss_jitter_conf & 1) ? -g_taa.px.x : g_taa.px.x;
+		const float jy = (ps_r__dlss_jitter_conf & 2) ? -g_taa.px.y : g_taa.px.y;
 		upscaled = dlss::evaluate(rt_render_scale->pSurface, rt_dlss_mv->pSurface, rt_dlss_depth->pSurface,
-		                          rt_dlss_out->pSurface, render_w, render_h, g_taa.px.x, g_taa.px.y, reset,
+		                          rt_dlss_out->pSurface, render_w, render_h, jx, jy, reset,
 		                          _max(Device.fTimeDelta * 1000.f, 1.f));
 		dlss_history = upscaled;
 		dlss_frame = dlss_frame_index();

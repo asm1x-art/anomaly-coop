@@ -1,0 +1,8 @@
+#include "common.h"
+
+// DLSS's output (already the screen's size) onto the screen, pixel for pixel (engine: CRenderTarget::scale_end).
+// A filtered copy would blur it: the quad's texture coordinates fall between two texels.
+float4 main(float2 tc : TEXCOORD0, float4 col : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	return s_generic.Load(int3(pos2d.xy, 0));
+}
