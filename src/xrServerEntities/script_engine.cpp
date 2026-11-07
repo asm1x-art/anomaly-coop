@@ -253,6 +253,14 @@ void CScriptEngine::lua_error_not_crash(lua_State* L)
         }
     }
 
+    // the co-op world's headless host (-coop_host) has nobody to answer the in-game box Lua shows: it ends as on
+    // any fatal error, and its server starts it again
+    if (strstr(Core.Params, "-coop_host"))
+    {
+        Debug.fatal(DEBUG_INFO, "LuaBind error on the co-op host: %s", lua_error_line.c_str());
+        return;
+    }
+
     ::luabind::functor<void> funct;
     if (ai().script_engine().functor("_G.COnLuaBindFatalError", funct))
         funct(lua_error_line.c_str());

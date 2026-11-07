@@ -96,7 +96,8 @@ public:
 	
 	float xr_stdcall GetAlcohol() { return m_fAlcohol; }
 	float xr_stdcall GetPsy() { return 1.0f - GetPsyHealth(); }
-	virtual float GetSatiety() { return m_fSatiety; }
+	// const: overrides CEntityCondition's (always 1), which db.actor.satiety and conditions():GetSatiety() reach
+	float GetSatiety() const override { return m_fSatiety; }
 	virtual void SetSatiety(float satiety) { m_fSatiety = satiety; }
 	IC float GetSatietyPower() const { return IsSleeping() ? m_fV_SatietyPowerSleep * m_fSatiety : m_fV_SatietyPower * m_fSatiety; };
 

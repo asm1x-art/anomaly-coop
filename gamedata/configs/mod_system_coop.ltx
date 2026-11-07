@@ -374,6 +374,13 @@ satiety_min = 0.2  ; below satiety_critical (actor.ltx, 0.2) hunger takes health
 settle_s    = 3    ; real s: back at the save point on the same level, all this once more then (a psi field still hits
             ; for a moment after one is gone from it)
 
+; Co-op: the world's host (-coop_host), a ghost on fake_start: what Anomaly does to an actor over time or on an event
+; is kept off it (coop_host_guard.script): no hits, needs, sleep, level changes or saves but the world's.
+[coop_host_guard]
+check_ms = 1000          ; real ms: its health, hunger, radiation, bleeding, psi health and stamina put back this often
+saves    = coop_autosave ; the only saves it makes, comma-separated: the world's (coop_sync.script AUTOSAVE); any other
+                         ; save would go up as the world, so it is dropped
+
 ; Co-op: a player's own autosave «àâòî» (coop_autosave.script): one per character, each new one in the old one's
 ; place, never touching manual saves or the exit save; in a group too it is the player's own. A lone death goes back
 ; to the newest of the player's own saves, this one counted. Made only when the player is safe: alive and up, health
