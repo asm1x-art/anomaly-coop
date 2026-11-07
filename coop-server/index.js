@@ -21,7 +21,7 @@ const server = await startServer({ port: config.server.port, dataDir: config.ser
   news: { keep: config.server.news_keep, types: config.server.news_types.split(/[\s,]+/).filter(Boolean) } });
 if (hostSecret) {
   const host = startHost({ gameDir: config.host.game_dir, exe: config.host.exe, args: config.host.args,
-    port: config.server.port, secret: hostSecret, events: server.coop.events });
+    port: config.server.port, secret: hostSecret, events: server.coop.emitter });
   server.coop.setHostProcess(host);
   const stop = () => {
     host.stop();

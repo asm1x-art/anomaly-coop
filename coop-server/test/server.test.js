@@ -1987,3 +1987,17 @@ test('the admin window: the world\'s events go to the sim master (a stop of a st
     server.close();
   }
 });
+
+test('the host process tells host_down through the emitter, apart from the world\'s events', async () => {
+  const server = await startServer(options());
+  try {
+    const seen = [];
+    server.coop.on('host_down', (e) => seen.push(e));
+    assert.equal(typeof server.coop.emitter.emit, 'function'); // host.js: events.emit('host_down', ...)
+    server.coop.emitter.emit('host_down', { code: 1, restarting: true });
+    assert.deepEqual(seen, [{ code: 1, restarting: true }]);
+    assert.equal(typeof server.coop.events, 'function'); // the admin page's and the bot's world events
+  } finally {
+    server.close();
+  }
+});

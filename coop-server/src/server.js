@@ -1257,7 +1257,7 @@ tests=1` : ''));
       return true;
     },
     on: (event, handler) => events.on(event, handler),
-    events, // host.js tells host_down through it
+    emitter: events, // host.js tells host_down through it (not 'events': that is the world's events below)
     // the master (the host, if it runs the world) saves it now
     saveWorld: () => requestSave('admin', 'admin'),
     // the world's events: what its game last said (a fresh report asked for), and one started or stopped by an admin
