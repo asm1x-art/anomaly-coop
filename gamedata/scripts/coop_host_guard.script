@@ -1,0 +1,154 @@
+-- Co-op: the world's host (-coop_host) is a ghost on fake_start, the sim master and nobody's player
+-- (docs/coop/multiplayer.md). Anomaly does a lot to an actor over time or on an event; on the host all of it is kept
+-- off here, in one place. A player's game is never touched: everything below is set up in the host's game alone.
+-- [coop_host_guard] in mod_system_coop.ltx.
+--   immunity   surges, psi storms and anomaly fields pass it by (level_environment.is_actor_immune). Not as
+--              "surge_immuned" (the Zone's mark): Anomaly's surge never ends for one (it starts again each time it
+--              should end: the news over and over, the world's clock left at x10) and kills nobody
+--   hits       none land: the surge's own psi hits ask only "surge_immuned" (surge_manager), and arszi_psy turns psi
+--              hits into its psi health, which kills at 0
+--   needs      thirst and sleep deprivation are off: it never drinks, so thirst once past its limit put it to sleep
+--              for 3-9 h about once a minute (thirst grows in that sleep, so for good), each sleep a jump of the
+--              world's clock while nobody is in it, a save of the world, and the surges and psi storms the clock
+--              jumped over ended. The needs are personal (coop_progress), the players' own come with them
+--   stats      health, hunger (the engine's satiety takes health once low), radiation (the "radiation day" of the
+--              harder difficulties, a hit), bleeding, psi health, stamina and arszi_psy's psi health are put back
+--              every check_ms
+--   death      never (coop_death.script, actor_on_before_death)
+--   sleep      Anomaly's sleep never starts on it: it jumps the clock (the engine refuses that on the host too:
+--              coop_time.cpp allow_time_jump) and saves "<user> - sleep"
+--   saves      only the world's own ([coop_host_guard] saves): any other save Anomaly makes (the sleep's, the timed
+--              autosave of the options, the tempsave after a Lua error, a new game's) would go up as the world
+--              (coop_save.cpp on_game_saved)
+--   levels     no level change: the ghost stays on fake_start
+
+local S = "coop_host_guard"
+local check_ms = 1000
+local saves = {}
+local next_check = 0
+local told = {} -- what was put right: said once (debug)
+
+local function dbg(what, value)
+	if not told[what] and get_console():get_integer("coop_debug") == 1 then
+		told[what] = true
+		printf("[coop dbg] host guard: %s put back (was %s)", what, tostring(value))
+	end
+end
+
+local function stub(module, name, why)
+	local m = _G[module]
+	if m and type(m[name]) == "function" then
+		m[name] = function()
+			printf("[coop] the host: %s.%s not done (%s)", module, name, why)
+		end
+	end
+end
+
+local function keep_stats()
+	local now = time_global()
+	if now < next_check then
+		return
+	end
+	next_check = now + check_ms
+	local a = db.actor
+	if not a:alive() then
+		return
+	end
+	if a.health < 1 then
+		dbg("health", a.health)
+		a:set_health_ex(1)
+	end
+	-- the engine's own: db.actor.satiety reads 1 whatever it is (CActorCondition::GetSatiety overrides nothing)
+	local satiety = a:cast_Actor():conditions():GetSatiety()
+	if satiety < 1 then
+		dbg("satiety", satiety)
+		a.satiety = 1
+	end
+	if a.radiation > 0 then
+		dbg("radiation", a.radiation)
+		a.radiation = 0
+	end
+	if a.psy_health < 1 then
+		dbg("psy_health", a.psy_health)
+		a.psy_health = 1
+	end
+	if a.bleeding > 0 then
+		dbg("bleeding", a.bleeding)
+		a.bleeding = 1 -- heals so much
+	end
+	if a.power < 1 then
+		a.power = 1
+	end
+	-- arszi_psy's psi health is its own: at 0 and below it blacks the screen out, takes the controls and kills
+	if arszi_psy and arszi_psy.save_state then
+		local m_data = {}
+		arszi_psy.save_state(m_data) -- its live table
+		local psy = m_data.psy_table
+		if psy and ((psy.actor_psy_health or 1) < 1 or psy.psy_death_scene) then
+			dbg("arszi_psy psi health", psy.actor_psy_health)
+			psy.actor_psy_health = 1
+			if psy.psy_death_scene then
+				psy.psy_death_scene = nil
+				level.enable_input()
+			end
+		end
+	end
+end
+
+local function first_update()
+	save_var(db.actor, "surge_immuned", nil) -- saves of the builds that set it
+	get_console():execute("g_god on") -- does nothing without -dbg
+	-- after game_difficulties' on_game_load, which turns them on as the difficulty has them
+	if actor_status_thirst and actor_status_thirst.toggle_feature then
+		actor_status_thirst.toggle_feature(false)
+	end
+	if actor_status_sleep and actor_status_sleep.toggle_feature then
+		actor_status_sleep.toggle_feature(false)
+	end
+end
+
+function on_game_start()
+	if not (coop and coop.is_host and coop.is_host()) then
+		return -- a player's game, or not the co-op engine
+	end
+	check_ms = ini_sys:r_float_ex(S, "check_ms") or check_ms
+	for _, name in ipairs(str_explode(ini_sys:r_string_ex(S, "saves") or "coop_autosave", ",")) do
+		if name ~= "" then
+			saves[name] = true
+		end
+	end
+
+	if level_environment and level_environment.is_actor_immune then
+		level_environment.is_actor_immune = function()
+			return true
+		end
+	end
+
+	stub("ui_sleep_dialog", "sleep", "it would jump the clock and save")
+	stub("ui_sleep_dialog", "sleep_forced", "it would jump the clock and save")
+	stub("ui_sleep_dialog", "sleep_bag", "it would jump the clock and save")
+	stub("actor_status_thirst", "force_sleep", "it would sleep")
+	stub("actor_status_sleep", "force_sleep", "it would sleep")
+
+	local exec = _G.exec_console_cmd
+	_G.exec_console_cmd = function(cmd, ...)
+		if type(cmd) == "string" then
+			local verb, name = string.match(cmd, "^%s*(%S+)%s*(.-)%s*$")
+			if verb == "save" and not saves[name] then
+				printf("[coop] the host saves the world alone: '%s' not saved", name)
+				return
+			end
+		end
+		return exec(cmd, ...)
+	end
+
+	_G.ChangeLevel = function()
+		printf("[coop] the host's ghost stays on fake_start: no level change")
+	end
+
+	RegisterScriptCallback("actor_on_first_update", first_update)
+	RegisterScriptCallback("actor_on_update", keep_stats)
+	RegisterScriptCallback("actor_on_before_hit", function(shit, bone_id, flags)
+		flags.ret_value = false
+	end)
+end

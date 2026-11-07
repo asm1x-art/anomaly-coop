@@ -6,7 +6,8 @@
 -- coop_autosave.script; never the exit save), the world loading
 -- again with the character as that save has it. With no save of their own: back where the player was when the
 -- world was last saved, everything carried kept, some rank lost. Either way what would kill again at once (psi
--- health, bleeding, radiation, needs, the controls taken) is put right: recover(). The world's host (a ghost) never dies.
+-- health, bleeding, radiation, needs, the controls taken) is put right: recover(). The world's host (a ghost) never dies
+-- (coop_host_guard.script).
 
 local NEAR = 2.5          -- m: how close a helper stays
 local HUD = nil
@@ -335,18 +336,6 @@ local function on_key(dik, bind, dis, flags)
 	end
 end
 
--- the host's ghost is never hurt by a surge, a psi storm or an anomaly field
-local host_immune_on = false
-local function host_immune()
-	local original = level_environment.is_actor_immune
-	if original and not host_immune_on then
-		host_immune_on = true
-		level_environment.is_actor_immune = function(...)
-			return coop.is_host() or original(...)
-		end
-	end
-end
-
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
@@ -354,11 +343,16 @@ function on_game_start()
 	ALLOWED = { [key_bindings.kQUIT] = true, [key_bindings.kCONSOLE] = true, [key_bindings.kSCREENSHOT] = true }
 
 	RegisterScriptCallback("actor_on_before_death", function(who_id, flags)
+		if coop.is_host() then
+			flags.ret_value = false -- the host's ghost (coop_host_guard.script), connected or not
+			db.actor:set_health_ex(1)
+			return
+		end
 		if not coop.connected() or raid and raid.is_raid_level(level.name()) then
 			return -- a raid's level has its own death rules (raid.script)
 		end
-		if coop.is_host() or coop_admin_do and coop_admin_do.immortal() then
-			flags.ret_value = false -- the host's ghost (a surge or a psi storm on its empty level), one the admin made immortal
+		if coop_admin_do and coop_admin_do.immortal() then
+			flags.ret_value = false -- one the admin made immortal
 			db.actor:set_health_ex(1)
 			return
 		end
@@ -385,24 +379,6 @@ function on_game_start()
 	end)
 	RegisterScriptCallback("actor_on_update", update)
 	RegisterScriptCallback("actor_on_first_update", function()
-		if coop.is_host() then
-			-- the ghost: surges and psi storms pass it by (level_environment.is_actor_immune), nothing hurts it. Not
-			-- as "surge_immuned" (the Zone's mark): Anomaly's surge never ends for one (it starts again each time it
-			-- should end: the news over and over, the world's clock left at x10) and kills nobody; g_god needs -dbg
-			host_immune()
-			save_var(db.actor, "surge_immuned", nil) -- saves of the builds that set it
-			get_console():execute("g_god on")
-			-- nor does it drink or sleep: it never drinks, so Anomaly's thirst once past its limit put it to
-			-- sleep for 3-9 h about once a minute (thirst grows in that sleep, so for good), each sleep a jump of
-			-- the world's clock while nobody is in it, a save of the world, and the surges and psi storms the
-			-- clock jumped over ended. The needs are personal (coop_progress), the players' own come with them
-			if actor_status_thirst and actor_status_thirst.toggle_feature then
-				actor_status_thirst.toggle_feature(false)
-			end
-			if actor_status_sleep and actor_status_sleep.toggle_feature then
-				actor_status_sleep.toggle_feature(false)
-			end
-		end
 		if not save_point then
 			mark_save_point()
 		end
