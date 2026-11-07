@@ -1,4 +1,5 @@
 import net from 'node:net';
+import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import { EventEmitter } from 'node:events';
 import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VERSION, ID_BLOCK_COUNT, NO_BLOCK, CHUNK_SIZE, MAX_SAVES_LISTED,
@@ -19,7 +20,7 @@ const PUBLIC_NEWS = 30; // the newest news in the public status
 // builds.js; none lets every build in
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
   journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {},
-  news: newsConfig = {} } = {}) {
+  news: newsConfig = {}, adminLockMs = 5 * 60000 } = {}) {
   const storage = openStorage(dataDir);
   // the world's important news, for the launchers (news.js)
   const news = createNews({ load: () => storage.loadNews(), save: (list) => storage.saveNews(list),
@@ -444,9 +445,47 @@ autosave_minutes=${autosaveMinutes}`));
     for (const c of clients.values()) c.send(msg, ask);
   };
 
-  // The in-game admin window: a connection that gave the admin password may do what the admin page does
-  const ADMIN_TRIES = 5; // wrong passwords a connection may give
+  // The in-game admin window: a connection that gave the admin password may do what the admin page does.
+  // ADMIN_TRIES wrong passwords from one address close the window's login there for adminLockMs (a reconnect
+  // doesn't lift it). The window keeps a token, not the password: the password's HMAC with this server's salt, so
+  // it stops working once the password changes, and the password (the admin page's too) is never on the disk.
+  const ADMIN_TRIES = 5;
+  const adminLocks = new Map(); // address -> { tries, until }
   const adminPasswordNow = () => adminPassword || storage.adminPassword().password;
+  const adminToken = () => 'token:' + crypto.createHmac('sha256', adminPasswordNow()).update(`coop-admin:${storage.adminSalt()}`).digest('hex');
+  const sameText = (a, b) => {
+    const [x, y] = [Buffer.from(a), Buffer.from(b)];
+    return x.length === y.length && crypto.timingSafeEqual(x, y);
+  };
+  // the password or the token: 'ok'; a wrong one: 'wrong', or 'locked' with the seconds left
+  const adminCheck = (address, secret) => {
+    const now = Date.now();
+    let lock = adminLocks.get(address);
+    if (lock?.until && lock.until <= now) {
+      adminLocks.delete(address); // served its time: tries from nothing again
+      lock = null;
+    }
+    if (lock?.until) return { result: 'locked', seconds: Math.ceil((lock.until - now) / 1000) };
+    if (sameText(secret, adminPasswordNow()) || sameText(secret, adminToken())) {
+      adminLocks.delete(address);
+      return { result: 'ok' };
+    }
+    lock ??= { tries: 0, until: 0 };
+    lock.tries++;
+    if (lock.tries >= ADMIN_TRIES) lock.until = now + adminLockMs;
+    adminLocks.set(address, lock);
+    return lock.until ? { result: 'locked', seconds: Math.ceil(adminLockMs / 1000) } : { result: 'wrong', left: ADMIN_TRIES - lock.tries };
+  };
+  const minutes = (seconds) => (seconds < 60 ? `${seconds} с` : `${Math.ceil(seconds / 60)} мин`);
+  // the window's login, as the first line of ADMIN_STATE: auth ok <token> | auth wrong 0 <text> | auth locked
+  // <seconds> <text> | auth need 0 <text>
+  const authLine = (check) => {
+    if (check.result === 'ok') return ['auth', 'ok', adminToken()].join('\t');
+    if (check.result === 'locked')
+      return ['auth', 'locked', check.seconds, `Слишком много неверных паролей: вход в админку закрыт на ${minutes(check.seconds)}.`].join('\t');
+    if (check.result === 'need') return ['auth', 'need', 0, 'Сначала пароль админки.'].join('\t');
+    return ['auth', 'wrong', 0, `Неверный пароль админки. Попыток до блокировки: ${check.left}.`].join('\t');
+  };
   const adminStatePayload = () => {
     const st = server.coop.status();
     const s = storage.settings();
@@ -460,7 +499,7 @@ autosave_minutes=${autosaveMinutes}`));
       for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
     for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
     for (const m of st.saves.slice(0, 20)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
-    return stringZ(lines.map((l) => l.join('\t')).join('\n'));
+    return stringZ([authLine({ result: 'ok' }), ...lines.map((l) => l.join('\t'))].join('\n'));
   };
   // '' for state: nothing to say
   const adminCommand = ([cmd, a = '', b = '']) => {
@@ -749,21 +788,21 @@ autosave_minutes=${autosaveMinutes}`));
           if (pending.got >= total) writeExitSave(saveId, pending.data);
           break;
         }
-        case M.ADMIN_LOGIN:
-          if ((client.adminTries ?? 0) >= ADMIN_TRIES) break;
-          if (readStringZ(payload, 0) !== adminPasswordNow()) {
-            client.adminTries = (client.adminTries ?? 0) + 1;
-            log(`[${id}] '${client.name}' gave a wrong admin password`);
-            send(M.ADMIN_RESULT, stringZ('Неверный пароль админки.'));
+        case M.ADMIN_LOGIN: {
+          const check = adminCheck(socket.remoteAddress, readStringZ(payload, 0));
+          if (check.result !== 'ok') {
+            log(`[${id}] '${client.name}' gave a wrong admin password${check.result === 'locked' ? ` (locked for ${check.seconds} s)` : ''}`);
+            send(M.ADMIN_STATE, stringZ(authLine(check)));
             break;
           }
           if (!client.admin) log(`[${id}] '${client.name}' opened the admin window`);
           client.admin = true;
           send(M.ADMIN_STATE, adminStatePayload());
           break;
+        }
         case M.ADMIN_COMMAND: {
           if (!client.admin) {
-            send(M.ADMIN_RESULT, stringZ('Сначала пароль админки.'));
+            send(M.ADMIN_STATE, stringZ(authLine({ result: 'need' })));
             break;
           }
           const fields = readStringZ(payload, 0).split('\t');

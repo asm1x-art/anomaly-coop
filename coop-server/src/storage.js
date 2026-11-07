@@ -371,6 +371,14 @@ export function openStorage(dir) {
       writeAtomic('admin.json', JSON.stringify({ password }));
       return { password, created: true };
     },
+    // a random salt for the admin window's tokens (server.js adminToken), made up once; outlives the world
+    adminSalt() {
+      const saved = readJson('admin_salt.json', null);
+      if (saved?.salt) return saved.salt;
+      const salt = crypto.randomBytes(16).toString('hex');
+      writeAtomic('admin_salt.json', JSON.stringify({ salt }));
+      return salt;
+    },
 
     // a new save, the world from now on, with the players' records as they are
     writeWorld(owner, files, { name = '', reason = 'auto', who = '', from, clock } = {}) {

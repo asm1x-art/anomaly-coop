@@ -104,8 +104,10 @@ export const M = {
   SNAPSHOT_THINGS: 57, // s->c: u32 total size, u32 offset, data: the things of the save the character was put back to,
                       // with the world (before WORLD_DONE), once
   // The in-game admin window (ui_coop_admin.script): the admin page's password, then what the page and the bot do
-  ADMIN_LOGIN: 58,    // c->s: stringZ the admin password: ADMIN_STATE back, or ADMIN_RESULT saying it is wrong
-  ADMIN_STATE: 59,    // s->c: stringZ lines of tab-split fields: host <text> | world <revision> <owner> | player <name>
+  ADMIN_LOGIN: 58,    // c->s: stringZ the admin password, or the token an earlier login gave: ADMIN_STATE back (its auth
+                      // line says whether it was let in); 5 wrong ones from an address lock it out for a while
+  ADMIN_STATE: 59,    // s->c: stringZ lines of tab-split fields, the first: auth ok <token> | auth wrong|locked|need
+                      // <seconds locked> <text> (nothing else follows those); then host <text> | world <revision> <owner> | player <name>
                       // <level> <ping> <1: runs its level> | setting <world|rules> <key> <value> <min> <max> <title> |
                       // faction <id> <1: allowed> <title> | save <revision> <unix time> <text>
   ADMIN_COMMAND: 60,  // c->s: stringZ tab-split: state | set <key> <value> | faction <id> <on|off> | save | restart_host |

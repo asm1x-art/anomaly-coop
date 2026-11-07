@@ -18,7 +18,8 @@ local function trim(s)
 	return string.match(s or "", "^%s*(.-)%s*$")
 end
 
--- { [server] = password }, "server<tab>password" lines
+-- { [server] = what logs in }, "server<tab>token:..." lines: the token the server gave for the password, never the
+-- password itself (a line of an older game with the password in it logs in once, then the token takes its place)
 local function load_passwords()
 	local list = {}
 	local f = io.open(getFS():update_path("$app_data_root$", FILE), "r")
@@ -146,17 +147,33 @@ local function add(list, text, entry)
 	entries[#entries + 1] = entry or {}
 end
 
--- the server's state: "kind<tab>field..." lines (coop-server/src/protocol.js ADMIN_STATE)
+-- the server's state: "kind<tab>field..." lines (coop-server/src/protocol.js ADMIN_STATE), the first its auth line
 function UICoopAdmin:Fill(text)
+	local auth = str_explode(string.match(text, "^[^\n]*"), "\t")
+	if auth[1] == "auth" and auth[2] ~= "ok" then
+		if auth[2] == "need" and logged_in and self.password then
+			logged_in = false -- the server forgot us (it restarted, we came back): in again with what we have
+			coop.admin_login(self.password)
+			return self:SetStatus(tr("st_coop_admin_wait"))
+		end
+		if auth[2] == "wrong" then
+			save_password(coop.server_address(), nil) -- a wrong one kept: asked again
+			self.password = nil
+		end
+		self:ShowLogin()
+		return self:SetStatus(auth[4] or "")
+	end
 	if not logged_in then
 		logged_in = true
 		self.cap_value:SetText(tr("st_coop_admin_value"))
 		self.btn_apply:TextControl():SetText(tr("st_coop_admin_apply"))
 		self.edit_value:SetText("") -- the password typed in it
-		if self.password then
-			save_password(coop.server_address(), self.password)
-		end
 		self:SetStatus(tr("st_coop_admin_hint"))
+	end
+	-- the token in place of the password, on the disk and for the next login
+	if auth[1] == "auth" and auth[3] and auth[3] ~= "" then
+		self.password = auth[3]
+		save_password(coop.server_address(), auth[3])
 	end
 	local selected = self.list:GetSelectedIndex()
 	local groups = { player = {}, world = {}, rules = {}, faction = {}, save = {} }
@@ -305,13 +322,9 @@ function on_state(text)
 	end
 end
 
+-- what a command did (the login's answers come in the state's auth line)
 function on_result(text)
-	if not wnd then
-		return
+	if wnd then
+		wnd:SetStatus(text)
 	end
-	if not logged_in then
-		save_password(coop.server_address(), nil) -- a wrong one kept: asked again
-		wnd:ShowLogin()
-	end
-	wnd:SetStatus(text)
 end
