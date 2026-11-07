@@ -335,6 +335,18 @@ local function on_key(dik, bind, dis, flags)
 	end
 end
 
+-- the host's ghost is never hurt by a surge, a psi storm or an anomaly field
+local host_immune_on = false
+local function host_immune()
+	local original = level_environment.is_actor_immune
+	if original and not host_immune_on then
+		host_immune_on = true
+		level_environment.is_actor_immune = function(...)
+			return coop.is_host() or original(...)
+		end
+	end
+end
+
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
@@ -374,8 +386,11 @@ function on_game_start()
 	RegisterScriptCallback("actor_on_update", update)
 	RegisterScriptCallback("actor_on_first_update", function()
 		if coop.is_host() then
-			-- the ghost: surges and psi storms pass it by (level_environment.is_actor_immune), nothing hurts it
-			save_var(db.actor, "surge_immuned", true)
+			-- the ghost: surges and psi storms pass it by (level_environment.is_actor_immune), nothing hurts it. Not
+			-- as "surge_immuned" (the Zone's mark): Anomaly's surge never ends for one (it starts again each time it
+			-- should end: the news over and over, the world's clock left at x10) and kills nobody; g_god needs -dbg
+			host_immune()
+			save_var(db.actor, "surge_immuned", nil) -- saves of the builds that set it
 			get_console():execute("g_god on")
 		end
 		if not save_point then
