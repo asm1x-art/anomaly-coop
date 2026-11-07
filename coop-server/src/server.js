@@ -559,7 +559,7 @@ tests=1` : ''));
   const playerCommand = (cmd, name, a, b, client) => {
     const target = inWorldPlayer(name);
     if (!target) return `${name || '?'}: нет в мире (в меню или не на сервере).`;
-    if (target === client && cmd !== 'logs' && !allowTests) return 'Читы для себя — только на тестовом сервере (allow_tests в server.cfg).';
+    if (target === client && cmd !== 'logs' && !allowTests) return 'Читы для себя - только на тестовом сервере (allow_tests в server.cfg).';
     switch (cmd) {
       case 'give': {
         const count = Number(b || 1);
@@ -569,7 +569,7 @@ tests=1` : ''));
       }
       case 'money': {
         const amount = Number(a);
-        if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 10000000) return 'Сумма: целое, не 0, до 10 000 000 (минус — забрать).';
+        if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 10000000) return 'Сумма: целое, не 0, до 10 000 000 (минус - забрать).';
         adminEvent(target, 'money', amount, client.name);
         return `${name}: ${amount > 0 ? 'выдано' : 'забрано'} ${Math.abs(amount)} RU.`;
       }
@@ -594,10 +594,10 @@ tests=1` : ''));
         const at = placeOf(to);
         if (!at) return `${to.name}: место ещё неизвестно.`;
         const sameLevel = placeOf(who)?.level === at.level;
-        if (!sameLevel && !(to.info?.lvid >= 0 && to.info?.gvid >= 0)) return `${to.name}: на другом уровне, его точка ещё неизвестна — повторите через 5 с.`;
+        if (!sameLevel && !(to.info?.lvid >= 0 && to.info?.gvid >= 0)) return `${to.name}: на другом уровне, его точка ещё неизвестна - повторите через 5 с.`;
         adminEvent(who, 'teleport', at.level, at.x.toFixed(2), at.y.toFixed(2), at.z.toFixed(2), sameLevel ? '' : to.info.lvid,
           sameLevel ? '' : to.info.gvid, client.name);
-        return cmd === 'goto' ? `Телепорт к ${name}.` : `${name} — телепорт к вам.`;
+        return cmd === 'goto' ? `Телепорт к ${name}.` : `${name} - телепорт к вам.`;
       }
     }
     return '';
@@ -624,7 +624,7 @@ tests=1` : ''));
       case 'kick':
         return server.coop.kick(a) ? `Отключён: ${a}` : `Нет такого игрока онлайн: ${a}`;
       case 'rollback':
-        if (Number(a) === storage.worldInfo()?.revision) return `№${a} — это мир сейчас: откатывать не к чему.`;
+        if (Number(a) === storage.worldInfo()?.revision) return `№${a} - это мир сейчас: откатывать не к чему.`;
         return server.coop.rollback(Number(a)) ? `Мир возвращён к №${a}.` : `Нет сохранения №${a}.`;
       case 'resume':
         return server.coop.resume() ? 'Пауза снята.' : 'Мир и так не на паузе.';
@@ -636,7 +636,7 @@ tests=1` : ''));
         return to.length ? `Отправлено ${to.length} игрок(ам).` : 'В мире никого: сообщение некому показать.';
       }
       case 'test':
-        if (!allowTests) return 'Тест-режимы — только на тестовом сервере (allow_tests в server.cfg).';
+        if (!allowTests) return 'Тест-режимы - только на тестовом сервере (allow_tests в server.cfg).';
         if (!client.inWorld) return 'Сначала войдите в мир.';
         if (!TEST_ACTION.test(a)) return `Нет такого тест-действия: ${a}`;
         adminEvent(client, 'test', a, client.name);
@@ -933,7 +933,7 @@ tests=1` : ''));
           const answer = adminCommand(fields, id, client);
           if (answer) {
             log(`[${id}] '${client.name}' (admin): ${fields.join(' ')} - ${answer}`);
-            journalAdmin(client.name, `${fields.join(' ')} — ${answer}`);
+            journalAdmin(client.name, `${fields.join(' ')} - ${answer}`);
             send(M.ADMIN_RESULT, stringZ(answer));
           }
           if (clients.has(id)) send(M.ADMIN_STATE, adminStatePayload(client)); // kicked themselves: gone

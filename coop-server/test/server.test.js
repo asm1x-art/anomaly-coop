@@ -1853,7 +1853,7 @@ test('the admin window: commands on a player go to their game as the server\'s o
     const journal = (await adminState(a)).filter((l) => l[0] === 'journal');
     assert.equal(journal.length, 8); // the newest
     assert.ok(journal.every((l) => l[2] === 'artem'));
-    assert.match(journal.at(-1)[3], /^give никто wpn_pm 1 — /);
+    assert.match(journal.at(-1)[3], /^give никто wpn_pm 1 - /);
     const kept = fs.readFileSync(path.join(dataDir, 'admin_log.jsonl'), 'utf8');
     assert.ok(kept.split('\n').filter(Boolean).length >= 10);
     a.socket.destroy();
