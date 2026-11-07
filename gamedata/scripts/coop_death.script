@@ -392,6 +392,16 @@ function on_game_start()
 			host_immune()
 			save_var(db.actor, "surge_immuned", nil) -- saves of the builds that set it
 			get_console():execute("g_god on")
+			-- nor does it drink or sleep: it never drinks, so Anomaly's thirst once past its limit put it to
+			-- sleep for 3-9 h about once a minute (thirst grows in that sleep, so for good), each sleep a jump of
+			-- the world's clock while nobody is in it, a save of the world, and the surges and psi storms the
+			-- clock jumped over ended. The needs are personal (coop_progress), the players' own come with them
+			if actor_status_thirst and actor_status_thirst.toggle_feature then
+				actor_status_thirst.toggle_feature(false)
+			end
+			if actor_status_sleep and actor_status_sleep.toggle_feature then
+				actor_status_sleep.toggle_feature(false)
+			end
 		end
 		if not save_point then
 			mark_save_point()
