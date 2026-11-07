@@ -225,6 +225,8 @@ test('telegram: /rollback and /reset_world wait for a confirmation, a minute at 
   try {
     await t.say('/rollback 9');
     assert.match(t.sent()[0].body.text, /Нет сохранения №9/);
+    await t.say('/rollback 12');
+    assert.match(t.sent()[0].body.text, /№12 — это мир сейчас/);
 
     await t.say('/rollback 10');
     const ask = t.sent()[0].body;

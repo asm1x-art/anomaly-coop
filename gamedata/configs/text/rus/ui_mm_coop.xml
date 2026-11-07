@@ -439,6 +439,12 @@
 	<string id="st_coop_admin_restart_ask">
 		<text>ѕерезапустить хост? »зменени€ мира после его последнего сохранени€ хранит журнал сервера.</text>
 	</string>
+	<string id="st_coop_admin_save_current">
+		<text>(мир сейчас)</text>
+	</string>
+	<string id="st_coop_admin_rollback_current">
+		<text>Ёто сохранение Ч мир сейчас: откатывать не к чему. ¬ыберите более старое.</text>
+	</string>
 	<string id="st_coop_saves_pick">
 		<text>¬ыберите сохранение в списке.</text>
 	</string>

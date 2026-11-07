@@ -223,6 +223,7 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
         const revision = Number(args);
         const save = coop.status().saves?.find((s) => s.revision === revision);
         if (!save) return say(chat, args ? `Нет сохранения №${args}. Список: /status` : 'Как: /rollback ревизия');
+        if (revision === coop.status().world?.revision) return say(chat, `№${revision} — это мир сейчас: откатывать не к чему.`);
         return confirm(chat, `Откатить мир к ${saveLine(save)}? Игроки в игре загрузят его заново.`, 'Откатить', () =>
           say(chat, coop.rollback(revision) ? `Мир возвращён к №${revision}.` : `Нет сохранения №${revision}.`));
       }

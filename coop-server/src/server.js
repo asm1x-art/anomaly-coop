@@ -517,6 +517,7 @@ autosave_minutes=${autosaveMinutes}`));
       case 'kick':
         return server.coop.kick(a) ? `Отключён: ${a}` : `Нет такого игрока онлайн: ${a}`;
       case 'rollback':
+        if (Number(a) === storage.worldInfo()?.revision) return `№${a} — это мир сейчас: откатывать не к чему.`;
         return server.coop.rollback(Number(a)) ? `Мир возвращён к №${a}.` : `Нет сохранения №${a}.`;
       default:
         return `Не знаю такой команды: ${cmd}`;
@@ -1027,6 +1028,7 @@ autosave_minutes=${autosaveMinutes}`));
     },
     // no vote: whoever is in the game loads the world again
     rollback(revision) {
+      if (revision === storage.worldInfo()?.revision) return 0; // the world as it is: nothing to go back to
       if (vote) endVote(ROLLBACK.CANCELLED, 'admin');
       return rollback(revision, 'admin page');
     },

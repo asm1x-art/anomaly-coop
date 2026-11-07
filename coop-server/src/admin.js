@@ -188,9 +188,12 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
         case 'POST /api/resume':
           coop.resume();
           return reply(res, 200, state());
-        case 'POST /api/rollback':
-          if (!coop.rollback(Number((await readJson(req)).revision))) return reply(res, 404, { error: 'no such save' });
+        case 'POST /api/rollback': {
+          const revision = Number((await readJson(req)).revision);
+          if (revision === coop.status().world?.revision) return reply(res, 409, { error: 'that save is the world now' });
+          if (!coop.rollback(revision)) return reply(res, 404, { error: 'no such save' });
           return reply(res, 200, state());
+        }
         default:
           return reply(res, 404, { error: 'not found' });
       }

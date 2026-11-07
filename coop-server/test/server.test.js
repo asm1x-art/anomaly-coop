@@ -506,15 +506,20 @@ test('the admin window: the admin password, then the admin page commands; the st
   const { port } = server.address();
   const text = (msg) => readStringZ(msg.payload, 0);
   const line = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+  const auth = async (c) => text(await until(c, M.ADMIN_STATE)).split('\n')[0].split('\t');
   try {
     const a = await player(port, 'artem');
     const b = await player(port, 'друг');
     a.send(M.ADMIN_COMMAND, line('save'));
-    assert.match(text(await until(a, M.ADMIN_RESULT)), /пароль/);
+    assert.deepEqual((await auth(a)).slice(0, 2), ['auth', 'need']);
     a.send(M.ADMIN_LOGIN, line('не тот'));
-    assert.match(text(await until(a, M.ADMIN_RESULT)), /Неверный/);
+    const wrong = await auth(a);
+    assert.deepEqual(wrong.slice(0, 2), ['auth', 'wrong']);
+    assert.match(wrong[3], /Неверный/);
     a.send(M.ADMIN_LOGIN, line('секрет'));
     const state = text(await until(a, M.ADMIN_STATE)).split('\n').map((l) => l.split('\t'));
+    assert.deepEqual(state[0].slice(0, 2), ['auth', 'ok']);
+    assert.match(state[0][2], /^token:[0-9a-f]{64}$/);
     assert.deepEqual(state.find((l) => l[0] === 'host'), ['host', 'нет: мир держит игра игрока']);
     assert.deepEqual(state.find((l) => l[2] === 'group_max').slice(0, 4), ['setting', 'rules', 'group_max', '4']);
     assert.deepEqual(state.filter((l) => l[0] === 'player').map((l) => l[1]), ['artem', 'друг']);
@@ -530,6 +535,70 @@ test('the admin window: the admin password, then the admin page commands; the st
     a.send(M.ADMIN_COMMAND, line('kick\tдруг'));
     assert.match(text(await until(a, M.ADMIN_RESULT)), /Отключён: друг/);
     await until(a, M.PEER_LEFT);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the admin window: a token instead of the password; it stops working once the password changes', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const text = (msg) => readStringZ(msg.payload, 0);
+  const line = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+  let server = await startServer({ ...options(dataDir), adminPassword: 'секрет' });
+  let token;
+  try {
+    const a = await player(server.address().port, 'artem');
+    a.send(M.ADMIN_LOGIN, line('секрет'));
+    token = text(await until(a, M.ADMIN_STATE)).split('\n')[0].split('\t')[2];
+    assert.ok(!token.includes('секрет'));
+    const b = await player(server.address().port, 'друг');
+    b.send(M.ADMIN_LOGIN, line(token));
+    assert.deepEqual(text(await until(b, M.ADMIN_STATE)).split('\n')[0].split('\t'), ['auth', 'ok', token]);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+  // the same data (the salt) with another password: the old token is a wrong password
+  server = await startServer({ ...options(dataDir), adminPassword: 'другой' });
+  try {
+    const a = await player(server.address().port, 'artem');
+    a.send(M.ADMIN_LOGIN, line(token));
+    assert.equal(text(await until(a, M.ADMIN_STATE)).split('\t')[1], 'wrong');
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the admin window: 5 wrong passwords lock the address out with an answer, a reconnect too, until the time is up', async () => {
+  const server = await startServer({ ...options(), adminPassword: 'секрет', adminLockMs: 400 });
+  const { port } = server.address();
+  const text = (msg) => readStringZ(msg.payload, 0);
+  const line = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+  const auth = async (c) => text(await until(c, M.ADMIN_STATE)).split('\t');
+  try {
+    const a = await player(port, 'artem');
+    for (let i = 0; i < 4; i++) {
+      a.send(M.ADMIN_LOGIN, line('не тот'));
+      assert.equal((await auth(a))[1], 'wrong');
+    }
+    a.send(M.ADMIN_LOGIN, line('не тот'));
+    const locked = await auth(a);
+    assert.equal(locked[1], 'locked');
+    assert.equal(locked[2], '1');
+    assert.match(locked[3], /закрыт на 1 с/);
+    // the right password doesn't help while locked, nor another connection from there
+    a.send(M.ADMIN_LOGIN, line('секрет'));
+    assert.equal((await auth(a))[1], 'locked');
+    const b = await player(port, 'друг');
+    b.send(M.ADMIN_LOGIN, line('секрет'));
+    assert.equal((await auth(b))[1], 'locked');
+    await new Promise((r) => setTimeout(r, 450));
+    b.send(M.ADMIN_LOGIN, line('секрет'));
+    assert.equal((await auth(b))[1], 'ok');
     a.socket.destroy();
     b.socket.destroy();
   } finally {
@@ -1219,7 +1288,11 @@ test('progress: asked of everyone in the world with each save, given back with t
     c.send(M.WORLD_REQUEST);
     assert.equal(await downloadProgress(c), null);
 
-    // back to revision 2: the progress kept with it
+    // the world as it is can't be gone back to; a save after it, then back to revision 2: the progress kept with it
+    assert.equal(server.coop.rollback(2), 0);
+    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2);
+    a.send(M.PING, Buffer.alloc(4));
+    await until(a, M.PONG);
     assert.ok(server.coop.rollback(2));
     await until(b2, M.WORLD_RELOAD);
     b2.send(M.WORLD_REQUEST);
@@ -1350,6 +1423,10 @@ test('facts: kept by the server, passed on when they change, given with the worl
     assert.deepEqual(await downloadFacts(c), { 'rel:dolg:freedom': '0',
       'once:create_squad(lazarus_dolg_squad,bar_dolg_general)': 'artem' });
 
+    assert.equal(server.coop.rollback(2), 0); // the world as it is: refused
+    await uploadSave(a, [Buffer.from('w3'), Buffer.from('l3')], 2);
+    a.send(M.PING, Buffer.alloc(4));
+    await until(a, M.PONG);
     assert.ok(server.coop.rollback(2));
     assert.deepEqual(server.coop.facts(), { 'info:esc_bandit_squad_dead': '1', 'rel:dolg:freedom': '-5000' });
     a.socket.destroy();

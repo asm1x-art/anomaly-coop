@@ -147,6 +147,11 @@ local function add(list, text, entry)
 	entries[#entries + 1] = entry or {}
 end
 
+-- an entry's identity, kept across refreshes (a row's number moves when someone comes or goes)
+local function identity(e)
+	return e and e.kind and (e.kind .. "\t" .. tostring(e.key or e.name or e.revision)) or nil
+end
+
 -- the server's state: "kind<tab>field..." lines (coop-server/src/protocol.js ADMIN_STATE), the first its auth line
 function UICoopAdmin:Fill(text)
 	local auth = str_explode(string.match(text, "^[^\n]*"), "\t")
@@ -175,7 +180,7 @@ function UICoopAdmin:Fill(text)
 		self.password = auth[3]
 		save_password(coop.server_address(), auth[3])
 	end
-	local selected = self.list:GetSelectedIndex()
+	local selected = identity(self:Selected())
 	local groups = { player = {}, world = {}, rules = {}, faction = {}, save = {} }
 	local host, world
 	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
@@ -220,11 +225,19 @@ function UICoopAdmin:Fill(text)
 		add(self.list, string.format("   %s: %s", f.title, tr(f.value and "st_coop_admin_yes" or "st_coop_admin_no")), f)
 	end
 	add(self.list, tr("st_coop_admin_saves"))
+	local current = world and tonumber(world[2])
 	for _, s in ipairs(groups.save) do
-		add(self.list, string.format("   #%d   %s   %s", s.revision, os.date("%d.%m %H:%M", s.time), s.title), s)
+		s.current = s.revision == current
+		add(self.list, string.format("   #%d   %s   %s%s", s.revision, os.date("%d.%m %H:%M", s.time), s.title,
+			s.current and ("   " .. tr("st_coop_admin_save_current")) or ""), s)
 	end
-	if selected >= 0 and selected < #entries then
-		self.list:SetSelectedIndex(selected)
+	-- the same player, setting or save as before, wherever it is now; gone: nothing picked
+	self.list:SetSelectedIndex(-1)
+	for i, e in ipairs(entries) do
+		if selected and identity(e) == selected then
+			self.list:SetSelectedIndex(i - 1)
+			break
+		end
 	end
 end
 
@@ -277,6 +290,9 @@ function UICoopAdmin:OnRollback()
 	local e = self:Selected()
 	if e.kind ~= "save" then
 		return self:SetStatus(tr("st_coop_admin_pick_save"))
+	end
+	if e.current then
+		return self:SetStatus(tr("st_coop_admin_rollback_current"))
 	end
 	ask(tr("st_coop_admin_rollback_ask", e.revision, e.title), function() command("rollback", e.revision) end)
 end

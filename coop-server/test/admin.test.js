@@ -7,6 +7,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { startServer } from '../src/server.js';
+import { openStorage } from '../src/storage.js';
 import { startAdmin, CRASH_MAGIC } from '../src/admin.js';
 import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
 import { normalizeSettings, DEFAULT_SETTINGS, settingsText } from '../src/settings.js';
@@ -124,9 +125,23 @@ test('admin: saves listed newest first; rollback makes the old save the world ag
     let state = await (await s.call('GET', '/api/state')).json();
     assert.deepEqual(state.saves.map((m) => m.revision), [3]);
     assert.equal((await s.call('POST', '/api/rollback', { revision: 9 })).status, 404);
-    state = await (await s.call('POST', '/api/rollback', { revision: 3 })).json();
-    assert.deepEqual(state.world, { owner: 'artem', revision: 4 });
-    assert.deepEqual(state.saves.map((m) => [m.revision, m.reason, m.from]), [[4, 'rollback', 3], [3, 'auto', undefined]]);
+    assert.equal((await s.call('POST', '/api/rollback', { revision: 3 })).status, 409); // the world as it is
+  } finally {
+    s.close();
+  }
+});
+
+test('admin: rollback to an older save makes it the world again', async () => {
+  const s = await start((dataDir) => {
+    const storage = openStorage(dataDir);
+    storage.writeWorld('artem', [Buffer.from('a'), Buffer.from('b')]);
+    storage.writeWorld('artem', [Buffer.from('c'), Buffer.from('d')]);
+  });
+  try {
+    const state = await (await s.call('POST', '/api/rollback', { revision: 1 })).json();
+    assert.deepEqual(state.world, { owner: 'artem', revision: 3 });
+    assert.deepEqual(state.saves.map((m) => [m.revision, m.reason, m.from]),
+      [[3, 'rollback', 1], [2, 'auto', undefined], [1, 'auto', undefined]]);
   } finally {
     s.close();
   }
