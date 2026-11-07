@@ -52,10 +52,28 @@ local ANOMALIES = {
 local QUIET_MS = 20000 -- a game that has just loaded the world settles a surge it missed: that was told long ago
 local started_at = nil
 
+-- an end is news only after its beginning: one the clock jumped over (a sleep: Anomaly's skip_surge,
+-- skip_psi_storm) ends without having begun
+local BEGINNING = { surge_end = "surge", psi_end = "psi" }
+local going = {} -- surge, psi: begun and not over
+
 local function actor_on_interaction(typ, obj, name)
 	local n = typ == "anomalies" and ANOMALIES[name]
-	if n and started_at and time_global() - started_at >= QUIET_MS then
-		publish(n[1], game.translate_string(n[2]))
+	if not n then
+		return
+	end
+	local kind = n[1]
+	local began = BEGINNING[kind]
+	if began then
+		if not going[began] then
+			return
+		end
+		going[began] = nil
+	else
+		going[kind] = true
+	end
+	if started_at and time_global() - started_at >= QUIET_MS then
+		publish(kind, game.translate_string(n[2]))
 	end
 end
 
@@ -65,6 +83,11 @@ function on_game_start()
 	end
 	RegisterScriptCallback("actor_on_first_update", function()
 		started_at = time_global()
+		-- one going on in the save we loaded
+		local surge = surge_manager and surge_manager.get_surge_manager()
+		local psi = psi_storm_manager and psi_storm_manager.get_psi_storm_manager()
+		going.surge = surge and surge.started == true or nil
+		going.psi = psi and psi.started == true or nil
 	end)
 	RegisterScriptCallback("actor_on_interaction", actor_on_interaction)
 end
