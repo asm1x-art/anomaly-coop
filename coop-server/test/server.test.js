@@ -1922,3 +1922,68 @@ test('the admin window: saves a page at a time; the pause lifted; autosaves of a
     server.close();
   }
 });
+
+test('the admin window: the world\'s events go to the sim master (a stop of a storm and the weather to every game); its report in the state and the journal', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const server = await startServer({ ...options(dataDir), adminPassword: 'секрет' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    // nobody in the world: nobody to start it
+    assert.match(server.coop.worldEvent('psi', 'start', 'бот'), /никто не держит/);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 1, 2, 3, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 10, 20, 30, 0));
+    await settle(a);
+    await settle(b);
+    // the master (artem, in first) is asked for its report with the others' reports, as the window logs in
+    a.send(M.ADMIN_LOGIN, adminLine('секрет'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['report', 'server']);
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['events_report', 'server']);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['report', 'server']);
+    await until(a, M.ADMIN_STATE);
+
+    a.send(M.ADMIN_COMMAND, adminLine('event\tsurge\tstart'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['event', 'surge', 'start', 'artem']);
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /Выброс: запуск - отправлено мастеру симуляции \(artem\)/);
+    assert.ok(!(await drain(b)).includes(M.SCRIPT_EVENT));
+    // stopping a surge, the weather: every game in the world
+    a.send(M.ADMIN_COMMAND, adminLine('event\tsurge\tstop'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['event', 'surge', 'stop', 'artem']);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['event', 'surge', 'stop', 'artem']);
+    assert.match(server.coop.worldEvent('weather_rain', 'start', 'бот'), /Погода: дождь: запуск/);
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['event', 'weather_rain', 'start', 'бот']);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['event', 'weather_rain', 'start', 'бот']);
+    // what can't be
+    a.send(M.ADMIN_COMMAND, adminLine('event\tbar_gift\tstop'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /остановить нельзя/);
+    a.send(M.ADMIN_COMMAND, adminLine('event\tnope\tstart'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /Нет такого события: nope/);
+    a.send(M.ADMIN_COMMAND, adminLine('event\tpsi\tnow'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /start\|stop/);
+
+    // the master's report: in the window's state, what it did in the journal; another game's is not heard
+    b.send(M.SCRIPT_EVENT, event('coop_admin_events', 'surge=0\tresult=не мастер'));
+    await settle(b);
+    a.send(M.SCRIPT_EVENT, event('coop_admin_events', 'surge=1\tsurge_in=-3\tpsi=0\tpsi_in=7200\tfactor=10\tweather=rain\tresult=Выброс начнётся через 15 с.'));
+    await settle(a);
+    assert.ok(!(await drain(b)).includes(M.SCRIPT_EVENT)); // not relayed
+    a.send(M.ADMIN_COMMAND, adminLine('state'));
+    const state = await adminState(a);
+    assert.deepEqual(state.find((l) => l[0] === 'events').slice(2), ['artem']);
+    assert.deepEqual(state.filter((l) => l[0] === 'ev').map((l) => l.slice(1)),
+      [['surge', '1'], ['surge_in', '-3'], ['psi', '0'], ['psi_in', '7200'], ['factor', '10'], ['weather', 'rain']]);
+    assert.equal(state.find((l) => l[0] === 'event_result')[2], 'Выброс начнётся через 15 с.');
+    const ev = server.coop.events();
+    assert.equal(ev.values.surge, '1');
+    assert.equal(ev.result.text, 'Выброс начнётся через 15 с.');
+    const kept = fs.readFileSync(path.join(dataDir, 'admin_log.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    assert.ok(kept.some((e) => e.who === 'artem' && e.text === 'Выброс начнётся через 15 с.'));
+    assert.ok(kept.some((e) => e.who === 'бот' && /^event weather_rain start - /.test(e.text)));
+    assert.ok(!kept.some((e) => e.text === 'не мастер'));
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

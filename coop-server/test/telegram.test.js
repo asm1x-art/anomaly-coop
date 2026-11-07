@@ -353,3 +353,33 @@ test('telegram: polling sets the commands, follows the offset, waits out network
   assert.match(t.lines.join('\n'), /fetch failed, trying again[\s\S]*reached again[\s\S]*Bad Gateway[\s\S]*does not know this token/);
   await t.bot.stop();
 });
+
+test('telegram: /event shows the world\'s events; a surge waits for a yes, the weather goes at once', async () => {
+  const done = [];
+  const coop = fakeCoop({
+    events: () => ({ values: { surge: '0', surge_in: '7200', psi: '1', factor: '10', cool: 'off', bar_rule: '1', barman: '0', weather: 'rain' } }),
+    worldEvent: (name, action, who) => (done.push([name, action, who]), `${name} ${action}: отправлено хосту.`),
+  });
+  const t = start({ coop });
+  try {
+    await t.say('/event');
+    const list = t.sent()[0].body.text;
+    assert.match(list, /Выброс: через 2 ч 0 мин \(~12 мин реальных\)/);
+    assert.match(list, /Пси-шторм: идёт/);
+    assert.match(list, /Охлаждение: не бывает/);
+    assert.match(list, /Погода: дождь/);
+    assert.match(list, /weather_storm — Погода: гроза/);
+    await t.say('/event weather_storm');
+    assert.deepEqual(done, [['weather_storm', 'start', 'бот']]);
+    assert.match(t.sent()[0].body.text, /отправлено хосту/);
+    await t.say('/event surge start');
+    assert.match(t.sent()[0].body.text, /Выброс: начать\? .*погибнет/);
+    assert.equal(done.length, 1);
+    await t.say('/confirm');
+    assert.deepEqual(done.at(-1), ['surge', 'start', 'бот']);
+    await t.say('/event surge stop'); // safe: at once
+    assert.deepEqual(done.at(-1), ['surge', 'stop', 'бот']);
+  } finally {
+    await t.bot.stop();
+  }
+});

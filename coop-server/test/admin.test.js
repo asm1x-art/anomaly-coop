@@ -291,3 +291,32 @@ test('bug reports: the crash receiver takes kind "bug", listed with it; a report
     s.close();
   }
 });
+
+test('admin: the world\'s events listed with their state; one started from the page goes to the world\'s game, in the journal', async () => {
+  const s = await start();
+  try {
+    let st = await (await s.call('GET', '/api/state')).json();
+    assert.ok(st.events.list.some((e) => e.id === 'surge' && e.stop && e.danger === 'start'));
+    assert.match(st.events.lines[0], /Событий пока не видно/);
+    let res = await s.call('POST', '/api/event', { name: 'surge', action: 'start' });
+    assert.equal(res.status, 200);
+    assert.match((await res.json()).answer, /никто не держит/);
+    // a player in the world runs it (no host): the event goes to its game
+    const port = s.game.address().port;
+    const master = await join(port, 'Мастер');
+    const got = [];
+    master.on('data', createDecoder((type, payload) => { if (type === M.SCRIPT_EVENT) got.push(payload.toString('latin1')); }));
+    master.write(encode(M.ACTOR_STATE, Buffer.concat([encodeText('l01_escape'), Buffer.from([0]), Buffer.alloc(16)])));
+    await settle();
+    res = await s.call('POST', '/api/event', { name: 'cooling', action: 'stop' });
+    st = await res.json();
+    assert.match(st.answer, /Охлаждение \(окно рейда\): остановка - отправлено мастеру симуляции \(Мастер\)/);
+    await settle();
+    assert.ok(got.some((p) => p.includes('event\tcooling\tstop')));
+    const kept = fs.readFileSync(path.join(s.dataDir, 'admin_log.jsonl'), 'utf8');
+    assert.match(kept, /админ-страница/);
+    master.destroy();
+  } finally {
+    s.close();
+  }
+});

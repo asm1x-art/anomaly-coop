@@ -6,7 +6,7 @@ import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VER
   EXIT_SAVE_NAME, AUTO_SAVE_NAME, TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText, FACTIONS } from './settings.js';
-import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo } from './admin_commands.js';
+import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo, WORLD_EVENTS, worldEventOf, toEveryGame } from './admin_commands.js';
 import { createClock } from './clock.js';
 import { createBuildCheck } from './builds.js';
 import { createNews, NEWS_FACT, DEFAULT_NEWS_TYPES } from './news.js';
@@ -221,6 +221,7 @@ tests=1` : ''));
   // the admin window's script events (coop_admin_do.script): the server's to a game, a game's report to the server
   const ADMIN_EVENT = 'coop_admin';
   const ADMIN_INFO = 'coop_admin_info';
+  const EVENTS_INFO = 'coop_admin_events'; // the world's game on its events (coop_world_events.script)
   const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
@@ -512,6 +513,42 @@ tests=1` : ''));
     if (Date.now() - reportAsked < REPORT_MS) return;
     reportAsked = Date.now();
     for (const [, c] of players()) if (c.inWorld) adminEvent(c, 'report', 'server');
+    const master = clients.get(masterId());
+    if (master?.inWorld) adminEvent(master, 'events_report', 'server');
+  };
+  // The world's events (admin_commands.js WORLD_EVENTS): the sim master's game reports where they are (EVENTS_INFO,
+  // "key=value" fields: surge, surge_in, psi, psi_in, cool, cool_left, cool_next, bar_next, bar_rule, barman,
+  // weather, factor; result: what it just did, for the journal). Only the game running the world is heard.
+  let worldEvents = null; // { time, from, values }
+  let eventResult = null; // { time, text }
+  const onEventsReport = (id, client, text) => {
+    const values = {};
+    for (const field of text.split('\t')) {
+      const at = field.indexOf('=');
+      if (at > 0) values[field.slice(0, at)] = field.slice(at + 1);
+    }
+    const from = client.host ? 'хост' : client.name;
+    const { result } = values;
+    delete values.result;
+    worldEvents = { time: Date.now(), from, values };
+    if (result) {
+      eventResult = { time: Date.now(), text: result };
+      log(`[${id}] '${client.name}' on the world's events: ${result}`);
+      journalAdmin(from, result);
+    }
+  };
+  // an event started or stopped by an admin (who): the answer for them
+  const worldEvent = (name, action, who) => {
+    const e = worldEventOf(name);
+    if (!e) return `Нет такого события: ${name || '?'}. Есть: ${WORLD_EVENTS.map((x) => x.id).join(', ')}.`;
+    if (action !== 'start' && action !== 'stop') return `Как: event ${name} start|stop.`;
+    if (action === 'stop' && !e.stop) return `${e.title}: остановить нельзя, это разовое событие.`;
+    const master = clients.get(masterId());
+    if (!master?.inWorld) return 'Мир сейчас никто не держит (ни хоста, ни игроков в мире): запускать некому.';
+    const to = toEveryGame(name, action) ? [...clients.values()].filter((c) => c.inWorld) : [master];
+    for (const c of to) adminEvent(c, 'event', name, action, who);
+    return `${e.title}: ${action === 'start' ? 'запуск' : 'остановка'} - отправлено ${master.host ? 'хосту' : `мастеру симуляции (${master.name})`}.`
+      + (emptyPaused ? ' Мир без игроков сейчас стоит (offline_sim выключено): пойдёт, когда кто-то войдёт.' : '');
   };
   const SAVES_PAGE = 10;
   const adminStatePayload = (client) => {
@@ -542,6 +579,12 @@ tests=1` : ''));
     for (const m of st.saves.slice(offset, offset + SAVES_PAGE)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
     for (const n of news.list().slice(-5)) lines.push(['news', Math.floor(n.time / 1000), n.text.replace(/\s+/g, ' ').slice(0, 160)]);
     for (const e of adminJournal.slice(-8)) lines.push(['journal', Math.floor(e.time / 1000), e.who, e.text.replace(/\s+/g, ' ').slice(0, 160)]);
+    // the world's events: how old the report is and whose, its values, the last thing done
+    if (worldEvents) {
+      lines.push(['events', Math.floor((Date.now() - worldEvents.time) / 1000), worldEvents.from]);
+      for (const [key, value] of Object.entries(worldEvents.values)) lines.push(['ev', key, value.replace(/\s+/g, ' ')]);
+    }
+    if (eventResult) lines.push(['event_result', Math.floor(eventResult.time / 1000), eventResult.text.replace(/\s+/g, ' ').slice(0, 160)]);
     return stringZ([authLine({ result: 'ok' }), ...lines.map((l) => l.join('\t'))].join('\n'));
   };
   // what the admins did, from the window: the server's log and data/admin_log.jsonl (the newest kept in memory)
@@ -635,6 +678,8 @@ tests=1` : ''));
         for (const [, p] of to) adminEvent(p, 'say', text, client.name);
         return to.length ? `Отправлено ${to.length} игрок(ам).` : 'В мире никого: сообщение некому показать.';
       }
+      case 'event':
+        return worldEvent(a, b, client.name);
       case 'test':
         if (!allowTests) return 'Тест-режимы - только на тестовом сервере (allow_tests в server.cfg).';
         if (!client.inWorld) return 'Сначала войдите в мир.';
@@ -1053,6 +1098,10 @@ tests=1` : ''));
           if (type === M.SCRIPT_EVENT) {
             const name = readStringZ(payload, 0);
             if (name === ADMIN_EVENT) break; // the server's own: a game may not send it
+            if (name === EVENTS_INFO) { // the world's game on its events, the server's only
+              if (client.host || id === masterId()) onEventsReport(id, client, readStringZ(payload, payload.indexOf(0) + 1));
+              break;
+            }
             if (name === ADMIN_INFO) { // a game's state for the admin window, the server's only
               const [health, rank, god, money, lvid, gvid] = readStringZ(payload, payload.indexOf(0) + 1).split('\t').map(Number);
               client.info = { health, rank, god, money, lvid, gvid };
@@ -1211,6 +1260,18 @@ tests=1` : ''));
     events, // host.js tells host_down through it
     // the master (the host, if it runs the world) saves it now
     saveWorld: () => requestSave('admin', 'admin'),
+    // the world's events: what its game last said (a fresh report asked for), and one started or stopped by an admin
+    // of the page or the bot (who), with the answer in the admins' journal
+    events() {
+      askReports();
+      return { ...worldEvents, result: eventResult };
+    },
+    worldEvent(name, action, who) {
+      const answer = worldEvent(name, action, who);
+      log(`${who} (admin): event ${name} ${action} - ${answer}`);
+      journalAdmin(who, `event ${name} ${action} - ${answer}`);
+      return answer;
+    },
     // that player is off the server (their game says it lost the connection)
     kick(name) {
       const found = players().find(([, c]) => c.name === name);

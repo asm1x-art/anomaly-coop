@@ -73,3 +73,57 @@ export function setFaction(coop, id, value = '') {
   coop.saveSettings({ ...s, factions: list });
   return null;
 }
+
+// The world's events an admin starts and stops (server.js worldEvent; in the game coop_world_events.script). The game
+// that runs the world's timetable does it (the sim master: the host while it runs the world); to stop a surge or a
+// psi storm, and for the weather, every game in the world is told (each runs its own). danger: the action asked
+// about first, with what it does to the players.
+export const WORLD_EVENTS = [
+  { id: 'surge', title: 'Выброс', stop: true, danger: 'start',
+    warn: 'Выброс у всех игроков на открытых локациях: кто не в укрытии, погибнет в конце.' },
+  { id: 'psi', title: 'Пси-шторм', stop: true, danger: 'start',
+    warn: 'Пси-шторм у всех игроков на открытых локациях: кто не в укрытии, получит пси-урон и может погибнуть.' },
+  { id: 'cooling', title: 'Охлаждение (окно рейда)', stop: true, danger: 'stop',
+    warn: 'Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.' },
+  { id: 'bar_rumour', title: 'Бар: слух о тайнике' },
+  { id: 'bar_quarrel', title: 'Бар: ссора' },
+  { id: 'bar_spender', title: 'Бар: гуляет отряд' },
+  { id: 'bar_gift', title: 'Бар: подарок группе' },
+  { id: 'bar_wounded', title: 'Бар: раненый у двери' },
+  { id: 'bar_binge', title: 'Бар: техник запил' },
+  { id: 'weather_clear', title: 'Погода: ясно' },
+  { id: 'weather_partly', title: 'Погода: переменная облачность' },
+  { id: 'weather_cloudy', title: 'Погода: облачно' },
+  { id: 'weather_rain', title: 'Погода: дождь' },
+  { id: 'weather_storm', title: 'Погода: гроза' },
+  { id: 'weather_foggy', title: 'Погода: туман' },
+];
+export const worldEventOf = (id) => WORLD_EVENTS.find((e) => e.id === id) ?? null;
+// every game in the world does it, not the sim master alone
+export const toEveryGame = (id, action) => id.startsWith('weather_') || ((id === 'surge' || id === 'psi') && action === 'stop');
+
+// game seconds as the admins read them, with the real time at the world's speed (factor)
+const gameTime = (seconds, factor) => {
+  const s = Math.max(0, Math.round(seconds));
+  const text = s < 3600 ? `${Math.floor(s / 60)} мин` : `${Math.floor(s / 3600)} ч ${Math.floor(s % 3600 / 60)} мин`;
+  const real = factor > 0 ? Math.round(s / factor / 60) : null;
+  return real === null ? text : `${text} (~${real < 60 ? `${real} мин` : `${Math.floor(real / 60)} ч ${real % 60} мин`} реальных)`;
+};
+const WEATHER = { clear: 'ясно', partly: 'переменная облачность', cloudy: 'облачно', rain: 'дождь', storm: 'гроза',
+  foggy: 'туман', pre_blowout: 'перед выбросом' };
+
+// what the world's game said of its events (server.js events(): values as the game reported them) as lines
+export function eventsText(events) {
+  const v = events?.values;
+  if (!v) return ['Событий пока не видно: мир никто не держит или игра ещё не ответила.'];
+  const factor = Number(v.factor) || 0;
+  const storm = (on, inS) => (on === '1' ? 'идёт' : inS !== undefined ? `через ${gameTime(Number(inS), factor)}` : '?');
+  const lines = [`Выброс: ${storm(v.surge, v.surge_in)}`, `Пси-шторм: ${storm(v.psi, v.psi_in)}`];
+  lines.push(`Охлаждение: ${v.cool === 'off' ? 'не бывает (Выжигатель выключен)' : v.cool === 'open'
+    ? `окно открыто, ещё ${gameTime(Number(v.cool_left), factor)}` : `через ${Math.max(0, Number(v.cool_next) || 0)} ч игровых`}`);
+  lines.push(`События бара: ${v.bar_rule === '0' ? 'выключены правилом' : v.barman === '1'
+    ? `следующее через ${Math.max(0, Math.round(Number(v.bar_next) || 0))} ч игровых` : 'нет бармена'}`);
+  if (v.weather) lines.push(`Погода: ${WEATHER[v.weather] ?? v.weather}`);
+  if (events.result) lines.push(`Последнее: ${events.result.text}`);
+  return lines;
+}

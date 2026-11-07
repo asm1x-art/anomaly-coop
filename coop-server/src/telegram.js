@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { FACTIONS } from './settings.js';
-import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel } from './admin_commands.js';
+import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel, WORLD_EVENTS, worldEventOf, eventsText } from './admin_commands.js';
 
 // The Telegram bot: what the admin page does, for the admins listed in server.cfg, and news for them (a player
 // joined or left, the host went down, a save failed). Long polling (getUpdates), so no port has to be open;
@@ -31,6 +31,7 @@ const COMMANDS = [
   ['rollback', 'Откатить мир: /rollback ревизия'],
   ['reset_world', 'Сбросить мир'],
   ['logs', 'Логи игроков: /logs имя'],
+  ['event', 'События мира: /event, /event surge start'],
   ['confirm', 'Подтвердить откат или сброс'],
   ['help', 'Команды'],
 ];
@@ -121,6 +122,20 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
     log(`telegram: ${e.stack ?? e.message}`);
     return say(chat, `Не получилось: ${e.message}`);
   });
+
+  // the world's events: their state and how to start one; one started or stopped (the dangerous asked about first)
+  const worldEvent = (chat, id = '', action = 'start') => {
+    if (typeof coop.worldEvent !== 'function') return say(chat, NOT_YET);
+    const e = worldEventOf(id);
+    if (!e) {
+      return say(chat, [...eventsText(coop.events()), '', 'Запустить: /event <событие> start, остановить: /event <событие> stop.',
+        ...WORLD_EVENTS.map((x) => `${x.id} — ${x.title}${x.stop ? ' (start/stop)' : ''}`)].join('\n'));
+    }
+    const run = () => say(chat, coop.worldEvent(e.id, action, 'бот'));
+    if (e.danger === action) return confirm(chat, `${e.title}: ${action === 'start' ? 'начать' : 'остановить'}? ${e.warn}`,
+      action === 'start' ? 'Начать' : 'Остановить', run);
+    return run();
+  };
 
   const settingsText = () => {
     const s = coop.settings();
@@ -239,6 +254,8 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
       }
       case 'logs':
         return logs(chat, args);
+      case 'event':
+        return worldEvent(chat, ...args.split(/\s+/));
       default:
         return say(chat, `Не знаю такой команды.
 ${HELP}`);

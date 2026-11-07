@@ -76,6 +76,11 @@
   ul.saves a { color: var(--accent); }
   ul.saves .when { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   ul.saves button { padding: 4px 10px; font-size: 13px; }
+  .events { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; margin-top: 12px; }
+  .events div { display: flex; gap: 6px; align-items: center; }
+  .events span { flex: 1; }
+  .events button { padding: 4px 10px; font-size: 13px; background: var(--line); color: var(--text); }
+  .events button.danger { background: transparent; }
   #msg.error { color: var(--danger); }
   #msg.ok { color: var(--ok); }
 </style>
@@ -96,6 +101,14 @@
     <p class="note" id="paused" style="display:none"></p>
     <button class="danger" id="reset">Сбросить мир</button>
     <p class="note" id="reset-note" style="margin:10px 0 0">Удаляет мир, персонажей и выданные id. Только когда никого нет онлайн.</p>
+  </section>
+
+  <section>
+    <h2>События мира</h2>
+    <p class="note">Запускает игра, которая держит мир (хост, без него мастер симуляции): у всех игроков, с обычными новостями мира. Что она сделала, пишется в журнал админов.</p>
+    <ul class="saves" id="events-now"></ul>
+    <div class="events" id="events"></div>
+    <p class="note" id="event-note" style="margin:10px 0 0"></p>
   </section>
 
   <section>
@@ -258,6 +271,46 @@
       $('paused').append(button);
     }
     renderSaves(state.saves ?? []);
+    renderEvents(state.events);
+  }
+
+  // the world's events: their state as the world's game told it, a button for each (stop where there is one)
+  let eventsBuilt = false;
+  function renderEvents(events) {
+    if (!events) return;
+    const now = $('events-now');
+    now.replaceChildren();
+    for (const line of events.lines) {
+      const li = document.createElement('li');
+      li.textContent = line;
+      now.append(li);
+    }
+    if (eventsBuilt) return;
+    eventsBuilt = true;
+    for (const e of events.list) {
+      const row = document.createElement('div');
+      const title = document.createElement('span');
+      title.textContent = e.title;
+      row.append(title);
+      for (const action of e.stop ? ['start', 'stop'] : ['start']) {
+        const button = document.createElement('button');
+        if (e.danger === action) button.className = 'danger';
+        button.textContent = action === 'start' ? 'Начать' : 'Остановить';
+        button.addEventListener('click', () => worldEvent(e, action));
+        row.append(button);
+      }
+      $('events').append(row);
+    }
+  }
+  async function worldEvent(e, action) {
+    if (e.danger === action && !confirm(`${e.title}: ${action === 'start' ? 'начать' : 'остановить'}? ${e.warn}`)) return;
+    try {
+      const state = await api('POST', '/api/event', { name: e.id, action });
+      $('event-note').textContent = state.answer;
+      renderStatus(state);
+    } catch (err) {
+      $('event-note').textContent = 'Не получилось: ' + err.message;
+    }
   }
 
   const REASONS = {

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { isSea, getAsset } from 'node:sea';
 import { FACTIONS } from './settings.js';
+import { WORLD_EVENTS, eventsText } from './admin_commands.js';
 
 // The admin page: world settings, allowed factions, who is online, world reset, crash and bug reports.
 // HTTP basic auth, any user name, the server's admin password. Two routes without it (the admin port is reached
@@ -104,7 +105,13 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
     req.on('error', reject);
   });
 
-  const state = () => ({ ...coop.status(), settings: coop.settings(), factions: FACTIONS });
+  // events: the world's events as its game last told them (server.js events), with their list and the lines to show
+  const events = () => {
+    if (typeof coop.events !== 'function') return null;
+    const now = coop.events();
+    return { ...now, list: WORLD_EVENTS, lines: eventsText(now) };
+  };
+  const state = () => ({ ...coop.status(), settings: coop.settings(), factions: FACTIONS, events: events() });
 
   const crashLimit = crashMaxMb * 1024 * 1024;
   const recent = new Map(); // address -> times of its reports in the last hour
@@ -184,6 +191,12 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
           res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store',
             'Content-Disposition': `attachment; filename="${file.replace(/[^\w.-]/g, '_')}"` });
           return res.end(data);
+        }
+        case 'POST /api/event': {
+          // a world's event started or stopped: { name, action: start|stop }; the server's answer and the state
+          const { name, action } = await readJson(req);
+          const answer = coop.worldEvent(String(name ?? ''), String(action ?? ''), 'админ-страница');
+          return reply(res, 200, { answer, ...state() });
         }
         case 'POST /api/resume':
           coop.resume();
