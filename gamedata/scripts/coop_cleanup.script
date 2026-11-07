@@ -243,7 +243,7 @@ local function update()
 		return
 	end
 	next_clean = now + num("clean_interval_s", 300) * 1000
-	if num("cleaner", 1) == 1 then
+	if coop_rules.flag("cleaner", num("cleaner", 1) == 1) then -- the server's rule, the ltx's without one
 		clean()
 	end
 end

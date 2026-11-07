@@ -36,7 +36,7 @@ end
 
 -- may one go in: always in single-player; in co-op, with group_only, only one in a group of two or more
 function may_enter()
-	if not in_coop() or not ini_sys:r_bool_ex(S, "group_only", true) then
+	if not in_coop() or not coop_rules.flag("shelter_group_only", ini_sys:r_bool_ex(S, "group_only", true)) then
 		return true
 	end
 	return #coop.group() >= 2

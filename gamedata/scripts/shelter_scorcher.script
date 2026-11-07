@@ -34,7 +34,7 @@ local function say(id, seconds)
 end
 
 local function working()
-	return ini_sys:r_bool_ex(S, "enabled", true) and not raid_window.off()
+	return coop_rules.flag("scorcher", ini_sys:r_bool_ex(S, "enabled", true)) and not raid_window.off()
 end
 
 -- how far inside the white zone: positive inside, negative outside

@@ -260,7 +260,7 @@ local function actor_on_update()
 		return
 	end
 	check_at = now + CHECK_MS
-	if master() and ini_sys:r_bool_ex(S, "enabled", true) then
+	if master() and coop_rules.flag("bar_events", ini_sys:r_bool_ex(S, "enabled", true)) then
 		tick()
 	end
 end

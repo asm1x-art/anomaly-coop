@@ -36,7 +36,7 @@ local function dbg(fmt, ...)
 end
 
 function immune()
-	return enabled and db.actor ~= nil and factions[get_actor_true_community()] == true
+	return coop_rules.flag("psi_immunity", enabled) and db.actor ~= nil and factions[get_actor_true_community()] == true
 end
 
 -- a psi zone or a killing restrictor of the switch: its logic checks one of the infos
