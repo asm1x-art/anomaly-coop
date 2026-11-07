@@ -58,7 +58,7 @@ local function keep_stats()
 		dbg("health", a.health)
 		a:set_health_ex(1)
 	end
-	-- the engine's own: db.actor.satiety reads 1 whatever it is (CActorCondition::GetSatiety overrides nothing)
+	-- the engine's own (db.actor.satiety read 1 whatever it was before CActorCondition::GetSatiety overrode the base's)
 	local satiety = a:cast_Actor():conditions():GetSatiety()
 	if satiety < 1 then
 		dbg("satiety", satiety)
