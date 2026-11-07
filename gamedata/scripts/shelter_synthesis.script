@@ -624,10 +624,6 @@ local function log_entry(nature, i)
 	if not result then
 		return nil
 	end
-	-- "#<string id>": not a player but someone the game names, in each game's own language
-	if string.sub(who, 1, 1) == "#" then
-		who = game.translate_string(string.sub(who, 2))
-	end
 	return { nature = nature, result = result, parts = str_explode(parts, ","), resonance = tonumber(resonance) or 0,
 		t = tonumber(t) or 0, who = who }
 end
@@ -842,7 +838,7 @@ function staff_try()
 				end
 				if fits and not known(nature, parts) then
 					load(nature, parts, true)
-					shelter.set_state("synth_who_" .. nature, "#" .. (ini_sys:r_string_ex("raid_rescue_npc_materials", "rescue_name") or ""))
+					shelter.set_state("synth_who_" .. nature, game.translate_string(ini_sys:r_string_ex("raid_rescue_npc_materials", "rescue_name")))
 					return nature
 				end
 			end

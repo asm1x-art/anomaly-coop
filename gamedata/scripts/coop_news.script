@@ -3,8 +3,7 @@
 -- sends them - the sim master (the headless host when it runs the world); the server takes them from no one else.
 -- Each goes as the fact "news" = "<type>\t<the world's clock>\t<text>" (coop.report_fact): not a fact of the world,
 -- the server neither keeps it with the facts nor relays it. Which types the server keeps is its business
--- (server.cfg news_types: trade and chatter are not kept). The text is Russian, as the server and the launchers are,
--- whatever this game's language (coop_lang.rus: the host may run in English).
+-- (server.cfg news_types: trade and chatter are not kept).
 -- Types: cooling, cooling_end (raid_window), surge, surge_end, psi, psi_end (here, Anomaly's own callbacks),
 -- raid (raid.script), shelter, bar, trade (shelter_trade.script).
 
@@ -56,7 +55,7 @@ local started_at = nil
 local function actor_on_interaction(typ, obj, name)
 	local n = typ == "anomalies" and ANOMALIES[name]
 	if n and started_at and time_global() - started_at >= QUIET_MS then
-		publish(n[1], coop_lang.rus(n[2]))
+		publish(n[1], game.translate_string(n[2]))
 	end
 end
 
