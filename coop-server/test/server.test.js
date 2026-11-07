@@ -2001,3 +2001,25 @@ test('the host process tells host_down through the emitter, apart from the world
     server.close();
   }
 });
+
+test('the world\'s language goes to the games with the settings (the host runs in it) and is in the public status', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d', language: 'eng' });
+  const { port } = server.address();
+  try {
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    await settle(h);
+    assert.match(h.settings.at(-1), /^language=eng$/m);
+    assert.equal(server.coop.publicStatus().language, 'eng');
+    h.socket.destroy();
+  } finally {
+    server.close();
+  }
+  const plain = await startServer(options());
+  try {
+    assert.equal(plain.coop.publicStatus().language, 'rus');
+  } finally {
+    plain.close();
+  }
+});

@@ -28,6 +28,34 @@ function flag(key, default)
 	return value ~= "0"
 end
 
+-- The world's language (server.cfg language, coop-server config.js): the host runs in it, so what it makes for
+-- everyone is in it - the world's news for the server's journal and the launchers, the answers to the admins'
+-- events. Done as the options' language is: localization.ltx, the system ini and the string table reloaded. A
+-- player's game keeps its own.
+local LANGUAGES = { rus = true, eng = true }
+local language_check = 0
+
+local function host_language()
+	if time_global() < language_check then
+		return
+	end
+	language_check = time_global() + 3000
+	if not (coop.connected() and coop.is_host()) then
+		return
+	end
+	local want = all().language
+	if not (want and LANGUAGES[want]) or ini_sys:r_string_ex("string_table", "language") == want then
+		return
+	end
+	local loc = ini_file_ex("localization.ltx", true)
+	loc:w_value("string_table", "language", want)
+	loc:save()
+	reload_ini_sys()
+	game.reload_language()
+	SendScriptCallback("on_localization_change")
+	printf("[coop] the world's language: %s (%s)", want, game.translate_string("st_coop_news_title"))
+end
+
 -- The world's difficulty (gameplay and economy) is the server's, the same for everyone: it is put on the save's
 -- Lua state as the world loads, before game_difficulties reads it (custom factors dropped), so a change on the admin
 -- page shows from the next load. The options' difficulty pages change nothing in co-op. Ironman is off in co-op:
@@ -36,6 +64,7 @@ function on_game_start()
 	if not (coop and game_difficulties and alife_storage_manager) then
 		return -- not the co-op engine
 	end
+	RegisterScriptCallback("actor_on_update", host_language)
 	local before_load = alife_storage_manager.on_before_load_state
 	alife_storage_manager.on_before_load_state = function(...)
 		if coop.connected() then

@@ -22,7 +22,7 @@ const PUBLIC_NEWS = 30; // the newest news in the public status
 // builds.js; none lets every build in
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
   journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {},
-  news: newsConfig = {}, adminLockMs = 5 * 60000, allowTests = false } = {}) {
+  news: newsConfig = {}, adminLockMs = 5 * 60000, allowTests = false, language = 'rus' } = {}) {
   const storage = openStorage(dataDir);
   // the world's important news, for the launchers (news.js)
   const news = createNews({ load: () => storage.loadNews(), save: (list) => storage.saveNews(list),
@@ -68,8 +68,10 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     return Math.min(...(inWorld.length ? inWorld : all.length ? all : clients.keys()));
   };
   // the world's settings for the games; the host also takes its autosave interval from them; tests=1 on a test
-  // server (its cheats: fast travel to points not seen yet, coop_travel.script)
-  const settingsPayload = () => stringZ(settingsText(storage.settings()) +
+  // server (its cheats: fast travel to points not seen yet, coop_travel.script); language: the world's (server.cfg),
+  // the host runs in it (coop_rules.script), so the news and the answers to the admins come in it
+  const settingsPayload = () => stringZ(settingsText(storage.settings()) + `
+language=${language}` +
     (autosaveMinutes === null ? '' : `
 autosave_minutes=${autosaveMinutes}`) + (allowTests ? `
 tests=1` : ''));
@@ -1198,6 +1200,7 @@ tests=1` : ''));
       return {
         protocol: PROTOCOL_VERSION,
         time: Date.now(),
+        language,
         max_players: storage.settings().rules?.max_players ?? null,
         host: hostProcess || hostClient ? { in_world: !!hostClient?.inWorld } : null,
         paused: !!pausedBy,
