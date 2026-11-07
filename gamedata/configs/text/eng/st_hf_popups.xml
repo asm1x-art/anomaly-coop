@@ -15,6 +15,9 @@
     <string id="st_reject_pickup_world_obj">
 		<text>I am unable to pick this up.</text>
 	</string>
+    <string id="st_reject_pickup_not_on_shelter">
+		<text>Objects can be placed in the shelter only.</text>
+	</string>
 	<string id="st_enable_collision">
 		<text>Enabled Collision</text>
 	</string>

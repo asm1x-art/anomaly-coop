@@ -54,6 +54,6 @@
 		<text>SMAA: не используетс€, пока работает NVIDIA DLSS (он сам сглаживает). ¬аша настройка SMAA вернЄтс€, когда DLSS выключен.</text>
 	</string>
 	<string id="ui_mm_dlss_attribution">
-		<text>»спользует NVIDIAЃ DLSS. NVIDIA, NVIDIA RTX, GeForce RTX и DLSS Ч товарные знаки NVIDIA Corporation.</text>
+		<text>»спользует NVIDIAЃ DLSS. NVIDIA, NVIDIA RTX, GeForce RTX и DLSS - товарные знаки NVIDIA Corporation.</text>
 	</string>
 </string_table>

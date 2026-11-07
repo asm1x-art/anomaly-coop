@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	
+	<string id="st_raid_penetrates_class_armor_desc">
+		<text>%c[d_purple] • %c[ui_gray_2] penetrates armour class:</text>
+	</string>
+	
+	<string id="st_raid_penetrates_class_armor_0_desc">
+		<text>%c[d_purple] • %c[ui_gray_2] ineffective against armour:</text>
+	</string>		
+	<string id="st_raid_penetrates_class_armor_1_desc">
+		<text>%c[ui_gray_1]I</text>
+	</string>	
+	<string id="st_raid_penetrates_class_armor_2_desc">
+		<text>%c[ui_gray_1]II</text>
+	</string>	
+	<string id="st_raid_penetrates_class_armor_3_desc">
+		<text>%c[ui_gray_1]III</text>
+	</string>	
+	<string id="st_raid_penetrates_class_armor_4_desc">
+		<text>%c[ui_gray_1]IV</text>
+	</string>	
+	<string id="st_raid_penetrates_class_armor_5_desc">
+		<text>%c[ui_gray_1]V</text>
+	</string>	
+	<string id="st_raid_penetrates_class_armor_6_desc">
+		<text>%c[ui_gray_1]VI</text>
+	</string>		
+	
+	
+	<string id="st_raid_tissue_damage_desc">
+		<text>%c[d_purple] • %c[ui_gray_2] tissue damage:</text>
+	</string>	
+	
+	<string id="st_raid_tissue_damage_1_desc">
+		<text>%c[ui_gray_1]below average</text>
+	</string>		
+	<string id="st_raid_tissue_damage_2_desc">
+		<text>%c[ui_gray_1]average</text>
+	</string>			
+	<string id="st_raid_tissue_damage_3_desc">
+		<text>%c[ui_gray_1]above average</text>
+	</string>	
+	<string id="st_raid_tissue_damage_4_desc">
+		<text>%c[ui_gray_1]high</text>
+	</string>	
+	<string id="st_raid_tissue_damage_5_desc">
+		<text>%c[ui_gray_1]very high</text>
+	</string>		
+	<string id="st_raid_tissue_damage_6_desc">
+		<text>%c[ui_gray_1]exceptional</text>
+	</string>		
+</string_table>

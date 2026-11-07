@@ -27,7 +27,7 @@ function UICoopFps:Update()
 	local frames = device().frame - self.frame
 	local text = string.format("%d FPS", math.floor(frames * 1000 / (now - self.since) + 0.5))
 	if coop.connected() then
-		text = string.format("%s   %d мс", text, coop.ping())
+		text = string.format("%s   %d %s", text, coop.ping(), game.translate_string("st_coop_ms"))
 	end
 	self.text:SetText(text)
 	self.frame = device().frame

@@ -644,7 +644,9 @@ end
 -- true = spawned. A revealed stash's content is the same everywhere; the green spot ("treasure") is
 -- shown to the others at once, the purple one ("treasure_searched", rare) through the PDA menu.
 
-local SHARE_STASH = "Поделиться с отрядом"
+local function share_stash() -- the PDA map spot's menu line
+	return game.translate_string("st_coop_share_stash")
+end
 local rare_revealed = {} -- box id -> { content, hint }: rare stashes we can share
 
 local function caches()
@@ -758,12 +760,12 @@ local function wrap_stashes()
 
 	RegisterScriptCallback("map_spot_menu_add_property", function(ui, id, level_name)
 		if coop_on() and rare_revealed[id] and caches()[id] == rare_revealed[id].content then
-			ui:AddItem(SHARE_STASH)
+			ui:AddItem(share_stash())
 		end
 	end)
 	RegisterScriptCallback("map_spot_menu_property_clicked", function(property_ui, id, level_name, prop)
 		local stash = rare_revealed[id]
-		if prop == SHARE_STASH and stash then
+		if prop == share_stash() and stash then
 			announce_stash(id, stash.content, "treasure_searched", stash.hint)
 			rare_revealed[id] = nil
 		end
@@ -782,7 +784,7 @@ local saving = nil -- the one being made, told to the others once it is (world_s
 local SAVES_APART_MS = 3000 -- a save goes up after the next frames: the next one waits, or it takes its name
 
 local function news(text)
-	db.actor:give_game_news("Кооператив", text, "ui_iconsTotal_grouping", 0, 8000)
+	db.actor:give_game_news(game.translate_string("st_coop_news_title"), text, "ui_iconsTotal_grouping", 0, 8000)
 end
 
 local function autosave()
@@ -806,7 +808,7 @@ local function autosave()
 	local meta = table.remove(asked, 1) or { name = "", reason = "auto", who = "" }
 	saving = meta
 	coop.set_save_meta(meta.name, meta.reason, meta.who)
-	actor_menu.set_msg(1, meta.reason == "auto" and "Автосохранение мира" or "Сохранение мира", 3)
+	actor_menu.set_msg(1, game.translate_string(meta.reason == "auto" and "st_coop_saving_auto" or "st_coop_saving"), 3)
 	local force_pause = not device():is_paused()
 	if force_pause then
 		device():pause(true)
@@ -841,15 +843,15 @@ local function wrap_saves()
 		local f = fields(payload)
 		local reason, name, who = f[1], f[2] or "", f[3] ~= "" and f[3] or sender
 		if reason == "auto" then
-			news("Автосохранение мира.")
+			news(game.translate_string("st_coop_saved_auto"))
 		elseif reason == "named" then
-			news(string.format("Мир сохранён: «%s» (%s).", name, who))
+			news(strformat(game.translate_string("st_coop_saved_named"), name, who))
 		elseif reason == "join" then
-			news(string.format("Мир сохранён: входит %s.", who))
+			news(strformat(game.translate_string("st_coop_saved_join"), who))
 		elseif reason == "leave" then
-			news(string.format("Мир сохранён: вышел %s.", who))
+			news(strformat(game.translate_string("st_coop_saved_leave"), who))
 		else
-			news(string.format("Мир сохранён (%s).", who))
+			news(strformat(game.translate_string("st_coop_saved_other"), who))
 		end
 	end
 end
@@ -869,7 +871,7 @@ local function watch_peers()
 		if not (db.actor and level_since) or time_global() - level_since < 5000 then
 			return
 		end
-		news(string.format(joined and "%s вошёл в мир." or "%s вышел из мира.", name))
+		news(strformat(game.translate_string(joined and "st_coop_peer_joined" or "st_coop_peer_left"), name))
 	end
 end
 
