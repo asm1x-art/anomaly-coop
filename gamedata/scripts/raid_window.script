@@ -108,9 +108,9 @@ local function new_cycle(t)
 	printf("raid_window: Cooling at world hour %s", t)
 	-- the server's journal: the news every game tells now (hear), with the window it opens
 	local senders = str_explode(ini_sys:r_string_ex(S, "senders") or "", ",")
-	local sender = game.translate_string(senders[math.random(math.max(1, #senders))] or "")
-	coop_news.publish("cooling", sender .. ": " .. game.translate_string("st_raid_cooling_text") .. " "
-		.. string.format(game.translate_string("st_coop_news_cooling_window"), num("window_hours", 6)))
+	local sender = coop_lang.rus(senders[math.random(math.max(1, #senders))] or "")
+	coop_news.publish("cooling", sender .. ": " .. coop_lang.rus("st_raid_cooling_text") .. " "
+		.. string.format(coop_lang.rus("st_coop_news_cooling_window"), num("window_hours", 6)))
 end
 
 -- the next cycle: every_hours from now, give or take every_spread, so that it does not fall on the same day each week
@@ -134,7 +134,7 @@ local function clock()
 	local closes = opened and opened + num("window_hours", 6)
 	if closes and t >= closes and t < closes + 2 and state_num("cool_end_told") ~= seq then
 		shelter.set_state("cool_end_told", seq)
-		coop_news.publish("cooling_end", game.translate_string("st_coop_news_cooling_end"))
+		coop_news.publish("cooling_end", coop_lang.rus("st_coop_news_cooling_end"))
 	end
 	local nxt = state_num("cool_next")
 	if not nxt then

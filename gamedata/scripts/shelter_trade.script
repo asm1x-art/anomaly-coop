@@ -101,14 +101,18 @@ local function news_list()
 	return out
 end
 
--- args of a news entry as text
-local function news_text(e)
+-- args of a news entry as text: in this game's language, or Russian for the server's journal (coop_lang)
+local function news_text(e, rus)
 	local args = {}
 	for i, a in ipairs(e.args) do
 		local kind, rest = string.sub(a, 1, 1), string.sub(a, 2)
-		args[i] = kind == "@" and ui_item.get_sec_name(rest) or kind == "#" and game.translate_string(rest) or a
+		if rus then
+			args[i] = kind == "@" and coop_lang.item_name(rest) or kind == "#" and coop_lang.rus(rest) or a
+		else
+			args[i] = kind == "@" and ui_item.get_sec_name(rest) or kind == "#" and game.translate_string(rest) or a
+		end
 	end
-	local text = game.translate_string(e.id)
+	local text = rus and coop_lang.rus(e.id) or game.translate_string(e.id)
 	return #args > 0 and string.format(text, unpack(args)) or text
 end
 
@@ -165,7 +169,7 @@ local function tell_world()
 	end
 	for _, e in ipairs(news_list()) do
 		if e.seq > told then
-			coop_news.publish(news_kind(e.id), news_text(e))
+			coop_news.publish(news_kind(e.id), news_text(e, true))
 		end
 	end
 end

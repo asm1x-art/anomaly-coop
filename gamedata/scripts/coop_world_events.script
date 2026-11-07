@@ -23,12 +23,21 @@ local function tr(key, ...)
 	return game.translate_string(key)
 end
 
+-- the answers go to the server's admin journal: Russian, whatever this game's language (coop_lang)
+local function ans(key, ...)
+	return coop_lang.rus_format(key, ...)
+end
+
 local function master()
 	return coop and coop.connected() and coop.is_sim_master()
 end
 
 local function title(name)
 	return tr("st_coop_ev_t_" .. name)
+end
+
+local function rus_title(name)
+	return coop_lang.rus("st_coop_ev_t_" .. name)
 end
 
 -- game seconds to the next one of a timetable (surge_manager, psi_storm_manager): nil without one
@@ -103,27 +112,27 @@ local function storm_start(name)
 		mgr:initialize()
 	end
 	if mgr.started then
-		return tr("st_coop_ev_r_running", title(name))
+		return ans("st_coop_ev_r_running", rus_title(name))
 	end
 	if not ui_options.get(s.option) then
-		return tr("st_coop_ev_r_option_off", title(name))
+		return ans("st_coop_ev_r_option_off", rus_title(name))
 	end
 	local flags = { allow = true }
 	SendScriptCallback(s.callback, flags) -- a world event (coop_events) holds them back
 	if flags.allow == false then
-		return tr("st_coop_ev_r_held", title(name))
+		return ans("st_coop_ev_r_held", rus_title(name))
 	end
 	local lead = ini_sys:r_float_ex(S, "lead_s") or 15
 	mgr._delta = math.ceil(game.get_game_time():diffSec(mgr[s.last]) + lead * level.get_time_factor())
 	coop_time.check_now() -- the timetable out at once, not at the next look
-	return tr("st_coop_ev_r_storm_start", title(name), math.floor(lead))
+	return ans("st_coop_ev_r_storm_start", rus_title(name), math.floor(lead))
 end
 
 -- ours ends now; a surge's end kills nobody (kill_all_unhided passes the surge-immune by)
 local function storm_stop(name)
 	local mgr = STORMS[name].mgr()
 	if not mgr.started then
-		return tr("st_coop_ev_r_not_running", title(name))
+		return ans("st_coop_ev_r_not_running", rus_title(name))
 	end
 	if name == "surge" then
 		local immune = load_var(db.actor, "surge_immuned", nil)
@@ -136,7 +145,7 @@ local function storm_stop(name)
 	else
 		mgr:finish(true)
 	end
-	return tr("st_coop_ev_r_stopped", title(name))
+	return ans("st_coop_ev_r_stopped", rus_title(name))
 end
 
 -------------------------------------------------------------------------------
@@ -144,42 +153,42 @@ end
 
 local function cooling(action)
 	if raid_window.off() then
-		return tr("st_coop_ev_r_cool_off")
+		return ans("st_coop_ev_r_cool_off")
 	end
 	if action == "start" then
 		if raid_window.open_now() then
-			return tr("st_coop_ev_r_cool_open")
+			return ans("st_coop_ev_r_cool_open")
 		end
 		raid_window.force_open()
-		return tr("st_coop_ev_r_cool_started", ini_sys:r_float_ex("raid_window", "window_hours") or 6)
+		return ans("st_coop_ev_r_cool_started", ini_sys:r_float_ex("raid_window", "window_hours") or 6)
 	end
 	if not raid_window.open_now() then
-		return tr("st_coop_ev_r_cool_closed")
+		return ans("st_coop_ev_r_cool_closed")
 	end
 	raid_window.force_close()
-	return tr("st_coop_ev_r_cool_stopped")
+	return ans("st_coop_ev_r_cool_stopped")
 end
 
 local function bar(id, name)
 	if not bar_needs_met(id) then
-		return tr("st_coop_ev_r_bar_needs", title(name))
+		return ans("st_coop_ev_r_bar_needs", rus_title(name))
 	end
 	shelter_events.force(id)
-	return tr("st_coop_ev_r_bar_done", title(name))
+	return ans("st_coop_ev_r_bar_done", rus_title(name))
 end
 
 local function weather(cycle, name)
 	local wm = level_weathers.get_weather_manager()
 	local presets = wm and wm.presets and wm.presets[cycle]
 	if not presets then
-		return tr("st_coop_ev_r_failed", title(name))
+		return ans("st_coop_ev_r_failed", rus_title(name))
 	end
 	wm.cycle = cycle
 	wm.preset = random_key_table(presets)
 	wm:reset_change_date(true) -- the cycle keeps for its whole period from now
 	wm.transition_period, wm.pre_blowout_period = false, false
 	wm:select_weather(true) -- published with it (coop_time)
-	return tr("st_coop_ev_r_weather", title(name))
+	return ans("st_coop_ev_r_weather", rus_title(name))
 end
 
 -------------------------------------------------------------------------------
@@ -216,12 +225,12 @@ function run(name, action, admin)
 		elseif bar_id then
 			result = bar(bar_id, name)
 		else
-			result = tr("st_coop_ev_r_unknown", tostring(name))
+			result = ans("st_coop_ev_r_unknown", tostring(name))
 		end
 	end)
 	if not ok then
 		printf("! [coop] admin event %s %s failed: %s", tostring(name), tostring(action), tostring(err))
-		result = tr("st_coop_ev_r_failed", tostring(name))
+		result = ans("st_coop_ev_r_failed", tostring(name))
 	end
 	printf("[coop] admin event %s %s (%s): %s", tostring(name), tostring(action), tostring(admin), tostring(result))
 	if is_master then

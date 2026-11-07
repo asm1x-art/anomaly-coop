@@ -155,7 +155,8 @@ local function tell_world()
 	for n = told, next_n - 1 do
 		local who, what, where = string.match(tostring(shelter.state("raid_news_" .. n, "") or ""), "^([^|]*)|([^|]*)|(.*)$")
 		if who then
-			coop_news.publish("raid", string.format(game.translate_string("st_raid_news_" .. what), who, level_caption(where)))
+			local l = get_levels()[where]
+			coop_news.publish("raid", string.format(coop_lang.rus("st_raid_news_" .. what), who, coop_lang.rus(l and l.original or where)))
 		end
 	end
 end
