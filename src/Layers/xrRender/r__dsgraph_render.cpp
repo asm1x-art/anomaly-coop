@@ -612,7 +612,9 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 
 		if (scope_3D_fake_enabled)
 		{
-			RCache.set_RT(RImplementation.Target->rt_ssfx_temp->pRT, 3); // Render scope_3D to any buffer
+			// the scopes' mask for SMAA; with MSAA the G-buffer has several samples and rt_ssfx_temp one: D3D would refuse
+			// the whole set of targets, so no mask then
+			RCache.set_RT(RImplementation.o.dx10_msaa ? NULL : RImplementation.Target->rt_ssfx_temp->pRT, 3); // Render scope_3D to any buffer
 			
 			mapScopeHUD.traverseLR(sorted_L1);
 

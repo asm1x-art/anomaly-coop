@@ -614,10 +614,12 @@ CRenderTarget::CRenderTarget()
 		rt_Heat.create(r2_RT_heat, w, h, D3DFMT_A8R8G8B8, SampleCount);
 		//--DSR-- HeatVision_end
 
+		// one sample even with MSAA: the shaders read it as a plain texture (the 3D scopes' picture, the blurs), and the
+		// 3D scopes copy the resolved rt_Generic_0 into it (with MSAA samples that copy failed: an empty scope)
 		if (RImplementation.o.dx11_hdr10) {
-			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A16B16G16R16F, RImplementation.o.dx10_msaa ? SampleCount : 1);
+			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A16B16G16R16F, 1);
 		} else {
-			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A8R8G8B8, RImplementation.o.dx10_msaa ? SampleCount : 1);
+			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A8R8G8B8, 1);
 		}
 
 		rt_dof.create(r2_RT_dof, w, h, RImplementation.o.dx11_hdr10 ? D3DFMT_A16B16G16R16F : D3DFMT_A8R8G8B8);
