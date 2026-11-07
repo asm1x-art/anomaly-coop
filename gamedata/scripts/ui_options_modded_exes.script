@@ -1,5 +1,106 @@
 --- Options menu extension
 
+-- NVIDIA DLSS and anti-aliasing in Video > Advanced. DLSS doesn't go with MSAA (the engine's r__dlss_status says msaa)
+-- and makes SMAA useless (the engine skips SMAA while DLSS runs): choosing a DLSS mode turns MSAA off, and while a DLSS
+-- mode is chosen the MSAA and SMAA rows give way to a line saying why.
+local DLSS_ID, MSAA_ID, SMAA_ID = "video/advanced/dlss_mode", "video/advanced/ssample_list", "video/advanced/smaa"
+local MSAA_OFF = "st_opt_off"
+local ui_self -- the options window drawn last: its pending (not yet applied) values count
+local options_hooked = false
+
+-- why DLSS can or can't run, read when the page is drawn (the renderer is made by then)
+function dlss_status()
+	return get_console():get_string("r__dlss_status") or ""
+end
+
+-- the DLSS list: when it can run now, or after a restart without MSAA
+function dlss_available()
+	local s = dlss_status()
+	return s == "ok" or s == "msaa"
+end
+
+-- a grey line with the reason DLSS can't run
+function dlss_unavailable(reason)
+	return dlss_status() == reason
+end
+
+-- an option's value in the open window (pending first), else the console's
+local function opt_now(id)
+	local v = ui_options.get_opt_table(id)
+	if not (v and v.cmd) then
+		return nil
+	end
+	if ui_self then
+		local path, opt = id:match("^(.*)/([^/]+)$")
+		return ui_self:GetCurrentValue(path, opt, v)
+	end
+	return get_console_cmd(0, v.cmd)
+end
+
+-- a DLSS mode is chosen (and DLSS can run): MSAA and SMAA are not used
+function dlss_chosen()
+	local m = opt_now(DLSS_ID)
+	return dlss_available() and m ~= nil and m ~= "off"
+end
+
+function dlss_not_chosen()
+	return not dlss_chosen()
+end
+
+-- the options window's hooks: DLSS wins over MSAA in the pending values; the page is drawn anew after a DLSS change
+-- (on the next update, not inside the list's own callback)
+local function hook_options_window()
+	local cls = ui_options.UIOptions
+	if not cls or options_hooked then
+		return
+	end
+	options_hooked = true
+
+	local base_reset_opt = cls.Reset_opt
+	function cls:Reset_opt(...)
+		ui_self = self
+		return base_reset_opt(self, ...)
+	end
+
+	local base_cache = cls.CacheValue
+	function cls:CacheValue(path, opt, value, v)
+		base_cache(self, path, opt, value, v)
+		local id = path .. "/" .. opt
+		if id ~= DLSS_ID and id ~= MSAA_ID then
+			return
+		end
+		ui_self = self
+		if dlss_chosen() and opt_now(MSAA_ID) ~= MSAA_OFF then
+			local mv = ui_options.get_opt_table(MSAA_ID)
+			if mv then
+				base_cache(self, "video/advanced", "ssample_list", MSAA_OFF, mv)
+			end
+		end
+		if id == DLSS_ID then
+			-- started with MSAA: DLSS comes only with the game's restart (MSAA is built into the shaders at start)
+			-- (the page shows a copy of the option; applying reads the option table's own row)
+			local restart = dlss_status() == "msaa" and value ~= "off" or nil
+			v.restart = restart
+			local own = ui_options.get_opt_table(DLSS_ID)
+			if own then
+				own.restart = restart
+			end
+			self.dlss_redraw = true
+		end
+	end
+
+	local base_update = cls.Update
+	function cls:Update()
+		base_update(self)
+		if self.dlss_redraw then
+			self.dlss_redraw = false
+			if self.last_curr_tree and self.last_path then
+				self:Reset_opt(self.last_curr_tree, self.last_path)
+			end
+		end
+	end
+end
+
 -- UI entrypoint
 function on_xml_read()
 	ui_options_base = ui_options.init_opt_base
@@ -115,7 +216,8 @@ function on_xml_read()
 			end
 		end
 
-		-- NVIDIA DLSS (engine: r__dlss_mode, r__dlss_status), after SMAA in Video > Advanced; when it can't run, the reason
+		-- NVIDIA DLSS (engine: r__dlss_mode, r__dlss_status), after SMAA in Video > Advanced; when it can't run, the reason.
+		-- While a DLSS mode is chosen, MSAA (off then) and SMAA (skipped by the engine) give way to a line saying why.
 		local advanced = nil
 		for _, top in ipairs(ui_options.options) do
 			if top.id == "video" and top.gr then
@@ -125,20 +227,28 @@ function on_xml_read()
 				break
 			end
 		end
-		local dlss_status = get_console():get_string("r__dlss_status") -- nil with an exe without DLSS
-		if advanced and advanced.gr and dlss_status and dlss_status ~= "" then
+		local has_dlss = get_console():get_string("r__dlss_status") -- nil with an exe without DLSS
+		if advanced and advanced.gr and has_dlss and has_dlss ~= "" then
 			local already_present = false
-			local smaa_idx = nil
+			local msaa_idx, smaa_idx = nil, nil
 			for i, row in ipairs(advanced.gr) do
 				if row.id == "dlss_mode" then
 					already_present = true
 					break
 				end
+				if row.id == "ssample_list" then
+					msaa_idx = i
+				end
 				if row.id == "smaa" then
 					smaa_idx = i
 				end
 			end
-			if not already_present and smaa_idx then
+			if not already_present and msaa_idx and smaa_idx and msaa_idx < smaa_idx then
+				local msaa_row, smaa_row = advanced.gr[msaa_idx], advanced.gr[smaa_idx]
+				-- MSAA is built into the shaders when the game starts: a change takes the game's restart
+				msaa_row.restart = true
+				msaa_row.precondition_1 = {dlss_not_chosen}
+				smaa_row.precondition_1 = {dlss_not_chosen}
 				local rows = {
 					{
 						id      = "dlss_mode",
@@ -153,6 +263,7 @@ function on_xml_read()
 							{"performance", "ui_mm_dlss_performance"},
 							{"ultra_performance", "ui_mm_dlss_ultra_performance"},
 						},
+						no_str  = true, -- the names are string ids already (as the SMAA row's)
 						vid     = true,
 						precondition = {dlss_available},
 					},
@@ -169,6 +280,22 @@ function on_xml_read()
 				for i, row in ipairs(rows) do
 					table.insert(advanced.gr, smaa_idx + i, row)
 				end
+				-- the lines in place of MSAA and SMAA (SMAA's first: inserting it doesn't move MSAA's place)
+				table.insert(advanced.gr, smaa_idx + 1, {
+					id           = "smaa_dlss",
+					type         = "desc",
+					text         = "ui_mm_smaa_off_dlss",
+					clr          = {255, 200, 200, 200},
+					precondition = {dlss_chosen},
+				})
+				table.insert(advanced.gr, msaa_idx + 1, {
+					id           = "msaa_dlss",
+					type         = "desc",
+					text         = "ui_mm_msaa_off_dlss",
+					clr          = {255, 200, 200, 200},
+					precondition = {dlss_chosen},
+				})
+				hook_options_window()
 				need_init_opt_coder = true
 			end
 		end
