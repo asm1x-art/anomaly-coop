@@ -32,7 +32,7 @@ test('config: sections, comments, inline comments, types; data_dir from the conf
   assert.equal(c.created, false);
   assert.deepEqual(c.warnings, []);
   assert.deepEqual(c.server, { port: 7790, admin_port: 0, admin_password: 'pa#ss', data_dir: path.join(dir, 'world', 'data'), max_players: 4,
-    builds_file: '', allow_dev: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') });
+    builds_file: '', allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') });
   assert.deepEqual(c.host, { game_dir: path.resolve(dir, '../Anomaly'), exe: 'bin\\AnomalyDX11AVX.exe', args: '', autosave_minutes: 5, pause_when_empty: false });
   assert.deepEqual(c.telegram, { token: '123:ABC-def', admins: [111, 222, 333] });
 });

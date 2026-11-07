@@ -46,6 +46,13 @@ export const DEFAULT_SETTINGS = {
     tool_group_share: 50, // % of that discount for the bringer's group
     story_rewards_all: false, // a group sharing its story: a step's reward for every member, not only who handed it in
     help_rewards_all: false, // «Помочь с:» (coop_help.script): a member's task handed in, its giver's reward for every helper too
+    // the world's mechanics, one value for the whole world (were .ltx keys each game read for itself)
+    offline_sim: true, // the host's world lives on with nobody in it (time, A-Life, surges); off: it stands (server.js)
+    cleaner: true, // the host releases bodies with nothing worth taking (coop_cleanup.script)
+    bar_events: true, // the shelter bar's events (shelter_events.script)
+    scorcher: true, // the way to the Brain Scorcher (shelter_scorcher.script)
+    shelter_group_only: true, // the shelter's entrance opens for a group only (shelter_entrance.script)
+    psi_immunity: true, // Monolith and Sin are immune to psi (coop_psi.script)
   },
 };
 

@@ -371,6 +371,31 @@ export function openStorage(dir) {
       writeAtomic('admin.json', JSON.stringify({ password }));
       return { password, created: true };
     },
+    // a save that is not the world (not the newest) gone; true when it was there
+    deleteSave(revision) {
+      const at = saves.findIndex((m) => m.revision === revision);
+      if (at === -1 || at === saves.length - 1) return false;
+      fs.rmSync(file(saveFile(revision, '')), { recursive: true, force: true });
+      saves.splice(at, 1);
+      return true;
+    },
+    // what the admins did from the in-game window (server.js journalAdmin), oldest first: { time, who, text }
+    adminLog() {
+      try {
+        return fs.readFileSync(file('admin_log.jsonl'), 'utf8').split('\n').filter(Boolean).flatMap((l) => {
+          try {
+            return [JSON.parse(l)];
+          } catch {
+            return [];
+          }
+        });
+      } catch {
+        return [];
+      }
+    },
+    appendAdminLog(entry) {
+      fs.appendFileSync(file('admin_log.jsonl'), JSON.stringify(entry) + '\n');
+    },
     // a random salt for the admin window's tokens (server.js adminToken), made up once; outlives the world
     adminSalt() {
       const saved = readJson('admin_salt.json', null);
@@ -381,14 +406,16 @@ export function openStorage(dir) {
     },
 
     // a new save, the world from now on, with the players' records as they are
-    writeWorld(owner, files, { name = '', reason = 'auto', who = '', from, clock } = {}) {
+    // (empty: an autosave of a world nobody was in, server.js keeps only the newest of a run of them)
+    writeWorld(owner, files, { name = '', reason = 'auto', who = '', from, clock, empty } = {}) {
       const revision = (saves.at(-1)?.revision ?? 0) + 1;
       fs.mkdirSync(file(saveFile(revision, '')), { recursive: true });
       WORLD_FILES.forEach((f, i) => writeAtomic(saveFile(revision, f), files[i]));
       writeAtomic(saveFile(revision, 'characters.json'), JSON.stringify(characters, null, 1));
       writeAtomic(saveFile(revision, 'facts.json'), JSON.stringify(facts, null, 1));
       copyProgress('progress', saveFile(revision, 'progress'));
-      const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}), ...(clock ? { clock } : {}) };
+      const meta = { revision, owner, time: Date.now(), name, reason, who, ...(from ? { from } : {}), ...(clock ? { clock } : {}),
+        ...(empty ? { empty } : {}) };
       writeAtomic(saveFile(revision, 'meta.json'), JSON.stringify(meta));
       saves.push(meta);
       return revision;

@@ -18,6 +18,8 @@ export const RULE_TITLES = {
   tool_discount_3: 'Скидка за инструменты: калибровка, %', tool_group_share: 'Доля скидки для группы, %',
   story_rewards_all: 'Награда за общий сюжет — всем',
   help_rewards_all: 'Награда за «Помочь с:» — всем',
+  offline_sim: 'Оффлайн-симуляция (мир живёт без игроков)', cleaner: 'Уборщик тел и мусора', bar_events: 'События бара',
+  scorcher: 'Выжигатель мозгов', shelter_group_only: 'Вход в убежище только группой', psi_immunity: 'Пси-иммунитет Монолита и Греха',
 };
 // a rule the bot has no title for still shows, under its key
 export const RULES = Object.entries(DEFAULT_SETTINGS.rules).map(([key, value]) =>

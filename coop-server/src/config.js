@@ -10,14 +10,15 @@ import { DEFAULT_NEWS_TYPES } from './news.js';
 // (so a password may hold a "#", just not " #"). An empty value is the default.
 // Where: the path given as the first argument or with --config; else next to the executable when packaged
 // (tools/server/build.mjs), next to where it's run from otherwise. Missing: an example is written there.
-// The environment overrides the file: COOP_PORT, COOP_HTTP_PORT, COOP_ADMIN_PASSWORD, COOP_BUILDS_FILE, COOP_ALLOW_DEV.
+// The environment overrides the file: COOP_PORT, COOP_HTTP_PORT, COOP_ADMIN_PASSWORD, COOP_BUILDS_FILE, COOP_ALLOW_DEV,
+// COOP_ALLOW_TESTS.
 
 export const CONFIG_FILE = 'server.cfg';
 
 // section -> key -> default; the default's type is the value's
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4, builds_file: '',
-    allow_dev: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') },
+    allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') },
   host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
@@ -33,7 +34,7 @@ const LIMITS = {
 };
 
 const ENV = { COOP_PORT: ['server', 'port'], COOP_HTTP_PORT: ['server', 'admin_port'], COOP_ADMIN_PASSWORD: ['server', 'admin_password'],
-  COOP_BUILDS_FILE: ['server', 'builds_file'], COOP_ALLOW_DEV: ['server', 'allow_dev'] };
+  COOP_BUILDS_FILE: ['server', 'builds_file'], COOP_ALLOW_DEV: ['server', 'allow_dev'], COOP_ALLOW_TESTS: ['server', 'allow_tests'] };
 
 const YES = ['1', 'true', 'yes', 'on', 'да'];
 const NO = ['0', 'false', 'no', 'off', 'нет'];
@@ -49,6 +50,7 @@ data_dir = data        # где хранится мир; путь от папк�
 max_players = 4        # игроков на сервере одновременно
 builds_file =          # builds.json лаунчера: пускать только выпущенные сборки; пусто — пускать все
 allow_dev = 0          # с builds_file: пускать и сборки «dev» (без лаунчера): 1 — да, 0 — нет
+allow_tests = 0        # тестовый сервер: в админке тест-режимы и читы для себя (бессмертие, телепорт...): 1 — да, 0 — нет
 crash_max_mb = 64      # отчёты о вылетах и баги от лаунчеров (на порт админки, без пароля): размер одного, МБ; 0 — не принимать
 news_keep = 50         # журнал важных новостей мира для лаунчеров (data/news.json): сколько последних хранить; 0 — не вести
 news_types = ${DEFAULT_NEWS_TYPES.join(',')}  # какие новости важные (присылает хост или мастер симуляции)
@@ -58,7 +60,7 @@ game_dir =             # папка игры для хоста; пусто — �
 exe = bin\\AnomalyDX11.exe  # exe игры, путь от game_dir; своя папка bin, если на этом ПК играют из той же игры
 args =                 # ещё параметры игры хоста, например своя appdata: -fsltx ..\\fsgame_host.ltx
 autosave_minutes = 5   # автосохранение мира хостом, минут; 0 — выключено
-pause_when_empty = 1   # мир стоит, пока в нём нет игроков: 1 — да, 0 — нет
+pause_when_empty = 1   # больше не действует: живёт ли мир без игроков, решает правило «Оффлайн-симуляция» в админке
 
 [telegram]
 token =                # токен бота от @BotFather; пусто — без бота

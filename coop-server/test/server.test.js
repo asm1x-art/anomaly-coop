@@ -475,7 +475,7 @@ test('the host: let in by its secret, the sim master once in the world, never a 
   }
 });
 
-test('the host: its autosave interval with the settings; paused while no player is in the world', async () => {
+test('the host: its autosave interval with the settings; without offline_sim paused while no player is in the world', async () => {
   const server = await startServer({ ...options(), hostSecret: 'f00d', autosaveMinutes: 7, pauseWhenEmpty: true });
   const { port } = server.address();
   try {
@@ -485,6 +485,10 @@ test('the host: its autosave interval with the settings; paused while no player 
     await settle(h);
     assert.match(h.settings.at(-1), /^autosave_minutes=7$/m);
     h.send(M.ACTOR_STATE, actorState('fake_start', 0, 0, 0, 0));
+    // offline_sim (on by default): the empty world lives on, its clock runs
+    assert.ok(!(await drain(h)).includes(M.PAUSED));
+    const s = server.coop.settings();
+    server.coop.saveSettings({ ...s, rules: { ...s.rules, offline_sim: false } });
     assert.deepEqual([...(await until(h, M.PAUSED)).payload], [1, ...Buffer.from('server'), 0]);
 
     const a = await player(port, 'artem');
@@ -520,7 +524,7 @@ test('the admin window: the admin password, then the admin page commands; the st
     const state = text(await until(a, M.ADMIN_STATE)).split('\n').map((l) => l.split('\t'));
     assert.deepEqual(state[0].slice(0, 2), ['auth', 'ok']);
     assert.match(state[0][2], /^token:[0-9a-f]{64}$/);
-    assert.deepEqual(state.find((l) => l[0] === 'host'), ['host', 'нет: мир держит игра игрока']);
+    assert.deepEqual(state.find((l) => l[0] === 'host').slice(0, 2), ['host', 'нет: мир держит игра игрока']);
     assert.deepEqual(state.find((l) => l[2] === 'group_max').slice(0, 4), ['setting', 'rules', 'group_max', '4']);
     assert.deepEqual(state.filter((l) => l[0] === 'player').map((l) => l[1]), ['artem', 'друг']);
     assert.deepEqual(state.find((l) => l[1] === 'monolith').slice(0, 3), ['faction', 'monolith', '1']);
@@ -1756,6 +1760,163 @@ test('autosaves: the character\'s own even in a group, one per character, listed
     const listed = charSaves(choice.payload).map((s) => s.reason);
     assert.deepEqual(listed, ['exit', 'auto', 'group']);
     b.socket.destroy();
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+// the admin window's helpers: a logged-in admin, a script event's [sender, name, fields]
+const adminText = (msg) => readStringZ(msg.payload, 0);
+const adminLine = (str) => Buffer.concat([encodeText(str), Buffer.from([0])]);
+async function adminState(c) {
+  return adminText(await until(c, M.ADMIN_STATE)).split('\n').map((l) => l.split('\t'));
+}
+function scriptEvent(msg) {
+  const [name, payload] = readStringsZ(msg.payload, 4, 2);
+  return { sender: msg.payload.readUInt32LE(0), name, fields: payload.split('\t') };
+}
+async function untilEvent(c, name) {
+  for (;;) {
+    const e = scriptEvent(await until(c, M.SCRIPT_EVENT));
+    if (e.name === name) return e;
+  }
+}
+
+test('the admin window: commands on a player go to their game as the server\'s own event, and into the journal', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const server = await startServer({ ...options(dataDir), adminPassword: 'секрет' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 1, 2, 3, 0));
+    b.send(M.ACTOR_STATE, actorState('l01_escape', 10, 20, 30, 0));
+    await settle(a);
+    await settle(b);
+    a.send(M.ADMIN_LOGIN, adminLine('секрет'));
+    await until(a, M.ADMIN_STATE);
+    // asked for its report: the game answers the server alone, never the other players
+    assert.deepEqual(await untilEvent(b, 'coop_admin'), { sender: 0, name: 'coop_admin', fields: ['report', 'server'] });
+    b.send(M.SCRIPT_EVENT, event('coop_admin_info', '87\t1200\t0\t5000\t77\t12'));
+    await settle(b);
+    // a game can't send the server's own event to another
+    b.send(M.SCRIPT_EVENT, event('coop_admin', 'god\t1\tдруг'));
+    await settle(b);
+    a.send(M.ADMIN_COMMAND, adminLine('state'));
+    const state = await adminState(a);
+    const card = state.find((l) => l[0] === 'player' && l[1] === 'друг');
+    assert.deepEqual(card.slice(9, 16), ['87', '1200', '0', '5000', '10.0', '20.0', '30.0']);
+    assert.ok(!(await drain(a)).includes(M.SCRIPT_EVENT));
+
+    a.send(M.ADMIN_COMMAND, adminLine('give\tдруг\twpn_pm\t3'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /wpn_pm x 3/);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['give', 'wpn_pm', '3', 'artem']);
+    a.send(M.ADMIN_COMMAND, adminLine('give\tдруг\tbad section\t3'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /Как: give/);
+    a.send(M.ADMIN_COMMAND, adminLine('money\tдруг\t-500'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /забрано 500/);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['money', '-500', 'artem']);
+    a.send(M.ADMIN_COMMAND, adminLine('god\tдруг\ton'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /бессмертие включено/);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['god', '1', 'artem']);
+    a.send(M.ADMIN_COMMAND, adminLine('heal\tдруг'));
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['heal', 'artem']);
+    await until(a, M.ADMIN_RESULT);
+    // to him: the admin's own game moves (the same level: no vertices); him to me: his
+    a.send(M.ADMIN_COMMAND, adminLine('goto\tдруг'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['teleport', 'l01_escape', '10.00', '20.00', '30.00', '', '', 'artem']);
+    await until(a, M.ADMIN_RESULT);
+    a.send(M.ADMIN_COMMAND, adminLine('bring\tдруг'));
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['teleport', 'l01_escape', '1.00', '2.00', '3.00', '', '', 'artem']);
+    await until(a, M.ADMIN_RESULT);
+    // another level: the target's vertices from its report, unknown yet for the admin
+    b.send(M.ACTOR_STATE, actorState('l02_garbage', 5, 6, 7, 0));
+    await settle(b);
+    a.send(M.ADMIN_COMMAND, adminLine('goto\tдруг'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['teleport', 'l02_garbage', '5.00', '6.00', '7.00', '77', '12', 'artem']);
+    await until(a, M.ADMIN_RESULT);
+    a.send(M.ADMIN_COMMAND, adminLine('bring\tдруг'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /повторите/);
+    a.send(M.ADMIN_COMMAND, adminLine('say\tвсем привет'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /Отправлено 2/);
+    assert.deepEqual((await untilEvent(b, 'coop_admin')).fields, ['say', 'всем привет', 'artem']);
+    // cheats on oneself and the test modes: a test server's only
+    a.send(M.ADMIN_COMMAND, adminLine('god\tartem\ton'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /только на тестовом сервере/);
+    a.send(M.ADMIN_COMMAND, adminLine('test\tbase_cooling'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /только на тестовом сервере/);
+    a.send(M.ADMIN_COMMAND, adminLine('give\tникто\twpn_pm\t1'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /нет в мире/);
+
+    a.send(M.ADMIN_COMMAND, adminLine('state'));
+    const journal = (await adminState(a)).filter((l) => l[0] === 'journal');
+    assert.equal(journal.length, 8); // the newest
+    assert.ok(journal.every((l) => l[2] === 'artem'));
+    assert.match(journal.at(-1)[3], /^give никто wpn_pm 1 — /);
+    const kept = fs.readFileSync(path.join(dataDir, 'admin_log.jsonl'), 'utf8');
+    assert.ok(kept.split('\n').filter(Boolean).length >= 10);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the admin window on a test server: cheats on oneself, the test modes; the games know it is one', async () => {
+  const server = await startServer({ ...options(), adminPassword: 'секрет', allowTests: true });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    assert.match(a.settings.at(-1) ?? (await settle(a), a.settings.at(-1)), /^tests=1$/m);
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 1, 2, 3, 0));
+    a.send(M.ADMIN_LOGIN, adminLine('секрет'));
+    const state = await adminState(a);
+    assert.equal(state.find((l) => l[0] === 'server')[1], '1');
+    a.send(M.ADMIN_COMMAND, adminLine('god\tartem\ton'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['god', '1', 'artem']);
+    a.send(M.ADMIN_COMMAND, adminLine('test\tbase_cooling'));
+    assert.deepEqual((await untilEvent(a, 'coop_admin')).fields, ['test', 'base_cooling', 'artem']);
+    await until(a, M.ADMIN_RESULT);
+    a.send(M.ADMIN_COMMAND, adminLine('test\tbad action!'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /Нет такого тест-действия/);
+    a.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+test('the admin window: saves a page at a time; the pause lifted; autosaves of an empty world kept one', async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coop-test-'));
+  const server = await startServer({ ...options(dataDir), adminPassword: 'секрет' });
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    await uploadSave(a, [Buffer.from('w'), Buffer.from('l')], 0, '', 'new', 'artem');
+    // nobody in the world: a run of autosaves leaves only its newest
+    for (let i = 0; i < 3; i++) {
+      await uploadSave(a, [Buffer.from('w'), Buffer.from('l')], i + 1);
+      a.send(M.PING, Buffer.alloc(4));
+      await until(a, M.PONG);
+    }
+    assert.deepEqual(server.coop.status().saves.map((m) => [m.revision, m.reason]), [[4, 'auto'], [1, 'new']]);
+    assert.ok(!fs.existsSync(path.join(dataDir, 'saves', '2')));
+    // in the world: each kept
+    a.send(M.ACTOR_STATE, actorState('l01_escape', 0, 0, 0, 0));
+    for (let i = 0; i < 12; i++) {
+      await uploadSave(a, [Buffer.from('w'), Buffer.from('l')], i + 4);
+      a.send(M.PING, Buffer.alloc(4));
+      await until(a, M.PONG);
+    }
+    a.send(M.ADMIN_LOGIN, adminLine('секрет'));
+    let state = await adminState(a);
+    assert.deepEqual(state.find((l) => l[0] === 'saves'), ['saves', '14', '0']);
+    assert.equal(state.filter((l) => l[0] === 'save').length, 10);
+    a.send(M.ADMIN_COMMAND, adminLine('saves\t10'));
+    state = await adminState(a);
+    assert.deepEqual(state.filter((l) => l[0] === 'save').map((l) => l[1]), ['6', '5', '4', '1']);
+    a.send(M.ADMIN_COMMAND, adminLine('resume'));
+    assert.match(adminText(await until(a, M.ADMIN_RESULT)), /не на паузе/);
     a.socket.destroy();
   } finally {
     server.close();

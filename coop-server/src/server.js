@@ -15,12 +15,14 @@ const PUBLIC_NEWS = 30; // the newest news in the public status
 
 // hostSecret: the world's host (the headless game host.js starts) says it in its HELLO; null: no host is let in
 // journalOverlapMs: how long before a save's upload began the journal keeps its changes (tests make it 0).
-// autosaveMinutes, pauseWhenEmpty: server.cfg's [host] (config.js), for the host. adminPassword: the admin page's,
+// autosaveMinutes: server.cfg's [host] (config.js), for the host. pauseWhenEmpty: the host's world may stand while
+// no player is in it, as the rule offline_sim says (off: it stands). allowTests: a test server, whose admins have
+// the test modes and cheats for themselves (server.cfg allow_tests). adminPassword: the admin page's,
 // for the in-game admin window too (null: the one made up in data/admin.json). builds: { file, allowDev } for
 // builds.js; none lets every build in
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
   journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {},
-  news: newsConfig = {}, adminLockMs = 5 * 60000 } = {}) {
+  news: newsConfig = {}, adminLockMs = 5 * 60000, allowTests = false } = {}) {
   const storage = openStorage(dataDir);
   // the world's important news, for the launchers (news.js)
   const news = createNews({ load: () => storage.loadNews(), save: (list) => storage.saveNews(list),
@@ -65,17 +67,21 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
     const inWorld = players().filter(([, c]) => c.inWorld).map(([cid]) => cid);
     return Math.min(...(inWorld.length ? inWorld : all.length ? all : clients.keys()));
   };
-  // the world's settings for the games; the host also takes its autosave interval from them
+  // the world's settings for the games; the host also takes its autosave interval from them; tests=1 on a test
+  // server (its cheats: fast travel to points not seen yet, coop_travel.script)
   const settingsPayload = () => stringZ(settingsText(storage.settings()) +
     (autosaveMinutes === null ? '' : `
-autosave_minutes=${autosaveMinutes}`));
-  // pauseWhenEmpty: the host's world stands while no player is in it (time in the Zone runs many times faster);
-  // only the host is told, the players' games never run an empty world
+autosave_minutes=${autosaveMinutes}`) + (allowTests ? `
+tests=1` : ''));
+  // The host's world with no player in it: it lives on (the rule offline_sim: time, A-Life, surges, as the host's
+  // game runs them), or stands while nobody is in it (time in the Zone runs many times faster). Only the host is
+  // told, the players' games never run an empty world.
   let emptyPaused = false;
   let saveWhileEmpty = false; // the host goes on for a save asked while the world stood empty
   const updateEmptyPause = () => {
     const hostClient = hostId === null ? null : clients.get(hostId);
-    const empty = pauseWhenEmpty && !!hostClient?.inWorld && !pausedBy && !players().some(([, c]) => c.inWorld);
+    const empty = pauseWhenEmpty && !storage.settings().rules.offline_sim && !!hostClient?.inWorld && !pausedBy &&
+      !players().some(([, c]) => c.inWorld);
     if (empty !== emptyPaused) {
       emptyPaused = empty;
       log(empty ? 'nobody in the world: the host pauses it' : 'a player is in the world: the host lets it go on');
@@ -212,6 +218,9 @@ autosave_minutes=${autosaveMinutes}`));
   // journalOverlapMs before its upload began (the game made the save a little earlier, and may not have applied
   // the latest yet); replaying one the save has changes nothing.
   // Lua events that change the world (coop_sync.script, coop_events.script); the others are for the players there
+  // the admin window's script events (coop_admin_do.script): the server's to a game, a game's report to the server
+  const ADMIN_EVENT = 'coop_admin';
+  const ADMIN_INFO = 'coop_admin_info';
   const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
@@ -486,25 +495,123 @@ autosave_minutes=${autosaveMinutes}`));
     if (check.result === 'need') return ['auth', 'need', 0, 'Сначала пароль админки.'].join('\t');
     return ['auth', 'wrong', 0, `Неверный пароль админки. Попыток до блокировки: ${check.left}.`].join('\t');
   };
-  const adminStatePayload = () => {
+  // a player's place, as their last ACTOR_STATE has it: { level, x, y, z } or null
+  const placeOf = (c) => {
+    if (!c?.state) return null;
+    const at = c.state.indexOf(0) + 1;
+    if (at <= 0 || c.state.length < at + 12) return null;
+    return { level: readStringZ(c.state, 0), x: c.state.readFloatLE(at), y: c.state.readFloatLE(at + 4), z: c.state.readFloatLE(at + 8) };
+  };
+  // what the admin window asks of a player's game: a script event from no player (coop_admin_do.script)
+  const adminEvent = (c, ...fields) =>
+    c.send(M.SCRIPT_EVENT, Buffer.concat([u32(0), stringZ(ADMIN_EVENT), stringZ(fields.join('\t'))]));
+  // the players' games report their state for the window (health, rank...) when asked, at most this often
+  const REPORT_MS = 4000;
+  let reportAsked = 0;
+  const askReports = () => {
+    if (Date.now() - reportAsked < REPORT_MS) return;
+    reportAsked = Date.now();
+    for (const [, c] of players()) if (c.inWorld) adminEvent(c, 'report', 'server');
+  };
+  const SAVES_PAGE = 10;
+  const adminStatePayload = (client) => {
     const st = server.coop.status();
     const s = storage.settings();
     const h = st.host;
     const lines = [['host', !h ? 'нет: мир держит игра игрока' : [h.running === false ? 'не работает' : 'работает',
       h.master ? 'держит мир' : h.connected ? 'загружает мир' : 'не подключён', h.gave_up ? 'упал 3 раза, ждёт перезапуска' : '']
-      .filter(Boolean).join(', ')]];
-    if (st.world) lines.push(['world', st.world.revision, st.world.owner]);
-    for (const p of st.online) lines.push(['player', p.name, p.level ?? '', p.ping ?? '', p.authority ? 1 : 0]);
+      .filter(Boolean).join(', '), h?.uptime ?? '', h ? 1 : 0]];
+    // the server: a test server; the pause and who asked for it; the world's clock; the time here (unix s)
+    lines.push(['server', allowTests ? 1 : 0, st.paused ?? '', st.clock?.game ?? '', st.clock?.factor ?? '',
+      st.clock?.running ? 1 : 0, Math.floor(Date.now() / 1000), emptyPaused ? 1 : 0]);
+    if (st.world) lines.push(['world', st.world.revision, st.world.owner, Math.floor((st.saves[0]?.time ?? 0) / 1000)]);
+    for (const p of st.online) {
+      const c = clients.get(p.id);
+      const at = placeOf(c);
+      const g = groupOf(p.name);
+      const i = c?.info ?? {};
+      lines.push(['player', p.name, p.level ?? '', p.ping ?? '', p.authority ? 1 : 0, p.master ? 1 : 0,
+        Math.floor((c?.since ?? 0) / 1000), g ? g.members[0] : '', g ? g.members.length : 0, i.health ?? '', i.rank ?? '',
+        i.god ?? '', i.money ?? '', at ? at.x.toFixed(1) : '', at ? at.y.toFixed(1) : '', at ? at.z.toFixed(1) : '']);
+    }
     for (const [group, list] of [['world', WORLD], ['rules', RULES]])
       for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
     for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
-    for (const m of st.saves.slice(0, 20)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
+    const offset = Math.max(0, Math.min(client?.adminSaves ?? 0, Math.max(0, st.saves.length - 1)));
+    lines.push(['saves', st.saves.length, offset]);
+    for (const m of st.saves.slice(offset, offset + SAVES_PAGE)) lines.push(['save', m.revision, Math.floor(m.time / 1000), saveLabel(m)]);
+    for (const n of news.list().slice(-5)) lines.push(['news', Math.floor(n.time / 1000), n.text.replace(/\s+/g, ' ').slice(0, 160)]);
+    for (const e of adminJournal.slice(-8)) lines.push(['journal', Math.floor(e.time / 1000), e.who, e.text.replace(/\s+/g, ' ').slice(0, 160)]);
     return stringZ([authLine({ result: 'ok' }), ...lines.map((l) => l.join('\t'))].join('\n'));
   };
+  // what the admins did, from the window: the server's log and data/admin_log.jsonl (the newest kept in memory)
+  const adminJournal = storage.adminLog().slice(-50);
+  const journalAdmin = (who, text) => {
+    const entry = { time: Date.now(), who, text };
+    adminJournal.push(entry);
+    if (adminJournal.length > 50) adminJournal.shift();
+    storage.appendAdminLog(entry);
+  };
+  // a player online by name, in the world (their game takes script events in a level only)
+  const inWorldPlayer = (name) => players().find(([, c]) => c.name === name && c.inWorld)?.[1] ?? null;
+  // a command on a player (or the admin themselves, test servers only): the target's game does it
+  const PLAYER_COMMANDS = new Set(['give', 'money', 'god', 'heal', 'goto', 'bring', 'logs']);
+  const playerCommand = (cmd, name, a, b, client) => {
+    const target = inWorldPlayer(name);
+    if (!target) return `${name || '?'}: нет в мире (в меню или не на сервере).`;
+    if (target === client && cmd !== 'logs' && !allowTests) return 'Читы для себя — только на тестовом сервере (allow_tests в server.cfg).';
+    switch (cmd) {
+      case 'give': {
+        const count = Number(b || 1);
+        if (!/^[\w.-]+$/.test(a) || !Number.isInteger(count) || count < 1 || count > 100) return 'Как: give <игрок> <секция> <1..100>.';
+        adminEvent(target, 'give', a, count, client.name);
+        return `${name}: выдаётся ${a} x ${count}.`;
+      }
+      case 'money': {
+        const amount = Number(a);
+        if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 10000000) return 'Сумма: целое, не 0, до 10 000 000 (минус — забрать).';
+        adminEvent(target, 'money', amount, client.name);
+        return `${name}: ${amount > 0 ? 'выдано' : 'забрано'} ${Math.abs(amount)} RU.`;
+      }
+      case 'god': {
+        const on = ['1', 'on', 'да'].includes(a);
+        adminEvent(target, 'god', on ? 1 : 0, client.name);
+        target.info = { ...target.info, god: on ? 1 : 0 };
+        return `${name}: бессмертие ${on ? 'включено' : 'выключено'}.`;
+      }
+      case 'heal':
+        adminEvent(target, 'heal', client.name);
+        return `${name}: вылечен.`;
+      case 'logs':
+        adminEvent(target, 'logs', client.name);
+        return `${name}: логи отправляются на сервер.`;
+      case 'goto':
+      case 'bring': {
+        // goto: the admin to the player; bring: the player to the admin
+        const [who, to] = cmd === 'goto' ? [client, target] : [target, client];
+        if (who === to) return 'Это вы сами.';
+        if (!client.inWorld) return 'Сначала войдите в мир.';
+        const at = placeOf(to);
+        if (!at) return `${to.name}: место ещё неизвестно.`;
+        const sameLevel = placeOf(who)?.level === at.level;
+        if (!sameLevel && !(to.info?.lvid >= 0 && to.info?.gvid >= 0)) return `${to.name}: на другом уровне, его точка ещё неизвестна — повторите через 5 с.`;
+        adminEvent(who, 'teleport', at.level, at.x.toFixed(2), at.y.toFixed(2), at.z.toFixed(2), sameLevel ? '' : to.info.lvid,
+          sameLevel ? '' : to.info.gvid, client.name);
+        return cmd === 'goto' ? `Телепорт к ${name}.` : `${name} — телепорт к вам.`;
+      }
+    }
+    return '';
+  };
+  // the test modes' actions (coop_admin_tests.script): a test server's, done by the admin's own game
+  const TEST_ACTION = /^[a-z_0-9]+$/;
   // '' for state: nothing to say
-  const adminCommand = ([cmd, a = '', b = '']) => {
+  const adminCommand = ([cmd, a = '', b = '', c = ''], id, client) => {
     switch (cmd) {
       case 'state':
+        askReports();
+        return '';
+      case 'saves':
+        client.adminSaves = Math.max(0, Number(a) || 0);
         return '';
       case 'set':
         return setSetting(server.coop, a, b);
@@ -519,11 +626,26 @@ autosave_minutes=${autosaveMinutes}`));
       case 'rollback':
         if (Number(a) === storage.worldInfo()?.revision) return `№${a} — это мир сейчас: откатывать не к чему.`;
         return server.coop.rollback(Number(a)) ? `Мир возвращён к №${a}.` : `Нет сохранения №${a}.`;
+      case 'resume':
+        return server.coop.resume() ? 'Пауза снята.' : 'Мир и так не на паузе.';
+      case 'say': {
+        const text = [a, b, c].filter(Boolean).join(' ').trim().slice(0, 200);
+        if (!text) return 'Пустое сообщение.';
+        const to = players().filter(([, p]) => p.inWorld);
+        for (const [, p] of to) adminEvent(p, 'say', text, client.name);
+        return to.length ? `Отправлено ${to.length} игрок(ам).` : 'В мире никого: сообщение некому показать.';
+      }
+      case 'test':
+        if (!allowTests) return 'Тест-режимы — только на тестовом сервере (allow_tests в server.cfg).';
+        if (!client.inWorld) return 'Сначала войдите в мир.';
+        if (!TEST_ACTION.test(a)) return `Нет такого тест-действия: ${a}`;
+        adminEvent(client, 'test', a, client.name);
+        return `Тест: ${a}.`;
       default:
+        if (PLAYER_COMMANDS.has(cmd)) return playerCommand(cmd, a, b, c, client);
         return `Не знаю такой команды: ${cmd}`;
     }
   };
-
   const server = net.createServer((socket) => {
     socket.setNoDelay(true);
     const id = nextId++;
@@ -798,7 +920,8 @@ autosave_minutes=${autosaveMinutes}`));
           }
           if (!client.admin) log(`[${id}] '${client.name}' opened the admin window`);
           client.admin = true;
-          send(M.ADMIN_STATE, adminStatePayload());
+          askReports();
+          send(M.ADMIN_STATE, adminStatePayload(client));
           break;
         }
         case M.ADMIN_COMMAND: {
@@ -807,12 +930,13 @@ autosave_minutes=${autosaveMinutes}`));
             break;
           }
           const fields = readStringZ(payload, 0).split('\t');
-          const answer = adminCommand(fields);
+          const answer = adminCommand(fields, id, client);
           if (answer) {
             log(`[${id}] '${client.name}' (admin): ${fields.join(' ')} - ${answer}`);
+            journalAdmin(client.name, `${fields.join(' ')} — ${answer}`);
             send(M.ADMIN_RESULT, stringZ(answer));
           }
-          if (clients.has(id)) send(M.ADMIN_STATE, adminStatePayload()); // kicked themselves: gone
+          if (clients.has(id)) send(M.ADMIN_STATE, adminStatePayload(client)); // kicked themselves: gone
           break;
         }
         case M.LOAD_REQUEST: {
@@ -894,8 +1018,13 @@ autosave_minutes=${autosaveMinutes}`));
           break;
         case M.WORLD_DONE: {
           if (!upload) break;
-          const revision = storage.writeWorld(client.name, upload.files, upload.meta);
-          log(`[${id}] '${client.name}' uploaded the world, revision ${revision} (${upload.meta.reason})`);
+          // an autosave of a world nobody is in (offline_sim): only the newest one of a run of them is kept
+          const empty = upload.meta.reason === 'auto' && !players().some(([, c]) => c.inWorld);
+          const before = storage.saves().at(-1);
+          const revision = storage.writeWorld(client.name, upload.files, { ...upload.meta, empty });
+          log(`[${id}] '${client.name}' uploaded the world, revision ${revision} (${upload.meta.reason}${empty ? ', nobody in it' : ''})`);
+          if (empty && before?.empty && before.reason === 'auto' && storage.deleteSave(before.revision))
+            log(`the autosave before it, revision ${before.revision}, also of the empty world, dropped`);
           setJournal(journal.filter((entry) => entry.time >= upload.startedAt - journalOverlapMs));
           upload = null;
           creatorId = null;
@@ -921,6 +1050,15 @@ autosave_minutes=${autosaveMinutes}`));
         case M.OBJECT_SPAWN:
         case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
+          if (type === M.SCRIPT_EVENT) {
+            const name = readStringZ(payload, 0);
+            if (name === ADMIN_EVENT) break; // the server's own: a game may not send it
+            if (name === ADMIN_INFO) { // a game's state for the admin window, the server's only
+              const [health, rank, god, money, lvid, gvid] = readStringZ(payload, payload.indexOf(0) + 1).split('\t').map(Number);
+              client.info = { health, rank, god, money, lvid, gvid };
+              break;
+            }
+          }
           if (type !== M.SCRIPT_EVENT || JOURNAL_EVENTS.has(readStringZ(payload, 0)))
             record(type, Buffer.concat([u32(id), payload]));
           broadcast(id, type, Buffer.concat([u32(id), payload]));
@@ -1052,6 +1190,7 @@ autosave_minutes=${autosaveMinutes}`));
       log('settings changed on the admin page');
       const text = settingsPayload();
       for (const c of clients.values()) c.send(M.SETTINGS, text);
+      updateEmptyPause(); // offline_sim may have changed
       return storage.settings();
     },
     // only with no player online: their games run the old world. The host's does too: it is sent off, comes
