@@ -1,0 +1,230 @@
+-- Co-op: the world's events an admin starts and stops (the admin window's "Events", the admin page, the bot:
+-- coop-server/src/server.js worldEvent, admin_commands.js WORLD_EVENTS). The server sends "event<tab>name<tab>action
+-- <tab>admin" (coop_admin_do.script) to the game that runs the world's timetable - the sim master, the host while it
+-- runs the world - and, to stop a surge or a psi storm and for the weather, to every game in the world (each runs
+-- its own). Each is done through the game's own ways, so the players get it as they get one of the Zone's:
+--   surge, psi     start: the master's timetable has the next one in [coop_admin_events] lead_s real seconds; every
+--                  game takes it (coop_time.script) and starts its own at the same game second, with the news. stop:
+--                  each game ends its own; a surge ends with nobody killed (as the surge-immune: no last wave).
+--   cooling        start: raid_window.force_open (the raid's window, its news); stop: the window closes now (the
+--                  raiders still in get its late psi). None while the Brain Scorcher is off.
+--   bar_<id>       one of the bar's events now (shelter_events.force), if the one it needs is in the shelter.
+--   weather_<c>    the weather cycle c now (clear, partly, cloudy, rain, storm, foggy): the master picks it and
+--                  publishes it, the other games take it at once.
+-- After each the master reports where the events are ("coop_admin_events": key=value fields, result: what it did,
+-- for the admins' journal); also when the server asks (events_report).
+
+local S = "coop_admin_events"
+
+local function tr(key, ...)
+	if select("#", ...) > 0 then
+		return strformat(game.translate_string(key), ...)
+	end
+	return game.translate_string(key)
+end
+
+local function master()
+	return coop and coop.connected() and coop.is_sim_master()
+end
+
+local function title(name)
+	return tr("st_coop_ev_t_" .. name)
+end
+
+-- game seconds to the next one of a timetable (surge_manager, psi_storm_manager): nil without one
+local function due_in(mgr, last)
+	if not (mgr and mgr[last] and mgr._delta) then
+		return nil
+	end
+	return math.floor(mgr._delta - game.get_game_time():diffSec(mgr[last]))
+end
+
+local function bar_needs_met(id)
+	return shelter_events and shelter_events.can_run and shelter_events.can_run(id)
+end
+
+-------------------------------------------------------------------------------
+-- the report
+
+function report(result)
+	if not (master() and db.actor) then
+		return
+	end
+	local f = {}
+	local function put(key, value)
+		if value ~= nil then
+			f[#f + 1] = key .. "=" .. string.gsub(tostring(value), "[\t\r\n]+", " ")
+		end
+	end
+	local sm = surge_manager.get_surge_manager()
+	put("surge", sm.started and 1 or 0)
+	put("surge_in", due_in(sm, "last_surge_time"))
+	local pm = psi_storm_manager.get_psi_storm_manager()
+	put("psi", pm.started and 1 or 0)
+	put("psi_in", due_in(pm, "last_psi_storm_time"))
+	if raid_window then
+		if raid_window.off() then
+			put("cool", "off")
+		elseif raid_window.open_now() then
+			put("cool", "open")
+			put("cool_left", math.floor(raid_window.seconds_left() or 0))
+		else
+			put("cool", "closed")
+			put("cool_next", raid_window.hours_to_next())
+		end
+	end
+	if shelter and shelter_trade then
+		local nxt = tonumber(shelter.state("event_next", nil))
+		put("bar_next", nxt and math.floor(nxt - shelter_trade.hours()))
+		put("bar_rule", coop_rules.flag("bar_events", true) and 1 or 0)
+		put("barman", shelter_trade.barman() ~= nil and 1 or 0)
+	end
+	local wm = level_weathers.get_weather_manager()
+	put("weather", wm and wm.cycle)
+	put("factor", level.get_time_factor())
+	put("result", result)
+	coop_sync.send_event("coop_admin_events", unpack(f))
+end
+
+-------------------------------------------------------------------------------
+-- surges and psi storms
+
+local STORMS = {
+	surge = { mgr = function() return surge_manager.get_surge_manager() end, last = "last_surge_time",
+		option = "alife/event/emission_state", callback = "on_before_surge" },
+	psi = { mgr = function() return psi_storm_manager.get_psi_storm_manager() end, last = "last_psi_storm_time",
+		option = "alife/event/psi_storm_state", callback = "on_before_psi_storm" },
+}
+
+local function storm_start(name)
+	local s = STORMS[name]
+	local mgr = s.mgr()
+	if not mgr._state_loaded then
+		mgr:initialize()
+	end
+	if mgr.started then
+		return tr("st_coop_ev_r_running", title(name))
+	end
+	if not ui_options.get(s.option) then
+		return tr("st_coop_ev_r_option_off", title(name))
+	end
+	local flags = { allow = true }
+	SendScriptCallback(s.callback, flags) -- a world event (coop_events) holds them back
+	if flags.allow == false then
+		return tr("st_coop_ev_r_held", title(name))
+	end
+	local lead = ini_sys:r_float_ex(S, "lead_s") or 15
+	mgr._delta = math.ceil(game.get_game_time():diffSec(mgr[s.last]) + lead * level.get_time_factor())
+	coop_time.check_now() -- the timetable out at once, not at the next look
+	return tr("st_coop_ev_r_storm_start", title(name), math.floor(lead))
+end
+
+-- ours ends now; a surge's end kills nobody (kill_all_unhided passes the surge-immune by)
+local function storm_stop(name)
+	local mgr = STORMS[name].mgr()
+	if not mgr.started then
+		return tr("st_coop_ev_r_not_running", title(name))
+	end
+	if name == "surge" then
+		local immune = load_var(db.actor, "surge_immuned", nil)
+		save_var(db.actor, "surge_immuned", true)
+		local ok, err = pcall(mgr.end_surge, mgr, true)
+		save_var(db.actor, "surge_immuned", immune)
+		if not ok then
+			error(err, 0)
+		end
+	else
+		mgr:finish(true)
+	end
+	return tr("st_coop_ev_r_stopped", title(name))
+end
+
+-------------------------------------------------------------------------------
+-- Cooling, the bar, the weather
+
+local function cooling(action)
+	if raid_window.off() then
+		return tr("st_coop_ev_r_cool_off")
+	end
+	if action == "start" then
+		if raid_window.open_now() then
+			return tr("st_coop_ev_r_cool_open")
+		end
+		raid_window.force_open()
+		return tr("st_coop_ev_r_cool_started", ini_sys:r_float_ex("raid_window", "window_hours") or 6)
+	end
+	if not raid_window.open_now() then
+		return tr("st_coop_ev_r_cool_closed")
+	end
+	raid_window.force_close()
+	return tr("st_coop_ev_r_cool_stopped")
+end
+
+local function bar(id, name)
+	if not bar_needs_met(id) then
+		return tr("st_coop_ev_r_bar_needs", title(name))
+	end
+	shelter_events.force(id)
+	return tr("st_coop_ev_r_bar_done", title(name))
+end
+
+local function weather(cycle, name)
+	local wm = level_weathers.get_weather_manager()
+	local presets = wm and wm.presets and wm.presets[cycle]
+	if not presets then
+		return tr("st_coop_ev_r_failed", title(name))
+	end
+	wm.cycle = cycle
+	wm.preset = random_key_table(presets)
+	wm:reset_change_date(true) -- the cycle keeps for its whole period from now
+	wm.transition_period, wm.pre_blowout_period = false, false
+	wm:select_weather(true) -- published with it (coop_time)
+	return tr("st_coop_ev_r_weather", title(name))
+end
+
+-------------------------------------------------------------------------------
+
+-- the server said so (coop_admin_do.script): name, start|stop, the admin
+function run(name, action, admin)
+	if not db.actor then
+		return
+	end
+	local is_master = master()
+	local result
+	local ok, err = pcall(function()
+		local storm = STORMS[name]
+		local bar_id = string.match(name or "", "^bar_(%a+)$")
+		local cycle = string.match(name or "", "^weather_(%a+)$")
+		if cycle then
+			if is_master then
+				result = weather(cycle, name)
+			else
+				coop_time.weather_now() -- the master's pick, when it comes, at once
+			end
+		elseif storm and action == "stop" then
+			result = storm_stop(name)
+			if not is_master and db.actor then
+				db.actor:give_game_news(game.translate_string("st_coop_admin_news"), tr("st_coop_ev_news_stopped", admin, title(name)),
+					"ui_inGame2_Poslednie_razrabotki", 0, 8000)
+			end
+		elseif not is_master then
+			return
+		elseif storm then
+			result = storm_start(name)
+		elseif name == "cooling" then
+			result = cooling(action)
+		elseif bar_id then
+			result = bar(bar_id, name)
+		else
+			result = tr("st_coop_ev_r_unknown", tostring(name))
+		end
+	end)
+	if not ok then
+		printf("! [coop] admin event %s %s failed: %s", tostring(name), tostring(action), tostring(err))
+		result = tr("st_coop_ev_r_failed", tostring(name))
+	end
+	printf("[coop] admin event %s %s (%s): %s", tostring(name), tostring(action), tostring(admin), tostring(result))
+	if is_master then
+		report(result)
+	end
+end

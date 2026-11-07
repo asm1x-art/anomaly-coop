@@ -873,4 +873,179 @@
 	<string id="st_coop_transition_to">
 		<text>Transition: %s</text>
 	</string>
+	<!-- the world's events (the admin window's "Events", coop_world_events.script) -->
+	<string id="st_coop_adm_sec_events">
+		<text>Events</text>
+	</string>
+	<string id="st_coop_adm_abbr_events">
+		<text>Ev</text>
+	</string>
+	<string id="st_coop_adm_events_sub">
+		<text>Surge, psi storm, Cooling, the bar and the weather for every player, with the usual world news. The game that runs the world (the host) does it; what it did goes to the journal.</text>
+	</string>
+	<string id="st_coop_adm_ev_wait">
+		<text>The host has not told about the events yet: nobody runs the world, or the answer is on its way.</text>
+	</string>
+	<string id="st_coop_adm_ev_running">
+		<text>running now</text>
+	</string>
+	<string id="st_coop_adm_ev_next">
+		<text>in %s (~%s real)</text>
+	</string>
+	<string id="st_coop_adm_ev_due">
+		<text>due by the timetable, but not started</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_off">
+		<text>none: the Brain Scorcher is off</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_open">
+		<text>the raid window is open, %s left</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_next">
+		<text>by itself in %s game hours</text>
+	</string>
+	<string id="st_coop_adm_ev_start">
+		<text>Start</text>
+	</string>
+	<string id="st_coop_adm_ev_stop">
+		<text>Stop</text>
+	</string>
+	<string id="st_coop_adm_ev_open">
+		<text>Open the window</text>
+	</string>
+	<string id="st_coop_adm_ev_close">
+		<text>Close the window</text>
+	</string>
+	<string id="st_coop_adm_ev_bar">
+		<text>Bar events</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_off">
+		<text>not by themselves: off in "World mechanics"</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_nobarman">
+		<text>no barman: none by themselves</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_next">
+		<text>the next by itself in %s game hours</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_hint">
+		<text>Needs the barman (the binge: the technician). Money and things go to the shelter's till and store.</text>
+	</string>
+	<string id="st_coop_adm_ev_weather">
+		<text>Weather</text>
+	</string>
+	<string id="st_coop_adm_ev_weather_now">
+		<text>now: %s</text>
+	</string>
+	<string id="st_coop_adm_ev_last">
+		<text>Last (%s, %s): %s</text>
+	</string>
+	<string id="st_coop_adm_ev_report">
+		<text>Data: %s, %s s ago. The events' news show in the launcher ("World events").</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_surge">
+		<text>A surge for every player on open levels in %s s: whoever is not in cover dies at its end. Stopping it kills nobody.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_psi">
+		<text>A psi storm for every player on open levels in %s s: whoever is not in cover takes psi damage and may die.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_cooling">
+		<text>The raid window closes now: whoever is in the raid loses health to psi until out.</text>
+	</string>
+	<string id="st_coop_ev_t_surge">
+		<text>Surge</text>
+	</string>
+	<string id="st_coop_ev_t_psi">
+		<text>Psi storm</text>
+	</string>
+	<string id="st_coop_ev_t_cooling">
+		<text>Cooling</text>
+	</string>
+	<string id="st_coop_ev_t_bar_rumour">
+		<text>Stash rumour</text>
+	</string>
+	<string id="st_coop_ev_t_bar_quarrel">
+		<text>Quarrel</text>
+	</string>
+	<string id="st_coop_ev_t_bar_spender">
+		<text>A squad spends</text>
+	</string>
+	<string id="st_coop_ev_t_bar_gift">
+		<text>Gift to the group</text>
+	</string>
+	<string id="st_coop_ev_t_bar_wounded">
+		<text>Wounded at the door</text>
+	</string>
+	<string id="st_coop_ev_t_bar_binge">
+		<text>Technician's binge</text>
+	</string>
+	<string id="st_coop_ev_t_weather_clear">
+		<text>Clear</text>
+	</string>
+	<string id="st_coop_ev_t_weather_partly">
+		<text>Partly cloudy</text>
+	</string>
+	<string id="st_coop_ev_t_weather_cloudy">
+		<text>Cloudy</text>
+	</string>
+	<string id="st_coop_ev_t_weather_rain">
+		<text>Rain</text>
+	</string>
+	<string id="st_coop_ev_t_weather_storm">
+		<text>Storm</text>
+	</string>
+	<string id="st_coop_ev_t_weather_foggy">
+		<text>Fog</text>
+	</string>
+	<string id="st_coop_ev_r_storm_start">
+		<text>%s begins in %s s for everyone on open levels.</text>
+	</string>
+	<string id="st_coop_ev_r_running">
+		<text>%s is already running.</text>
+	</string>
+	<string id="st_coop_ev_r_option_off">
+		<text>%s: off in the host game's options (Options › Events).</text>
+	</string>
+	<string id="st_coop_ev_r_held">
+		<text>%s: not now, a world event runs (the barrier or the pump station defence).</text>
+	</string>
+	<string id="st_coop_ev_r_not_running">
+		<text>%s is not running.</text>
+	</string>
+	<string id="st_coop_ev_r_stopped">
+		<text>%s: stopped by an admin, nobody died.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_off">
+		<text>No Cooling: the Brain Scorcher is off.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_open">
+		<text>The raid window is already open.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_started">
+		<text>Cooling: the raid window is open for %s game hours.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_closed">
+		<text>The raid window is already closed.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_stopped">
+		<text>The raid window is closed.</text>
+	</string>
+	<string id="st_coop_ev_r_bar_needs">
+		<text>Bar: "%s" needs someone the shelter lacks (the barman; the binge, the technician).</text>
+	</string>
+	<string id="st_coop_ev_r_bar_done">
+		<text>Bar: "%s".</text>
+	</string>
+	<string id="st_coop_ev_r_weather">
+		<text>Weather: %s.</text>
+	</string>
+	<string id="st_coop_ev_r_unknown">
+		<text>No such event: %s.</text>
+	</string>
+	<string id="st_coop_ev_r_failed">
+		<text>Failed: %s (see the host's log).</text>
+	</string>
+	<string id="st_coop_ev_news_stopped">
+		<text>%s stopped an event: %s.</text>
+	</string>
 </string_table>

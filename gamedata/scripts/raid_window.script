@@ -151,6 +151,11 @@ function force_open()
 	new_cycle(hours())
 end
 
+-- the admin's (coop_world_events): the open window closes now; the clock tells the journal it ended
+function force_close()
+	shelter.set_state("cool_open", hours() - num("window_hours", 6))
+end
+
 -------------------------------------------------------------------------------
 -- this game's news of the event
 

@@ -238,6 +238,11 @@ local function tick()
 	end
 end
 
+-- the admin's (coop_world_events): such an event, and the one it needs is there (its cooldown aside)
+function can_run(id)
+	return RUN[id] ~= nil and needs_met(id)
+end
+
 -- tests: an event now, whatever its needs and cooldown (an id, or the next one of the list in a ring); its id
 function force(id)
 	if not id then

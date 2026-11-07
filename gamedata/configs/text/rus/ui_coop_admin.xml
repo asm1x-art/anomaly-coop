@@ -873,4 +873,179 @@
 	<string id="st_coop_transition_to">
 		<text>Переход: %s</text>
 	</string>
+	<!-- the world's events (the admin window's "Events", coop_world_events.script) -->
+	<string id="st_coop_adm_sec_events">
+		<text>События</text>
+	</string>
+	<string id="st_coop_adm_abbr_events">
+		<text>Сб</text>
+	</string>
+	<string id="st_coop_adm_events_sub">
+		<text>Выброс, пси-шторм, Охлаждение, бар и погода у всех игроков, с обычными новостями мира. Запускает игра, которая держит мир (хост); что она сделала - в журнале.</text>
+	</string>
+	<string id="st_coop_adm_ev_wait">
+		<text>Хост ещё не рассказал о событиях: мир никто не держит или ответ в пути.</text>
+	</string>
+	<string id="st_coop_adm_ev_running">
+		<text>идёт сейчас</text>
+	</string>
+	<string id="st_coop_adm_ev_next">
+		<text>через %s (~%s реальных)</text>
+	</string>
+	<string id="st_coop_adm_ev_due">
+		<text>по расписанию пора, но не начался</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_off">
+		<text>не бывает: Выжигатель выключен</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_open">
+		<text>окно рейда открыто, ещё %s</text>
+	</string>
+	<string id="st_coop_adm_ev_cool_next">
+		<text>само через %s ч игровых</text>
+	</string>
+	<string id="st_coop_adm_ev_start">
+		<text>Начать</text>
+	</string>
+	<string id="st_coop_adm_ev_stop">
+		<text>Остановить</text>
+	</string>
+	<string id="st_coop_adm_ev_open">
+		<text>Открыть окно</text>
+	</string>
+	<string id="st_coop_adm_ev_close">
+		<text>Закрыть окно</text>
+	</string>
+	<string id="st_coop_adm_ev_bar">
+		<text>События бара</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_off">
+		<text>сами не идут: выключены в «Механиках мира»</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_nobarman">
+		<text>нет бармена: сами не идут</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_next">
+		<text>следующее само через %s ч игровых</text>
+	</string>
+	<string id="st_coop_adm_ev_bar_hint">
+		<text>Нужен бармен (запой - техник). Деньги и вещи идут в кассу и склад убежища.</text>
+	</string>
+	<string id="st_coop_adm_ev_weather">
+		<text>Погода</text>
+	</string>
+	<string id="st_coop_adm_ev_weather_now">
+		<text>сейчас: %s</text>
+	</string>
+	<string id="st_coop_adm_ev_last">
+		<text>Последнее (%s, %s): %s</text>
+	</string>
+	<string id="st_coop_adm_ev_report">
+		<text>Данные: %s, %s с назад. Новости событий видны в лаунчере («События мира»).</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_surge">
+		<text>Выброс у всех игроков на открытых локациях через %s с: кто не в укрытии, погибнет в конце. Остановить можно, тогда никто не погибнет.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_psi">
+		<text>Пси-шторм у всех игроков на открытых локациях через %s с: кто не в укрытии, получит пси-урон и может погибнуть.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_cooling">
+		<text>Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.</text>
+	</string>
+	<string id="st_coop_ev_t_surge">
+		<text>Выброс</text>
+	</string>
+	<string id="st_coop_ev_t_psi">
+		<text>Пси-шторм</text>
+	</string>
+	<string id="st_coop_ev_t_cooling">
+		<text>Охлаждение</text>
+	</string>
+	<string id="st_coop_ev_t_bar_rumour">
+		<text>Слух о тайнике</text>
+	</string>
+	<string id="st_coop_ev_t_bar_quarrel">
+		<text>Ссора</text>
+	</string>
+	<string id="st_coop_ev_t_bar_spender">
+		<text>Гуляет отряд</text>
+	</string>
+	<string id="st_coop_ev_t_bar_gift">
+		<text>Подарок группе</text>
+	</string>
+	<string id="st_coop_ev_t_bar_wounded">
+		<text>Раненый у двери</text>
+	</string>
+	<string id="st_coop_ev_t_bar_binge">
+		<text>Техник запил</text>
+	</string>
+	<string id="st_coop_ev_t_weather_clear">
+		<text>Ясно</text>
+	</string>
+	<string id="st_coop_ev_t_weather_partly">
+		<text>Переменная облачность</text>
+	</string>
+	<string id="st_coop_ev_t_weather_cloudy">
+		<text>Облачно</text>
+	</string>
+	<string id="st_coop_ev_t_weather_rain">
+		<text>Дождь</text>
+	</string>
+	<string id="st_coop_ev_t_weather_storm">
+		<text>Гроза</text>
+	</string>
+	<string id="st_coop_ev_t_weather_foggy">
+		<text>Туман</text>
+	</string>
+	<string id="st_coop_ev_r_storm_start">
+		<text>%s начнётся через %s с у всех на открытых локациях.</text>
+	</string>
+	<string id="st_coop_ev_r_running">
+		<text>%s уже идёт.</text>
+	</string>
+	<string id="st_coop_ev_r_option_off">
+		<text>%s: выключено в настройках игры хоста (Настройки › События).</text>
+	</string>
+	<string id="st_coop_ev_r_held">
+		<text>%s: сейчас нельзя - идёт событие мира (оборона барьера или насосной).</text>
+	</string>
+	<string id="st_coop_ev_r_not_running">
+		<text>%s сейчас не идёт.</text>
+	</string>
+	<string id="st_coop_ev_r_stopped">
+		<text>%s: остановлено админом, никто не погиб.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_off">
+		<text>Охлаждения не бывает: Выжигатель выключен.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_open">
+		<text>Окно рейда и так открыто.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_started">
+		<text>Охлаждение: окно рейда открыто на %s ч игровых.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_closed">
+		<text>Окно рейда и так закрыто.</text>
+	</string>
+	<string id="st_coop_ev_r_cool_stopped">
+		<text>Окно рейда закрыто.</text>
+	</string>
+	<string id="st_coop_ev_r_bar_needs">
+		<text>Бар: «%s» - в убежище нет того, кто для этого нужен (бармен, для запоя - техник).</text>
+	</string>
+	<string id="st_coop_ev_r_bar_done">
+		<text>Бар: «%s».</text>
+	</string>
+	<string id="st_coop_ev_r_weather">
+		<text>Погода: %s.</text>
+	</string>
+	<string id="st_coop_ev_r_unknown">
+		<text>Нет такого события: %s.</text>
+	</string>
+	<string id="st_coop_ev_r_failed">
+		<text>Не получилось: %s (подробности в логе хоста).</text>
+	</string>
+	<string id="st_coop_ev_news_stopped">
+		<text>%s остановил событие: %s.</text>
+	</string>
 </string_table>

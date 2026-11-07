@@ -137,6 +137,18 @@ end
 
 local taken = {} -- fact -> the master's timetable we took last
 
+-- the admin's events (coop_world_events.script): the master's timetable goes out at the next update, not at the
+-- next look
+function check_now()
+	next_check = 0
+end
+
+-- the admin changed the weather: the master's pick, when it comes, is taken at once, not over the hour
+local weather_now_until = 0
+function weather_now()
+	weather_now_until = time_global() + 15000
+end
+
 -- mgr: the manager, last: its field with the last one's time
 local function sync_timetable(fact, mgr, last)
 	if not (mgr and mgr[last] and mgr._delta) then
@@ -219,7 +231,7 @@ function on_game_start()
 		if db.actor and not master() then
 			local wm = patch_weather_manager()
 			if wm then
-				wm:select_weather(false)
+				wm:select_weather(time_global() < weather_now_until)
 			end
 		end
 	end)

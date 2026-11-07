@@ -3,8 +3,9 @@
 --   Сервер (the admin page's password): Обзор, Игроки, Правила, Мир и фракции, Сохранения, Журнал. What the admin
 --     page and the bot do (coop-server/src/server.js ADMIN_*), and on a player: items, money, immortality, healing,
 --     teleports, logs (their game does it, coop_admin_do.script; each in the server's journal).
---   Мир · хост (the password): Механики мира (the server's rules for the whole world), Тест-режимы (a test server's
---     only, server.cfg allow_tests: the old F7 test modes as buttons, coop_admin_tests.script).
+--   Мир · хост (the password): События (surge, psi storm, Cooling, the bar's, the weather: started and stopped by the
+--     game that runs the world, coop_world_events.script), Механики мира (the server's rules for the whole world),
+--     Тест-режимы (a test server's only, server.cfg allow_tests: the old F7 test modes as buttons, coop_admin_tests.script).
 --   Моя игра (no password, every player): what this game shows (coop_my_game.script, the console, the options).
 -- A status bar on top, the card of the picked thing on the right, a search over everything, pinned toggles under the
 -- sections. The server's state comes every [coop_admin] poll_seconds while it is open. The password is asked once:
@@ -91,7 +92,7 @@ end
 -- the server's state: tab-split lines (protocol.js ADMIN_STATE), the first the login's
 
 local function parse(text)
-	local d = { players = {}, settings = {}, rules = {}, world = {}, factions = {}, saves = {}, news = {}, journal = {} }
+	local d = { players = {}, settings = {}, rules = {}, world = {}, factions = {}, saves = {}, news = {}, journal = {}, ev = {} }
 	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
 		local f = str_explode(line, "\t")
 		local k = f[1]
@@ -128,6 +129,12 @@ local function parse(text)
 			table.insert(d.news, { time = tonumber(f[2]), text = f[3] })
 		elseif k == "journal" then
 			table.insert(d.journal, { time = tonumber(f[2]), who = f[3], text = f[4] })
+		elseif k == "events" then
+			d.events = { age = tonumber(f[2]) or 0, from = f[3] }
+		elseif k == "ev" then
+			d.ev[f[2]] = f[3]
+		elseif k == "event_result" then
+			d.event_result = { time = tonumber(f[2]), text = f[3] }
 		end
 	end
 	return d
@@ -139,7 +146,7 @@ end
 local SECTIONS = {
 	{ id = "overview", group = "server" }, { id = "players", group = "server" }, { id = "rules", group = "server" },
 	{ id = "world", group = "server" }, { id = "saves", group = "server" }, { id = "journal", group = "server" },
-	{ id = "mechanics", group = "host" }, { id = "tests", group = "host" },
+	{ id = "events", group = "host" }, { id = "mechanics", group = "host" }, { id = "tests", group = "host" },
 	{ id = "debug", group = "mine" }, { id = "map", group = "mine" }, { id = "render", group = "mine" },
 }
 local GROUP_OF = {}
@@ -156,6 +163,7 @@ local RULE_GROUPS = {
 	{ "rewards", { "story_rewards_all", "help_rewards_all" } },
 }
 local MECHANICS = { "offline_sim", "cleaner", "bar_events", "scorcher", "shelter_group_only", "psi_immunity" }
+local EVENT_TITLES -- the world's events' ids, for the search (set with the section, below)
 local IS_MECHANIC = {}
 for _, k in ipairs(MECHANICS) do
 	IS_MECHANIC[k] = true
@@ -1055,6 +1063,115 @@ function UICoopAdmin:main_mechanics(box, X, Y, W, H, L)
 	self:text(30, y, W - 60, 60, tr(d.host and d.host.has and "st_coop_adm_host_god" or "st_coop_adm_no_host_offline"), C.dim, box, nil, "s")
 end
 
+-- События: the world's events (coop_world_events.script), the server's command "event <id> <start|stop>". Rows:
+-- { id, the start's and the stop's captions, the action asked about first }
+local EVENT_ROWS = {
+	{ "surge", "st_coop_adm_ev_start", "st_coop_adm_ev_stop", "start" },
+	{ "psi", "st_coop_adm_ev_start", "st_coop_adm_ev_stop", "start" },
+	{ "cooling", "st_coop_adm_ev_open", "st_coop_adm_ev_close", "stop" },
+}
+local BAR_EVENTS = { "rumour", "quarrel", "spender", "gift", "wounded", "binge" }
+local WEATHERS = { "clear", "partly", "cloudy", "rain", "storm", "foggy" }
+
+-- for the search
+EVENT_TITLES = { "surge", "psi", "cooling" }
+for _, id in ipairs(BAR_EVENTS) do
+	EVENT_TITLES[#EVENT_TITLES + 1] = "bar_" .. id
+end
+for _, id in ipairs(WEATHERS) do
+	EVENT_TITLES[#EVENT_TITLES + 1] = "weather_" .. id
+end
+
+-- a storm's row: running, or when by the timetable (game time, and real at the world's speed)
+local function storm_state(v, id)
+	if v[id] == "1" then
+		return tr("st_coop_adm_ev_running"), C.warn
+	end
+	local left = tonumber(v[id .. "_in"])
+	if not left then
+		return "-"
+	end
+	if left <= 0 then
+		return tr("st_coop_adm_ev_due"), C.dim
+	end
+	local factor = tonumber(v.factor) or 0
+	return tr("st_coop_adm_ev_next", duration(left), factor > 0 and duration(left / factor) or "?")
+end
+
+function UICoopAdmin:main_events(box, X, Y, W, H, L)
+	local d = data
+	local v = d.ev
+	local y = math.max(72, self:heading(24, 14, W - 48, tr("st_coop_adm_sec_events"), box, tr("st_coop_adm_events_sub")) + 10)
+	if not d.events then
+		self:text(24, y, W - 48, 24, tr("st_coop_adm_ev_wait"), C.faint, box, nil, "s")
+		y = y + 30
+	end
+	local lead = ini_sys:r_float_ex("coop_admin_events", "lead_s") or 15
+	local bw = 130
+	for _, row in ipairs(EVENT_ROWS) do
+		local id, start, stop, danger = row[1], row[2], row[3], row[4]
+		local state, color
+		if id == "cooling" then
+			if v.cool == "off" then
+				state, color = tr("st_coop_adm_ev_cool_off"), C.dim
+			elseif v.cool == "open" then
+				state, color = tr("st_coop_adm_ev_cool_open", duration(tonumber(v.cool_left))), C.warn
+			elseif v.cool_next then
+				state = tr("st_coop_adm_ev_cool_next", v.cool_next)
+			end
+		else
+			state, color = storm_state(v, id)
+		end
+		self:text(24, y, 150, 34, tr("st_coop_ev_t_" .. id), C.text, box, nil, "m")
+		self:text(180, y, W - 24 - 2 * bw - 10 - 190, 34, state or "-", color or C.dim, box, nil, "s")
+		for i, action in ipairs({ "start", "stop" }) do
+			local caption = tr(i == 1 and start or stop)
+			local f = function() command("event", id, action) end
+			local ask = danger == action
+			self:btn(W - 24 - (3 - i) * bw - (2 - i) * 10, y, bw, 34, caption, ask and function()
+				self:confirm(tr("st_coop_ev_t_" .. id) .. ": " .. caption, tr("st_coop_adm_ev_warn_" .. id, math.floor(lead)), caption, f)
+			end or f, L, box, X, Y, ask and "danger" or "normal")
+		end
+		y = y + 40
+	end
+	-- buttons in three columns
+	local cw = math.floor((W - 48 - 2 * 10) / 3)
+	local function grid(ids, prefix)
+		for i, id in ipairs(ids) do
+			local c, r = (i - 1) % 3, math.floor((i - 1) / 3)
+			self:btn(24 + c * (cw + 10), y + r * 36, cw, 30, tr("st_coop_ev_t_" .. prefix .. id),
+				function() command("event", prefix .. id, "start") end, L, box, X, Y)
+		end
+		y = y + math.ceil(#ids / 3) * 36
+	end
+	y = y + 8
+	local bar_state = v.bar_rule == "0" and tr("st_coop_adm_ev_bar_off") or v.barman == "0" and tr("st_coop_adm_ev_bar_nobarman")
+		or v.bar_next and tr("st_coop_adm_ev_bar_next", math.max(0, tonumber(v.bar_next) or 0)) or ""
+	self:text(24, y, 200, 26, tr("st_coop_adm_ev_bar"), C.text, box, nil, "m")
+	self:text(230, y, W - 24 - 230, 26, bar_state, C.dim, box, nil, "s")
+	y = y + 30
+	grid(BAR_EVENTS, "bar_")
+	self:text(24, y, W - 48, 22, tr("st_coop_adm_ev_bar_hint"), C.faint, box, nil, "s")
+	y = y + 32
+	local now = v.weather and game.translate_string("st_coop_ev_t_weather_" .. v.weather)
+	if now == "st_coop_ev_t_weather_" .. tostring(v.weather) then
+		now = v.weather -- a cycle with no button (before a surge)
+	end
+	self:text(24, y, 200, 26, tr("st_coop_adm_ev_weather"), C.text, box, nil, "m")
+	self:text(230, y, W - 24 - 230, 26, now and tr("st_coop_adm_ev_weather_now", now) or "", C.dim, box, nil, "s")
+	y = y + 30
+	grid(WEATHERS, "weather_")
+	y = y + 8
+	if d.event_result then
+		local text = tr("st_coop_adm_ev_last", d.events and d.events.from or "-", os.date("%H:%M", d.event_result.time), d.event_result.text)
+		self:text(24, y, W - 48, 40, text, C.text, box, nil, "s")
+		y = y + 42
+	end
+	if d.events and y < H - 30 then
+		self:text(24, y, W - 48, 40, tr("st_coop_adm_ev_report", d.events.from, d.events.age), C.faint, box, nil, "s")
+	end
+end
+
 -- Тест-режимы: a test server's only
 local TEST_MODES = { "shelter", "base", "ai" }
 
@@ -1211,6 +1328,9 @@ function UICoopAdmin:search_hits(q)
 		end
 		for _, a in ipairs(coop_admin_tests.LIST) do
 			try(tr("st_coop_tests_" .. a[1]), "tests", nil)
+		end
+		for _, id in ipairs(EVENT_TITLES) do
+			try(tr("st_coop_ev_t_" .. id), "events", nil)
 		end
 	end
 	return hits

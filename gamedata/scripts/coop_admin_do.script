@@ -9,6 +9,7 @@
 --   teleport <level> <x> <y> <z> <level vertex> <game vertex>    to a place (another level: a level change)
 --   logs                              our logs to the server (coop_send_logs)
 --   say <text>                        a message to everyone          test <action>   a test mode's action (coop_admin_tests)
+--   event <name> <start|stop>         a world's event (coop_world_events)    events_report   the world's events' state
 
 local god = false
 local next_heal = 0
@@ -105,6 +106,12 @@ local ACTIONS = {
 		if coop_admin_tests then
 			coop_admin_tests.run(f[2], admin)
 		end
+	end,
+	event = function(f, admin)
+		coop_world_events.run(f[2], f[3], admin)
+	end,
+	events_report = function()
+		coop_world_events.report()
 	end,
 }
 
