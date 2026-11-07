@@ -13,13 +13,14 @@
 
 namespace dlss
 {
-static status s_status = status::no_sdk;
+static status s_status = status::not_started;
 
 const char* status_name(status s)
 {
 	switch (s)
 	{
 	case status::ok: return "ok";
+	case status::not_started: return "not_started";
 	case status::no_sdk: return "no_sdk";
 	case status::headless: return "headless";
 	case status::not_nvidia: return "not_nvidia";
@@ -41,6 +42,7 @@ bool available() { return s_status == status::ok; }
 static const char* project_id = "c8bfef75-1637-4d76-8686-a8367212b7fe";
 
 static bool s_ngx = false; // NGX is initialised
+static bool s_tried = false; // init ran since the start or shutdown(): its status stands
 static NVSDK_NGX_Parameter* s_params = nullptr;
 static NVSDK_NGX_Handle* s_handle = nullptr;
 // A copy of the color input. From IX-Ray (DLSSWrapper::GetColorInput): on D3D11, DLSS reads its inputs through
@@ -106,8 +108,9 @@ void init(bool msaa, bool hdr10)
 	s_status = status::no_sdk;
 	Msg("* DLSS: off, built without the DLSS SDK");
 #else
-	if (s_ngx)
+	if (s_tried)
 		return;
+	s_tried = true;
 	if (g_coop_headless)
 		return fail(status::headless, "the co-op host draws nothing");
 	if (HW.Caps.id_vendor != 0x10DE)
@@ -182,6 +185,7 @@ void init(bool msaa, bool hdr10)
 void shutdown()
 {
 #ifdef USE_DLSS
+	s_tried = false;
 	release_feature();
 	_RELEASE(s_color);
 	if (s_params)

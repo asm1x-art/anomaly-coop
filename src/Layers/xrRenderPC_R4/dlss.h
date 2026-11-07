@@ -13,6 +13,7 @@ namespace dlss
 enum class status
 {
 	ok,
+	not_started, // the renderer isn't made yet (the console's dump at the start shows this)
 	no_sdk, // the engine was built without the DLSS SDK
 	headless, // the co-op host without a window (-coop_host)
 	not_nvidia, // another maker's video card
@@ -35,7 +36,8 @@ enum mode
 	mode_ultra_performance,
 };
 
-// once the device is made (CRender::create); msaa/hdr10: the render's options then
+// once the device is made (CRender::create); msaa/hdr10: the render's options then. Only the first call after the
+// start or shutdown() does anything.
 void init(bool msaa, bool hdr10);
 void shutdown();
 
