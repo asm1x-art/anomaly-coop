@@ -1426,6 +1426,13 @@ bool CRenderTarget::scale_begin()
 	render_scale_swap_in(render_w, render_h);
 	HW.pBaseRT = rt_render_scale->pRT;
 	HW.pBaseZB = rt_render_scale_z->pZRT;
+	// the frame starts at the render size: the last target set (the screen, scale_end) and its viewport were the
+	// screen's, and the first passes (CRender::Render_scene's rmNormal, the level drawn into the G-buffer before the
+	// HUD with the split scene) took that viewport. With a weapon in the hands it came out right; with empty hands
+	// (the parkour climb puts the weapon away) the world was drawn bigger than its target: a zoomed, doubled picture
+	dwWidth = render_w;
+	dwHeight = render_h;
+	set_viewport_size(HW.pContext, float(render_w), float(render_h));
 	g_render_scale_on = true;
 	return true;
 }
