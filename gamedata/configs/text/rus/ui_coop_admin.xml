@@ -1,0 +1,876 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<!-- Co-op: the admin window (scripts/ui_coop_admin.script), its per-player actions (coop_admin_do.script),
+	     the test modes as buttons (coop_admin_tests.script), the PDA map's transitions (coop_my_game.script) -->
+	<string id="st_coop_adm_title">
+		<text>Админка сервера</text>
+	</string>
+	<string id="st_coop_adm_search">
+		<text>Найти настройку или игрока</text>
+	</string>
+	<string id="st_coop_adm_chip_offline">
+		<text>нет подключения</text>
+	</string>
+	<string id="st_coop_adm_chip_admin">
+		<text>вошли как админ</text>
+	</string>
+	<string id="st_coop_adm_chip_tests">
+		<text>тестовый сервер</text>
+	</string>
+	<string id="st_coop_adm_chip_no_password">
+		<text>без пароля: только «Моя игра»</text>
+	</string>
+	<string id="st_coop_adm_grp_server">
+		<text>Сервер · по паролю</text>
+	</string>
+	<string id="st_coop_adm_grp_host">
+		<text>Мир · хост</text>
+	</string>
+	<string id="st_coop_adm_grp_mine">
+		<text>Моя игра · без пароля</text>
+	</string>
+	<string id="st_coop_adm_sec_overview">
+		<text>Обзор</text>
+	</string>
+	<string id="st_coop_adm_sec_players">
+		<text>Игроки</text>
+	</string>
+	<string id="st_coop_adm_sec_rules">
+		<text>Правила</text>
+	</string>
+	<string id="st_coop_adm_sec_world">
+		<text>Мир и фракции</text>
+	</string>
+	<string id="st_coop_adm_sec_saves">
+		<text>Сохранения</text>
+	</string>
+	<string id="st_coop_adm_sec_journal">
+		<text>Журнал</text>
+	</string>
+	<string id="st_coop_adm_sec_mechanics">
+		<text>Механики мира</text>
+	</string>
+	<string id="st_coop_adm_sec_tests">
+		<text>Тест-режимы</text>
+	</string>
+	<string id="st_coop_adm_sec_debug">
+		<text>Отладка и логи</text>
+	</string>
+	<string id="st_coop_adm_sec_map">
+		<text>Карта и метки</text>
+	</string>
+	<string id="st_coop_adm_sec_render">
+		<text>Рендер</text>
+	</string>
+	<string id="st_coop_adm_abbr_overview">
+		<text>Об</text>
+	</string>
+	<string id="st_coop_adm_abbr_players">
+		<text>Иг</text>
+	</string>
+	<string id="st_coop_adm_abbr_rules">
+		<text>Пр</text>
+	</string>
+	<string id="st_coop_adm_abbr_world">
+		<text>Мир</text>
+	</string>
+	<string id="st_coop_adm_abbr_saves">
+		<text>Сх</text>
+	</string>
+	<string id="st_coop_adm_abbr_journal">
+		<text>Жр</text>
+	</string>
+	<string id="st_coop_adm_abbr_mechanics">
+		<text>Мх</text>
+	</string>
+	<string id="st_coop_adm_abbr_tests">
+		<text>Тс</text>
+	</string>
+	<string id="st_coop_adm_abbr_debug">
+		<text>Лг</text>
+	</string>
+	<string id="st_coop_adm_abbr_map">
+		<text>Кр</text>
+	</string>
+	<string id="st_coop_adm_abbr_render">
+		<text>Рн</text>
+	</string>
+	<string id="st_coop_adm_pinned">
+		<text>Закреплённые</text>
+	</string>
+	<string id="st_coop_adm_pin">
+		<text>Закрепить в меню</text>
+	</string>
+	<string id="st_coop_adm_unpin">
+		<text>Открепить</text>
+	</string>
+	<string id="st_coop_adm_offline">
+		<text>Нет подключения к серверу: подключитесь через «Кооператив». «Моя игра» работает и так.</text>
+	</string>
+	<string id="st_coop_adm_wait">
+		<text>Жду ответа сервера...</text>
+	</string>
+	<string id="st_coop_adm_login_title">
+		<text>Вход в админку</text>
+	</string>
+	<string id="st_coop_adm_login_hint">
+		<text>Пароль веб-админки (admin_password в server.cfg или из data/admin.json). Запомнится для этого сервера - как токен, не сам пароль.</text>
+	</string>
+	<string id="st_coop_adm_password">
+		<text>Пароль</text>
+	</string>
+	<string id="st_coop_adm_login">
+		<text>Войти</text>
+	</string>
+	<string id="st_coop_adm_login_mine">
+		<text>Разделы «Моя игра» открыты без пароля: они меняют только то, что видно в вашей игре.</text>
+	</string>
+	<string id="st_coop_adm_t_host">
+		<text>Хост</text>
+	</string>
+	<string id="st_coop_adm_t_world">
+		<text>Мир</text>
+	</string>
+	<string id="st_coop_adm_t_online">
+		<text>Онлайн</text>
+	</string>
+	<string id="st_coop_adm_t_clock">
+		<text>Время мира</text>
+	</string>
+	<string id="st_coop_adm_t_pause">
+		<text>Пауза</text>
+	</string>
+	<string id="st_coop_adm_host_yes">
+		<text>Держит мир</text>
+	</string>
+	<string id="st_coop_adm_host_no">
+		<text>Нет хоста</text>
+	</string>
+	<string id="st_coop_adm_uptime">
+		<text>работает %s</text>
+	</string>
+	<string id="st_coop_adm_saved_ago">
+		<text>сохранён %s назад</text>
+	</string>
+	<string id="st_coop_adm_online_sub">
+		<text>%s в мире, %s в меню</text>
+	</string>
+	<string id="st_coop_adm_clock_runs">
+		<text>идёт</text>
+	</string>
+	<string id="st_coop_adm_clock_stands">
+		<text>стоит</text>
+	</string>
+	<string id="st_coop_adm_clock_empty">
+		<text>стоит: в мире никого</text>
+	</string>
+	<string id="st_coop_adm_min">
+		<text>%s мин</text>
+	</string>
+	<string id="st_coop_adm_hmin">
+		<text>%s ч %s мин</text>
+	</string>
+	<string id="st_coop_adm_yes">
+		<text>да</text>
+	</string>
+	<string id="st_coop_adm_no">
+		<text>нет</text>
+	</string>
+	<string id="st_coop_adm_none">
+		<text>Пока ничего.</text>
+	</string>
+	<string id="st_coop_adm_save_world">
+		<text>Сохранить мир</text>
+	</string>
+	<string id="st_coop_adm_resume">
+		<text>Снять паузу</text>
+	</string>
+	<string id="st_coop_adm_restart_host">
+		<text>Перезапустить хост</text>
+	</string>
+	<string id="st_coop_adm_restart_ask">
+		<text>Хост перезапустится. Изменения мира после его последнего сохранения хранит журнал сервера.</text>
+	</string>
+	<string id="st_coop_adm_restart_do">
+		<text>Перезапустить</text>
+	</string>
+	<string id="st_coop_adm_say_title">
+		<text>Сообщение всем</text>
+	</string>
+	<string id="st_coop_adm_say_hint">
+		<text>Например: через 5 минут перезапуск хоста</text>
+	</string>
+	<string id="st_coop_adm_send">
+		<text>Отправить</text>
+	</string>
+	<string id="st_coop_adm_news">
+		<text>Журнал мира</text>
+	</string>
+	<string id="st_coop_adm_journal">
+		<text>Что делали админы</text>
+	</string>
+	<string id="st_coop_adm_players_sub">
+		<text>%s подключено · лимит %s (правило «Игроков на сервере»)</text>
+	</string>
+	<string id="st_coop_adm_col_name">
+		<text>Игрок</text>
+	</string>
+	<string id="st_coop_adm_col_where">
+		<text>Где</text>
+	</string>
+	<string id="st_coop_adm_col_ping">
+		<text>Пинг</text>
+	</string>
+	<string id="st_coop_adm_col_role">
+		<text>Роль</text>
+	</string>
+	<string id="st_coop_adm_you">
+		<text> (вы)</text>
+	</string>
+	<string id="st_coop_adm_ms">
+		<text> мс</text>
+	</string>
+	<string id="st_coop_adm_in_menu">
+		<text>в меню</text>
+	</string>
+	<string id="st_coop_adm_role_master">
+		<text>мастер</text>
+	</string>
+	<string id="st_coop_adm_role_authority">
+		<text>ведёт уровень</text>
+	</string>
+	<string id="st_coop_adm_role_group">
+		<text>группа %s (%s)</text>
+	</string>
+	<string id="st_coop_adm_nobody">
+		<text>Никого нет.</text>
+	</string>
+	<string id="st_coop_adm_players_note">
+		<text>Выбор держится по имени: строка не съезжает, когда кто-то входит или выходит.</text>
+	</string>
+	<string id="st_coop_adm_page">
+		<text>стр. %s из %s</text>
+	</string>
+	<string id="st_coop_adm_rules_sub">
+		<text>Правила сервера: действуют сразу, у всех.</text>
+	</string>
+	<string id="st_coop_adm_rg_join">
+		<text>Группы и вход</text>
+	</string>
+	<string id="st_coop_adm_rg_death">
+		<text>Смерть и помощь</text>
+	</string>
+	<string id="st_coop_adm_rg_travel">
+		<text>Перемещение и отношения</text>
+	</string>
+	<string id="st_coop_adm_rg_tools">
+		<text>Инструменты механиков</text>
+	</string>
+	<string id="st_coop_adm_rg_rewards">
+		<text>Награды</text>
+	</string>
+	<string id="st_coop_adm_rg_other">
+		<text>Другие</text>
+	</string>
+	<string id="st_coop_adm_rule_ask">
+		<text>«%s»: %s. Это меняет мир у всех игроков.</text>
+	</string>
+	<string id="st_coop_adm_apply">
+		<text>Применить</text>
+	</string>
+	<string id="st_coop_adm_world_sub">
+		<text>Настройки мира - для нового мира; сложность и экономика - со следующей загрузки.</text>
+	</string>
+	<string id="st_coop_adm_lvl_1">
+		<text>Лёгкая</text>
+	</string>
+	<string id="st_coop_adm_lvl_2">
+		<text>Средняя</text>
+	</string>
+	<string id="st_coop_adm_lvl_3">
+		<text>Тяжёлая</text>
+	</string>
+	<string id="st_coop_adm_factions">
+		<text>Фракции для новых персонажей</text>
+	</string>
+	<string id="st_coop_adm_saves_sub">
+		<text>Всего %s. Откат - к любому, кроме мира сейчас.</text>
+	</string>
+	<string id="st_coop_adm_save_current">
+		<text>мир сейчас</text>
+	</string>
+	<string id="st_coop_adm_journal_sub">
+		<text>Команды админов из игры: кто, что, кому (data/admin_log.jsonl на сервере).</text>
+	</string>
+	<string id="st_coop_adm_logs_title">
+		<text>Логи и вылеты</text>
+	</string>
+	<string id="st_coop_adm_logs_hint">
+		<text>Логи игрока - кнопка «Попросить логи» в его карточке. Сами логи, вылеты и баги из лаунчеров - на веб-админке.</text>
+	</string>
+	<string id="st_coop_adm_mechanics_sub">
+		<text>Правила сервера: одно значение на весь мир (раньше - ключи ltx у каждой игры).</text>
+	</string>
+	<string id="st_coop_adm_host_facts">
+		<text>Хост</text>
+	</string>
+	<string id="st_coop_adm_host_god">
+		<text>Хост бессмертен сам (призрак: g_god, выбросы его не трогают). Оффлайн-симуляция: хост гоняет A-Life, время и выбросы, пока игроков нет; на VPS это ~1 ядро из 4 и те же ~1,8 ГБ памяти, что хост держит и так; автосохранения пустого мира сервер хранит одно, последнее.</text>
+	</string>
+	<string id="st_coop_adm_no_host_offline">
+		<text>Хоста нет: мир держит игра игрока, и без игроков он стоит при любой оффлайн-симуляции; пропущенный выброс досчитывается при загрузке.</text>
+	</string>
+	<string id="st_coop_adm_tests_sub">
+		<text>Бывшие F7-режимы тестовых копий кнопками: режим включать не нужно. Красные меняют общий мир - с подтверждением.</text>
+	</string>
+	<string id="st_coop_adm_tests_off">
+		<text>Только на тестовом сервере: allow_tests = 1 в server.cfg (или COOP_ALLOW_TESTS=1).</text>
+	</string>
+	<string id="st_coop_adm_tm_shelter">
+		<text>Убежище</text>
+	</string>
+	<string id="st_coop_adm_tm_base">
+		<text>База и рейд</text>
+	</string>
+	<string id="st_coop_adm_tm_ai">
+		<text>Зрение ИИ</text>
+	</string>
+	<string id="st_coop_adm_test_ask">
+		<text>Это меняет общий мир у всех игроков. Вернуть - только откатом мира.</text>
+	</string>
+	<string id="st_coop_adm_do">
+		<text>Сделать</text>
+	</string>
+	<string id="st_coop_adm_cheats">
+		<text>Читы для себя</text>
+	</string>
+	<string id="st_coop_adm_cheats_hint">
+		<text>Всё через сервер, в его журнал. «Все точки быстрого перемещения» (Моя игра › Карта) на тестовом сервере дают и перемещаться к непосещённым.</text>
+	</string>
+	<string id="st_coop_adm_god_on">
+		<text>Бессмертие: включить</text>
+	</string>
+	<string id="st_coop_adm_god_off">
+		<text>Бессмертие: выключить</text>
+	</string>
+	<string id="st_coop_adm_heal">
+		<text>Вылечить</text>
+	</string>
+	<string id="st_coop_adm_mine_sub">
+		<text>Только эта игра, без пароля: другие игроки этого не видят.</text>
+	</string>
+	<string id="st_coop_adm_color_done">
+		<text>Цвет меток других игроков изменён.</text>
+	</string>
+	<string id="st_coop_adm_found">
+		<text>Найдено: %s</text>
+	</string>
+	<string id="st_coop_adm_found_login">
+		<text>Настройки сервера ищутся после входа по паролю.</text>
+	</string>
+	<string id="st_coop_adm_card_none">
+		<text>Ничего не выбрано</text>
+	</string>
+	<string id="st_coop_adm_card_none_hint">
+		<text>Выберите игрока, сохранение или настройку: здесь - что это, где действует, как включалось раньше и что с ним можно сделать.</text>
+	</string>
+	<string id="st_coop_adm_player_gone">
+		<text>%s больше нет на сервере.</text>
+	</string>
+	<string id="st_coop_adm_since">
+		<text>на сервере с %s</text>
+	</string>
+	<string id="st_coop_adm_f_level">
+		<text>Уровень</text>
+	</string>
+	<string id="st_coop_adm_f_ping">
+		<text>Пинг</text>
+	</string>
+	<string id="st_coop_adm_f_group">
+		<text>Группа</text>
+	</string>
+	<string id="st_coop_adm_f_health">
+		<text>Здоровье</text>
+	</string>
+	<string id="st_coop_adm_f_rank">
+		<text>Ранг</text>
+	</string>
+	<string id="st_coop_adm_f_money">
+		<text>Деньги</text>
+	</string>
+	<string id="st_coop_adm_f_god">
+		<text>Бессмертие</text>
+	</string>
+	<string id="st_coop_adm_player_menu">
+		<text>Игрок в меню: действия - когда он в мире.</text>
+	</string>
+	<string id="st_coop_adm_self_tests">
+		<text>Читы для себя - только на тестовом сервере (allow_tests).</text>
+	</string>
+	<string id="st_coop_adm_goto">
+		<text>К нему</text>
+	</string>
+	<string id="st_coop_adm_bring">
+		<text>Ко мне</text>
+	</string>
+	<string id="st_coop_adm_money_hint">
+		<text>Сумма (-500: забрать)</text>
+	</string>
+	<string id="st_coop_adm_give">
+		<text>Выдать</text>
+	</string>
+	<string id="st_coop_adm_spawner">
+		<text>Выдать предмет</text>
+	</string>
+	<string id="st_coop_adm_spawn_hint">
+		<text>Секция или название</text>
+	</string>
+	<string id="st_coop_adm_spawn_empty">
+		<text>Начните вводить: wpn_ak74, аптечка...</text>
+	</string>
+	<string id="st_coop_adm_spawn_none">
+		<text>Ничего не нашлось.</text>
+	</string>
+	<string id="st_coop_adm_pick_item">
+		<text>Выберите предмет</text>
+	</string>
+	<string id="st_coop_adm_give_item">
+		<text>Выдать x%s</text>
+	</string>
+	<string id="st_coop_adm_logs">
+		<text>Попросить логи</text>
+	</string>
+	<string id="st_coop_adm_kick">
+		<text>Кикнуть</text>
+	</string>
+	<string id="st_coop_adm_kick_ask">
+		<text>Отключить %s от сервера? Зайти он сможет снова.</text>
+	</string>
+	<string id="st_coop_adm_cancel">
+		<text>Отмена</text>
+	</string>
+	<string id="st_coop_adm_f_when">
+		<text>Когда</text>
+	</string>
+	<string id="st_coop_adm_f_why">
+		<text>Почему</text>
+	</string>
+	<string id="st_coop_adm_rollback">
+		<text>Откатить мир</text>
+	</string>
+	<string id="st_coop_adm_rollback_ask">
+		<text>Откатить весь мир к сохранению №%s (%s)? Игроки в игре загрузят его заново.</text>
+	</string>
+	<string id="st_coop_adm_rollback_current">
+		<text>Это сохранение - мир сейчас: откатывать не к чему.</text>
+	</string>
+	<string id="st_coop_adm_rollback_hint">
+		<text>Откат без голосования: все в игре перезагрузятся, персонажи вернутся туда, где были в этом сохранении.</text>
+	</string>
+	<string id="st_coop_adm_f_what">
+		<text>Что делает</text>
+	</string>
+	<string id="st_coop_adm_f_where">
+		<text>Где действует</text>
+	</string>
+	<string id="st_coop_adm_f_now">
+		<text>Сейчас</text>
+	</string>
+	<string id="st_coop_adm_f_range">
+		<text>Диапазон</text>
+	</string>
+	<string id="st_coop_adm_f_before">
+		<text>Как было раньше</text>
+	</string>
+	<string id="st_coop_adm_scope_world">
+		<text>Весь мир, одно значение; сразу</text>
+	</string>
+	<string id="st_coop_adm_scope_new_world">
+		<text>Мир: при создании нового (сложность и экономика - со следующей загрузки)</text>
+	</string>
+	<string id="st_coop_adm_scope_rule">
+		<text>Сервер, у всех; сразу</text>
+	</string>
+	<string id="st_coop_adm_scope_mine">
+		<text>Только эта игра</text>
+	</string>
+	<string id="st_coop_adm_key">
+		<text>Ключ: %s (бот: /set %s значение)</text>
+	</string>
+	<string id="st_coop_adm_h_offline_sim">
+		<text>Мир живёт, пока на сервере никого: хост гоняет время, A-Life (отряды ходят и воюют, торговцы пополняются), выбросы и пси-шторма. Выключено - мир хоста стоит, часы сервера тоже. Нужен хост на сервере.</text>
+	</string>
+	<string id="st_coop_adm_h_cleaner">
+		<text>Хост убирает тела и мусор, на которых нет ничего ценного (раньше: [coop_cleanup] cleaner).</text>
+	</string>
+	<string id="st_coop_adm_h_bar_events">
+		<text>События бара в убежище раз в 20–40 часов мира (раньше: [shelter_events] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_scorcher">
+		<text>Путь к Выжигателю мозгов: окна, дешифратор, белая зона (раньше: [shelter_scorcher] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_shelter_group_only">
+		<text>Вход в убежище открывается только группе из двух и больше (раньше: [shelter_entrance] group_only).</text>
+	</string>
+	<string id="st_coop_adm_h_psi_immunity">
+		<text>Монолит и Грех не чувствуют пси-зон и белой зоны Радара (раньше: [coop_psi_immunity] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_max_players">
+		<text>Сколько игроков пускает сервер одновременно.</text>
+	</string>
+	<string id="st_coop_adm_h_group_max">
+		<text>Игроков в группе, лидер считается.</text>
+	</string>
+	<string id="st_coop_adm_i_coop_debug">
+		<text>Подробный лог кооператива</text>
+	</string>
+	<string id="st_coop_adm_h_coop_debug">
+		<text>Всё, что делает сеть кооператива, - в лог. Включён по умолчанию.</text>
+	</string>
+	<string id="st_coop_adm_b_coop_debug">
+		<text>консоль: coop_debug 0/1</text>
+	</string>
+	<string id="st_coop_adm_i_prof_spikes">
+		<text>Кадры дольше N мс - в лог (0 - выкл.)</text>
+	</string>
+	<string id="st_coop_adm_h_prof_spikes">
+		<text>Каждый кадр дольше этого пишется в лог с разбивкой: для поиска фризов.</text>
+	</string>
+	<string id="st_coop_adm_b_prof_spikes">
+		<text>консоль: prof_spikes</text>
+	</string>
+	<string id="st_coop_adm_i_fps">
+		<text>FPS и пинг в углу экрана</text>
+	</string>
+	<string id="st_coop_adm_h_fps">
+		<text>Счётчик кадров и пинг до сервера.</text>
+	</string>
+	<string id="st_coop_adm_b_fps">
+		<text>Опции › Кооп › FPS</text>
+	</string>
+	<string id="st_coop_adm_i_rs_stats">
+		<text>Статистика рендера</text>
+	</string>
+	<string id="st_coop_adm_h_rs_stats">
+		<text>Счётчики движка поверх экрана.</text>
+	</string>
+	<string id="st_coop_adm_b_rs_stats">
+		<text>консоль: rs_stats</text>
+	</string>
+	<string id="st_coop_adm_i_prof_stats">
+		<text>Профиль кадров 10 с</text>
+	</string>
+	<string id="st_coop_adm_h_prof_stats">
+		<text>Сводка по кадрам за 10 секунд - в лог.</text>
+	</string>
+	<string id="st_coop_adm_b_prof_stats">
+		<text>консоль: prof_stats 10</text>
+	</string>
+	<string id="st_coop_adm_i_flush">
+		<text>Записать лог на диск</text>
+	</string>
+	<string id="st_coop_adm_h_flush">
+		<text>Лог буферизуется: это сбрасывает его в файл сейчас.</text>
+	</string>
+	<string id="st_coop_adm_b_flush">
+		<text>консоль: flush</text>
+	</string>
+	<string id="st_coop_adm_i_send_logs">
+		<text>Отправить логи на сервер</text>
+	</string>
+	<string id="st_coop_adm_h_send_logs">
+		<text>Лог и дампы вылетов уходят на сервер, их видно на веб-админке.</text>
+	</string>
+	<string id="st_coop_adm_b_send_logs">
+		<text>консоль: coop_send_logs</text>
+	</string>
+	<string id="st_coop_adm_i_coop_status">
+		<text>Статус связи</text>
+	</string>
+	<string id="st_coop_adm_h_coop_status">
+		<text>Состояние подключения - в лог и консоль.</text>
+	</string>
+	<string id="st_coop_adm_b_coop_status">
+		<text>консоль: coop_status</text>
+	</string>
+	<string id="st_coop_adm_i_all_transitions">
+		<text>Показать все переходы между уровнями</text>
+	</string>
+	<string id="st_coop_adm_h_all_transitions">
+		<text>На карте ПДА метка на каждом переходе, подпись - куда ведёт. Видно и закрытые, и ещё не найденные.</text>
+	</string>
+	<string id="st_coop_adm_b_all_transitions">
+		<text>Не было нигде (новое).</text>
+	</string>
+	<string id="st_coop_adm_i_all_travel">
+		<text>Все точки быстрого перемещения</text>
+	</string>
+	<string id="st_coop_adm_h_all_travel">
+		<text>На карте все точки вашей фракции, не только посещённые. Перемещаться к непосещённым - только на тестовом сервере.</text>
+	</string>
+	<string id="st_coop_adm_b_all_travel">
+		<text>В коопе - только посещённые (coop_travel).</text>
+	</string>
+	<string id="st_coop_adm_i_raid_debug_map">
+		<text>Отладка рейда на ноутбуке</text>
+	</string>
+	<string id="st_coop_adm_h_raid_debug_map">
+		<text>На карте рейда в ноутбуке Химика - маршруты, посты и патрули Монолита.</text>
+	</string>
+	<string id="st_coop_adm_b_raid_debug_map">
+		<text>Шло вместе с coop_debug.</text>
+	</string>
+	<string id="st_coop_adm_i_raid_timer">
+		<text>Таймер рейда</text>
+	</string>
+	<string id="st_coop_adm_h_raid_timer">
+		<text>Сколько осталось до конца рейда - на экране.</text>
+	</string>
+	<string id="st_coop_adm_b_raid_timer">
+		<text>Опции › Кооп</text>
+	</string>
+	<string id="st_coop_adm_i_peer_color">
+		<text>Цвет меток других игроков</text>
+	</string>
+	<string id="st_coop_adm_h_peer_color">
+		<text>Цвет значков напарников на карте и миникарте.</text>
+	</string>
+	<string id="st_coop_adm_b_peer_color">
+		<text>Опции › Кооп (ползунки), консоль coop_peer_color</text>
+	</string>
+	<string id="st_coop_adm_i_dlss">
+		<text>DLSS</text>
+	</string>
+	<string id="st_coop_adm_h_dlss">
+		<text>Режим NVIDIA DLSS. Действует после перезапуска видео (vid_restart) или игры.</text>
+	</string>
+	<string id="st_coop_adm_b_dlss">
+		<text>консоль: r__dlss_mode</text>
+	</string>
+	<string id="st_coop_adm_i_dlss_mv">
+		<text>Показать векторы движения DLSS</text>
+	</string>
+	<string id="st_coop_adm_h_dlss_mv">
+		<text>Для замеров: векторы движения на экране.</text>
+	</string>
+	<string id="st_coop_adm_b_dlss_mv">
+		<text>консоль: r__dlss_mv_debug</text>
+	</string>
+	<string id="st_coop_adm_i_render_scale">
+		<text>Масштаб рендера, %</text>
+	</string>
+	<string id="st_coop_adm_h_render_scale">
+		<text>Мир рисуется в этой доле размера экрана. После перезапуска видео.</text>
+	</string>
+	<string id="st_coop_adm_b_render_scale">
+		<text>консоль: r__render_scale</text>
+	</string>
+	<string id="st_coop_adm_i_muzzle_shadows">
+		<text>Тени от вспышек выстрелов NPC</text>
+	</string>
+	<string id="st_coop_adm_h_muzzle_shadows">
+		<text>Тест производительности: тени от вспышек чужих выстрелов.</text>
+	</string>
+	<string id="st_coop_adm_b_muzzle_shadows">
+		<text>консоль: g_npc_muzzle_shadows</text>
+	</string>
+	<string id="st_coop_adm_dlss_off">
+		<text>выкл</text>
+	</string>
+	<string id="st_coop_adm_dlss_dlaa">
+		<text>DLAA</text>
+	</string>
+	<string id="st_coop_adm_dlss_quality">
+		<text>качество</text>
+	</string>
+	<string id="st_coop_adm_dlss_balanced">
+		<text>баланс</text>
+	</string>
+	<string id="st_coop_adm_dlss_performance">
+		<text>скорость</text>
+	</string>
+	<string id="st_coop_admin_news">
+		<text>Админ</text>
+	</string>
+	<string id="st_coop_admin_give_done">
+		<text>%s выдал вам: %s x %s</text>
+	</string>
+	<string id="st_coop_admin_give_bad">
+		<text>%s хотел выдать «%s», но такого предмета нет.</text>
+	</string>
+	<string id="st_coop_admin_money_done">
+		<text>%s: деньги %s RU</text>
+	</string>
+	<string id="st_coop_admin_god_on">
+		<text>%s сделал вас бессмертным.</text>
+	</string>
+	<string id="st_coop_admin_god_off">
+		<text>%s снял с вас бессмертие.</text>
+	</string>
+	<string id="st_coop_admin_heal_done">
+		<text>%s вылечил вас.</text>
+	</string>
+	<string id="st_coop_admin_teleport_done">
+		<text>Телепорт: %s.</text>
+	</string>
+	<string id="st_coop_admin_logs_done">
+		<text>%s попросил ваши логи: отправляются на сервер.</text>
+	</string>
+	<string id="st_coop_admin_say">
+		<text>%s: %s</text>
+	</string>
+	<string id="st_coop_tests_shelter_travel">
+		<text>В убежище и обратно</text>
+	</string>
+	<string id="st_coop_tests_shelter_kit">
+		<text>Набор для демо</text>
+	</string>
+	<string id="st_coop_tests_shelter_synthesis">
+		<text>Синтез: дальше, к камерам</text>
+	</string>
+	<string id="st_coop_tests_shelter_rubble">
+		<text>Убрать все завалы</text>
+	</string>
+	<string id="st_coop_tests_shelter_stash">
+		<text>Тайник: все вещи паков</text>
+	</string>
+	<string id="st_coop_tests_shelter_bar_event">
+		<text>Событие бара (по кругу)</text>
+	</string>
+	<string id="st_coop_tests_shelter_dig">
+		<text>Копать в 5 раз быстрее (вкл/выкл)</text>
+	</string>
+	<string id="st_coop_tests_base_cooling">
+		<text>«Охлаждение» сейчас</text>
+	</string>
+	<string id="st_coop_tests_base_target">
+		<text>След. цель рейда</text>
+	</string>
+	<string id="st_coop_tests_base_all_saved">
+		<text>Все спасены, детали</text>
+	</string>
+	<string id="st_coop_tests_base_crisis">
+		<text>След. кризис</text>
+	</string>
+	<string id="st_coop_tests_base_scorcher">
+		<text>Выжигатель вкл/выкл</text>
+	</string>
+	<string id="st_coop_tests_base_decoder">
+		<text>Дешифратор, взлом 40 с</text>
+	</string>
+	<string id="st_coop_tests_base_window">
+		<text>Окно: +2 часа</text>
+	</string>
+	<string id="st_coop_tests_base_radar">
+		<text>На Радар, к X-10</text>
+	</string>
+	<string id="st_coop_tests_base_health">
+		<text>Здоровье и пси</text>
+	</string>
+	<string id="st_coop_tests_base_clock">
+		<text>Часы базы +12 ч</text>
+	</string>
+	<string id="st_coop_tests_ai_obs20">
+		<text>Наблюдатель в 20 м</text>
+	</string>
+	<string id="st_coop_tests_ai_obs40">
+		<text>Наблюдатель в 40 м</text>
+	</string>
+	<string id="st_coop_tests_ai_clear">
+		<text>Убрать наблюдателей</text>
+	</string>
+	<string id="st_coop_tests_ai_grass">
+		<text>Трава прячет: вкл/выкл</text>
+	</string>
+	<string id="st_coop_tests_no_bunker">
+		<text>Бункер не найден в графе: пакет локации не подключился.</text>
+	</string>
+	<string id="st_coop_tests_kit_done">
+		<text>Демо-набор выдан.</text>
+	</string>
+	<string id="st_coop_tests_synthesis_done">
+		<text>Синтез: капсулы наполнены и отданы. Осталось поставить 4 капсулы в камеры.</text>
+	</string>
+	<string id="st_coop_tests_rubble_done">
+		<text>Завалы убраны: %s. Останется в сохранении, сделанном после.</text>
+	</string>
+	<string id="st_coop_tests_no_stash">
+		<text>Тайника убежища ещё нет.</text>
+	</string>
+	<string id="st_coop_tests_stash_done">
+		<text>В тайнике %s вещей паков.</text>
+	</string>
+	<string id="st_coop_tests_dig_fast">
+		<text>Копать: 8 ударов на лопату.</text>
+	</string>
+	<string id="st_coop_tests_dig_normal">
+		<text>Копать: как в игре.</text>
+	</string>
+	<string id="st_coop_tests_cooling_done">
+		<text>Окно «Охлаждения» открыто.</text>
+	</string>
+	<string id="st_coop_tests_target_done">
+		<text>Цель следующего рейда: %s</text>
+	</string>
+	<string id="st_coop_tests_target_no">
+		<text>Цель %s сейчас не выпадает (нужен починенный лифт вниз).</text>
+	</string>
+	<string id="st_coop_tests_all_saved_done">
+		<text>Все спасены, Шуруп нанят, детали выданы. Сохранись и загрузись: персонал появится.</text>
+	</string>
+	<string id="st_coop_tests_crisis_done">
+		<text>Кризис: %s</text>
+	</string>
+	<string id="st_coop_tests_scorcher_on">
+		<text>Выжигатель работает.</text>
+	</string>
+	<string id="st_coop_tests_scorcher_off">
+		<text>Выжигатель отключён.</text>
+	</string>
+	<string id="st_coop_tests_decoder_done">
+		<text>Дешифратор выдан, подбор кода - 40 секунд.</text>
+	</string>
+	<string id="st_coop_tests_window_done">
+		<text>Окно: прошло ещё 2 часа, всего %s.</text>
+	</string>
+	<string id="st_coop_tests_health_done">
+		<text>Здоровье и пси восстановлены.</text>
+	</string>
+	<string id="st_coop_tests_clock_done">
+		<text>Часы базы: +12.</text>
+	</string>
+	<string id="st_coop_tests_bar_event_done">
+		<text>Событие бара: %s</text>
+	</string>
+	<string id="st_coop_tests_failed">
+		<text>Тест-действие %s не удалось: см. лог.</text>
+	</string>
+	<string id="st_coop_tests_grass_on">
+		<text>Трава прячет от ИИ.</text>
+	</string>
+	<string id="st_coop_tests_grass_off">
+		<text>Трава больше не прячет.</text>
+	</string>
+	<string id="st_coop_tests_sees">
+		<text>ВИДИТ</text>
+	</string>
+	<string id="st_coop_tests_sees_not">
+		<text>не видит</text>
+	</string>
+	<string id="st_coop_tests_no_grid">
+		<text>Нет AI-сетки в %s м впереди: повернись или отойди.</text>
+	</string>
+	<string id="st_coop_tests_observer">
+		<text>Наблюдатель в %s м.</text>
+	</string>
+	<string id="st_coop_tests_observers_gone">
+		<text>Наблюдатели убраны.</text>
+	</string>
+	<string id="st_coop_transition">
+		<text>Переход</text>
+	</string>
+	<string id="st_coop_transition_to">
+		<text>Переход: %s</text>
+	</string>
+</string_table>

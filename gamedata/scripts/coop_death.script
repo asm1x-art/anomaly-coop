@@ -179,6 +179,11 @@ local function recover()
 	xr_effects.enable_ui(db.actor, nil)
 end
 
+-- everything a death leaves put right, health aside: the admin window's "heal" (coop_admin_do.script)
+function recover_now()
+	recover()
+end
+
 -- a lone death costs rank_loss % of the rank, back to our own save or to the save point alike
 local function lose_rank()
 	local rank = db.actor:character_rank()
@@ -340,8 +345,8 @@ function on_game_start()
 		if not coop.connected() or raid and raid.is_raid_level(level.name()) then
 			return -- a raid's level has its own death rules (raid.script)
 		end
-		if coop.is_host() then
-			flags.ret_value = false -- the host's ghost: a surge or a psi storm on its empty level
+		if coop.is_host() or coop_admin_do and coop_admin_do.immortal() then
+			flags.ret_value = false -- the host's ghost (a surge or a psi storm on its empty level), one the admin made immortal
 			db.actor:set_health_ex(1)
 			return
 		end

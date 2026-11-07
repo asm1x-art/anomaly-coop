@@ -1,0 +1,498 @@
+-- Co-op: the test modes as the admin window's buttons ("Мир · хост" › "Тест-режимы"), a test server's only (server.cfg
+-- allow_tests): the window asks the server (command "test <action>"), the server checks the flag, writes it in its
+-- journal and has this game do it (coop_admin_do.script). They were the F7 test modes of the test copies
+-- (tools/shelter/zz_shelter_test.lua, zz_base_test.lua, zz_ai_stand.lua); the old key is in each button's caption.
+-- ACTIONS: id -> { mode, caption key, old key, f, confirm = true for those that change the shared world }
+
+local function msg(text)
+	actor_menu.set_msg(1, text, 6)
+	printf("[coop tests] %s", text)
+end
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+-------------------------------------------------------------------------------
+-- the shelter (zz_shelter_test.lua)
+
+local BUNKER = "bunker_a1"
+local ENTRANCE = { pos = vector():set(-6.99, 3.28, -27.09), lvid = 1600, look = vector():set(0.978, 0, -0.124) }
+local back = nil -- where we came from: { pos, lvid, gvid }
+
+-- the level's game vertex nearest a point of it
+local function level_vertex(level_name, pos)
+	local gg, sim = game_graph(), alife()
+	local best, best_d
+	local gvid = 0
+	while gg:valid_vertex_id(gvid) do
+		local v = gg:vertex(gvid)
+		if sim:level_name(v:level_id()) == level_name then
+			local d = v:level_point():distance_to(pos)
+			if not best_d or d < best_d then
+				best, best_d = gvid, d
+			end
+		end
+		gvid = gvid + 1
+	end
+	return best
+end
+
+local function shelter_travel()
+	if level.name() == BUNKER then
+		if back then
+			return ChangeLevel(back.pos, back.lvid, back.gvid, VEC_ZERO)
+		end
+		local smart = SIMBOARD and SIMBOARD.smarts_by_names["esc_smart_terrain_2_12"]
+		if smart then
+			ChangeLevel(smart.position, smart.m_level_vertex_id, smart.m_game_vertex_id, VEC_ZERO)
+		end
+		return
+	end
+	local gvid = level_vertex(BUNKER, ENTRANCE.pos)
+	if not gvid then
+		return msg(game.translate_string("st_coop_tests_no_bunker"))
+	end
+	back = { pos = db.actor:position(), lvid = db.actor:level_vertex_id(), gvid = db.actor:game_vertex_id() }
+	ChangeLevel(ENTRANCE.pos, ENTRANCE.lvid, gvid, VEC_ZERO)
+end
+
+local SHELTER_KIT = {
+	"shovel_mili", "shovel_mili", "shovel_mili",
+	"shelter_generator_tools", "af_electra_flash", "af_electra_flash",
+	"shelter_laptop_item",
+	"shelter_capsule_gravi", "shelter_capsule_thermo", "shelter_capsule_chem", "shelter_capsule_electro",
+	"ball_hammer", "steel_wool", "grease", "tarpaulin", "e_syringe", "jar", "radio2", "duct_tape",
+	"itm_sleepbag",
+	"prt_i_textolite", "prt_i_textolite", "prt_i_copper", "prt_i_copper", "prt_i_resistors", "prt_i_resistors",
+	"prt_i_capacitors", "prt_i_capacitors", "prt_i_transistors", "prt_i_transistors", "prt_i_copper",
+}
+-- an anomaly of each nature across the bunker's hall (once a game), shaped before it's online
+local DEMO_ANOMALIES = {
+	{ "zone_mine_gravitational_weak", vector():set(12.6, 1.45, -14.7) },
+	{ "zone_mine_thermal_weak", vector():set(15.4, 1.45, -14.7) },
+	{ "zone_mine_acidic_weak", vector():set(18.2, 1.45, -14.7) },
+	{ "zone_mine_electric_weak", vector():set(21.7, 1.45, -14.7) },
+}
+
+local function spawn_demo_anomalies()
+	if level.name() ~= BUNKER or load_var(db.actor, "shelter_demo_anomalies") then
+		return false
+	end
+	for _, a in ipairs(DEMO_ANOMALIES) do
+		local lv = level.vertex_id(a[2])
+		if lv < 4294967295 then
+			local se = alife_create(a[1], level.vertex_position(lv), lv, db.actor:game_vertex_id())
+			local data = se and utils_stpk.get_anom_zone_data(se)
+			if data then
+				data.shapes[1] = { shtype = 0, offset = vector():set(0, 0, 0), center = vector():set(0, 0, 0), radius = 1 }
+				utils_stpk.set_anom_zone_data(data, se)
+			elseif se then
+				alife_release(se)
+			end
+		end
+	end
+	save_var(db.actor, "shelter_demo_anomalies", true)
+	return true
+end
+
+local function shelter_kit()
+	for _, sec in ipairs(SHELTER_KIT) do
+		if ini_sys:section_exist(sec) then
+			alife_create_item(sec, db.actor)
+		end
+	end
+	spawn_demo_anomalies()
+	msg(game.translate_string("st_coop_tests_kit_done"))
+end
+
+local NATURES = { "gravi", "thermo", "chem", "electro" }
+
+local function shelter_synthesis()
+	local tm = task_manager.get_task_manager()
+	if not db.actor:get_task("shelter_synthesis", true) then
+		give_info("shelter_idea_synthesis_read")
+		tm:give_task("shelter_synthesis")
+	end
+	give_info("shelter_capsules_got")
+	local empty = {}
+	db.actor:iterate_inventory(function(_, item)
+		for _, n in ipairs(NATURES) do
+			if item:section() == "shelter_capsule_" .. n then
+				empty[#empty + 1] = item
+			end
+		end
+	end, db.actor)
+	for _, item in ipairs(empty) do
+		alife_release(item)
+	end
+	shelter_synthesis.take_quietly(3000)
+	for _, n in ipairs(NATURES) do
+		shelter.set_state("capsules_filled_" .. n, 2)
+		if not db.actor:get_task("shelter_synthesis_" .. n, true) then
+			tm:give_task("shelter_synthesis_" .. n)
+		end
+		if not db.actor:object("shelter_capsule_" .. n .. "_full") then
+			alife_create_item("shelter_capsule_" .. n .. "_full", db.actor)
+		end
+	end
+	give_info("shelter_capsules_paid")
+	msg(game.translate_string("st_coop_tests_synthesis_done"))
+end
+
+local RUBBLE = { 2, 3, 4, 8, 9, 10, 11, 12, 13 }
+
+local function shelter_rubble()
+	local sim = alife()
+	local removed = 0
+	for _, n in ipairs(RUBBLE) do
+		local section = "shelter_mound_" .. n
+		shelter.set_state("dug_" .. section, true)
+		local zone = ini_sys:r_string_ex(section, "shelter_zone")
+		if zone then
+			shelter.set_state("open_" .. zone, true)
+		end
+		local var = "shelter_keep_out_" .. section
+		local keep_out = load_var(db.actor, var, nil)
+		local se = keep_out and sim:object(keep_out)
+		if se and se:section_name() == "space_restrictor" then
+			alife_release(se)
+		end
+		save_var(db.actor, var, nil)
+	end
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		local section = se and se:section_name()
+		if section and (string.find(section, "^shelter_mound_") or string.find(section, "^shelter_rubble_")) then
+			alife_release(se)
+			removed = removed + 1
+		end
+	end
+	msg(tr("st_coop_tests_rubble_done", removed))
+end
+
+local function shelter_stash()
+	local id = shelter.state("stash_id", nil)
+	local box = id and alife_object(id)
+	if not box then
+		return msg(game.translate_string("st_coop_tests_no_stash"))
+	end
+	local n = 0
+	for i = 0, ini_sys:line_count("shelter_pack_items") - 1 do
+		local _, sec = ini_sys:r_line_ex("shelter_pack_items", i, "", "")
+		if sec and ini_sys:section_exist(sec) then
+			alife_create_item(sec, box)
+			n = n + 1
+		end
+	end
+	msg(tr("st_coop_tests_stash_done", n))
+end
+
+-- digging: 8 strokes a shovel, not 40 (as the test copy had it from the start); again: back to the game's own
+local DIG_FAST = { wear = 0.125, stroke = 1250 }
+local dig_normal = nil
+local function shelter_dig()
+	if dig_normal then
+		shelter.DIG.wear, shelter.DIG.stroke = dig_normal.wear, dig_normal.stroke
+		dig_normal = nil
+		return msg(game.translate_string("st_coop_tests_dig_normal"))
+	end
+	dig_normal = { wear = shelter.DIG.wear, stroke = shelter.DIG.stroke }
+	shelter.DIG.wear, shelter.DIG.stroke = DIG_FAST.wear, DIG_FAST.stroke
+	msg(game.translate_string("st_coop_tests_dig_fast"))
+end
+
+-------------------------------------------------------------------------------
+-- the base and the raid (zz_base_test.lua)
+
+local TARGETS = { "scientists", "medic", "frame", "sect" }
+local CRISES = { "audit", "double", "snipers", "dry", "psi", "dump", "rats" }
+local BASE_KIT = { "device_weather_radar", "detector_radio", "batteries_dead", "batteries_dead", "batteries_dead",
+	"batteries_dead", "mutant_part_cat_thyroid", "af_drops", "drug_psy_blockade", "drug_psy_blockade", "drug_psy_blockade",
+	"drug_psy_blockade", "drug_psy_blockade", "af_gravi", "af_gravi", "af_electra_flash", "af_electra_flash", "device_pda_3",
+	"medium_repair_kit", "medium_repair_kit", "raid_incubator_frame", "exo_outfit" }
+local turn_target, turn_crisis = 0, 0
+
+local function base_cooling()
+	raid_window.force_open()
+	msg(game.translate_string("st_coop_tests_cooling_done"))
+end
+
+local function base_target()
+	turn_target = turn_target % #TARGETS + 1
+	local t = TARGETS[turn_target]
+	shelter.set_state("rescue_done_" .. t, nil)
+	shelter.set_state("rescue_lost_" .. t, nil)
+	msg(tr(raid_rescue.force(t) and "st_coop_tests_target_done" or "st_coop_tests_target_no", t))
+end
+
+local function base_all_saved()
+	shelter.set_state("rescue_done_scientists", true)
+	shelter.set_state("rescue_done_medic", true)
+	shelter.set_state("tech_hired", true)
+	shelter.set_state("tech_new", true)
+	for _, s in ipairs(BASE_KIT) do
+		alife_create_item(s, db.actor)
+	end
+	shelter_trade.ledger_add("medkit", 20)
+	shelter_trade.ledger_add("medium_repair_kit", 10)
+	db.actor:give_money(500000)
+	msg(game.translate_string("st_coop_tests_all_saved_done"))
+end
+
+local function base_crisis()
+	turn_crisis = turn_crisis % #CRISES + 1
+	local id = CRISES[turn_crisis]
+	if shelter_trade.crisis() then
+		shelter_base.crisis_ended(shelter_trade.crisis())
+	end
+	shelter.set_state("crisis", id)
+	shelter.set_state("crisis_until", shelter_trade.hours() + 48)
+	shelter_base.crisis_started(id)
+	msg(tr("st_coop_tests_crisis_done", id))
+end
+
+local function base_scorcher()
+	if raid_window.off() then
+		disable_info("bar_deactivate_radar_done")
+		msg(game.translate_string("st_coop_tests_scorcher_on"))
+	else
+		give_info("bar_deactivate_radar_done")
+		msg(game.translate_string("st_coop_tests_scorcher_off"))
+	end
+end
+
+local function base_decoder()
+	if not shelter_scorcher.has_decoder() then
+		alife_create_item(ini_sys:r_string_ex("shelter_scorcher", "decoder"), db.actor)
+	end
+	shelter.set_state("x10_left", 40)
+	msg(game.translate_string("st_coop_tests_decoder_done"))
+end
+
+local function base_window()
+	local opened = tonumber(shelter.state("cool_open", nil)) or shelter_trade.hours()
+	shelter.set_state("cool_open", opened - 2)
+	msg(tr("st_coop_tests_window_done", shelter_trade.hours() - opened + 2))
+end
+
+local function base_radar()
+	local se = SIMBOARD.smarts_by_names["rad_antenna_camper"]
+	if se then
+		ChangeLevel(se.position, se.m_level_vertex_id, se.m_game_vertex_id, VEC_ZERO)
+	end
+end
+
+local function base_health()
+	if coop_death and coop_death.recover_now then
+		coop_death.recover_now()
+	end
+	db.actor:set_health_ex(1)
+	msg(game.translate_string("st_coop_tests_health_done"))
+end
+
+local function base_clock()
+	shelter.set_state("base_last_hour", shelter_trade.hours() - 12)
+	msg(game.translate_string("st_coop_tests_clock_done"))
+end
+
+-------------------------------------------------------------------------------
+-- the AI's sight (zz_ai_stand.lua): observers who stand and look at you; a readout at the left edge while any is up
+
+local OBSERVER = "sim_default_stalker_2"
+local observers = {}
+
+class "coop_tests_hud" (CUIScriptWnd)
+
+function coop_tests_hud:__init() super()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self.text = CUIStatic()
+	self.text:SetAutoDelete(true)
+	self:AttachChild(self.text)
+	self.text:SetWndPos(vector2():set(8, 170))
+	self.text:SetWndSize(vector2():set(360, 520))
+	local t = self.text:TextControl()
+	t:SetFont(GetFontLetterica16Russian())
+	t:SetTextComplexMode(true)
+	t:SetTextColor(GetARGB(255, 235, 235, 200))
+end
+
+local hud, shown = nil, false
+
+local function show_hud(on)
+	if on and not hud then
+		hud = coop_tests_hud()
+	end
+	if hud and on ~= shown then
+		if on then
+			get_hud():AddDialogToRender(hud)
+		else
+			get_hud():RemoveDialogToRender(hud)
+		end
+		shown = on
+	end
+end
+
+local function point(obj, bone, dy)
+	local ok, p = pcall(obj.bone_position, obj, bone)
+	if ok and p then
+		return p
+	end
+	return obj:position():add(vector():set(0, dy, 0))
+end
+
+-- the share of sight the see-through static materials leave along the ray
+local function materials(from, to)
+	local vis, guard = 1, 0
+	local dir = vector():set(to.x - from.x, to.y - from.y, to.z - from.z)
+	local left = dir:magnitude()
+	dir:normalize()
+	local at = vector():set(from)
+	while left > 0.05 and guard < 32 do
+		guard = guard + 1
+		local rp = ray_pick(at, dir, left, rq_target.rqtStatic, nil)
+		if not rp:query() then
+			break
+		end
+		local r = rp:get_result()
+		vis = vis * (r and r.material_vis_transparency_factor or 0)
+		if vis <= 0 then
+			return 0
+		end
+		local step = rp:get_distance() + 0.05
+		at = at:add(vector():set(dir):mul(step))
+		left = left - step
+	end
+	return vis
+end
+
+local function readout()
+	local lines = { game.translate_string(get_console():get_integer("ai_grass") == 0 and "st_coop_tests_grass_off"
+		or "st_coop_tests_grass_on") }
+	local head, waist = point(db.actor, "bip01_head", 1.6), point(db.actor, "bip01_pelvis", 0.9)
+	for id in pairs(observers) do
+		local npc = level.object_by_id(id)
+		if npc and npc:alive() then
+			local eye = point(npc, "bip01_head", 1.7)
+			lines[#lines + 1] = string.format("%.0f m: %s", npc:position():distance_to(db.actor:position()),
+				npc:see(db.actor) and "%c[255,255,90,90]" .. game.translate_string("st_coop_tests_sees") .. "%c[default]"
+				or "%c[255,120,255,120]" .. game.translate_string("st_coop_tests_sees_not") .. "%c[default]")
+			lines[#lines + 1] = string.format("   grass: %.2f / %.2f   bushes: %.2f / %.2f", level.grass_transparency(eye, head),
+				level.grass_transparency(eye, waist), materials(eye, head), materials(eye, waist))
+			if ai_tuning and ai_tuning.detection_factor then
+				local f, name, c = ai_tuning.detection_factor(npc, db.actor)
+				lines[#lines + 1] = string.format("   x%.2f (%s, %.0f%%)", f, name, c * 100)
+			end
+		end
+	end
+	return table.concat(lines, "\\n")
+end
+
+local function observe(dist)
+	local dir = device().cam_dir
+	dir = vector():set(dir.x, 0, dir.z):normalize()
+	local lv = level.vertex_id(db.actor:position():add(dir:mul(dist)))
+	if lv >= 4294967295 then
+		return msg(tr("st_coop_tests_no_grid", dist))
+	end
+	local se = alife_create(OBSERVER, level.vertex_position(lv), lv, db.actor:game_vertex_id())
+	if se then
+		observers[se.id] = {}
+		msg(tr("st_coop_tests_observer", dist))
+	end
+end
+
+local function ai_clear()
+	for id in pairs(observers) do
+		local se = alife_object(id)
+		if se then
+			alife_release(se)
+		end
+	end
+	observers = {}
+	show_hud(false)
+	msg(game.translate_string("st_coop_tests_observers_gone"))
+end
+
+local function ai_grass()
+	local on = get_console():get_integer("ai_grass") ~= 0
+	exec_console_cmd("ai_grass " .. (on and 0 or 1))
+	msg(game.translate_string(on and "st_coop_tests_grass_off" or "st_coop_tests_grass_on"))
+end
+
+local next_readout = 0
+local function update()
+	if not next(observers) then
+		return
+	end
+	local head = point(db.actor, "bip01_head", 1.6)
+	for id, o in pairs(observers) do
+		local npc = level.object_by_id(id)
+		if npc and npc:alive() then
+			if not o.set then
+				o.set = true
+				npc:set_relation(game_object.friend, db.actor)
+				npc:movement_enabled(false)
+			end
+			npc:set_sight(look.point, head, 0)
+		end
+	end
+	if time_global() >= next_readout then
+		next_readout = time_global() + 250
+		show_hud(true)
+		hud.text:TextControl():SetText(readout())
+	end
+end
+
+-------------------------------------------------------------------------------
+
+-- in the window's order: { id, mode, old key, f, confirm }; the captions are st_coop_tests_<id>
+LIST = {
+	{ "shelter_travel", "shelter", "F8", shelter_travel },
+	{ "shelter_kit", "shelter", "F10", shelter_kit },
+	{ "shelter_synthesis", "shelter", "F6", shelter_synthesis },
+	{ "shelter_rubble", "shelter", "Ins", shelter_rubble, true },
+	{ "shelter_stash", "shelter", "End", shelter_stash },
+	{ "shelter_bar_event", "shelter", "PgUp", function() msg(tr("st_coop_tests_bar_event_done", tostring(shelter_events.force()))) end, true },
+	{ "shelter_dig", "shelter", "", shelter_dig },
+	{ "base_cooling", "base", "PgUp", base_cooling, true },
+	{ "base_target", "base", "PgDn", base_target, true },
+	{ "base_all_saved", "base", "Del", base_all_saved, true },
+	{ "base_crisis", "base", "Ins", base_crisis, true },
+	{ "base_scorcher", "base", "End", base_scorcher, true },
+	{ "base_decoder", "base", "ScrLk", base_decoder },
+	{ "base_window", "base", "F6", base_window, true },
+	{ "base_radar", "base", "F8", base_radar },
+	{ "base_health", "base", "F10", base_health },
+	{ "base_clock", "base", "J", base_clock, true },
+	{ "ai_obs20", "ai", "PgUp", function() observe(20) end },
+	{ "ai_obs40", "ai", "PgDn", function() observe(40) end },
+	{ "ai_clear", "ai", "Del", ai_clear },
+	{ "ai_grass", "ai", "ScrLk", ai_grass },
+}
+local BY_ID = {}
+for _, a in ipairs(LIST) do
+	BY_ID[a[1]] = a
+end
+
+-- the server said so (coop_admin_do.script): a test server, asked by this game's admin
+function run(id, admin)
+	local a = BY_ID[id]
+	if not (a and db.actor) then
+		return printf("! [coop tests] no such action: %s", tostring(id))
+	end
+	printf("[coop tests] %s (%s)", id, tostring(admin))
+	local ok, err = pcall(a[4])
+	if not ok then
+		printf("! [coop tests] %s: %s", id, tostring(err))
+		msg(tr("st_coop_tests_failed", id))
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", update)
+	RegisterScriptCallback("actor_on_net_destroy", function()
+		observers = {} -- a new level has a new HUD
+		hud, shown = nil, false
+	end)
+end

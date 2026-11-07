@@ -1,5 +1,11 @@
--- Co-op: the server's admin window (ui_coop_admin.script) opens from the main menu by its hotkey; the engine's
--- answers from the server go to it.
+-- Co-op: the admin window (ui_coop_admin.script) opens by [coop_admin] menu_key in the main menu and game_key in the
+-- game; the engine's answers from the server go to it. The PDA map's mark of a level transition ("Моя игра", every
+-- transition: coop_my_game.script), in both map_spots files.
+
+local targets = {
+	[ [[ui\map_spots.xml]] ] = true,
+	[ [[ui\map_spots_16.xml]] ] = true,
+}
 
 function on_xml_read()
 	if not coop then
@@ -10,8 +16,35 @@ function on_xml_read()
 	_G.coop_on_admin_result = function(text) ui_coop_admin.on_result(text) end
 
 	RegisterScriptCallback("main_menu_on_keyboard", function(dik, keyboard_action, menu)
-		if dik == ui_coop_admin.HOTKEY and keyboard_action == ui_events.WINDOW_KEY_PRESSED and not ui_coop_admin.is_shown() then
+		if dik == ui_coop_admin.menu_key() and keyboard_action == ui_events.WINDOW_KEY_PRESSED and not ui_coop_admin.is_shown() then
 			ui_coop_admin.open(menu)
+		end
+	end)
+
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		if not targets[xml_file_name] then
+			return
+		end
+		xml_obj:insertFromXMLString([[
+<coop_transition>
+	<level_map spot="coop_transition_spot"/>
+</coop_transition>
+<coop_transition_spot width="19" height="21" alignment="c" location_level="1">
+	<texture r="250" g="200" b="60">ui_pda2_exit_point</texture>
+</coop_transition_spot>
+]])
+	end)
+end
+
+-- in the game: not over another window, not in the console
+function on_game_start()
+	if not coop then
+		return
+	end
+	RegisterScriptCallback("actor_on_net_destroy", ui_coop_admin.drop_game_window)
+	RegisterScriptCallback("on_key_press", function(dik)
+		if dik == ui_coop_admin.game_key() and not ui_coop_admin.is_shown() and not level.is_input_captured() then
+			ui_coop_admin.open(nil)
 		end
 	end)
 end

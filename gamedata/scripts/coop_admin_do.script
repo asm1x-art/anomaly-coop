@@ -1,0 +1,145 @@
+-- Co-op: what the server's admin asks of this game (coop-server/src/server.js, the admin window's per-player
+-- commands): the server sends a script event "coop_admin" (from no player: only the server can, it drops one a game
+-- sends) with "action<tab>fields...<tab>admin". Done here, through the game's own ways, so co-op syncs it as anything
+-- else: things made in the actor's inventory take ids from this game's own id blocks (coop_ids.cpp), as bought or
+-- looted ones do. Every one is told to the player (a news) and is in the server's journal.
+--   report                            our state for the admin window: "coop_admin_info" back to the server
+--   give <section> <count>            things into our inventory      money <amount>   money (less than 0: taken)
+--   god <1|0>                         immortal or not (this game's own, until it loads a save)    heal   everything put right
+--   teleport <level> <x> <y> <z> <level vertex> <game vertex>    to a place (another level: a level change)
+--   logs                              our logs to the server (coop_send_logs)
+--   say <text>                        a message to everyone          test <action>   a test mode's action (coop_admin_tests)
+
+local god = false
+local next_heal = 0
+
+local function tr(key, ...)
+	return strformat(game.translate_string(key), ...)
+end
+
+local function news(text)
+	if db.actor then
+		db.actor:give_game_news(game.translate_string("st_coop_admin_news"), text, "ui_inGame2_Poslednie_razrabotki", 0, 8000)
+	end
+	printf("[coop] admin: %s", text)
+end
+
+function immortal()
+	return god
+end
+
+-- health, rank, immortality, money, where on the level graph: the admin window's player card
+local function report()
+	if not db.actor then
+		return
+	end
+	coop_sync.send_event("coop_admin_info", math.floor(db.actor.health * 100 + 0.5), db.actor:character_rank(),
+		god and 1 or 0, db.actor:money(), db.actor:level_vertex_id(), db.actor:game_vertex_id())
+end
+
+local function heal()
+	if coop_death and coop_death.recover_now then
+		coop_death.recover_now() -- psi, needs, bleeding, radiation, the UI a death took away
+	end
+	db.actor:set_health_ex(1)
+	db.actor.power = 1
+end
+
+local function give(section, count, admin)
+	count = math.max(1, math.min(tonumber(count) or 1, 100))
+	if not (section and ini_sys:section_exist(section) and ini_sys:r_float_ex(section, "inv_grid_x")) then
+		return news(tr("st_coop_admin_give_bad", admin, section or "?"))
+	end
+	for _ = 1, count do
+		alife_create_item(section, db.actor)
+	end
+	news(tr("st_coop_admin_give_done", admin, ui_item.get_sec_name(section), count))
+end
+
+local function teleport(f, admin)
+	local lvl, x, y, z, lvid, gvid = f[2], tonumber(f[3]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6]), tonumber(f[7])
+	if not (x and y and z) then
+		return
+	end
+	local pos = vector():set(x, y, z)
+	news(tr("st_coop_admin_teleport_done", admin))
+	if lvl == level.name() then
+		db.actor:set_actor_position(pos)
+	elseif lvid and gvid and game_graph():valid_vertex_id(gvid) then
+		ChangeLevel(pos, lvid, gvid, VEC_ZERO)
+	end
+end
+
+local ACTIONS = {
+	report = function() report() end,
+	give = function(f, admin) give(f[2], f[3], admin) end,
+	money = function(f, admin)
+		local amount = math.floor(tonumber(f[2]) or 0)
+		if amount > 0 then
+			db.actor:give_money(amount)
+		elseif amount < 0 then
+			db.actor:give_money(-math.min(-amount, db.actor:money()))
+		end
+		news(tr("st_coop_admin_money_done", admin, amount))
+	end,
+	god = function(f, admin)
+		god = f[2] == "1"
+		news(tr(god and "st_coop_admin_god_on" or "st_coop_admin_god_off", admin))
+		report()
+	end,
+	heal = function(f, admin)
+		heal()
+		news(tr("st_coop_admin_heal_done", admin))
+	end,
+	teleport = teleport,
+	logs = function(f, admin)
+		get_console():execute("coop_send_logs")
+		news(tr("st_coop_admin_logs_done", admin))
+	end,
+	say = function(f, admin)
+		local text = f[2] or ""
+		news(tr("st_coop_admin_say", admin, text))
+		actor_menu.set_msg(1, admin .. ": " .. text, 10)
+	end,
+	test = function(f, admin)
+		if coop_admin_tests then
+			coop_admin_tests.run(f[2], admin)
+		end
+	end,
+}
+
+local function on_admin(sender, payload)
+	if sender ~= "" or not db.actor then
+		return -- the server's only
+	end
+	local f = str_explode(payload, "\t")
+	local admin = f[#f] or "?"
+	local action = ACTIONS[f[1]]
+	if action then
+		local ok, err = pcall(action, f, admin)
+		if not ok then
+			printf("! [coop] admin %s failed: %s", f[1], tostring(err))
+		end
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	coop_sync.on_event("coop_admin", on_admin)
+	RegisterScriptCallback("actor_on_before_hit", function(shit, bone_id, flags)
+		if god then
+			flags.ret_value = false
+		end
+	end)
+	RegisterScriptCallback("actor_on_update", function()
+		if god and time_global() >= next_heal then
+			next_heal = time_global() + 500
+			db.actor:set_health_ex(1) -- what comes by no hit: radiation, bleeding, psi, hunger
+			db.actor.radiation = 0
+			db.actor.bleeding = 1
+			db.actor.psy_health = 1
+		end
+	end)
+end

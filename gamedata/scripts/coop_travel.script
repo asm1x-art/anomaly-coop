@@ -61,10 +61,17 @@ local function refresh_marks()
 			if level.map_has_object_spot(i, MARK) ~= 0 then
 				level.map_remove_object_spot(i, MARK)
 			end
-			if on() and visited[smart:name()] then
+			if on() and (visited[smart:name()] or coop_my_game.flag("all_travel")) then
 				mark(i, smart:name())
 			end
 		end
+	end
+end
+
+-- the marks again, as the admin window's "all points" now says
+function refresh()
+	if db.actor and coop.connected() then
+		refresh_marks()
 	end
 end
 
@@ -144,7 +151,9 @@ end
 
 local function menu_items(id)
 	local smart = id > 0 and alife_object(id)
-	if not (smart and smart:clsid() == clsid.smart_terrain and points[smart:name()] and visited[smart:name()]) then
+	-- one not seen yet: shown with the admin window's "all points", gone to on a test server only (a cheat)
+	if not (smart and smart:clsid() == clsid.smart_terrain and points[smart:name()] and (visited[smart:name()] or
+		coop_my_game.flag("all_travel") and coop_rules.flag("tests", false))) then
 		return
 	end
 	local place = game.translate_string(smart:name())

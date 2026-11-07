@@ -1,25 +1,62 @@
--- Co-op: the server's admin window, opened from the main menu by HOTKEY (modxml_coop_admin.script) while connected.
--- The admin page's password unlocks it (asked once, kept per server in <appdata>\coop_admin.txt); then it shows the
--- host, the world, who is online and where, the world's settings, rules and factions, the world's saves, and does
--- what the admin page and the Telegram bot do (coop-server/src/server.js ADMIN_*, admin_commands.js).
+-- Co-op: the admin window, a console of sections (Notion "Внутриигровая админка: дизайн и опции", direction A). Opens
+-- by [coop_admin] menu_key (F10) in the main menu and game_key (Home) in the game, connected or not.
+--   Сервер (the admin page's password): Обзор, Игроки, Правила, Мир и фракции, Сохранения, Журнал. What the admin
+--     page and the bot do (coop-server/src/server.js ADMIN_*), and on a player: items, money, immortality, healing,
+--     teleports, logs (their game does it, coop_admin_do.script; each in the server's journal).
+--   Мир · хост (the password): Механики мира (the server's rules for the whole world), Тест-режимы (a test server's
+--     only, server.cfg allow_tests: the old F7 test modes as buttons, coop_admin_tests.script).
+--   Моя игра (no password, every player): what this game shows (coop_my_game.script, the console, the options).
+-- A status bar on top, the card of the picked thing on the right, a search over everything, pinned toggles under the
+-- sections. The server's state comes every [coop_admin] poll_seconds while it is open. The password is asked once:
+-- the server gives a token for it, kept per server in <appdata>\coop_admin.txt (the password never is). Below
+-- [coop_admin] compact_below pixels of screen width the sections show as short marks. The look: ui_shelter_style.
 
-HOTKEY = DIK_keys.DIK_F10
-
+local C = ui_shelter_style.C
+local XML = "ui_shelter_laptop.xml"
+local S = "coop_admin"
 local FILE = "coop_admin.txt"
-local wnd = nil      -- the window, made on first use
-local entries = {}   -- what each line of the list is: { kind, key, value, min, max, name, revision, title }
+
+local function key_of(name, default)
+	return DIK_keys[ini_sys:r_string_ex(S, name) or default] or DIK_keys[default]
+end
+local function num(name, default)
+	return ini_sys:r_float_ex(S, name) or default
+end
+
+local wnd = nil
+local data = nil         -- the server's state as parsed (parse below)
 local logged_in = false
+local result = ""        -- what the last command did, the server's words
 
 local function tr(key, ...)
-	return strformat(game.translate_string(key), ...)
+	if select("#", ...) > 0 then
+		return strformat(game.translate_string(key), ...)
+	end
+	return game.translate_string(key)
 end
 
 local function trim(s)
 	return string.match(s or "", "^%s*(.-)%s*$")
 end
 
--- { [server] = what logs in }, "server<tab>token:..." lines: the token the server gave for the password, never the
--- password itself (a line of an older game with the password in it logs in once, then the token takes its place)
+-- lower case, the Cyrillic of cp1251 too (string.lower leaves it as it is)
+local function lower(s)
+	s = string.gsub(string.lower(s or ""), "[\192-\223]", function(c) return string.char(string.byte(c) + 32) end)
+	return (string.gsub(s, "\168", "\184"))
+end
+
+local function command(...)
+	coop.admin_command(table.concat({ ... }, "\t"))
+end
+
+local function connected()
+	return coop and coop.connected()
+end
+
+-------------------------------------------------------------------------------
+-- what logs in, per server: "server<tab>token:..." lines (an older game's line holds the password: it logs in once,
+-- then the token takes its place)
+
 local function load_passwords()
 	local list = {}
 	local f = io.open(getFS():update_path("$app_data_root$", FILE), "r")
@@ -50,297 +87,1645 @@ local function save_password(server, password)
 	f:close()
 end
 
-local function command(...)
-	coop.admin_command(table.concat({ ... }, "\t"))
+-------------------------------------------------------------------------------
+-- the server's state: tab-split lines (protocol.js ADMIN_STATE), the first the login's
+
+local function parse(text)
+	local d = { players = {}, settings = {}, rules = {}, world = {}, factions = {}, saves = {}, news = {}, journal = {} }
+	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
+		local f = str_explode(line, "\t")
+		local k = f[1]
+		if k == "auth" then
+			d.auth = { result = f[2], token = f[3], seconds = tonumber(f[3]), text = f[4] }
+		elseif k == "host" then
+			d.host = { text = f[2], uptime = tonumber(f[3]), has = f[4] == "1" }
+		elseif k == "server" then
+			d.tests = f[2] == "1"
+			d.paused = f[3] ~= "" and f[3] or nil
+			d.clock = tonumber(f[4])
+			d.factor = tonumber(f[5])
+			d.clock_running = f[6] == "1"
+			d.now = tonumber(f[7]) or os.time()
+			d.empty_paused = f[8] == "1"
+		elseif k == "world" then
+			d.revision, d.owner, d.saved = tonumber(f[2]), f[3], tonumber(f[4])
+		elseif k == "player" then
+			table.insert(d.players, { name = f[2], level = f[3], ping = tonumber(f[4]), authority = f[5] == "1",
+				master = f[6] == "1", since = tonumber(f[7]), leader = f[8] ~= "" and f[8] or nil, group = tonumber(f[9]) or 0,
+				health = tonumber(f[10]), rank = tonumber(f[11]), god = f[12] == "1", money = tonumber(f[13]),
+				x = tonumber(f[14]), y = tonumber(f[15]), z = tonumber(f[16]) })
+		elseif k == "setting" then
+			local s = { group = f[2], key = f[3], value = tonumber(f[4]), min = tonumber(f[5]), max = tonumber(f[6]), title = f[7] }
+			table.insert(f[2] == "world" and d.world or d.rules, s)
+			d.settings[s.key] = s
+		elseif k == "faction" then
+			table.insert(d.factions, { key = f[2], value = f[3] == "1", title = f[4] })
+		elseif k == "saves" then
+			d.saves_total, d.saves_offset = tonumber(f[2]) or 0, tonumber(f[3]) or 0
+		elseif k == "save" then
+			table.insert(d.saves, { revision = tonumber(f[2]), time = tonumber(f[3]), title = f[4] })
+		elseif k == "news" then
+			table.insert(d.news, { time = tonumber(f[2]), text = f[3] })
+		elseif k == "journal" then
+			table.insert(d.journal, { time = tonumber(f[2]), who = f[3], text = f[4] })
+		end
+	end
+	return d
 end
 
+-------------------------------------------------------------------------------
+-- what goes where
+
+local SECTIONS = {
+	{ id = "overview", group = "server" }, { id = "players", group = "server" }, { id = "rules", group = "server" },
+	{ id = "world", group = "server" }, { id = "saves", group = "server" }, { id = "journal", group = "server" },
+	{ id = "mechanics", group = "host" }, { id = "tests", group = "host" },
+	{ id = "debug", group = "mine" }, { id = "map", group = "mine" }, { id = "render", group = "mine" },
+}
+local GROUP_OF = {}
+for _, s in ipairs(SECTIONS) do
+	GROUP_OF[s.id] = s.group
+end
+
+-- the rules' groups in "Правила"; MECHANICS go to "Механики мира"
+local RULE_GROUPS = {
+	{ "join", { "max_players", "group_max" } },
+	{ "death", { "downed_time", "revive_time", "revive_health", "rank_loss" } },
+	{ "travel", { "fast_travel", "travel_overloaded", "travel_enemy_radius", "faction_penalty", "witness_radius" } },
+	{ "tools", { "tool_discount_1", "tool_discount_2", "tool_discount_3", "tool_group_share" } },
+	{ "rewards", { "story_rewards_all", "help_rewards_all" } },
+}
+local MECHANICS = { "offline_sim", "cleaner", "bar_events", "scorcher", "shelter_group_only", "psi_immunity" }
+local IS_MECHANIC = {}
+for _, k in ipairs(MECHANICS) do
+	IS_MECHANIC[k] = true
+end
+
+local function con_int(name)
+	return get_console():get_integer(name)
+end
+local function exec(cmd)
+	get_console():execute(cmd)
+end
+local function opt(path)
+	return ui_options.get(path)
+end
+
+-- "Моя игра": { id, kind, get, set, via (how it was set before: console, options, ltx, new), extra }
+local MY = {
+	debug = {
+		{ id = "coop_debug", kind = "toggle", via = "console", get = function() return con_int("coop_debug") == 1 end,
+			set = function(v) exec("coop_debug " .. (v and 1 or 0)) end },
+		{ id = "prof_spikes", kind = "number", via = "console", min = 0, max = 200, step = 5,
+			get = function() return math.floor(get_console():get_float("prof_spikes") + 0.5) end,
+			set = function(v) exec("prof_spikes " .. v) end },
+		{ id = "fps", kind = "toggle", via = "options", get = function() return opt("coop/general/fps") == true end,
+			set = function(v)
+				ui_options.set("coop/general/fps", v)
+				if coop_fps and coop_fps.refresh then
+					coop_fps.refresh()
+				end
+			end },
+		{ id = "rs_stats", kind = "toggle", via = "console", get = function() return get_console():get_bool("rs_stats") end,
+			set = function(v) exec("rs_stats " .. (v and "on" or "off")) end },
+		{ id = "prof_stats", kind = "button", via = "console", run = function() exec("prof_stats 10") end },
+		{ id = "flush", kind = "button", via = "console", run = function() exec("flush") end },
+		{ id = "send_logs", kind = "button", via = "console", run = function() exec("coop_send_logs") end, online = true },
+		{ id = "coop_status", kind = "button", via = "console", run = function() exec("coop_status") end, online = true },
+	},
+	map = {
+		{ id = "all_transitions", kind = "toggle", via = "new", get = function() return coop_my_game.flag("all_transitions") end,
+			set = function(v)
+				coop_my_game.set("all_transitions", v)
+				coop_my_game.refresh_transitions()
+			end },
+		{ id = "all_travel", kind = "toggle", via = "new", get = function() return coop_my_game.flag("all_travel") end,
+			set = function(v)
+				coop_my_game.set("all_travel", v)
+				if coop_travel and coop_travel.refresh then
+					coop_travel.refresh()
+				end
+			end },
+		{ id = "raid_debug_map", kind = "toggle", via = "console", get = function() return coop_my_game.flag("raid_debug_map") end,
+			set = function(v) coop_my_game.set("raid_debug_map", v) end },
+		{ id = "raid_timer", kind = "toggle", via = "options", get = function() return opt("coop/general/raid_timer") == true end,
+			set = function(v)
+				ui_options.set("coop/general/raid_timer", v)
+				if ui_raid_hud and ui_raid_hud.refresh_timer then
+					ui_raid_hud.refresh_timer()
+				end
+			end },
+		{ id = "peer_color", kind = "color", via = "options" },
+	},
+	render = {
+		{ id = "dlss", kind = "segment", via = "console", values = { "off", "dlaa", "quality", "balanced", "performance" },
+			get = function() return get_console():get_token("r__dlss_mode") end,
+			set = function(v) exec("r__dlss_mode " .. v) end },
+		{ id = "dlss_mv", kind = "toggle", via = "console", get = function() return con_int("r__dlss_mv_debug") == 1 end,
+			set = function(v) exec("r__dlss_mv_debug " .. (v and 1 or 0)) end },
+		{ id = "render_scale", kind = "number", via = "console", min = 50, max = 100, step = 5,
+			get = function() return math.floor(get_console():get_float("r__render_scale") * 100 + 0.5) end,
+			set = function(v) exec(string.format("r__render_scale %.2f", v / 100)) end },
+		{ id = "muzzle_shadows", kind = "toggle", via = "console", get = function() return con_int("g_npc_muzzle_shadows") == 1 end,
+			set = function(v) exec("g_npc_muzzle_shadows " .. (v and 1 or 0)) end },
+	},
+}
+local MY_BY_ID = {}
+for sec, list in pairs(MY) do
+	for _, it in ipairs(list) do
+		it.section = sec
+		MY_BY_ID[it.id] = it
+	end
+end
+-- the peer marks' colours to pick from (Опции › Кооп has the sliders)
+local PEER_COLORS = { { 90, 200, 255 }, { 92, 210, 128 }, { 240, 180, 70 }, { 240, 98, 88 }, { 200, 120, 255 }, { 255, 255, 255 } }
+
+local function pins()
+	local list = {}
+	for id in string.gmatch(coop_my_game.get("pins", "coop_debug,all_transitions,fps"), "[^,]+") do
+		if MY_BY_ID[id] and MY_BY_ID[id].kind == "toggle" then
+			list[#list + 1] = id
+		end
+	end
+	return list
+end
+
+local function pinned(id)
+	for _, p in ipairs(pins()) do
+		if p == id then
+			return true
+		end
+	end
+	return false
+end
+
+local function set_pin(id, on)
+	local list = {}
+	for _, p in ipairs(pins()) do
+		if p ~= id then
+			list[#list + 1] = p
+		end
+	end
+	if on then
+		list[#list + 1] = id
+	end
+	coop_my_game.set("pins", table.concat(list, ","))
+end
+
+-------------------------------------------------------------------------------
+-- formatting
+
+local function duration(seconds)
+	seconds = math.max(0, math.floor(seconds or 0))
+	if seconds < 3600 then
+		return tr("st_coop_adm_min", math.floor(seconds / 60))
+	end
+	return tr("st_coop_adm_hmin", math.floor(seconds / 3600), math.floor(seconds % 3600 / 60))
+end
+
+local function level_name(level)
+	if not level or level == "" then
+		return tr("st_coop_adm_in_menu")
+	end
+	return game.translate_string(level)
+end
+
+local function clock_text(ms)
+	if not ms then
+		return "-"
+	end
+	local minutes = math.floor(ms / 60000)
+	return string.format("%02d:%02d", math.floor(minutes / 60) % 24, minutes % 60)
+end
+
+local function find_player(name)
+	for _, p in ipairs(data and data.players or {}) do
+		if p.name == name then
+			return p
+		end
+	end
+end
+
+local function me()
+	return coop and coop.my_name and coop.my_name() or ""
+end
+
+-------------------------------------------------------------------------------
+-- the window
+
 class "UICoopAdmin" (CUIScriptWnd)
+ui_shelter_style.apply(UICoopAdmin)
 
 function UICoopAdmin:__init(owner) super()
 	self.owner = owner
-	self:InitControls()
-	self:InitCallBacks()
+	self.k = utils_xml.screen_ratio()
+	self.W = math.floor(1024 / self.k + 0.5)
+	self.H = 768
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self.compact = device().width < num("compact_below", 1600)
+	self.char = math.max(5.5, 8.5 * self.W / device().width) -- a letter of the small font across, in square units
+	self.line = math.max(14, 18 * 768 / device().height)     -- a line of it down
+	self.section = "overview"
+	self.sel = {}           -- what the card shows: { kind = "player"|"save"|"rule"|"my"|"test"|..., id }
+	self.edit_text = {}     -- the fields' texts, kept over a rebuild
+	self.edits = {}         -- name -> the field, its hint, the region it is in
+	self.hints = {}
+	self.edit_region = {}
+	self.clicks = { top = {}, nav = {}, main = {}, aside = {}, modal = {} }
+	self.spawn = { query = "", picked = nil, count = 1, page = 0 }
+	self.players_page = 0
+	self.search = ""
+	self.typed = 0
+	self:frame()
 end
 
 function UICoopAdmin:__finalize()
 end
 
-function UICoopAdmin:InitControls()
-	self:SetWndRect(Frect():set(0, 0, 1024, 768))
-	local xml = CScriptXmlInit()
-	xml:ParseFile("ui_coop_admin.xml")
+-- the cursor in square units
+function UICoopAdmin:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k, p.y)
+end
 
-	xml:InitStatic("background", self)
-	local form = xml:InitStatic("form", self)
-	xml:InitTextWnd("form:caption", form)
-	xml:InitFrame("form:list_frame", form)
-	self.list = xml:InitListBox("form:list", form)
-	self.list:ShowSelectedItem(true)
-	self:Register(self.list, "list")
-	self.cap_value = xml:InitTextWnd("form:cap_value", form)
-	self.edit_value = xml:InitEditBox("form:edit_value", form)
-	self:Register(self.edit_value, "edit_value")
-	self.status = xml:InitTextWnd("form:status", form)
-	self.btn_apply = xml:Init3tButton("form:btn_apply", form)
-	self:Register(self.btn_apply, "btn_apply")
-	for _, name in ipairs({ "btn_kick", "btn_rollback", "btn_save_world", "btn_restart_host", "btn_refresh", "btn_close" }) do
-		self:Register(xml:Init3tButton("form:" .. name, form), name)
+-- the panel's regions, in square units from the screen's corner
+function UICoopAdmin:layout()
+	local pad = self.compact and 12 or 36
+	local x, y, w, h = pad, self.compact and 10 or 24, self.W - 2 * pad, self.H - (self.compact and 20 or 48)
+	local top = 46
+	local nav = self.compact and 52 or 196
+	local aside = self.compact and 250 or 300
+	local status = 30
+	self.L = {
+		panel = { x, y, w, h },
+		top = { x, y, w, top },
+		nav = { x, y + top, nav, h - top - status },
+		main = { x + nav, y + top, w - nav - aside, h - top - status },
+		aside = { x + w - aside, y + top, aside, h - top - status },
+		status = { x, y + h - status, w, status },
+	}
+end
+
+-- the frame: the dimmed screen, the panel, its top bar (with the search) and the status line, made once
+function UICoopAdmin:frame()
+	self:layout()
+	self:rect(0, 0, self.W, self.H, C.black, self, self.owner and 235 or 170)
+	local P = self.L.panel
+	for i = 4, 1, -1 do
+		self:round(P[1] - 2 * i, P[2] + 3 - i, P[3] + 4 * i, P[4] + 4 * i, C.black, self, 10 + 2 * i, 16)
+	end
+	self:framed(P[1], P[2], P[3], P[4], C.surface, self, 12)
+	self.r = {}
+	self:build_top()
+	self.top_region = self.r.top
+	local S_ = self.L.status
+	self:rect(S_[1] + 1, S_[2], S_[3] - 2, 1, C.line, self)
+	self.status_text = self:text(S_[1] + 16, S_[2], S_[3] - 32, S_[4], "", C.dim, self, nil, "s")
+	self:build()
+end
+
+function UICoopAdmin:region(name)
+	-- the fields in it die with it: their texts kept first
+	for ename, r in pairs(self.edit_region) do
+		if r == name and self.edits[ename] then
+			self.edit_text[ename] = self.edits[ename]:GetText()
+			self.edits[ename], self.hints[ename], self.edit_region[ename] = nil, nil, nil
+		end
+	end
+	if self.r[name] then
+		self:DetachChild(self.r[name])
+	end
+	local R = self.L[name]
+	if name == "aside" then
+		self.spawn_box, self.spawn_at = nil, nil
+	end
+	local box = self:box(R[1], R[2], R[3], R[4], self)
+	self.r[name] = box
+	self.clicks[name] = {}
+	self.cur_region = name
+	return box, R[1], R[2], R[3], R[4]
+end
+
+-- a field to type in: name keys its text over rebuilds
+function UICoopAdmin:field(name, x, y, w, h, parent, ax, ay, list, hint)
+	self:framed(x, y, w, h, C.field, parent, 6)
+	local edit = self.xml:InitEditBox("edit", parent)
+	self:place(edit, x + 8, y + math.floor((h - 26) / 2), w - 16, 26)
+	if self.edit_text[name] then
+		edit:SetText(self.edit_text[name])
+	end
+	if hint then
+		self.hints[name] = self:text(x + 10, y, w - 20, h, hint, C.faint, parent, nil, "s")
+		self.hints[name]:Show((self.edit_text[name] or "") == "")
+	end
+	self.edits[name] = edit
+	self.edit_region[name] = self.cur_region
+	list[#list + 1] = { ax + x, ay + y, w, h, function() edit:CaptureFocus(true) end, edit = edit }
+	return edit
+end
+
+function UICoopAdmin:value(name)
+	local edit = self.edits[name]
+	if edit then
+		self.edit_text[name] = edit:GetText()
+	end
+	return trim(self.edit_text[name] or "")
+end
+
+function UICoopAdmin:keep_fields()
+	for name, edit in pairs(self.edits) do
+		self.edit_text[name] = edit:GetText()
 	end
 end
 
-function UICoopAdmin:InitCallBacks()
-	self:AddCallback("list", ui_events.LIST_ITEM_CLICKED, self.OnSelect, self)
-	self:AddCallback("btn_apply", ui_events.BUTTON_CLICKED, self.OnApply, self)
-	self:AddCallback("btn_kick", ui_events.BUTTON_CLICKED, self.OnKick, self)
-	self:AddCallback("btn_rollback", ui_events.BUTTON_CLICKED, self.OnRollback, self)
-	self:AddCallback("btn_save_world", ui_events.BUTTON_CLICKED, self.OnSaveWorld, self)
-	self:AddCallback("btn_restart_host", ui_events.BUTTON_CLICKED, self.OnRestartHost, self)
-	self:AddCallback("btn_refresh", ui_events.BUTTON_CLICKED, self.OnRefresh, self)
-	self:AddCallback("btn_close", ui_events.BUTTON_CLICKED, self.Close, self)
+function UICoopAdmin:build_top()
+	local box, X, Y, W, H = self:region("top")
+	local L = self.clicks.top
+	self:round(14, 11, 24, 24, C.accent, box, 6)
+	self:text(14, 11, 24, 24, "A", C.on_accent, box, CGameFont.alCenter, "m")
+	self:text(48, 0, 220, H, tr("st_coop_adm_title"), C.text, box, nil, "l")
+	local cx = W - 48
+	local hb = self:hover_of(cx, 6, 40, H - 12, box, 6, C.close, 255)
+	self:image(cx + 14, H / 2 - 6, 12, 12, "ui\\shelter\\os_close", box, C.dim)
+	L[#L + 1] = { X + cx, Y + 6, 40, H - 12, function() self:Close() end, hover = hb }
+	local sw = self.compact and 200 or 320
+	local sx = cx - 10 - sw
+	self:field("search", sx, 7, sw, H - 14, box, X, Y, L, tr("st_coop_adm_search"))
+	self.chips_x = 290
+	self.chips = self:box(self.chips_x, 0, sx - self.chips_x - 10, H, box)
+	self:rect(1, H - 1, W - 2, 1, C.line, box)
 end
 
-function UICoopAdmin:SetStatus(text)
-	self.status:SetText(text)
-end
-
--- before the password is in: the edit box takes it, the button logs in
-function UICoopAdmin:ShowLogin()
-	logged_in = false
-	entries = {}
-	self.list:RemoveAll()
-	self.cap_value:SetText(tr("st_coop_admin_password"))
-	self.btn_apply:TextControl():SetText(tr("st_coop_admin_login"))
-	self.edit_value:SetText("")
-end
-
-function UICoopAdmin:Open()
-	self:ShowDialog(true)
-	self.owner:HideDialog()
-	self.owner:Show(false)
-	if not coop.connected() then
-		self:ShowLogin()
-		return self:SetStatus(tr("st_coop_admin_offline"))
+-- the server, the login, the polling: chips in the top bar
+function UICoopAdmin:build_chips()
+	local box = self.r.top
+	box:DetachChild(self.chips) -- the top region's; made again in it
+	self.chips = self:box(self.chips_x, 0, 1, self.L.top[4], box)
+	local x = 0
+	local function chip(text, fg, bg, alpha)
+		local cw = math.min(300, 20 + string.len(text) * self.char)
+		self:round(x, 11, cw, 24, bg or C.raised, self.chips, 6, alpha)
+		self:text(x, 11, cw, 24, text, fg or C.dim, self.chips, CGameFont.alCenter, "s")
+		x = x + cw + 8
 	end
-	-- the server lets in a connection, not a game: logged in again each time it opens
-	local password = load_passwords()[coop.server_address()]
-	logged_in = false
-	if password then
-		self.password = password
-		coop.admin_login(password)
-		self:SetStatus(tr("st_coop_admin_wait"))
+	local address = connected() and coop.server_address() or ""
+	if address ~= "" and not self.compact then
+		chip(address)
+	end
+	if not connected() then
+		chip(tr("st_coop_adm_chip_offline"), C.warn)
+	elseif logged_in then
+		chip(tr("st_coop_adm_chip_admin"), C.accent, C.accent, 45)
+		if data and data.tests then
+			chip(tr("st_coop_adm_chip_tests"), C.warn)
+		end
 	else
-		self:ShowLogin()
-		self:SetStatus(tr("st_coop_admin_ask"))
+		chip(tr("st_coop_adm_chip_no_password"))
 	end
 end
 
-function UICoopAdmin:Close()
-	self.owner:ShowDialog(true)
-	if self:IsShown() then
-		self:HideDialog()
-	end
-	self.owner:Show(true)
+function UICoopAdmin:set_status(text)
+	result = text or ""
+	self.status_text:SetText(result)
 end
 
-local function add(list, text, entry)
-	list:AddTextItem(text)
-	entries[#entries + 1] = entry or {}
+-------------------------------------------------------------------------------
+-- rebuilding
+
+function UICoopAdmin:build()
+	self:build_chips()
+	self:build_nav()
+	if self.search ~= "" then
+		self:build_search()
+	else
+		self:build_main()
+	end
+	self:build_aside()
+	self:set_status(result)
+	self.dirty = false
 end
 
--- an entry's identity, kept across refreshes (a row's number moves when someone comes or goes)
-local function identity(e)
-	return e and e.kind and (e.kind .. "\t" .. tostring(e.key or e.name or e.revision)) or nil
+function UICoopAdmin:go(section, sel)
+	self.auto_section = false
+	self.section = section
+	self.sel = sel or {}
+	self.search = ""
+	if self.edits.search then
+		self.edits.search:SetText("")
+	end
+	self.edit_text.search = ""
+	self:build()
 end
 
--- the server's state: "kind<tab>field..." lines (coop-server/src/protocol.js ADMIN_STATE), the first its auth line
-function UICoopAdmin:Fill(text)
-	local auth = str_explode(string.match(text, "^[^\n]*"), "\t")
-	if auth[1] == "auth" and auth[2] ~= "ok" then
-		if auth[2] == "need" and logged_in and self.password then
-			logged_in = false -- the server forgot us (it restarted, we came back): in again with what we have
-			coop.admin_login(self.password)
-			return self:SetStatus(tr("st_coop_admin_wait"))
-		end
-		if auth[2] == "wrong" then
-			save_password(coop.server_address(), nil) -- a wrong one kept: asked again
-			self.password = nil
-		end
-		self:ShowLogin()
-		return self:SetStatus(auth[4] or "")
-	end
-	if not logged_in then
-		logged_in = true
-		self.cap_value:SetText(tr("st_coop_admin_value"))
-		self.btn_apply:TextControl():SetText(tr("st_coop_admin_apply"))
-		self.edit_value:SetText("") -- the password typed in it
-		self:SetStatus(tr("st_coop_admin_hint"))
-	end
-	-- the token in place of the password, on the disk and for the next login
-	if auth[1] == "auth" and auth[3] and auth[3] ~= "" then
-		self.password = auth[3]
-		save_password(coop.server_address(), auth[3])
-	end
-	local selected = identity(self:Selected())
-	local groups = { player = {}, world = {}, rules = {}, faction = {}, save = {} }
-	local host, world
-	for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
-		local f = str_explode(line, "\t")
-		if f[1] == "host" then
-			host = f[2]
-		elseif f[1] == "world" then
-			world = f
-		elseif f[1] == "player" then
-			table.insert(groups.player, { kind = "player", name = f[2], level = f[3], ping = f[4], authority = f[5] == "1" })
-		elseif f[1] == "setting" then
-			table.insert(groups[f[2]], { kind = "setting", key = f[3], value = tonumber(f[4]), min = tonumber(f[5]),
-				max = tonumber(f[6]), title = f[7] })
-		elseif f[1] == "faction" then
-			table.insert(groups.faction, { kind = "faction", key = f[2], value = f[3] == "1", title = f[4] })
-		elseif f[1] == "save" then
-			table.insert(groups.save, { kind = "save", revision = tonumber(f[2]), time = tonumber(f[3]), title = f[4] })
-		end
-	end
+function UICoopAdmin:pick(sel)
+	self.sel = sel
+	self:build_aside()
+	self:build_main() -- the picked row lit
+end
 
-	entries = {}
-	self.list:RemoveAll()
-	add(self.list, tr("st_coop_admin_host", host or "?"))
-	add(self.list, world and tr("st_coop_admin_world", world[2]) or tr("st_coop_admin_no_world"))
-	add(self.list, tr("st_coop_admin_players", #groups.player))
-	for _, p in ipairs(groups.player) do
-		local where = p.level ~= "" and p.level or tr("st_coop_admin_in_menu")
-		add(self.list, string.format("   %s - %s%s%s", p.name, where, p.ping ~= "" and (", " .. p.ping .. " ms") or "",
-			p.authority and (", " .. tr("st_coop_admin_authority")) or ""), p)
+function UICoopAdmin:locked(group)
+	return group ~= "mine" and not logged_in
+end
+
+function UICoopAdmin:build_nav()
+	local box, X, Y, W, H = self:region("nav")
+	local L = self.clicks.nav
+	self:rect(0, 0, W, H, C.bar, box)
+	self:rect(W - 1, 0, 1, H, C.line, box)
+	local y = 6
+	local last
+	for _, s in ipairs(SECTIONS) do
+		if s.group ~= last then
+			last = s.group
+			if self.compact then
+				if y > 6 then
+					self:rect(10, y + 4, W - 20, 1, C.line, box)
+					y = y + 10
+				end
+			else
+				self:text(14, y + 6, W - 20, 20, tr("st_coop_adm_grp_" .. s.group), C.faint, box, nil, "s")
+				y = y + 28
+			end
+		end
+		local on = self.section == s.id and self.search == ""
+		local h = self.compact and 36 or 32
+		if on then
+			self:round(6, y, W - 12, h, C.accent, box, 7, 45)
+		end
+		local hb = self:hover_of(6, y, W - 12, h, box, 7)
+		local color = on and C.text or self:locked(s.group) and C.faint or C.dim
+		if self.compact then
+			self:text(6, y, W - 12, h, tr("st_coop_adm_abbr_" .. s.id), color, box, CGameFont.alCenter, "m")
+		else
+			self:text(18, y, W - 30, h, tr("st_coop_adm_sec_" .. s.id), color, box, nil, "m")
+			local count = s.id == "players" and data and #data.players or s.id == "saves" and data and data.saves_total
+			if count and logged_in then
+				self:text(W - 60, y, 44, h, tostring(count), C.dim, box, CGameFont.alRight, "s")
+			end
+		end
+		L[#L + 1] = { X + 6, Y + y, W - 12, h, function() self:go(s.id) end, hover = hb }
+		y = y + h + 2
 	end
-	local function settings(header, list)
-		add(self.list, tr(header))
-		for _, s in ipairs(list) do
-			local value = s.min and tostring(s.value) or tr(s.value == 1 and "st_coop_admin_yes" or "st_coop_admin_no")
-			add(self.list, string.format("   %s: %s%s", s.title, value, s.min and string.format(" (%s-%s)", s.min, s.max) or ""), s)
+	-- the pinned toggles
+	if not self.compact then
+		local list = pins()
+		local py = H - 14 - #list * 28
+		if #list > 0 and py > y + 30 then
+			self:rect(10, py - 30, W - 20, 1, C.line, box)
+			self:text(14, py - 26, W - 20, 20, tr("st_coop_adm_pinned"), C.faint, box, nil, "s")
+			for i, id in ipairs(list) do
+				local it = MY_BY_ID[id]
+				local yy = py + (i - 1) * 28
+				local ok, on = pcall(it.get)
+				self:switch(14, yy + 4, ok and on, box)
+				self:text(58, yy, W - 64, 28, tr("st_coop_adm_i_" .. id), C.text, box, nil, "s")
+				L[#L + 1] = { X + 10, Y + yy, W - 20, 28, function() self:my_set(it, not (ok and on)) end }
+			end
 		end
 	end
-	settings("st_coop_admin_world_settings", groups.world)
-	settings("st_coop_admin_rules", groups.rules)
-	add(self.list, tr("st_coop_admin_factions"))
-	for _, f in ipairs(groups.faction) do
-		add(self.list, string.format("   %s: %s", f.title, tr(f.value and "st_coop_admin_yes" or "st_coop_admin_no")), f)
+end
+
+-------------------------------------------------------------------------------
+-- parts
+
+function UICoopAdmin:switch(x, y, on, parent)
+	self:round(x, y, 36, 20, on and C.accent or C.border, parent, 10)
+	self:round(x + (on and 18 or 2), y + 2, 16, 16, on and C.white or { 201, 206, 214 }, parent, 8)
+end
+
+-- a button at x, y of a region box (ax, ay its place); kind: "primary", "normal", "danger", "on", "off", "flat"
+function UICoopAdmin:btn(x, y, w, h, text, f, list, box, ax, ay, kind)
+	if kind == "danger" then
+		self:round(x, y, w, h, C.bad, box, 6, 40)
+		local hb = self:hover_of(x, y, w, h, box, 6)
+		self:text(x, y, w, h, text, { 255, 138, 128 }, box, CGameFont.alCenter, "s")
+		list[#list + 1] = { ax + x, ay + y, w, h, f, hover = hb }
+		return
 	end
-	add(self.list, tr("st_coop_admin_saves"))
-	local current = world and tonumber(world[2])
-	for _, s in ipairs(groups.save) do
-		s.current = s.revision == current
-		add(self.list, string.format("   #%d   %s   %s%s", s.revision, os.date("%d.%m %H:%M", s.time), s.title,
-			s.current and ("   " .. tr("st_coop_admin_save_current")) or ""), s)
+	local t = self:button(x, y, w, h, "", f, list, box, ax, ay, kind)
+	self:text(x, y, w, h, text, kind == "primary" and C.on_accent or kind == "off" and C.faint or C.text, box,
+		CGameFont.alCenter, "s")
+	return t
+end
+
+function UICoopAdmin:heading(x, y, w, text, box, sub)
+	local th = math.max(30, math.floor(self.line * 1.6))
+	self:text(x, y, w, th, text, C.text, box, nil, "l")
+	local sh = sub and self:lines(sub, w) * self.line or 0
+	if sub then
+		self:text(x, y + th, w, sh, sub, C.dim, box, nil, "s")
 	end
-	-- the same player, setting or save as before, wherever it is now; gone: nothing picked
-	self.list:SetSelectedIndex(-1)
-	for i, e in ipairs(entries) do
-		if selected and identity(e) == selected then
-			self.list:SetSelectedIndex(i - 1)
+	return y + th + sh -- where what is under it may go
+end
+
+-- a tile of the status row
+function UICoopAdmin:tile(x, y, w, key, value, sub, box, color)
+	self:round(x, y, w, 64, C.raised, box, 8)
+	self:text(x + 12, y + 6, w - 20, 18, key, C.dim, box, nil, "s")
+	self:text(x + 12, y + 22, w - 20, 24, value, color or C.text, box, nil, "m")
+	if sub then
+		self:text(x + 12, y + 42, w - 20, 18, sub, C.dim, box, nil, "s")
+	end
+end
+
+-- a modern yes/no box of our own over everything
+function UICoopAdmin:confirm(title, text, action, f)
+	self.modal_on = true
+	-- texts are drawn after every picture: what is under the box is hidden, not covered
+	for _, name in ipairs({ "nav", "main", "aside" }) do
+		self.r[name]:Show(false)
+	end
+	local box = self:box(0, 0, self.W, self.H, self)
+	self.modal = box
+	self.clicks.modal = {}
+	local L = self.clicks.modal
+	self:rect(0, 0, self.W, self.H, C.black, box, 140)
+	local w, h = 480, 170
+	local x, y = math.floor((self.W - w) / 2), math.floor((self.H - h) / 2)
+	for i = 4, 1, -1 do
+		self:round(x - 2 * i, y + 3 - i, w + 4 * i, h + 4 * i, C.black, box, 10 + 2 * i, 18)
+	end
+	self:framed(x, y, w, h, C.surface, box, 12)
+	self:text(x + 20, y + 14, w - 40, 30, title, C.text, box, nil, "l")
+	self:text(x + 20, y + 50, w - 40, 60, text, C.dim, box, nil, "s")
+	local close = function()
+		self:close_modal()
+	end
+	self:btn(x + w - 20 - 110 - 8 - 170, y + h - 50, 110, 34, tr("st_coop_adm_cancel"), close, L, box, 0, 0)
+	self:round(x + w - 20 - 170, y + h - 50, 170, 34, { 200, 71, 62 }, box, 6)
+	local hb = self:hover_of(x + w - 20 - 170, y + h - 50, 170, 34, box, 6)
+	self:text(x + w - 20 - 170, y + h - 50, 170, 34, action, C.white, box, CGameFont.alCenter, "s")
+	L[#L + 1] = { x + w - 20 - 170, y + h - 50, 170, 34, function()
+		close()
+		f()
+	end, hover = hb }
+end
+
+function UICoopAdmin:close_modal()
+	if self.modal then
+		self:DetachChild(self.modal)
+	end
+	self.modal, self.modal_on = nil, false
+	self.clicks.modal = {}
+	for _, name in ipairs({ "nav", "main", "aside" }) do
+		self.r[name]:Show(true)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the main area
+
+function UICoopAdmin:build_main()
+	local box, X, Y, W, H = self:region("main")
+	local L = self.clicks.main
+	local group = GROUP_OF[self.section]
+	if group ~= "mine" and not connected() then
+		return self:heading(24, 20, W - 48, tr("st_coop_adm_sec_" .. self.section), box, tr("st_coop_adm_offline"))
+	end
+	if self:locked(group) then
+		return self:login(box, X, Y, W, H, L)
+	end
+	if group ~= "mine" and not data then
+		return self:heading(24, 20, W - 48, tr("st_coop_adm_sec_" .. self.section), box, tr("st_coop_adm_wait"))
+	end
+	local f = self["main_" .. self.section]
+	if f then
+		f(self, box, X, Y, W, H, L)
+	end
+end
+
+function UICoopAdmin:login(box, X, Y, W, H, L)
+	local y = math.max(90, self:heading(24, 20, W - 48, tr("st_coop_adm_login_title"), box, tr("st_coop_adm_login_hint")) + 12)
+	local fw = math.min(360, W - 48)
+	self:field("password", 24, y, fw, 36, box, X, Y, L, tr("st_coop_adm_password"))
+	self:btn(24 + fw + 10, y, 110, 36, tr("st_coop_adm_login"), function() self:do_login() end, L, box, X, Y, "primary")
+	y = y + 46
+	if data and data.auth and data.auth.result ~= "ok" and data.auth.text then
+		self:text(24, y, W - 48, 40, data.auth.text, data.auth.result == "locked" and C.bad or C.warn, box, nil, "s")
+	end
+	self:text(24, y + 44, W - 48, 60, tr("st_coop_adm_login_mine"), C.dim, box, nil, "s")
+end
+
+function UICoopAdmin:do_login()
+	local password = self:value("password")
+	if password == "" then
+		return
+	end
+	self.password = password
+	self.edit_text.password = ""
+	self.edits.password:SetText("")
+	coop.admin_login(password)
+	self:set_status(tr("st_coop_adm_wait"))
+end
+
+-- Обзор
+function UICoopAdmin:main_overview(box, X, Y, W, H, L)
+	local d = data
+	-- five tiles in a row, or three and two on a narrow screen
+	local cols = (W - 48) / 5 >= 150 and 5 or 3
+	local tw = math.floor((W - 48 - (cols - 1) * 10) / cols)
+	local function at(i)
+		local c, r = (i - 1) % cols, math.floor((i - 1) / cols)
+		return 24 + c * (tw + 10), 18 + r * 74
+	end
+	local y = 18
+	local online, in_world = #d.players, 0
+	for _, p in ipairs(d.players) do
+		if p.level ~= "" then
+			in_world = in_world + 1
+		end
+	end
+	local max = d.settings.max_players and d.settings.max_players.value or 0
+	local x
+	x, y = at(1)
+	self:tile(x, y, tw, tr("st_coop_adm_t_host"), d.host and d.host.has and tr("st_coop_adm_host_yes") or tr("st_coop_adm_host_no"),
+		d.host and d.host.has and d.host.uptime and tr("st_coop_adm_uptime", duration(d.host.uptime)) or nil, box,
+		d.host and d.host.has and C.good or C.dim)
+	x, y = at(2)
+	self:tile(x, y, tw, tr("st_coop_adm_t_world"), d.revision and ("#" .. d.revision) or "-",
+		d.saved and tr("st_coop_adm_saved_ago", duration(d.now - d.saved)) or nil, box)
+	x, y = at(3)
+	self:tile(x, y, tw, tr("st_coop_adm_t_online"), string.format("%d / %d", online, max),
+		tr("st_coop_adm_online_sub", in_world, online - in_world), box)
+	x, y = at(4)
+	self:tile(x, y, tw, tr("st_coop_adm_t_clock"),
+		d.clock and (clock_text(d.clock) .. (d.factor and string.format("  x%g", d.factor) or "")) or "-",
+		tr(d.clock_running and "st_coop_adm_clock_runs" or d.empty_paused and "st_coop_adm_clock_empty" or "st_coop_adm_clock_stands"), box)
+	x, y = at(5)
+	self:tile(x, y, tw, tr("st_coop_adm_t_pause"), d.paused and tr("st_coop_adm_yes") or tr("st_coop_adm_no"),
+		d.paused and d.paused or nil, box, d.paused and C.warn or nil)
+	y = y + 84
+	local bx = 24
+	local function action(text, f, kind, bw)
+		bw = bw or (24 + string.len(text) * self.char)
+		self:btn(bx, y, bw, 34, text, f, L, box, X, Y, kind)
+		bx = bx + bw + 10
+	end
+	action(tr("st_coop_adm_save_world"), function() command("save") end, "primary")
+	if d.paused then
+		action(tr("st_coop_adm_resume"), function() command("resume") end)
+	end
+	if d.host and d.host.has then
+		action(tr("st_coop_adm_restart_host"), function()
+			self:confirm(tr("st_coop_adm_restart_host"), tr("st_coop_adm_restart_ask"), tr("st_coop_adm_restart_do"),
+				function() command("restart_host") end)
+		end, "danger")
+	end
+	y = y + 52
+	-- a message to everyone
+	self:text(24, y, W - 48, 24, tr("st_coop_adm_say_title"), C.text, box, nil, "m")
+	y = y + 28
+	self:field("say", 24, y, W - 48 - 130, 36, box, X, Y, L, tr("st_coop_adm_say_hint"))
+	self:btn(W - 24 - 120, y, 120, 36, tr("st_coop_adm_send"), function()
+		local text = self:value("say")
+		if text ~= "" then
+			command("say", text)
+			self.edit_text.say = ""
+			self.edits.say:SetText("")
+		end
+	end, L, box, X, Y, "primary")
+	y = y + 56
+	-- the world's news and what the admins did
+	local half = math.floor((W - 48 - 16) / 2)
+	self:text(24, y, half, 24, tr("st_coop_adm_news"), C.text, box, nil, "m")
+	self:text(24 + half + 16, y, half, 24, tr("st_coop_adm_journal"), C.text, box, nil, "m")
+	y = y + 28
+	local function list(x, items, line)
+		local yy = y
+		if #items == 0 then
+			self:text(x, yy, half, 22, tr("st_coop_adm_none"), C.faint, box, nil, "s")
+		end
+		for i = #items, math.max(1, #items - 7), -1 do
+			if yy > H - 30 then
+				break
+			end
+			self:text(x, yy, half, 40, line(items[i]), C.dim, box, nil, "s")
+			yy = yy + 42
+		end
+	end
+	list(24, d.news, function(n) return os.date("%H:%M", n.time) .. "  " .. n.text end)
+	list(24 + half + 16, d.journal, function(e) return os.date("%H:%M", e.time) .. "  " .. e.who .. ": " .. e.text end)
+end
+
+-- Игроки
+local PLAYERS_PAGE = 10
+
+function UICoopAdmin:main_players(box, X, Y, W, H, L)
+	local d = data
+	local max = d.settings.max_players and d.settings.max_players.value or 0
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_players"), box, tr("st_coop_adm_players_sub", #d.players, max))
+	local y = 70
+	local cols = { 24, 24 + math.floor((W - 48) * 0.30), 24 + math.floor((W - 48) * 0.58), 24 + math.floor((W - 48) * 0.70) }
+	self:round(24, y, W - 48, H - y - 14, C.field, box, 8)
+	for i, key in ipairs({ "st_coop_adm_col_name", "st_coop_adm_col_where", "st_coop_adm_col_ping", "st_coop_adm_col_role" }) do
+		self:text(cols[i] + 12, y, 200, 30, tr(key), C.dim, box, nil, "s")
+	end
+	y = y + 30
+	local first = self.players_page * PLAYERS_PAGE
+	for i = first + 1, math.min(#d.players, first + PLAYERS_PAGE) do
+		local p = d.players[i]
+		local sel = self.sel.kind == "player" and self.sel.id == p.name
+		if sel then
+			self:rect(24, y, W - 48, 40, C.accent, box, 22)
+			self:rect(24, y, 3, 40, C.accent, box)
+		end
+		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
+		self:round(cols[1] + 12, y + 15, 10, 10, p.level ~= "" and C.good or C.faint, box, 5)
+		self:text(cols[1] + 30, y, cols[2] - cols[1] - 30, 40, p.name .. (p.name == me() and tr("st_coop_adm_you") or ""), C.text, box, nil, "m")
+		self:text(cols[2] + 12, y, cols[3] - cols[2] - 12, 40, level_name(p.level), p.level ~= "" and C.text or C.dim, box, nil, "s")
+		self:text(cols[3] + 12, y, cols[4] - cols[3] - 12, 40, p.ping and (p.ping .. tr("st_coop_adm_ms")) or "-",
+			p.ping and p.ping > num("ping_warn", 150) and C.warn or C.text, box, nil, "s")
+		local roles = {}
+		if p.master then
+			roles[#roles + 1] = tr("st_coop_adm_role_master")
+		end
+		if p.authority then
+			roles[#roles + 1] = tr("st_coop_adm_role_authority")
+		end
+		if p.leader then
+			roles[#roles + 1] = tr("st_coop_adm_role_group", p.leader, p.group)
+		end
+		self:text(cols[4] + 12, y, W - 24 - cols[4] - 24, 40, table.concat(roles, " · "), C.accent, box, nil, "s")
+		self:rect(24, y + 40, W - 48, 1, C.line, box)
+		L[#L + 1] = { X + 24, Y + y, W - 48, 40, function() self:pick({ kind = "player", id = p.name }) end, hover = hb }
+		y = y + 41
+	end
+	if #d.players == 0 then
+		self:text(36, y, W - 72, 40, tr("st_coop_adm_nobody"), C.faint, box, nil, "s")
+	end
+	self:pager(#d.players, PLAYERS_PAGE, self.players_page, function(page)
+		self.players_page = page
+		self:build_main()
+	end, box, X, Y, W, H, L)
+	self:text(24, H - 34, W - 200, 20, tr("st_coop_adm_players_note"), C.faint, box, nil, "s")
+end
+
+-- the page buttons at the bottom right of a list
+function UICoopAdmin:pager(total, size, page, f, box, X, Y, W, H, L)
+	local pages = math.ceil(total / size)
+	if pages <= 1 then
+		return
+	end
+	local y = H - 48
+	self:text(W - 24 - 200, y, 110, 30, tr("st_coop_adm_page", page + 1, pages), C.dim, box, CGameFont.alRight, "s")
+	self:btn(W - 24 - 80, y, 36, 30, "<", function() f(math.max(0, page - 1)) end, L, box, X, Y, page > 0 and "normal" or "off")
+	self:btn(W - 24 - 36, y, 36, 30, ">", function() f(math.min(pages - 1, page + 1)) end, L, box, X, Y,
+		page < pages - 1 and "normal" or "off")
+end
+
+-- one setting's row: title, value control; picks it for the card
+function UICoopAdmin:setting_row(s, x, y, w, box, X, Y, L)
+	local sel = self.sel.kind == "rule" and self.sel.id == s.key
+	if sel then
+		self:round(x - 6, y, w + 12, 34, C.accent, box, 6, 30)
+	end
+	local hb = self:hover_of(x - 6, y, w + 12, 34, box, 6)
+	L[#L + 1] = { X + x - 6, Y + y, w - 120, 34, function() self:pick({ kind = "rule", id = s.key }) end, hover = hb }
+	self:text(x, y, w - 130, 34, s.title, C.text, box, nil, "s")
+	if not s.min then
+		local on = s.value == 1
+		self:switch(x + w - 40, y + 7, on, box)
+		L[#L + 1] = { X + x + w - 48, Y + y, 52, 34, function() self:set_rule(s, on and "0" or "1") end }
+	else
+		local step = s.max - s.min <= 20 and 1 or s.max - s.min <= 100 and 5 or s.max - s.min <= 600 and 10 or 50
+		self:btn(x + w - 120, y + 4, 26, 26, "-", function() self:set_rule(s, tostring(math.max(s.min, s.value - step))) end, L, box, X, Y,
+			s.value > s.min and "normal" or "off")
+		self:text(x + w - 92, y, 64, 34, tostring(s.value), C.text, box, CGameFont.alCenter, "m")
+		self:btn(x + w - 26, y + 4, 26, 26, "+", function() self:set_rule(s, tostring(math.min(s.max, s.value + step))) end, L, box, X, Y,
+			s.value < s.max and "normal" or "off")
+	end
+end
+
+function UICoopAdmin:set_rule(s, value)
+	if IS_MECHANIC[s.key] or s.key == "max_players" then
+		-- the world's mechanics and the player limit are asked first: they change the world for everyone
+		local shown = s.min and value or tr(value == "1" and "st_coop_adm_yes" or "st_coop_adm_no")
+		return self:confirm(s.title, tr("st_coop_adm_rule_ask", s.title, shown), tr("st_coop_adm_apply"),
+			function() command("set", s.key, value) end)
+	end
+	command("set", s.key, value)
+end
+
+-- Правила: the rules in their groups, two columns
+function UICoopAdmin:main_rules(box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_rules"), box, tr("st_coop_adm_rules_sub"))
+	local cw = math.floor((W - 48 - 24) / 2)
+	local col, y = 0, 72
+	local ys = { 72, 72 }
+	local seen = {}
+	local groups = {}
+	for _, g in ipairs(RULE_GROUPS) do
+		groups[#groups + 1] = g
+		for _, k in ipairs(g[2]) do
+			seen[k] = true
+		end
+	end
+	local other = {}
+	for _, s in ipairs(d.rules) do
+		if not seen[s.key] and not IS_MECHANIC[s.key] then
+			other[#other + 1] = s.key
+		end
+	end
+	if #other > 0 then
+		groups[#groups + 1] = { "other", other }
+	end
+	for _, g in ipairs(groups) do
+		col = ys[1] <= ys[2] and 1 or 2
+		local x = 24 + (col - 1) * (cw + 24)
+		y = ys[col]
+		self:text(x, y, cw, 24, tr("st_coop_adm_rg_" .. g[1]), C.faint, box, nil, "s")
+		y = y + 26
+		for _, k in ipairs(g[2]) do
+			local s = d.settings[k]
+			if s then
+				self:setting_row(s, x + 6, y, cw - 12, box, X, Y, L)
+				y = y + 36
+			end
+		end
+		ys[col] = y + 12
+	end
+end
+
+-- Мир и фракции
+local LEVELS3 = { "st_coop_adm_lvl_1", "st_coop_adm_lvl_2", "st_coop_adm_lvl_3" }
+
+function UICoopAdmin:main_world(box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_world"), box, tr("st_coop_adm_world_sub"))
+	local cw = math.floor((W - 48 - 24) / 2)
+	local y = 72
+	for _, s in ipairs(d.world) do
+		if s.min == 1 and s.max == 3 then
+			-- difficulty and economy: as the admin page names them
+			self:text(30, y, cw - 250, 34, s.title, C.text, box, nil, "s")
+			for i = 1, 3 do
+				local on = s.value == i
+				self:btn(24 + cw - 240 + (i - 1) * 80, y + 2, 78, 30, tr(LEVELS3[i]), function() command("set", s.key, tostring(i)) end,
+					L, box, X, Y, on and "on" or "normal")
+			end
+		else
+			self:setting_row(s, 30, y, cw - 12, box, X, Y, L)
+		end
+		y = y + 36
+	end
+	local x = 24 + cw + 24
+	y = 72
+	self:text(x, y, cw, 24, tr("st_coop_adm_factions"), C.faint, box, nil, "s")
+	y = y + 26
+	for _, f in ipairs(d.factions) do
+		self:text(x + 6, y, cw - 60, 32, f.title, C.text, box, nil, "s")
+		self:switch(x + cw - 42, y + 6, f.value, box)
+		L[#L + 1] = { X + x, Y + y, cw, 32, function() command("faction", f.key, f.value and "off" or "on") end }
+		y = y + 33
+	end
+end
+
+-- Сохранения
+function UICoopAdmin:main_saves(box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_saves"), box, tr("st_coop_adm_saves_sub", d.saves_total or 0))
+	self:btn(W - 24 - 160, 18, 160, 34, tr("st_coop_adm_save_world"), function() command("save") end, L, box, X, Y, "primary")
+	local y = 72
+	self:round(24, y, W - 48, H - y - 60, C.field, box, 8)
+	y = y + 6
+	for _, s in ipairs(d.saves) do
+		local sel = self.sel.kind == "save" and self.sel.id == s.revision
+		if sel then
+			self:rect(24, y, W - 48, 40, C.accent, box, 22)
+			self:rect(24, y, 3, 40, C.accent, box)
+		end
+		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
+		self:text(40, y, 80, 40, "#" .. s.revision, C.text, box, nil, "m")
+		self:text(120, y, 130, 40, os.date("%d.%m %H:%M", s.time), C.dim, box, nil, "s")
+		self:text(250, y, W - 48 - 250 - 130, 40, s.title, C.text, box, nil, "s")
+		if s.revision == d.revision then
+			self:round(W - 24 - 124, y + 9, 110, 22, C.accent, box, 5, 45)
+			self:text(W - 24 - 124, y + 9, 110, 22, tr("st_coop_adm_save_current"), C.accent, box, CGameFont.alCenter, "s")
+		end
+		self:rect(24, y + 40, W - 48, 1, C.line, box)
+		L[#L + 1] = { X + 24, Y + y, W - 48, 40, function() self:pick({ kind = "save", id = s.revision, save = s }) end, hover = hb }
+		y = y + 41
+	end
+	self:pager(d.saves_total or 0, 10, math.floor((d.saves_offset or 0) / 10), function(page)
+		command("saves", tostring(page * 10))
+	end, box, X, Y, W, H, L)
+end
+
+-- Журнал
+function UICoopAdmin:main_journal(box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_journal"), box, tr("st_coop_adm_journal_sub"))
+	local y = 72
+	if #d.journal == 0 then
+		self:text(24, y, W - 48, 24, tr("st_coop_adm_none"), C.faint, box, nil, "s")
+	end
+	for i = #d.journal, 1, -1 do
+		local e = d.journal[i]
+		self:text(24, y, 110, 40, os.date("%d.%m %H:%M", e.time), C.dim, box, nil, "s")
+		self:text(140, y, 120, 40, e.who, C.accent, box, nil, "s")
+		self:text(260, y, W - 24 - 260, 40, e.text, C.text, box, nil, "s")
+		self:rect(24, y + 40, W - 48, 1, C.line, box)
+		y = y + 42
+	end
+	y = math.max(y + 10, H - 120)
+	self:text(24, y, W - 48, 24, tr("st_coop_adm_logs_title"), C.text, box, nil, "m")
+	self:text(24, y + 26, W - 48, 40, tr("st_coop_adm_logs_hint"), C.dim, box, nil, "s")
+end
+
+-- Механики мира: the server's rules for the whole world
+function UICoopAdmin:main_mechanics(box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_mechanics"), box, tr("st_coop_adm_mechanics_sub"))
+	local y = 72
+	local w = math.min(W - 48, 560)
+	for _, k in ipairs(MECHANICS) do
+		local s = d.settings[k]
+		if s then
+			self:setting_row(s, 30, y, w - 12, box, X, Y, L)
+			y = y + 36
+		end
+	end
+	y = y + 16
+	self:text(24, y, W - 48, 24, tr("st_coop_adm_host_facts"), C.faint, box, nil, "s")
+	y = y + 26
+	self:text(30, y, W - 60, 60, tr(d.host and d.host.has and "st_coop_adm_host_god" or "st_coop_adm_no_host_offline"), C.dim, box, nil, "s")
+end
+
+-- Тест-режимы: a test server's only
+local TEST_MODES = { "shelter", "base", "ai" }
+
+function UICoopAdmin:main_tests(box, X, Y, W, H, L)
+	local d = data
+	local top = math.max(72, self:heading(24, 14, W - 48, tr("st_coop_adm_sec_tests"), box,
+		tr(d.tests and "st_coop_adm_tests_sub" or "st_coop_adm_tests_off")) + 10)
+	local cw = math.floor((W - 48 - 2 * 12) / 3)
+	local ys = {}
+	for i, mode in ipairs(TEST_MODES) do
+		local x = 24 + (i - 1) * (cw + 12)
+		local y = top
+		self:text(x, y, cw, 26, tr("st_coop_adm_tm_" .. mode), C.text, box, nil, "m")
+		y = y + 30
+		for _, a in ipairs(coop_admin_tests.LIST) do
+			if a[2] == mode then
+				local id, key, danger = a[1], a[3], a[5]
+				local kind = not d.tests and "off" or danger and "danger" or "normal"
+				local f = function()
+					if danger then
+						self:confirm(tr("st_coop_tests_" .. id), tr("st_coop_adm_test_ask"), tr("st_coop_adm_do"),
+							function() command("test", id) end)
+					else
+						command("test", id)
+					end
+				end
+				self:btn(x, y, cw, 30, "", d.tests and f or function() end, L, box, X, Y, kind)
+				self:text(x + 10, y, cw - 60, 30, tr("st_coop_tests_" .. id), d.tests and C.text or C.faint, box, nil, "s")
+				if key ~= "" then
+					self:text(x + cw - 56, y, 48, 30, key, C.dim, box, CGameFont.alRight, "s")
+				end
+				y = y + 34
+			end
+		end
+		ys[i] = y
+	end
+	-- cheats on oneself
+	local y = math.max(ys[1], ys[2], ys[3]) + 14
+	self:text(24, y, W - 48, 24, tr("st_coop_adm_cheats"), C.text, box, nil, "m")
+	y = y + 30
+	local mine = find_player(me())
+	local kind = d.tests and mine and mine.level ~= "" and "normal" or "off"
+	self:btn(24, y, 200, 32, tr(mine and mine.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"),
+		function() command("god", me(), mine and mine.god and "off" or "on") end, L, box, X, Y, kind)
+	self:btn(234, y, 200, 32, tr("st_coop_adm_heal"), function() command("heal", me()) end, L, box, X, Y, kind)
+	self:text(24, y + 40, W - 48, 40, tr("st_coop_adm_cheats_hint"), C.dim, box, nil, "s")
+end
+
+-- Моя игра
+function UICoopAdmin:my_set(it, v)
+	local ok, err = pcall(it.set, v)
+	if not ok then
+		printf("! [coop] admin window, %s: %s", it.id, tostring(err))
+	end
+	self:build_nav()
+	self:build_main()
+	self:build_aside()
+end
+
+function UICoopAdmin:main_my(section, box, X, Y, W, H, L)
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_" .. section), box, tr("st_coop_adm_mine_sub"))
+	local y = 72
+	local w = math.min(W - 48, 600)
+	local bx = 24
+	for _, it in ipairs(MY[section]) do
+		local sel = self.sel.kind == "my" and self.sel.id == it.id
+		if it.kind == "button" then
+			local bw = 30 + string.len(tr("st_coop_adm_i_" .. it.id)) * self.char
+			local usable = not it.online or connected()
+			if bx > 24 and bx + bw > 24 + w then
+				bx, y = 24, y + 40 -- no room left in the row
+			end
+			self:btn(bx, y, bw, 32, tr("st_coop_adm_i_" .. it.id), function()
+				it.run()
+				self:pick({ kind = "my", id = it.id })
+			end, L, box, X, Y, usable and "normal" or "off")
+			bx = bx + bw + 8
+		else
+			if bx > 24 then
+				bx, y = 24, y + 46
+			end
+			if sel then
+				self:round(18, y, w + 12, 40, C.accent, box, 6, 30)
+			end
+			local hb = self:hover_of(18, y, w + 12, 40, box, 6)
+			L[#L + 1] = { X + 18, Y + y, w - 220, 40, function() self:pick({ kind = "my", id = it.id }) end, hover = hb }
+			self:text(24, y, w - 230, 40, tr("st_coop_adm_i_" .. it.id), C.text, box, nil, "s")
+			local ok, value = pcall(it.get or function() end)
+			if it.kind == "toggle" then
+				self:switch(24 + w - 40, y + 10, ok and value, box)
+				L[#L + 1] = { X + 24 + w - 48, Y + y, 52, 40, function() self:my_set(it, not (ok and value)) end }
+			elseif it.kind == "number" then
+				value = ok and value or 0
+				self:btn(24 + w - 120, y + 7, 26, 26, "-", function() self:my_set(it, math.max(it.min, value - it.step)) end, L, box, X, Y)
+				self:text(24 + w - 92, y, 64, 40, tostring(value), C.text, box, CGameFont.alCenter, "m")
+				self:btn(24 + w - 26, y + 7, 26, 26, "+", function() self:my_set(it, math.min(it.max, value + it.step)) end, L, box, X, Y)
+			elseif it.kind == "segment" then
+				local sw = 72
+				for i, v in ipairs(it.values) do
+					local sx = 24 + w - (#it.values - i + 1) * (sw + 2)
+					self:btn(sx, y + 6, sw, 28, tr("st_coop_adm_dlss_" .. v), function() self:my_set(it, v) end, L, box, X, Y,
+						ok and value == v and "on" or "normal")
+				end
+			elseif it.kind == "color" then
+				for i, c in ipairs(PEER_COLORS) do
+					local sx = 24 + w - (#PEER_COLORS - i + 1) * 30
+					self:round(sx, y + 9, 24, 22, c, box, 5)
+					L[#L + 1] = { X + sx, Y + y + 9, 24, 22, function() self:set_peer_color(c) end }
+				end
+			end
+			y = y + 44
+		end
+	end
+end
+
+function UICoopAdmin:set_peer_color(c)
+	ui_options.set("coop/general/color_r", c[1])
+	ui_options.set("coop/general/color_g", c[2])
+	ui_options.set("coop/general/color_b", c[3])
+	exec(string.format("coop_peer_color (%d, %d, %d, 255)", c[1], c[2], c[3]))
+	self:set_status(tr("st_coop_adm_color_done"))
+end
+
+function UICoopAdmin:main_debug(...) self:main_my("debug", ...) end
+function UICoopAdmin:main_map(...) self:main_my("map", ...) end
+function UICoopAdmin:main_render(...) self:main_my("render", ...) end
+
+-------------------------------------------------------------------------------
+-- the search over everything: sections, settings, players, the test modes' actions
+
+function UICoopAdmin:search_hits(q)
+	q = lower(q)
+	local hits = {}
+	local function try(title, section, sel)
+		if title and string.find(lower(title), q, 1, true) then
+			hits[#hits + 1] = { title = title, section = section, sel = sel }
+		end
+	end
+	for _, s in ipairs(SECTIONS) do
+		try(tr("st_coop_adm_sec_" .. s.id), s.id, nil)
+	end
+	for id, it in pairs(MY_BY_ID) do
+		try(tr("st_coop_adm_i_" .. id), it.section, { kind = "my", id = id })
+	end
+	if logged_in and data then
+		for _, s in ipairs(data.rules) do
+			try(s.title, IS_MECHANIC[s.key] and "mechanics" or "rules", { kind = "rule", id = s.key })
+		end
+		for _, s in ipairs(data.world) do
+			try(s.title, "world", { kind = "rule", id = s.key })
+		end
+		for _, p in ipairs(data.players) do
+			try(p.name, "players", { kind = "player", id = p.name })
+		end
+		for _, a in ipairs(coop_admin_tests.LIST) do
+			try(tr("st_coop_tests_" .. a[1]), "tests", nil)
+		end
+	end
+	return hits
+end
+
+function UICoopAdmin:build_search()
+	local box, X, Y, W, H = self:region("main")
+	local L = self.clicks.main
+	local hits = self:search_hits(self.search)
+	self:heading(24, 14, W - 48, tr("st_coop_adm_found", #hits), box, self.search)
+	local y = 72
+	for i, h in ipairs(hits) do
+		if y > H - 50 then
 			break
 		end
+		local hb = self:hover_of(24, y, W - 48, 36, box, 6)
+		self:text(36, y, W - 300, 36, h.title, C.text, box, nil, "m")
+		self:text(W - 24 - 250, y, 240, 36, tr("st_coop_adm_sec_" .. h.section), C.dim, box, CGameFont.alRight, "s")
+		L[#L + 1] = { X + 24, Y + y, W - 48, 36, function() self:go(h.section, h.sel) end, hover = hb }
+		y = y + 38
+	end
+	if #hits == 0 and not logged_in then
+		self:text(24, y, W - 48, 40, tr("st_coop_adm_found_login"), C.faint, box, nil, "s")
 	end
 end
 
-function UICoopAdmin:Selected()
-	return entries[self.list:GetSelectedIndex() + 1] or {}
+-------------------------------------------------------------------------------
+-- the card on the right
+
+-- the lines a text of the small font takes in w square units, near enough
+function UICoopAdmin:lines(text, w)
+	return math.max(1, math.ceil(string.len(text or "") * self.char * 0.75 / w))
 end
 
--- a number's value goes into the edit box to be changed
-function UICoopAdmin:OnSelect()
-	local e = self:Selected()
-	if e.kind == "setting" and e.min then
-		self.edit_value:SetText(tostring(e.value))
-	end
+function UICoopAdmin:card_field(key, value, y, box, W, color)
+	local h = self:lines(value, W - 32) * self.line
+	self:text(16, y, W - 32, self.line, key, C.dim, box, nil, "s")
+	self:text(16, y + self.line, W - 32, h, value, color or C.text, box, nil, "s")
+	self:rect(16, y + self.line + h + 4, W - 32, 1, C.line, box)
+	return y + self.line + h + 10
 end
 
-function UICoopAdmin:OnApply()
-	if not logged_in then
-		self.password = trim(self.edit_value:GetText())
-		if self.password == "" then
-			return self:SetStatus(tr("st_coop_admin_ask"))
-		end
-		coop.admin_login(self.password)
-		return self:SetStatus(tr("st_coop_admin_wait"))
-	end
-	local e = self:Selected()
-	if e.kind == "setting" and e.min then
-		command("set", e.key, trim(self.edit_value:GetText()))
-	elseif e.kind == "setting" then
-		command("set", e.key, e.value == 1 and "0" or "1")
-	elseif e.kind == "faction" then
-		command("faction", e.key, e.value and "off" or "on")
+-- the card's title, as many lines as it takes; returns where the card goes on
+function UICoopAdmin:card_title(text, box, W)
+	local h = math.ceil(self:lines(text, W - 32) * 1.25) * self.line
+	self:text(16, 12, W - 32, h, text, C.text, box, nil, "m")
+	return 12 + h + 10
+end
+
+function UICoopAdmin:build_aside()
+	local box, X, Y, W, H = self:region("aside")
+	local L = self.clicks.aside
+	self:rect(0, 0, W, H, C.bar, box)
+	self:rect(0, 0, 1, H, C.line, box)
+	local s = self.sel
+	local f = s.kind and self["card_" .. s.kind]
+	if f and (s.kind == "my" or logged_in and data) then
+		f(self, box, X, Y, W, H, L)
 	else
-		self:SetStatus(tr("st_coop_admin_pick_setting"))
+		self:text(16, 16, W - 32, 26, tr("st_coop_adm_card_none"), C.text, box, nil, "m")
+		self:text(16, 46, W - 32, 120, tr("st_coop_adm_card_none_hint"), C.dim, box, nil, "s")
 	end
 end
 
-local function ask(text, yes)
-	ui_dyn_msg_box.msg_box_ui("message_box_yes_no", true, text, yes, function() end)
-end
-
-function UICoopAdmin:OnKick()
-	local e = self:Selected()
-	if e.kind ~= "player" then
-		return self:SetStatus(tr("st_coop_admin_pick_player"))
+-- a player: what is known, and what the admin may do to them
+function UICoopAdmin:card_player(box, X, Y, W, H, L)
+	local p = find_player(self.sel.id)
+	if not p then
+		return self:text(16, 16, W - 32, 60, tr("st_coop_adm_player_gone", self.sel.id), C.dim, box, nil, "s")
 	end
-	ask(tr("st_coop_admin_kick_ask", e.name), function() command("kick", e.name) end)
-end
-
-function UICoopAdmin:OnRollback()
-	local e = self:Selected()
-	if e.kind ~= "save" then
-		return self:SetStatus(tr("st_coop_admin_pick_save"))
+	local self_ = p.name == me()
+	self:round(16, 14, 44, 44, C.raised, box, 10)
+	self:text(16, 14, 44, 44, string.upper(string.sub(p.name, 1, 2)), C.accent, box, CGameFont.alCenter, "m")
+	self:text(70, 12, W - 86, 28, p.name, C.text, box, nil, "l")
+	self:text(70, 38, W - 86, 20, p.since and tr("st_coop_adm_since", os.date("%H:%M", p.since)) or "", C.dim, box, nil, "s")
+	local y = 68
+	local inline = function(key, value, color)
+		self:text(16, y, 110, 24, key, C.dim, box, nil, "s")
+		self:text(126, y, W - 142, 24, value, color or C.text, box, nil, "s")
+		y = y + 24
 	end
-	if e.current then
-		return self:SetStatus(tr("st_coop_admin_rollback_current"))
+	inline(tr("st_coop_adm_f_level"), level_name(p.level))
+	inline(tr("st_coop_adm_f_ping"), p.ping and (p.ping .. tr("st_coop_adm_ms")) or "-")
+	inline(tr("st_coop_adm_f_group"), p.leader and tr("st_coop_adm_role_group", p.leader, p.group) or tr("st_coop_adm_no"))
+	inline(tr("st_coop_adm_f_health"), p.health and (p.health .. "%") or "-", p.health and p.health < 30 and C.bad or nil)
+	inline(tr("st_coop_adm_f_rank"), p.rank and tostring(p.rank) or "-")
+	inline(tr("st_coop_adm_f_money"), p.money and (p.money .. " RU") or "-")
+	inline(tr("st_coop_adm_f_god"), p.god and tr("st_coop_adm_yes") or tr("st_coop_adm_no"), p.god and C.warn or nil)
+	y = y + 8
+	if p.level == "" then
+		return self:text(16, y, W - 32, 60, tr("st_coop_adm_player_menu"), C.dim, box, nil, "s")
 	end
-	ask(tr("st_coop_admin_rollback_ask", e.revision, e.title), function() command("rollback", e.revision) end)
+	if self_ and not data.tests then
+		self:text(16, y, W - 32, 60, tr("st_coop_adm_self_tests"), C.dim, box, nil, "s")
+		return
+	end
+	local bw = math.floor((W - 32 - 8) / 2)
+	local function two(a, fa, b, fb, kind_b)
+		self:btn(16, y, bw, 30, a, fa, L, box, X, Y)
+		if b then
+			self:btn(16 + bw + 8, y, bw, 30, b, fb, L, box, X, Y, kind_b)
+		end
+		y = y + 36
+	end
+	if not self_ then
+		two(tr("st_coop_adm_goto"), function() command("goto", p.name) end, tr("st_coop_adm_bring"), function() command("bring", p.name) end)
+	end
+	two(tr("st_coop_adm_heal"), function() command("heal", p.name) end,
+		tr(p.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"), function() command("god", p.name, p.god and "off" or "on") end)
+	-- money
+	self:field("money", 16, y, W - 32 - 98, 30, box, X, Y, L, tr("st_coop_adm_money_hint"))
+	self:btn(W - 16 - 90, y, 90, 30, tr("st_coop_adm_give"), function()
+		local amount = tonumber(self:value("money"))
+		if amount then
+			command("money", p.name, tostring(math.floor(amount)))
+		end
+	end, L, box, X, Y, "primary")
+	y = y + 38
+	-- things: the spawner
+	self:text(16, y, W - 32, 22, tr("st_coop_adm_spawner"), C.text, box, nil, "s")
+	y = y + 24
+	self:field("spawn", 16, y, W - 32, 30, box, X, Y, L, tr("st_coop_adm_spawn_hint"))
+	y = y + 36
+	self.spawn_at = { y = y, h = math.max(0, H - y - 100) }
+	self:build_spawn_list()
+	y = H - 96
+	self:btn(16, y, 30, 30, "-", function()
+		self.spawn.count = math.max(1, self.spawn.count - 1)
+		self:build_aside()
+	end, L, box, X, Y)
+	self:text(48, y, 40, 30, tostring(self.spawn.count), C.text, box, CGameFont.alCenter, "m")
+	self:btn(90, y, 30, 30, "+", function()
+		self.spawn.count = math.min(100, self.spawn.count + (self.spawn.count >= 10 and 10 or 1))
+		self:build_aside()
+	end, L, box, X, Y)
+	self:btn(130, y, W - 146, 30, self.spawn.picked and tr("st_coop_adm_give_item", self.spawn.count) or
+		tr("st_coop_adm_pick_item"), function()
+		if self.spawn.picked then
+			command("give", p.name, self.spawn.picked, tostring(self.spawn.count))
+		end
+	end, L, box, X, Y, self.spawn.picked and "primary" or "off")
+	y = y + 38
+	self:btn(16, y, bw, 30, tr("st_coop_adm_logs"), function() command("logs", p.name) end, L, box, X, Y)
+	if not self_ then
+		self:btn(16 + bw + 8, y, bw, 30, tr("st_coop_adm_kick"), function()
+			self:confirm(tr("st_coop_adm_kick"), tr("st_coop_adm_kick_ask", p.name), tr("st_coop_adm_kick"),
+				function() command("kick", p.name) end)
+		end, L, box, X, Y, "danger")
+	end
 end
 
-function UICoopAdmin:OnSaveWorld()
-	command("save")
+-- the item sections (those with an inventory grid), made once: { section, name }
+local ITEMS = nil
+local function items()
+	if not ITEMS then
+		ITEMS = {}
+		ini_sys:section_for_each(function(sec)
+			if ini_sys:r_float_ex(sec, "inv_grid_x") and ini_sys:r_string_ex(sec, "inv_name") then
+				ITEMS[#ITEMS + 1] = { sec, lower(game.translate_string(ini_sys:r_string_ex(sec, "inv_name"))) }
+			end
+		end)
+		table.sort(ITEMS, function(a, b) return a[1] < b[1] end)
+	end
+	return ITEMS
 end
 
-function UICoopAdmin:OnRestartHost()
-	ask(tr("st_coop_admin_restart_ask"), function() command("restart_host") end)
+-- the spawner's matches, in their own box under its field (typing there rebuilds only them)
+function UICoopAdmin:build_spawn_list()
+	if not self.spawn_at then
+		return
+	end
+	if self.spawn_box then
+		self.r.aside:DetachChild(self.spawn_box)
+	end
+	local X, Y, W = self.L.aside[1], self.L.aside[2], self.L.aside[3]
+	local y0, h = self.spawn_at.y, self.spawn_at.h
+	local box = self:box(16, y0, W - 32, h, self.r.aside)
+	self.spawn_box = box
+	-- its clicks: those of the aside's list tagged spawn, made again
+	local L = self.clicks.aside
+	for i = #L, 1, -1 do
+		if L[i].spawn then
+			table.remove(L, i)
+		end
+	end
+	local q = lower(self.spawn.query)
+	if q == "" then
+		return self:text(0, 0, W - 32, 40, tr("st_coop_adm_spawn_empty"), C.faint, box, nil, "s")
+	end
+	local rows = math.floor(h / 34)
+	local n = 0
+	for _, it in ipairs(items()) do
+		if string.find(it[1], q, 1, true) or string.find(it[2], q, 1, true) then
+			local y = n * 34
+			local picked = self.spawn.picked == it[1]
+			if picked then
+				self:round(0, y, W - 32, 32, C.accent, box, 6, 45)
+			end
+			local hb = self:hover_of(0, y, W - 32, 32, box, 6)
+			self:icon(it[1], 2, y + 2, 28, box)
+			self:text(36, y, W - 32 - 40, 18, ui_item.get_sec_name(it[1]), C.text, box, nil, "s")
+			self:text(36, y + 15, W - 32 - 40, 16, it[1], C.faint, box, nil, "s")
+			local sec = it[1]
+			L[#L + 1] = { X + 16, Y + y0 + y, W - 32, 32, function()
+				self.spawn.picked = sec
+				self:build_aside()
+			end, hover = hb, spawn = true }
+			n = n + 1
+			if n >= rows then
+				break
+			end
+		end
+	end
+	if n == 0 then
+		self:text(0, 0, W - 32, 40, tr("st_coop_adm_spawn_none"), C.faint, box, nil, "s")
+	end
 end
 
-function UICoopAdmin:OnRefresh()
-	if logged_in then
+function UICoopAdmin:card_save(box, X, Y, W, H, L)
+	local s = self.sel.save
+	self:text(16, 14, W - 32, 30, "#" .. s.revision, C.text, box, nil, "l")
+	local y = 52
+	y = self:card_field(tr("st_coop_adm_f_when"), os.date("%d.%m.%Y %H:%M", s.time), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_why"), s.title, y, box, W)
+	local current = s.revision == data.revision
+	if current then
+		self:text(16, y, W - 32, 60, tr("st_coop_adm_rollback_current"), C.dim, box, nil, "s")
+		return
+	end
+	self:btn(16, y + 6, W - 32, 34, tr("st_coop_adm_rollback"), function()
+		self:confirm(tr("st_coop_adm_rollback"), tr("st_coop_adm_rollback_ask", s.revision, s.title), tr("st_coop_adm_rollback"),
+			function() command("rollback", tostring(s.revision)) end)
+	end, L, box, X, Y, "danger")
+	self:text(16, y + 50, W - 32, 80, tr("st_coop_adm_rollback_hint"), C.dim, box, nil, "s")
+end
+
+-- a rule or a world setting: what it does, its range, how to type a number
+function UICoopAdmin:card_rule(box, X, Y, W, H, L)
+	local s = data.settings[self.sel.id]
+	if not s then
+		return
+	end
+	local y = self:card_title(s.title, box, W)
+	local hint = game.translate_string("st_coop_adm_h_" .. s.key)
+	if hint ~= "st_coop_adm_h_" .. s.key then
+		y = self:card_field(tr("st_coop_adm_f_what"), hint, y, box, W)
+	end
+	y = self:card_field(tr("st_coop_adm_f_where"), tr(IS_MECHANIC[s.key] and "st_coop_adm_scope_world" or s.group == "world"
+		and "st_coop_adm_scope_new_world" or "st_coop_adm_scope_rule"), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_now"), s.min and tostring(s.value) or tr(s.value == 1 and "st_coop_adm_yes" or "st_coop_adm_no"), y, box, W)
+	if s.min then
+		y = self:card_field(tr("st_coop_adm_f_range"), s.min .. " - " .. s.max, y, box, W)
+		self:field("value", 16, y + 4, W - 32 - 98, 30, box, X, Y, L, tostring(s.value))
+		self:btn(W - 16 - 90, y + 4, 90, 30, tr("st_coop_adm_apply"), function()
+			local v = tonumber(self:value("value"))
+			if v then
+				self:set_rule(s, tostring(math.floor(v)))
+				self.edit_text.value = ""
+			end
+		end, L, box, X, Y, "primary")
+	end
+	self:text(16, H - 60, W - 32, 50, tr("st_coop_adm_key", s.key, s.key), C.faint, box, nil, "s")
+end
+
+-- a "Моя игра" option: what it does, how it was set before, where it acts; pin it
+function UICoopAdmin:card_my(box, X, Y, W, H, L)
+	local it = MY_BY_ID[self.sel.id]
+	if not it then
+		return
+	end
+	local y = self:card_title(tr("st_coop_adm_i_" .. it.id), box, W)
+	y = self:card_field(tr("st_coop_adm_f_what"), tr("st_coop_adm_h_" .. it.id), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_before"), tr("st_coop_adm_b_" .. it.id), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_where"), tr("st_coop_adm_scope_mine"), y, box, W)
+	if it.kind == "toggle" then
+		local on = pinned(it.id)
+		self:btn(16, y + 8, W - 32, 32, tr(on and "st_coop_adm_unpin" or "st_coop_adm_pin"), function()
+			set_pin(it.id, not on)
+			self:build_nav()
+			self:build_aside()
+		end, L, box, X, Y)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- life of the window
+
+function UICoopAdmin:poll()
+	if connected() and logged_in and self:IsShown() then
 		command("state")
+	end
+end
+
+function UICoopAdmin:Update()
+	CUIScriptWnd.Update(self)
+	local now = time_global()
+	if not self.next_poll or now >= self.next_poll then
+		self.next_poll = now + num("poll_seconds", 5) * 1000
+		self:poll()
+	end
+	-- the search and the spawner follow what is typed
+	local search = self.edits.search and trim(self.edits.search:GetText()) or ""
+	if search ~= self.search then
+		self.search = search
+		self.typed = now
+		self:build_nav()
+		if search ~= "" then
+			self:build_search()
+		else
+			self:build_main()
+		end
+		self:build_aside()
+	end
+	local spawn = self.edits.spawn and trim(self.edits.spawn:GetText()) or nil
+	if spawn and spawn ~= self.spawn.query then
+		self.spawn.query = spawn
+		self.edit_text.spawn = spawn
+		self.typed = now
+		self:build_spawn_list()
+	end
+	for name, hint in pairs(self.hints or {}) do
+		local edit = self.edits[name]
+		if edit then
+			hint:Show(edit:GetText() == "")
+		end
+	end
+	-- a state that came while typing: shown once the typing stops
+	if self.dirty and not self.modal_on and now - self.typed > 2500 then
+		self:build()
+	end
+	if not self.modal_on then
+		self:hovers(self:cursor(), { self.clicks.aside, self.clicks.main, self.clicks.nav, self.clicks.top })
+	end
+end
+
+local function inside(p, c)
+	return p.x >= c[1] and p.x < c[1] + c[3] and p.y >= c[2] and p.y < c[2] + c[4]
+end
+
+function UICoopAdmin:click(p)
+	local lists = self.modal_on and { self.clicks.modal } or { self.clicks.aside, self.clicks.main, self.clicks.nav, self.clicks.top }
+	for _, list in ipairs(lists) do
+		for i = #list, 1, -1 do
+			local c = list[i]
+			if inside(p, c) then
+				if c.edit then
+					c.edit:CaptureFocus(true)
+				else
+					c[5]()
+				end
+				return true
+			end
+		end
 	end
 end
 
 function UICoopAdmin:OnKeyboard(dik, keyboard_action)
 	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
-	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED and (dik == DIK_keys.DIK_ESCAPE or dik == HOTKEY) then
-		self:Close()
+	if keyboard_action ~= ui_events.WINDOW_KEY_PRESSED then
+		return res
+	end
+	if dik == DIK_keys.MOUSE_1 then
+		self:click(self:cursor())
+		return true
+	end
+	if res then
+		self.typed = time_global() -- a field took it
+		if dik == DIK_keys.DIK_RETURN or dik == DIK_keys.DIK_NUMPADENTER then
+			if self.edits.password and not logged_in then
+				self:do_login()
+			end
+		end
+		return res
+	end
+	if dik == DIK_keys.DIK_ESCAPE or dik == key_of("menu_key", "DIK_F10") and self.owner or dik == key_of("game_key", "DIK_HOME") and not self.owner then
+		if self.modal_on then
+			self:close_modal()
+		else
+			self:Close()
+		end
+		return true
 	end
 	return res
 end
+
+function UICoopAdmin:Open()
+	self:ShowDialog(true)
+	if self.owner then
+		self.owner:HideDialog()
+		self.owner:Show(false)
+	end
+	logged_in = false
+	data = nil
+	result = "" -- the last window's
+	if connected() then
+		-- the server lets in a connection, not a game: in again each time it opens
+		local password = load_passwords()[coop.server_address()]
+		if password then
+			self.password = password
+			coop.admin_login(password)
+		end
+	end
+	if not connected() then
+		self.section, self.auto_section = "debug", true -- what anyone may use
+	end
+	self:build()
+end
+
+function UICoopAdmin:Close()
+	self:keep_fields()
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	if self.owner then
+		self.owner:ShowDialog(true)
+		self.owner:Show(true)
+	end
+	Unregister_UI("UICoopAdmin")
+end
+
+-- the server's answers (coop_net.cpp)
+function UICoopAdmin:on_state(text)
+	local d = parse(text)
+	local auth = d.auth or { result = "ok" }
+	if auth.result ~= "ok" then
+		if auth.result == "need" and self.password then
+			logged_in = false -- the server forgot us (it restarted, we came back): in again with what we have
+			coop.admin_login(self.password)
+			return
+		end
+		if auth.result == "wrong" then
+			save_password(coop.server_address(), nil) -- a wrong one kept: asked again
+			self.password = nil
+		end
+		logged_in = false
+		data = d
+		self:set_status(auth.text or "")
+		self:build()
+		return
+	end
+	if not logged_in then
+		logged_in = true
+		self.edit_text.password = ""
+		if self.auto_section then
+			self.section, self.auto_section = "overview", false
+		end
+	end
+	-- the token in place of the password, on the disk and for the next login
+	if auth.token and auth.token ~= "" then
+		self.password = auth.token
+		save_password(coop.server_address(), auth.token)
+	end
+	data = d
+	-- a page of saves past the end (after a rollback): the first
+	if self.sel.kind == "save" then
+		local still = false
+		for _, s in ipairs(d.saves) do
+			if s.revision == self.sel.id then
+				self.sel.save, still = s, true
+			end
+		end
+		if not still then
+			self.sel = {}
+		end
+	end
+	if time_global() - self.typed < 2500 or self.modal_on then
+		self.dirty = true -- not under the typing hands or a question: later
+		self:build_chips()
+		return
+	end
+	self:build()
+end
+
+-------------------------------------------------------------------------------
 
 function is_shown()
 	return wnd ~= nil and wnd:IsShown()
 end
 
--- the main menu (owner) opens it
+-- owner: the main menu, or nothing in the game
 function open(owner)
-	if not (wnd and rawequal(wnd.owner, owner)) then -- engine objects have no == of their own
-		wnd = UICoopAdmin(owner)
+	if wnd and wnd:IsShown() then
+		return
 	end
+	wnd = UICoopAdmin(owner)
 	wnd:Open()
+	Register_UI("UICoopAdmin", "ui_coop_admin")
 end
 
--- from the engine (coop_net.cpp)
+-- the level goes (a level change, the main menu's load...): a window opened in the game goes with it, closed first
+function drop_game_window()
+	if wnd and not wnd.owner then
+		if wnd:IsShown() then
+			wnd:Close()
+		end
+		wnd = nil
+	end
+end
+
 function on_state(text)
-	if wnd then
-		wnd:Fill(text)
+	if wnd and wnd:IsShown() then
+		wnd:on_state(text)
 	end
 end
 
--- what a command did (the login's answers come in the state's auth line)
 function on_result(text)
-	if wnd then
-		wnd:SetStatus(text)
+	if wnd and wnd:IsShown() then
+		wnd:set_status(text)
 	end
+end
+
+function menu_key()
+	return key_of("menu_key", "DIK_F10")
+end
+
+function game_key()
+	return key_of("game_key", "DIK_HOME")
 end

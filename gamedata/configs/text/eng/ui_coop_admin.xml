@@ -1,0 +1,876 @@
+<?xml version="1.0" encoding="windows-1251"?>
+
+<string_table>
+	<!-- Co-op: the admin window (scripts/ui_coop_admin.script), its per-player actions (coop_admin_do.script),
+	     the test modes as buttons (coop_admin_tests.script), the PDA map's transitions (coop_my_game.script) -->
+	<string id="st_coop_adm_title">
+		<text>Server admin</text>
+	</string>
+	<string id="st_coop_adm_search">
+		<text>Find a setting or a player</text>
+	</string>
+	<string id="st_coop_adm_chip_offline">
+		<text>not connected</text>
+	</string>
+	<string id="st_coop_adm_chip_admin">
+		<text>logged in as admin</text>
+	</string>
+	<string id="st_coop_adm_chip_tests">
+		<text>test server</text>
+	</string>
+	<string id="st_coop_adm_chip_no_password">
+		<text>no password: "My game" only</text>
+	</string>
+	<string id="st_coop_adm_grp_server">
+		<text>Server · password</text>
+	</string>
+	<string id="st_coop_adm_grp_host">
+		<text>World · host</text>
+	</string>
+	<string id="st_coop_adm_grp_mine">
+		<text>My game · no password</text>
+	</string>
+	<string id="st_coop_adm_sec_overview">
+		<text>Overview</text>
+	</string>
+	<string id="st_coop_adm_sec_players">
+		<text>Players</text>
+	</string>
+	<string id="st_coop_adm_sec_rules">
+		<text>Rules</text>
+	</string>
+	<string id="st_coop_adm_sec_world">
+		<text>World and factions</text>
+	</string>
+	<string id="st_coop_adm_sec_saves">
+		<text>Saves</text>
+	</string>
+	<string id="st_coop_adm_sec_journal">
+		<text>Journal</text>
+	</string>
+	<string id="st_coop_adm_sec_mechanics">
+		<text>World mechanics</text>
+	</string>
+	<string id="st_coop_adm_sec_tests">
+		<text>Test modes</text>
+	</string>
+	<string id="st_coop_adm_sec_debug">
+		<text>Debug and logs</text>
+	</string>
+	<string id="st_coop_adm_sec_map">
+		<text>Map and marks</text>
+	</string>
+	<string id="st_coop_adm_sec_render">
+		<text>Render</text>
+	</string>
+	<string id="st_coop_adm_abbr_overview">
+		<text>Ov</text>
+	</string>
+	<string id="st_coop_adm_abbr_players">
+		<text>Pl</text>
+	</string>
+	<string id="st_coop_adm_abbr_rules">
+		<text>Ru</text>
+	</string>
+	<string id="st_coop_adm_abbr_world">
+		<text>Wo</text>
+	</string>
+	<string id="st_coop_adm_abbr_saves">
+		<text>Sa</text>
+	</string>
+	<string id="st_coop_adm_abbr_journal">
+		<text>Jo</text>
+	</string>
+	<string id="st_coop_adm_abbr_mechanics">
+		<text>Me</text>
+	</string>
+	<string id="st_coop_adm_abbr_tests">
+		<text>Te</text>
+	</string>
+	<string id="st_coop_adm_abbr_debug">
+		<text>Lg</text>
+	</string>
+	<string id="st_coop_adm_abbr_map">
+		<text>Ma</text>
+	</string>
+	<string id="st_coop_adm_abbr_render">
+		<text>Re</text>
+	</string>
+	<string id="st_coop_adm_pinned">
+		<text>Pinned</text>
+	</string>
+	<string id="st_coop_adm_pin">
+		<text>Pin to the menu</text>
+	</string>
+	<string id="st_coop_adm_unpin">
+		<text>Unpin</text>
+	</string>
+	<string id="st_coop_adm_offline">
+		<text>Not connected: connect through "Co-op". "My game" works anyway.</text>
+	</string>
+	<string id="st_coop_adm_wait">
+		<text>Waiting for the server...</text>
+	</string>
+	<string id="st_coop_adm_login_title">
+		<text>Admin login</text>
+	</string>
+	<string id="st_coop_adm_login_hint">
+		<text>The admin page's password (admin_password in server.cfg or data/admin.json). Kept for this server as a token, not the password.</text>
+	</string>
+	<string id="st_coop_adm_password">
+		<text>Password</text>
+	</string>
+	<string id="st_coop_adm_login">
+		<text>Log in</text>
+	</string>
+	<string id="st_coop_adm_login_mine">
+		<text>The "My game" sections need no password: they change only what your game shows.</text>
+	</string>
+	<string id="st_coop_adm_t_host">
+		<text>Host</text>
+	</string>
+	<string id="st_coop_adm_t_world">
+		<text>World</text>
+	</string>
+	<string id="st_coop_adm_t_online">
+		<text>Online</text>
+	</string>
+	<string id="st_coop_adm_t_clock">
+		<text>World time</text>
+	</string>
+	<string id="st_coop_adm_t_pause">
+		<text>Pause</text>
+	</string>
+	<string id="st_coop_adm_host_yes">
+		<text>Runs the world</text>
+	</string>
+	<string id="st_coop_adm_host_no">
+		<text>No host</text>
+	</string>
+	<string id="st_coop_adm_uptime">
+		<text>up %s</text>
+	</string>
+	<string id="st_coop_adm_saved_ago">
+		<text>saved %s ago</text>
+	</string>
+	<string id="st_coop_adm_online_sub">
+		<text>%s in the world, %s in the menu</text>
+	</string>
+	<string id="st_coop_adm_clock_runs">
+		<text>runs</text>
+	</string>
+	<string id="st_coop_adm_clock_stands">
+		<text>stands</text>
+	</string>
+	<string id="st_coop_adm_clock_empty">
+		<text>stands: nobody in the world</text>
+	</string>
+	<string id="st_coop_adm_min">
+		<text>%s min</text>
+	</string>
+	<string id="st_coop_adm_hmin">
+		<text>%s h %s min</text>
+	</string>
+	<string id="st_coop_adm_yes">
+		<text>yes</text>
+	</string>
+	<string id="st_coop_adm_no">
+		<text>no</text>
+	</string>
+	<string id="st_coop_adm_none">
+		<text>Nothing yet.</text>
+	</string>
+	<string id="st_coop_adm_save_world">
+		<text>Save the world</text>
+	</string>
+	<string id="st_coop_adm_resume">
+		<text>Lift the pause</text>
+	</string>
+	<string id="st_coop_adm_restart_host">
+		<text>Restart the host</text>
+	</string>
+	<string id="st_coop_adm_restart_ask">
+		<text>The host restarts. The world's changes since its last save are kept in the server's journal.</text>
+	</string>
+	<string id="st_coop_adm_restart_do">
+		<text>Restart</text>
+	</string>
+	<string id="st_coop_adm_say_title">
+		<text>A message to everyone</text>
+	</string>
+	<string id="st_coop_adm_say_hint">
+		<text>Say: the host restarts in 5 minutes</text>
+	</string>
+	<string id="st_coop_adm_send">
+		<text>Send</text>
+	</string>
+	<string id="st_coop_adm_news">
+		<text>The world's news</text>
+	</string>
+	<string id="st_coop_adm_journal">
+		<text>What the admins did</text>
+	</string>
+	<string id="st_coop_adm_players_sub">
+		<text>%s connected · limit %s (rule "players on the server")</text>
+	</string>
+	<string id="st_coop_adm_col_name">
+		<text>Player</text>
+	</string>
+	<string id="st_coop_adm_col_where">
+		<text>Where</text>
+	</string>
+	<string id="st_coop_adm_col_ping">
+		<text>Ping</text>
+	</string>
+	<string id="st_coop_adm_col_role">
+		<text>Role</text>
+	</string>
+	<string id="st_coop_adm_you">
+		<text> (you)</text>
+	</string>
+	<string id="st_coop_adm_ms">
+		<text> ms</text>
+	</string>
+	<string id="st_coop_adm_in_menu">
+		<text>in the menu</text>
+	</string>
+	<string id="st_coop_adm_role_master">
+		<text>master</text>
+	</string>
+	<string id="st_coop_adm_role_authority">
+		<text>runs the level</text>
+	</string>
+	<string id="st_coop_adm_role_group">
+		<text>group of %s (%s)</text>
+	</string>
+	<string id="st_coop_adm_nobody">
+		<text>Nobody here.</text>
+	</string>
+	<string id="st_coop_adm_players_note">
+		<text>The pick follows the name: it stays when someone comes or goes.</text>
+	</string>
+	<string id="st_coop_adm_page">
+		<text>page %s of %s</text>
+	</string>
+	<string id="st_coop_adm_rules_sub">
+		<text>The server's rules: at once, for everyone.</text>
+	</string>
+	<string id="st_coop_adm_rg_join">
+		<text>Groups and joining</text>
+	</string>
+	<string id="st_coop_adm_rg_death">
+		<text>Death and help</text>
+	</string>
+	<string id="st_coop_adm_rg_travel">
+		<text>Travel and relations</text>
+	</string>
+	<string id="st_coop_adm_rg_tools">
+		<text>Mechanics' tools</text>
+	</string>
+	<string id="st_coop_adm_rg_rewards">
+		<text>Rewards</text>
+	</string>
+	<string id="st_coop_adm_rg_other">
+		<text>Other</text>
+	</string>
+	<string id="st_coop_adm_rule_ask">
+		<text>"%s": %s. This changes the world for every player.</text>
+	</string>
+	<string id="st_coop_adm_apply">
+		<text>Apply</text>
+	</string>
+	<string id="st_coop_adm_world_sub">
+		<text>World settings are for a new world; difficulty and economy from the next load.</text>
+	</string>
+	<string id="st_coop_adm_lvl_1">
+		<text>Easy</text>
+	</string>
+	<string id="st_coop_adm_lvl_2">
+		<text>Medium</text>
+	</string>
+	<string id="st_coop_adm_lvl_3">
+		<text>Hard</text>
+	</string>
+	<string id="st_coop_adm_factions">
+		<text>Factions for new characters</text>
+	</string>
+	<string id="st_coop_adm_saves_sub">
+		<text>%s in all. Roll back to any but the world as it is.</text>
+	</string>
+	<string id="st_coop_adm_save_current">
+		<text>the world now</text>
+	</string>
+	<string id="st_coop_adm_journal_sub">
+		<text>The admins' commands from the game: who, what, whom (data/admin_log.jsonl on the server).</text>
+	</string>
+	<string id="st_coop_adm_logs_title">
+		<text>Logs and crashes</text>
+	</string>
+	<string id="st_coop_adm_logs_hint">
+		<text>A player's logs: "Ask for logs" in their card. The logs, crashes and bug reports themselves are on the admin page.</text>
+	</string>
+	<string id="st_coop_adm_mechanics_sub">
+		<text>The server's rules: one value for the whole world (were ltx keys in each game).</text>
+	</string>
+	<string id="st_coop_adm_host_facts">
+		<text>The host</text>
+	</string>
+	<string id="st_coop_adm_host_god">
+		<text>The host is immortal itself (a ghost: g_god, surges pass it by). Offline simulation: the host runs A-Life, time and surges while nobody is on; on the VPS about 1 core of 4 and the same ~1.8 GB the host holds anyway; of the empty world's autosaves the server keeps the newest.</text>
+	</string>
+	<string id="st_coop_adm_no_host_offline">
+		<text>No host: a player's game runs the world, which stands with nobody in it whatever offline simulation says; a missed surge is settled on load.</text>
+	</string>
+	<string id="st_coop_adm_tests_sub">
+		<text>The test copies' F7 modes as buttons: no mode to switch on. Red ones change the shared world: asked first.</text>
+	</string>
+	<string id="st_coop_adm_tests_off">
+		<text>A test server's only: allow_tests = 1 in server.cfg (or COOP_ALLOW_TESTS=1).</text>
+	</string>
+	<string id="st_coop_adm_tm_shelter">
+		<text>Shelter</text>
+	</string>
+	<string id="st_coop_adm_tm_base">
+		<text>Base and raid</text>
+	</string>
+	<string id="st_coop_adm_tm_ai">
+		<text>AI sight</text>
+	</string>
+	<string id="st_coop_adm_test_ask">
+		<text>This changes the shared world for everyone. Only a rollback takes it back.</text>
+	</string>
+	<string id="st_coop_adm_do">
+		<text>Do it</text>
+	</string>
+	<string id="st_coop_adm_cheats">
+		<text>Cheats on yourself</text>
+	</string>
+	<string id="st_coop_adm_cheats_hint">
+		<text>All through the server, into its journal. "Every fast travel point" (My game › Map) on a test server lets you travel to unseen ones too.</text>
+	</string>
+	<string id="st_coop_adm_god_on">
+		<text>Immortality: on</text>
+	</string>
+	<string id="st_coop_adm_god_off">
+		<text>Immortality: off</text>
+	</string>
+	<string id="st_coop_adm_heal">
+		<text>Heal</text>
+	</string>
+	<string id="st_coop_adm_mine_sub">
+		<text>This game only, no password: the others don't see it.</text>
+	</string>
+	<string id="st_coop_adm_color_done">
+		<text>The other players' marks have a new colour.</text>
+	</string>
+	<string id="st_coop_adm_found">
+		<text>Found: %s</text>
+	</string>
+	<string id="st_coop_adm_found_login">
+		<text>The server's settings are searched after the login.</text>
+	</string>
+	<string id="st_coop_adm_card_none">
+		<text>Nothing picked</text>
+	</string>
+	<string id="st_coop_adm_card_none_hint">
+		<text>Pick a player, a save or a setting: here is what it is, where it acts, how it was set before and what can be done.</text>
+	</string>
+	<string id="st_coop_adm_player_gone">
+		<text>%s is no longer on the server.</text>
+	</string>
+	<string id="st_coop_adm_since">
+		<text>on the server since %s</text>
+	</string>
+	<string id="st_coop_adm_f_level">
+		<text>Level</text>
+	</string>
+	<string id="st_coop_adm_f_ping">
+		<text>Ping</text>
+	</string>
+	<string id="st_coop_adm_f_group">
+		<text>Group</text>
+	</string>
+	<string id="st_coop_adm_f_health">
+		<text>Health</text>
+	</string>
+	<string id="st_coop_adm_f_rank">
+		<text>Rank</text>
+	</string>
+	<string id="st_coop_adm_f_money">
+		<text>Money</text>
+	</string>
+	<string id="st_coop_adm_f_god">
+		<text>Immortal</text>
+	</string>
+	<string id="st_coop_adm_player_menu">
+		<text>The player is in the menu: actions once they are in the world.</text>
+	</string>
+	<string id="st_coop_adm_self_tests">
+		<text>Cheats on yourself: a test server's only (allow_tests).</text>
+	</string>
+	<string id="st_coop_adm_goto">
+		<text>Go to them</text>
+	</string>
+	<string id="st_coop_adm_bring">
+		<text>Bring here</text>
+	</string>
+	<string id="st_coop_adm_money_hint">
+		<text>Amount (-500 takes)</text>
+	</string>
+	<string id="st_coop_adm_give">
+		<text>Give</text>
+	</string>
+	<string id="st_coop_adm_spawner">
+		<text>Give a thing</text>
+	</string>
+	<string id="st_coop_adm_spawn_hint">
+		<text>Section or name</text>
+	</string>
+	<string id="st_coop_adm_spawn_empty">
+		<text>Start typing: wpn_ak74, medkit...</text>
+	</string>
+	<string id="st_coop_adm_spawn_none">
+		<text>Nothing found.</text>
+	</string>
+	<string id="st_coop_adm_pick_item">
+		<text>Pick a thing</text>
+	</string>
+	<string id="st_coop_adm_give_item">
+		<text>Give x%s</text>
+	</string>
+	<string id="st_coop_adm_logs">
+		<text>Ask for logs</text>
+	</string>
+	<string id="st_coop_adm_kick">
+		<text>Kick</text>
+	</string>
+	<string id="st_coop_adm_kick_ask">
+		<text>Disconnect %s? They may come back.</text>
+	</string>
+	<string id="st_coop_adm_cancel">
+		<text>Cancel</text>
+	</string>
+	<string id="st_coop_adm_f_when">
+		<text>When</text>
+	</string>
+	<string id="st_coop_adm_f_why">
+		<text>Why</text>
+	</string>
+	<string id="st_coop_adm_rollback">
+		<text>Roll the world back</text>
+	</string>
+	<string id="st_coop_adm_rollback_ask">
+		<text>Roll the whole world back to save #%s (%s)? The players in the game load it again.</text>
+	</string>
+	<string id="st_coop_adm_rollback_current">
+		<text>This save is the world now: nothing to roll back to.</text>
+	</string>
+	<string id="st_coop_adm_rollback_hint">
+		<text>No vote: everyone in the game reloads, the characters back where that save has them.</text>
+	</string>
+	<string id="st_coop_adm_f_what">
+		<text>What it does</text>
+	</string>
+	<string id="st_coop_adm_f_where">
+		<text>Where it acts</text>
+	</string>
+	<string id="st_coop_adm_f_now">
+		<text>Now</text>
+	</string>
+	<string id="st_coop_adm_f_range">
+		<text>Range</text>
+	</string>
+	<string id="st_coop_adm_f_before">
+		<text>How it was set before</text>
+	</string>
+	<string id="st_coop_adm_scope_world">
+		<text>The whole world, one value; at once</text>
+	</string>
+	<string id="st_coop_adm_scope_new_world">
+		<text>The world: when a new one is made (difficulty, economy: from the next load)</text>
+	</string>
+	<string id="st_coop_adm_scope_rule">
+		<text>The server, everyone; at once</text>
+	</string>
+	<string id="st_coop_adm_scope_mine">
+		<text>This game only</text>
+	</string>
+	<string id="st_coop_adm_key">
+		<text>Key: %s (bot: /set %s value)</text>
+	</string>
+	<string id="st_coop_adm_h_offline_sim">
+		<text>The world lives while nobody is on: the host runs time, A-Life (squads move and fight, traders restock), surges and psi storms. Off: the host's world stands, the server's clock too. Needs a host.</text>
+	</string>
+	<string id="st_coop_adm_h_cleaner">
+		<text>The host clears bodies and junk with nothing worth taking (was [coop_cleanup] cleaner).</text>
+	</string>
+	<string id="st_coop_adm_h_bar_events">
+		<text>The shelter bar's events every 20-40 world hours (was [shelter_events] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_scorcher">
+		<text>The way to the Brain Scorcher: windows, decoder, white zone (was [shelter_scorcher] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_shelter_group_only">
+		<text>The shelter's entrance opens for a group of two or more only (was [shelter_entrance] group_only).</text>
+	</string>
+	<string id="st_coop_adm_h_psi_immunity">
+		<text>Monolith and Sin are immune to psi zones and the Radar's white zone (was [coop_psi_immunity] enabled).</text>
+	</string>
+	<string id="st_coop_adm_h_max_players">
+		<text>How many players the server lets in at once.</text>
+	</string>
+	<string id="st_coop_adm_h_group_max">
+		<text>Players in a group, the leader counted.</text>
+	</string>
+	<string id="st_coop_adm_i_coop_debug">
+		<text>Detailed co-op log</text>
+	</string>
+	<string id="st_coop_adm_h_coop_debug">
+		<text>Everything co-op's networking does goes to the log. On by default.</text>
+	</string>
+	<string id="st_coop_adm_b_coop_debug">
+		<text>console: coop_debug 0/1</text>
+	</string>
+	<string id="st_coop_adm_i_prof_spikes">
+		<text>Frames over N ms into the log (0: off)</text>
+	</string>
+	<string id="st_coop_adm_h_prof_spikes">
+		<text>Each frame longer than this is logged with a breakdown: for hunting stutters.</text>
+	</string>
+	<string id="st_coop_adm_b_prof_spikes">
+		<text>console: prof_spikes</text>
+	</string>
+	<string id="st_coop_adm_i_fps">
+		<text>FPS and ping in the corner</text>
+	</string>
+	<string id="st_coop_adm_h_fps">
+		<text>The frame counter and the ping to the server.</text>
+	</string>
+	<string id="st_coop_adm_b_fps">
+		<text>Options › Co-op › FPS</text>
+	</string>
+	<string id="st_coop_adm_i_rs_stats">
+		<text>Render statistics</text>
+	</string>
+	<string id="st_coop_adm_h_rs_stats">
+		<text>The engine's counters over the screen.</text>
+	</string>
+	<string id="st_coop_adm_b_rs_stats">
+		<text>console: rs_stats</text>
+	</string>
+	<string id="st_coop_adm_i_prof_stats">
+		<text>Frame profile, 10 s</text>
+	</string>
+	<string id="st_coop_adm_h_prof_stats">
+		<text>A 10-second frame summary into the log.</text>
+	</string>
+	<string id="st_coop_adm_b_prof_stats">
+		<text>console: prof_stats 10</text>
+	</string>
+	<string id="st_coop_adm_i_flush">
+		<text>Write the log to disk</text>
+	</string>
+	<string id="st_coop_adm_h_flush">
+		<text>The log is buffered: this writes it out now.</text>
+	</string>
+	<string id="st_coop_adm_b_flush">
+		<text>console: flush</text>
+	</string>
+	<string id="st_coop_adm_i_send_logs">
+		<text>Send the logs to the server</text>
+	</string>
+	<string id="st_coop_adm_h_send_logs">
+		<text>The log and crash dumps go to the server, seen on the admin page.</text>
+	</string>
+	<string id="st_coop_adm_b_send_logs">
+		<text>console: coop_send_logs</text>
+	</string>
+	<string id="st_coop_adm_i_coop_status">
+		<text>Connection status</text>
+	</string>
+	<string id="st_coop_adm_h_coop_status">
+		<text>The connection's state into the log and console.</text>
+	</string>
+	<string id="st_coop_adm_b_coop_status">
+		<text>console: coop_status</text>
+	</string>
+	<string id="st_coop_adm_i_all_transitions">
+		<text>Show every level transition</text>
+	</string>
+	<string id="st_coop_adm_h_all_transitions">
+		<text>A mark on every transition on the PDA map, its hint where it leads. Closed and unfound ones too.</text>
+	</string>
+	<string id="st_coop_adm_b_all_transitions">
+		<text>Nowhere before (new).</text>
+	</string>
+	<string id="st_coop_adm_i_all_travel">
+		<text>Every fast travel point</text>
+	</string>
+	<string id="st_coop_adm_h_all_travel">
+		<text>Every point of your faction on the map, not only those visited. Travel to unvisited ones: a test server's only.</text>
+	</string>
+	<string id="st_coop_adm_b_all_travel">
+		<text>In co-op only the visited ones (coop_travel).</text>
+	</string>
+	<string id="st_coop_adm_i_raid_debug_map">
+		<text>Raid debug on the laptop</text>
+	</string>
+	<string id="st_coop_adm_h_raid_debug_map">
+		<text>On the Chemist's laptop raid map: the Monolith's routes, posts and patrols.</text>
+	</string>
+	<string id="st_coop_adm_b_raid_debug_map">
+		<text>Went with coop_debug.</text>
+	</string>
+	<string id="st_coop_adm_i_raid_timer">
+		<text>Raid timer</text>
+	</string>
+	<string id="st_coop_adm_h_raid_timer">
+		<text>The raid's time left on the screen.</text>
+	</string>
+	<string id="st_coop_adm_b_raid_timer">
+		<text>Options › Co-op</text>
+	</string>
+	<string id="st_coop_adm_i_peer_color">
+		<text>The other players' mark colour</text>
+	</string>
+	<string id="st_coop_adm_h_peer_color">
+		<text>The partners' marks on the map and minimap.</text>
+	</string>
+	<string id="st_coop_adm_b_peer_color">
+		<text>Options › Co-op (sliders), console coop_peer_color</text>
+	</string>
+	<string id="st_coop_adm_i_dlss">
+		<text>DLSS</text>
+	</string>
+	<string id="st_coop_adm_h_dlss">
+		<text>NVIDIA DLSS mode. After a video restart (vid_restart) or the game's.</text>
+	</string>
+	<string id="st_coop_adm_b_dlss">
+		<text>console: r__dlss_mode</text>
+	</string>
+	<string id="st_coop_adm_i_dlss_mv">
+		<text>Show DLSS motion vectors</text>
+	</string>
+	<string id="st_coop_adm_h_dlss_mv">
+		<text>For tests: the motion vectors on the screen.</text>
+	</string>
+	<string id="st_coop_adm_b_dlss_mv">
+		<text>console: r__dlss_mv_debug</text>
+	</string>
+	<string id="st_coop_adm_i_render_scale">
+		<text>Render scale, %</text>
+	</string>
+	<string id="st_coop_adm_h_render_scale">
+		<text>The world is drawn at this share of the screen. After a video restart.</text>
+	</string>
+	<string id="st_coop_adm_b_render_scale">
+		<text>console: r__render_scale</text>
+	</string>
+	<string id="st_coop_adm_i_muzzle_shadows">
+		<text>NPC muzzle flash shadows</text>
+	</string>
+	<string id="st_coop_adm_h_muzzle_shadows">
+		<text>A performance test: shadows from others' muzzle flashes.</text>
+	</string>
+	<string id="st_coop_adm_b_muzzle_shadows">
+		<text>console: g_npc_muzzle_shadows</text>
+	</string>
+	<string id="st_coop_adm_dlss_off">
+		<text>off</text>
+	</string>
+	<string id="st_coop_adm_dlss_dlaa">
+		<text>DLAA</text>
+	</string>
+	<string id="st_coop_adm_dlss_quality">
+		<text>quality</text>
+	</string>
+	<string id="st_coop_adm_dlss_balanced">
+		<text>balanced</text>
+	</string>
+	<string id="st_coop_adm_dlss_performance">
+		<text>speed</text>
+	</string>
+	<string id="st_coop_admin_news">
+		<text>Admin</text>
+	</string>
+	<string id="st_coop_admin_give_done">
+		<text>%s gave you: %s x %s</text>
+	</string>
+	<string id="st_coop_admin_give_bad">
+		<text>%s meant to give "%s", there is no such thing.</text>
+	</string>
+	<string id="st_coop_admin_money_done">
+		<text>%s: money %s RU</text>
+	</string>
+	<string id="st_coop_admin_god_on">
+		<text>%s made you immortal.</text>
+	</string>
+	<string id="st_coop_admin_god_off">
+		<text>%s took your immortality off.</text>
+	</string>
+	<string id="st_coop_admin_heal_done">
+		<text>%s healed you.</text>
+	</string>
+	<string id="st_coop_admin_teleport_done">
+		<text>Teleport: %s.</text>
+	</string>
+	<string id="st_coop_admin_logs_done">
+		<text>%s asked for your logs: they go to the server.</text>
+	</string>
+	<string id="st_coop_admin_say">
+		<text>%s: %s</text>
+	</string>
+	<string id="st_coop_tests_shelter_travel">
+		<text>To the shelter and back</text>
+	</string>
+	<string id="st_coop_tests_shelter_kit">
+		<text>The demo kit</text>
+	</string>
+	<string id="st_coop_tests_shelter_synthesis">
+		<text>Synthesis: on to the chambers</text>
+	</string>
+	<string id="st_coop_tests_shelter_rubble">
+		<text>Clear all rubble</text>
+	</string>
+	<string id="st_coop_tests_shelter_stash">
+		<text>Stash: every pack's things</text>
+	</string>
+	<string id="st_coop_tests_shelter_bar_event">
+		<text>A bar event (in turn)</text>
+	</string>
+	<string id="st_coop_tests_shelter_dig">
+		<text>Dig 5 times faster (on/off)</text>
+	</string>
+	<string id="st_coop_tests_base_cooling">
+		<text>"Cooling" now</text>
+	</string>
+	<string id="st_coop_tests_base_target">
+		<text>Next raid target</text>
+	</string>
+	<string id="st_coop_tests_base_all_saved">
+		<text>All rescued, parts</text>
+	</string>
+	<string id="st_coop_tests_base_crisis">
+		<text>Next crisis</text>
+	</string>
+	<string id="st_coop_tests_base_scorcher">
+		<text>Scorcher on/off</text>
+	</string>
+	<string id="st_coop_tests_base_decoder">
+		<text>Decoder, 40 s hack</text>
+	</string>
+	<string id="st_coop_tests_base_window">
+		<text>Window: +2 hours</text>
+	</string>
+	<string id="st_coop_tests_base_radar">
+		<text>To the Radar, by X-10</text>
+	</string>
+	<string id="st_coop_tests_base_health">
+		<text>Health and psi</text>
+	</string>
+	<string id="st_coop_tests_base_clock">
+		<text>The base's clock +12 h</text>
+	</string>
+	<string id="st_coop_tests_ai_obs20">
+		<text>An observer at 20 m</text>
+	</string>
+	<string id="st_coop_tests_ai_obs40">
+		<text>An observer at 40 m</text>
+	</string>
+	<string id="st_coop_tests_ai_clear">
+		<text>Remove the observers</text>
+	</string>
+	<string id="st_coop_tests_ai_grass">
+		<text>Grass hides: on/off</text>
+	</string>
+	<string id="st_coop_tests_no_bunker">
+		<text>No bunker in the graph: the level pack is missing.</text>
+	</string>
+	<string id="st_coop_tests_kit_done">
+		<text>The demo kit is given.</text>
+	</string>
+	<string id="st_coop_tests_synthesis_done">
+		<text>Synthesis: capsules filled and handed in. Put the 4 into the chambers.</text>
+	</string>
+	<string id="st_coop_tests_rubble_done">
+		<text>Rubble cleared: %s. Kept in a save made after.</text>
+	</string>
+	<string id="st_coop_tests_no_stash">
+		<text>The shelter has no stash yet.</text>
+	</string>
+	<string id="st_coop_tests_stash_done">
+		<text>%s pack things in the stash.</text>
+	</string>
+	<string id="st_coop_tests_dig_fast">
+		<text>Digging: 8 strokes a shovel.</text>
+	</string>
+	<string id="st_coop_tests_dig_normal">
+		<text>Digging: as the game has it.</text>
+	</string>
+	<string id="st_coop_tests_cooling_done">
+		<text>The "Cooling" window is open.</text>
+	</string>
+	<string id="st_coop_tests_target_done">
+		<text>Next raid's target: %s</text>
+	</string>
+	<string id="st_coop_tests_target_no">
+		<text>Target %s can't come now (the lift down needs repair).</text>
+	</string>
+	<string id="st_coop_tests_all_saved_done">
+		<text>All rescued, Shurup hired, parts given. Save and load: the staff come.</text>
+	</string>
+	<string id="st_coop_tests_crisis_done">
+		<text>Crisis: %s</text>
+	</string>
+	<string id="st_coop_tests_scorcher_on">
+		<text>The Scorcher works.</text>
+	</string>
+	<string id="st_coop_tests_scorcher_off">
+		<text>The Scorcher is off.</text>
+	</string>
+	<string id="st_coop_tests_decoder_done">
+		<text>Decoder given, the code in 40 seconds.</text>
+	</string>
+	<string id="st_coop_tests_window_done">
+		<text>Window: 2 more hours, %s in all.</text>
+	</string>
+	<string id="st_coop_tests_health_done">
+		<text>Health and psi restored.</text>
+	</string>
+	<string id="st_coop_tests_clock_done">
+		<text>The base's clock: +12.</text>
+	</string>
+	<string id="st_coop_tests_bar_event_done">
+		<text>Bar event: %s</text>
+	</string>
+	<string id="st_coop_tests_failed">
+		<text>Test action %s failed: see the log.</text>
+	</string>
+	<string id="st_coop_tests_grass_on">
+		<text>Grass hides from the AI.</text>
+	</string>
+	<string id="st_coop_tests_grass_off">
+		<text>Grass no longer hides.</text>
+	</string>
+	<string id="st_coop_tests_sees">
+		<text>SEES</text>
+	</string>
+	<string id="st_coop_tests_sees_not">
+		<text>doesn't see</text>
+	</string>
+	<string id="st_coop_tests_no_grid">
+		<text>No AI grid %s m ahead: turn or step away.</text>
+	</string>
+	<string id="st_coop_tests_observer">
+		<text>An observer at %s m.</text>
+	</string>
+	<string id="st_coop_tests_observers_gone">
+		<text>Observers removed.</text>
+	</string>
+	<string id="st_coop_transition">
+		<text>Transition</text>
+	</string>
+	<string id="st_coop_transition_to">
+		<text>Transition: %s</text>
+	</string>
+</string_table>

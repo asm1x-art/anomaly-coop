@@ -345,7 +345,8 @@ max_kept              = 400   ; at most this many kept at once (the newest stay)
 junk_price            = 300   ; a thing cheaper than this is junk
 junk_condition        = 0.25  ; a thing worn below this is junk (seen only when it is online on the host)
 junk_sections         =       ; comma-separated parts of section names that are always junk (empty mags...)
-cleaner               = 1     ; 1: the host releases bodies with nothing worth taking; 0: it doesn't
+cleaner               = 1     ; 1: the host releases bodies with nothing worth taking; 0: it doesn't (in co-op the server's
+                              ; rule "cleaner" decides, the admin window's "Механики мира")
 clean_interval_s      = 300   ; real s between the host's cleaner passes
 keep_bodies_per_level = 5     ; a level keeps this many bodies even with nothing on them
 max_per_pass          = 10    ; at most this many released per level each pass
@@ -357,7 +358,7 @@ min_player_distance   = 200   ; m: no body this close to a player goes (on a pla
 ; zones and the killing restrictors whose logic checks one of the infos (those vanilla's switch gives), and the
 ; shelter's white zone at the Radar. Psi storms, controllers and other psi zones still work on them.
 [coop_psi_immunity]
-enabled  = true                    ; false: no one is immune
+enabled  = true                    ; false: no one is immune (in co-op the server's rule "psi_immunity" decides)
 factions = monolith, greh, zombied ; the player's true faction (a faction change carries it)
 infos    = bar_deactivate_radar_done, yan_labx16_switcher_primary_off, yan_labx16_switcher_1_off, yan_labx16_switcher_2_off, yan_labx16_switcher_3_off
 
@@ -401,3 +402,11 @@ usage_warn_percent = 90  ; from this share of ids taken that line is a warning (
 [coop_help]
 enabled = true
 sync_ms = 2000      ; how often a player's own tasks are compared with what the group was told
+
+; Co-op: the admin window (ui_coop_admin.script). Keys: DIK_keys names; F10 in the game is a test mode's, so Home.
+[coop_admin]
+menu_key      = DIK_F10   ; in the main menu, connected or not
+game_key      = DIK_HOME  ; in the game
+poll_seconds  = 5         ; the server's state asked this often while it is open
+compact_below = 1600      ; a screen narrower than this (pixels): the sections as short marks
+ping_warn     = 150       ; ms: a ping above it is lit

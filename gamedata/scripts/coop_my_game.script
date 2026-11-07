@@ -1,0 +1,105 @@
+-- Co-op: "Моя игра", the admin window's options of this game alone (ui_coop_admin.script), open to every player
+-- without the admin password: what this game shows, never what the world does. Kept in <appdata>\coop_my_game.txt
+-- ("key=value" lines), apart from the console's and the options' own (those the window sets where they live).
+--   all_transitions  a mark on every level transition on the PDA map, its hint where it leads
+--   all_travel       every fast travel point of the faction on the map, not only those seen (travel to one not
+--                    seen: a test server's cheat, coop_travel.script)
+--   raid_debug_map   the raid's debug view on the shelter laptop's map (ui_shelter_laptop.script)
+--   pins             the window's pinned toggles, comma-separated ids
+
+local FILE = "coop_my_game.txt"
+local prefs = nil
+
+local function path()
+	return getFS():update_path("$app_data_root$", FILE)
+end
+
+local function load()
+	prefs = {}
+	local f = io.open(path(), "r")
+	if f then
+		for line in f:lines() do
+			local key, value = string.match(line, "^([%w_]+)=(.*)$")
+			if key then
+				prefs[key] = value
+			end
+		end
+		f:close()
+	end
+end
+
+function get(key, default)
+	if not prefs then
+		load()
+	end
+	local value = prefs[key]
+	if value == nil then
+		return default
+	end
+	return value
+end
+
+function flag(key, default)
+	local value = get(key, nil)
+	if value == nil then
+		return default or false
+	end
+	return value == "1"
+end
+
+function set(key, value)
+	if not prefs then
+		load()
+	end
+	if type(value) == "boolean" then
+		value = value and "1" or "0"
+	end
+	prefs[key] = value ~= nil and tostring(value) or nil
+	local f = io.open(path(), "w")
+	if not f then
+		return
+	end
+	for k, v in pairs(prefs) do
+		f:write(k, "=", v, "\n")
+	end
+	f:close()
+end
+
+-------------------------------------------------------------------------------
+-- every level transition on the PDA map (the engine gives a transition's destination to scripts: dest_game_vertex_id)
+
+local SPOT = "coop_transition"
+
+local function level_of(gvid)
+	local gg = game_graph()
+	if not (gvid and gg:valid_vertex_id(gvid)) then
+		return nil
+	end
+	return alife():level_name(gg:vertex(gvid):level_id())
+end
+
+function refresh_transitions()
+	if not (db.actor and level.present()) then
+		return
+	end
+	-- the marks are kept in the save: those of a time it was on go when it is off
+	local on = flag("all_transitions")
+	local sim = alife()
+	for id = 1, 65534 do
+		local se = sim:object(id)
+		if se and se:clsid() == clsid.level_changer_s then
+			local has = level.map_has_object_spot(id, SPOT) ~= 0
+			if on and not has then
+				local to = level_of(se.dest_game_vertex_id)
+				level.map_add_object_spot(id, SPOT, to and strformat(game.translate_string("st_coop_transition_to"),
+					game.translate_string(to)) or game.translate_string("st_coop_transition"))
+			elseif has and not on then
+				level.map_remove_object_spot(id, SPOT)
+			end
+		end
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", refresh_transitions)
+end

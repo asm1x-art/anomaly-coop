@@ -869,13 +869,13 @@ function UIShelterOS:raid_pins()
 			pin("note", m.x, m.z, m)
 		end
 	end
-	if raid.debug() then
+	if coop_my_game.flag("raid_debug_map") then -- the admin window's "Моя игра" (it went with coop_debug)
 		self:raid_debug_pins()
 	end
 	self:raid_draw()
 end
 
--- the debug view (raid.debug()): the Monolith's routes as dots, its smarts (number: men alive), its patrols; they follow
+-- the debug view (coop_my_game raid_debug_map): the Monolith's routes as dots, its smarts (number: men alive), its patrols; they follow
 -- the map, take no clicks
 function UIShelterOS:raid_debug_pins()
 	local view = raid_monolith.debug_view(self.raid_level)
