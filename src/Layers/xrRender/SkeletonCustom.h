@@ -125,7 +125,8 @@ public:
 protected:
 	SkeletonWMVec wallmarks;
 	u32 wm_frame;
-	u32 CurrentFrame;
+	u32 CurrentFrame = 0; // the frame its motion-vector state was last saved (CSkeletonX::_Render)
+	u32 MV_MainFrame = u32(-1); // DLSS: the main frame (g_taa.frame) it was last drawn in; -1: never
 	Fmatrix	Matrix_Prev;
 	Fmatrix Matrix_Temp;
 

@@ -614,10 +614,12 @@ CRenderTarget::CRenderTarget()
 		rt_Heat.create(r2_RT_heat, w, h, D3DFMT_A8R8G8B8, SampleCount);
 		//--DSR-- HeatVision_end
 
+		// one sample even with MSAA: the shaders read it as a plain texture (the 3D scopes' picture, the blurs), and the
+		// 3D scopes copy the resolved rt_Generic_0 into it (with MSAA samples that copy failed: an empty scope)
 		if (RImplementation.o.dx11_hdr10) {
-			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A16B16G16R16F, RImplementation.o.dx10_msaa ? SampleCount : 1);
+			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A16B16G16R16F, 1);
 		} else {
-			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A8R8G8B8, RImplementation.o.dx10_msaa ? SampleCount : 1);
+			rt_Generic_temp.create("$user$generic_temp", w, h, D3DFMT_A8R8G8B8, 1);
 		}
 
 		rt_dof.create(r2_RT_dof, w, h, RImplementation.o.dx11_hdr10 ? D3DFMT_A16B16G16R16F : D3DFMT_A8R8G8B8);
@@ -1424,6 +1426,13 @@ bool CRenderTarget::scale_begin()
 	render_scale_swap_in(render_w, render_h);
 	HW.pBaseRT = rt_render_scale->pRT;
 	HW.pBaseZB = rt_render_scale_z->pZRT;
+	// the frame starts at the render size: the last target set (the screen, scale_end) and its viewport were the
+	// screen's, and the first passes (CRender::Render_scene's rmNormal, the level drawn into the G-buffer before the
+	// HUD with the split scene) took that viewport. With a weapon in the hands it came out right; with empty hands
+	// (the parkour climb puts the weapon away) the world was drawn bigger than its target: a zoomed, doubled picture
+	dwWidth = render_w;
+	dwHeight = render_h;
+	set_viewport_size(HW.pContext, float(render_w), float(render_h));
 	g_render_scale_on = true;
 	return true;
 }

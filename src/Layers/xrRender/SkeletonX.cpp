@@ -73,16 +73,48 @@ void CSkeletonX::_Render(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCount)
 			// Save current frame
 			Parent->CurrentFrame = Device.dwFrame;
 
-			// Save prev m_W and save current m_W for the next frame
-			Parent->Matrix_Prev.set(Parent->Matrix_Temp);
-			Parent->Matrix_Temp.set(RCache.xforms.m_w);
+			// DLSS: a model not drawn in the last main frame (just made, hidden for a while, the hands coming back when
+			// the parkour climb takes the weapon away, the legs after it) has no last frame: its saved matrices are from
+			// long ago and somewhere else, and DLSS would drag old pixels across the screen (a ghost). It takes no motion
+			// of its own this frame: a world model goes with the camera, a HUD model stays where it is on the screen.
+			const bool fresh = g_taa.mv && !RImplementation.o.ssfx_motionvectors &&
+				(Parent->MV_MainFrame == u32(-1) || Parent->MV_MainFrame + 1 != g_taa.frame);
+			if (g_taa.mv)
+				Parent->MV_MainFrame = g_taa.frame;
 
-			// Save bone matrix to use in the next frame
-			for (u16 b = 0; b < Parent->LL_BoneCount(); b++)
+			if (fresh)
 			{
-				CBoneInstance& Bone = Parent->LL_GetBoneInstance(b);
-				Bone.mRenderTransform_prev.set(Bone.mRenderTransform_temp);
-				Bone.mRenderTransform_temp.set(Bone.mRenderTransform);
+				if (g_taa.hud)
+				{
+					// where it is to the camera now, put to the last frame's camera: V_prev * W_prev = V * W
+					Fmatrix wv, inv_v_prev;
+					wv.mul_43(RCache.xforms.m_v, RCache.xforms.m_w);
+					inv_v_prev.invert(RCache.xforms.m_v_prev);
+					Parent->Matrix_Prev.mul_43(inv_v_prev, wv);
+				}
+				else
+					Parent->Matrix_Prev.set(RCache.xforms.m_w);
+				Parent->Matrix_Temp.set(RCache.xforms.m_w);
+				for (u16 b = 0; b < Parent->LL_BoneCount(); b++)
+				{
+					CBoneInstance& Bone = Parent->LL_GetBoneInstance(b);
+					Bone.mRenderTransform_prev.set(Bone.mRenderTransform);
+					Bone.mRenderTransform_temp.set(Bone.mRenderTransform);
+				}
+			}
+			else
+			{
+				// Save prev m_W and save current m_W for the next frame
+				Parent->Matrix_Prev.set(Parent->Matrix_Temp);
+				Parent->Matrix_Temp.set(RCache.xforms.m_w);
+
+				// Save bone matrix to use in the next frame
+				for (u16 b = 0; b < Parent->LL_BoneCount(); b++)
+				{
+					CBoneInstance& Bone = Parent->LL_GetBoneInstance(b);
+					Bone.mRenderTransform_prev.set(Bone.mRenderTransform_temp);
+					Bone.mRenderTransform_temp.set(Bone.mRenderTransform);
+				}
 			}
 		}
 

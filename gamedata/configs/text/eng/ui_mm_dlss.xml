@@ -36,7 +36,7 @@
 		<text>NVIDIA DLSS is unavailable: nvngx_dlss.dll is missing from the game's bin folder.</text>
 	</string>
 	<string id="ui_mm_dlss_off_msaa">
-		<text>NVIDIA DLSS is unavailable with MSAA on: turn MSAA off and restart the game.</text>
+		<text>The game started with MSAA on: choosing a DLSS mode turns MSAA off, DLSS starts after the game's restart.</text>
 	</string>
 	<string id="ui_mm_dlss_off_hdr10">
 		<text>NVIDIA DLSS is unavailable with HDR10 output on.</text>
@@ -46,6 +46,12 @@
 	</string>
 	<string id="ui_mm_dlss_off_no_sdk">
 		<text>NVIDIA DLSS is unavailable: this build of the game has no DLSS.</text>
+	</string>
+	<string id="ui_mm_msaa_off_dlss">
+		<text>MSAA: off, NVIDIA DLSS is chosen (it anti-aliases itself, the two don't go together). To use MSAA, turn DLSS off first.</text>
+	</string>
+	<string id="ui_mm_smaa_off_dlss">
+		<text>SMAA: not used while NVIDIA DLSS runs (DLSS anti-aliases itself). Your SMAA setting comes back with DLSS off.</text>
 	</string>
 	<string id="ui_mm_dlss_attribution">
 		<text>Uses NVIDIA® DLSS. NVIDIA, NVIDIA RTX, GeForce RTX and DLSS are trademarks of NVIDIA Corporation.</text>

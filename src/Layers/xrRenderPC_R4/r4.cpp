@@ -417,6 +417,18 @@ void CRender::create()
 	// HDR10
 	o.dx11_hdr10 = !!ps_r4_hdr10_on;
 
+	// NVIDIA DLSS (dlss.h) doesn't go with MSAA, and MSAA is built into the shaders here: a DLSS mode asked for (the
+	// options menu, the launcher, user.ltx) turns MSAA off when DLSS can run, so the mode works after this start
+	if (ps_r__dlss_mode != dlss::mode_off && ps_r3_msaa && !o.dx11_hdr10)
+	{
+		dlss::init(false, false);
+		if (dlss::available())
+		{
+			Msg("* DLSS: r__dlss_mode is on, MSAA (r3_msaa) turned off: they don't go together");
+			ps_r3_msaa = 0;
+		}
+	}
+
 	//	MSAA option dependencies
 	o.dx10_msaa = ps_r3_msaa && !o.dx11_hdr10;
 	o.dx10_msaa_samples = o.dx11_hdr10 ? 1 : (1 << ps_r3_msaa);

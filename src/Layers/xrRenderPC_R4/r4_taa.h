@@ -12,6 +12,7 @@ struct r_taa_jitter
 	bool on = false; // this frame is jittered (stays set after r_taa_jitter_end, for the upscaler)
 	bool applied = false; // Device's matrices hold the shift now (between begin and r_taa_jitter_end)
 	bool mv = false; // this frame makes motion vectors (models keep their last bones, CSkeletonX)
+	bool hud = false; // the HUD (hands, weapon) is being drawn now (r_dsgraph_render_hud)
 	Fvector2 px = {0.f, 0.f}; // the shift in render pixels, -0.5..0.5 (x right, y down), as DLSS takes it
 	Fvector2 ndc = {0.f, 0.f}; // the same in clip space (x right, y up)
 	u32 phases = 0;

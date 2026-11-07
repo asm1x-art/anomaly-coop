@@ -595,6 +595,7 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 	Fmatrix Pold_prev = RCache.xforms.m_p_prev;
 #if defined(USE_DX11)
 	RCache.set_xform_project_prev(g_taa.mv ? g_taa.project_hud() : Device.mProjectHud);
+	g_taa.hud = true;
 #else
 	RCache.set_xform_project_prev(Device.mProjectHud);
 #endif
@@ -612,7 +613,9 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 
 		if (scope_3D_fake_enabled)
 		{
-			RCache.set_RT(RImplementation.Target->rt_ssfx_temp->pRT, 3); // Render scope_3D to any buffer
+			// the scopes' mask for SMAA; with MSAA the G-buffer has several samples and rt_ssfx_temp one: D3D would refuse
+			// the whole set of targets, so no mask then
+			RCache.set_RT(RImplementation.o.dx10_msaa ? NULL : RImplementation.Target->rt_ssfx_temp->pRT, 3); // Render scope_3D to any buffer
 			
 			mapScopeHUD.traverseLR(sorted_L1);
 
@@ -683,6 +686,9 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 
 	// Restore Prev Matrix
 	RCache.set_xform_project_prev(Pold_prev);
+#if defined(USE_DX11)
+	g_taa.hud = false;
+#endif
 }
 
 void R_dsgraph_structure::r_dsgraph_render_hud_ui()

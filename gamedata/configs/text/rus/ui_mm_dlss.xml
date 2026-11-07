@@ -36,7 +36,7 @@
 		<text>NVIDIA DLSS недоступен: в папке игры bin нет файла nvngx_dlss.dll.</text>
 	</string>
 	<string id="ui_mm_dlss_off_msaa">
-		<text>NVIDIA DLSS недоступен при включённом MSAA: выключите MSAA и перезапустите игру.</text>
+		<text>Игра запущена с MSAA: при выборе режима DLSS MSAA выключится, DLSS заработает после перезапуска игры.</text>
 	</string>
 	<string id="ui_mm_dlss_off_hdr10">
 		<text>NVIDIA DLSS недоступен при включённом выводе HDR10.</text>
@@ -46,6 +46,12 @@
 	</string>
 	<string id="ui_mm_dlss_off_no_sdk">
 		<text>NVIDIA DLSS недоступен: эта сборка игры собрана без DLSS.</text>
+	</string>
+	<string id="ui_mm_msaa_off_dlss">
+		<text>MSAA: выключено, выбран NVIDIA DLSS (он сам сглаживает, вместе они не работают). Чтобы включить MSAA, сначала выключите DLSS.</text>
+	</string>
+	<string id="ui_mm_smaa_off_dlss">
+		<text>SMAA: не используется, пока работает NVIDIA DLSS (он сам сглаживает). Ваша настройка SMAA вернётся, когда DLSS выключен.</text>
 	</string>
 	<string id="ui_mm_dlss_attribution">
 		<text>Использует NVIDIA® DLSS. NVIDIA, NVIDIA RTX, GeForce RTX и DLSS — товарные знаки NVIDIA Corporation.</text>

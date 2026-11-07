@@ -205,7 +205,12 @@ void CRenderTarget::phase_3DSSReticle()
 
 	HW.pContext->CopyResource(rt_Generic_temp->pTexture->surface_get(), rt_Generic_0->pTexture->surface_get());
 
-	u_setrt(RImplementation.Target->rt_Generic_0, RImplementation.Target->rt_Position, 0, HW.pBaseZB);
+	// with MSAA rt_Position has several samples and rt_Generic_0 one: D3D refuses them together and the reticles were
+	// never drawn (an empty scope). The reticles write only the colour.
+	if (RImplementation.o.dx10_msaa)
+		u_setrt(RImplementation.Target->rt_Generic_0, 0, 0, HW.pBaseZB);
+	else
+		u_setrt(RImplementation.Target->rt_Generic_0, RImplementation.Target->rt_Position, 0, HW.pBaseZB);
 
 	RCache.set_CullMode(CULL_CCW);
 	RCache.set_Stencil(FALSE);
