@@ -595,6 +595,7 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 	Fmatrix Pold_prev = RCache.xforms.m_p_prev;
 #if defined(USE_DX11)
 	RCache.set_xform_project_prev(g_taa.mv ? g_taa.project_hud() : Device.mProjectHud);
+	g_taa.hud = true;
 #else
 	RCache.set_xform_project_prev(Device.mProjectHud);
 #endif
@@ -685,6 +686,9 @@ void R_dsgraph_structure::r_dsgraph_render_hud(bool NoPS)
 
 	// Restore Prev Matrix
 	RCache.set_xform_project_prev(Pold_prev);
+#if defined(USE_DX11)
+	g_taa.hud = false;
+#endif
 }
 
 void R_dsgraph_structure::r_dsgraph_render_hud_ui()
