@@ -160,15 +160,17 @@ local function sync_timetable(fact, mgr, last)
 	if mgr.started then
 		return -- ours runs; the next one is set when it ends
 	end
-	-- each timetable the master publishes is taken once. One already due isn't taken: the master hasn't run it (the
-	-- host's ghost, a paused world), and ours would start it at once, skip it as missed («a surge happened in the
-	-- Zone»), set a timetable of its own, and take the master's again two seconds later: the news over and over
+	-- each timetable the master publishes is taken once, and again while ours is not it: a game that has just loaded
+	-- the world skips the surge its save missed and rolls a timetable of its own, often after ours took the master's.
+	-- One already due isn't taken: the master hasn't run it (the host's ghost, a paused world), and ours would start
+	-- it at once, skip it as missed («a surge happened in the Zone»), set a timetable of its own, and take the
+	-- master's again two seconds later: the news over and over
 	local value = coop.fact(fact)
-	if value == taken[fact] then
+	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
+	if value == taken[fact] and (not when or stamp(mgr[last]) == when and mgr._delta == tonumber(delta)) then
 		return
 	end
 	taken[fact] = value
-	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
 	local t = when and ctime(when)
 	if not t then
 		return
