@@ -13,7 +13,7 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - `timesync`, `launcher` — the world's clock on the server; the launcher's game side (`launcher` is `timesync` plus it). Merged into `coop`.
 - `multiplayer` — headless host (the sim master), joins from the journal, character saves, exit saves, one offline world, packaged server + bot, F10 admin window. Docs: `docs/coop/multiplayer.md`. Merged into `coop`.
 - `render` — engine/render performance: render scale, `prof_spikes`, Lua GC step, optional PGO build (`tools/pgo/pgo.ps1`). Docs: `docs/coop/render.md`. Merged into `coop`.
-- `dlss` — NVIDIA DLSS (`r__dlss_mode`): jitter, motion vectors, NGX; the SDK is fetched by `tools/dlss/get_dlss_sdk.ps1` (not in the repo). Docs: `docs/coop/render.md` §6. Not merged yet.
+- `dlss` — NVIDIA DLSS (`r__dlss_mode`): jitter, motion vectors, NGX; the SDK is fetched by `tools/dlss/get_dlss_sdk.ps1` (not in the repo). Docs: `docs/coop/render.md` §6. Merged into `coop` (its fixes via `fix-dlss`).
 - `weapons` — weapon pack plan (`docs/coop/weapons.md`), no code yet.
 - `rebalance` — hard-mode balance, no code yet.
 
