@@ -18,7 +18,8 @@ export const CONFIG_FILE = 'server.cfg';
 // section -> key -> default; the default's type is the value's
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4, builds_file: '',
-    allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') },
+    allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(','),
+    language: 'rus' },
   host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
@@ -35,6 +36,9 @@ const LIMITS = {
 
 const ENV = { COOP_PORT: ['server', 'port'], COOP_HTTP_PORT: ['server', 'admin_port'], COOP_ADMIN_PASSWORD: ['server', 'admin_password'],
   COOP_BUILDS_FILE: ['server', 'builds_file'], COOP_ALLOW_DEV: ['server', 'allow_dev'], COOP_ALLOW_TESTS: ['server', 'allow_tests'] };
+
+// the world's language: the host runs in it, so the texts it makes (news, answers to the admins) are in it
+export const LANGUAGES = ['rus', 'eng'];
 
 const YES = ['1', 'true', 'yes', 'on', 'да'];
 const NO = ['0', 'false', 'no', 'off', 'нет'];
@@ -54,6 +58,7 @@ allow_tests = 0        # тестовый сервер: в админке тес
 crash_max_mb = 64      # отчёты о вылетах и баги от лаунчеров (на порт админки, без пароля): размер одного, МБ; 0 — не принимать
 news_keep = 50         # журнал важных новостей мира для лаунчеров (data/news.json): сколько последних хранить; 0 — не вести
 news_types = ${DEFAULT_NEWS_TYPES.join(',')}  # какие новости важные (присылает хост или мастер симуляции)
+language = rus         # язык мира: rus или eng; на нём хост пишет новости и ответы админам
 
 [host]
 game_dir =             # папка игры для хоста; пусто — без хоста (мир держит игрок, как раньше)
@@ -149,6 +154,11 @@ export function loadConfig({ argv = process.argv.slice(2), env = process.env, cw
     const parsed = parseValue(key, env[name], DEFAULTS[section][key], (t) => warn(`${name}: ${t}`));
     if (parsed !== undefined) config[section][key] = parsed;
   }
+
+  if (!LANGUAGES.includes(config.server.language.toLowerCase())) {
+    warn(`language: "${config.server.language}" is not one of ${LANGUAGES.join(', ')}, rus is used`);
+    config.server.language = 'rus';
+  } else config.server.language = config.server.language.toLowerCase();
 
   const dir = path.dirname(file);
   config.server.data_dir = path.resolve(dir, config.server.data_dir);

@@ -14,14 +14,14 @@ for (const warning of config.warnings) console.log(`config: ${warning}`);
 const hostSecret = config.host.game_dir ? crypto.randomBytes(8).toString('hex') : null;
 const server = await startServer({ port: config.server.port, dataDir: config.server.data_dir, hostSecret,
   autosaveMinutes: hostSecret ? config.host.autosave_minutes : null, pauseWhenEmpty: !!hostSecret,
-  allowTests: config.server.allow_tests,
+  allowTests: config.server.allow_tests, language: config.server.language,
   adminPassword: config.server.admin_password || null,
   // builds_file: the launcher's builds.json, only those builds get in (and "dev" ones with allow_dev)
   builds: { file: config.server.builds_file || null, allowDev: config.server.allow_dev },
   news: { keep: config.server.news_keep, types: config.server.news_types.split(/[\s,]+/).filter(Boolean) } });
 if (hostSecret) {
   const host = startHost({ gameDir: config.host.game_dir, exe: config.host.exe, args: config.host.args,
-    port: config.server.port, secret: hostSecret, events: server.coop.events });
+    port: config.server.port, secret: hostSecret, events: server.coop.emitter });
   server.coop.setHostProcess(host);
   const stop = () => {
     host.stop();

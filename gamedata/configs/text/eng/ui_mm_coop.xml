@@ -565,4 +565,41 @@
 	<string id="ui_mm_coop_general_raid_timer_desc">
 		<text>Time left till the Cooling window closes, in a corner of the screen during a raid (real minutes).</text>
 	</string>
+	<!-- co-op messages in the game (coop_sync.script, coop_fps.script) -->
+	<string id="st_coop_share_stash">
+		<text>Share with the group</text>
+	</string>
+	<string id="st_coop_news_title">
+		<text>Co-op</text>
+	</string>
+	<string id="st_coop_saving_auto">
+		<text>Autosaving the world</text>
+	</string>
+	<string id="st_coop_saving">
+		<text>Saving the world</text>
+	</string>
+	<string id="st_coop_saved_auto">
+		<text>The world autosaved.</text>
+	</string>
+	<string id="st_coop_saved_named">
+		<text>The world saved: "%s" (%s).</text>
+	</string>
+	<string id="st_coop_saved_join">
+		<text>The world saved: %s comes in.</text>
+	</string>
+	<string id="st_coop_saved_leave">
+		<text>The world saved: %s left.</text>
+	</string>
+	<string id="st_coop_saved_other">
+		<text>The world saved (%s).</text>
+	</string>
+	<string id="st_coop_peer_joined">
+		<text>%s came into the world.</text>
+	</string>
+	<string id="st_coop_peer_left">
+		<text>%s left the world.</text>
+	</string>
+	<string id="st_coop_ms">
+		<text>ms</text>
+	</string>
 </string_table>

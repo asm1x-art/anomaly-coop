@@ -32,7 +32,7 @@ test('config: sections, comments, inline comments, types; data_dir from the conf
   assert.equal(c.created, false);
   assert.deepEqual(c.warnings, []);
   assert.deepEqual(c.server, { port: 7790, admin_port: 0, admin_password: 'pa#ss', data_dir: path.join(dir, 'world', 'data'), max_players: 4,
-    builds_file: '', allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(',') });
+    builds_file: '', allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(','), language: 'rus' });
   assert.deepEqual(c.host, { game_dir: path.resolve(dir, '../Anomaly'), exe: 'bin\\AnomalyDX11AVX.exe', args: '', autosave_minutes: 5, pause_when_empty: false });
   assert.deepEqual(c.telegram, { token: '123:ABC-def', admins: [111, 222, 333] });
 });
@@ -98,4 +98,17 @@ test('config: where it is looked for', () => {
   assert.equal(load(dir, { argv: ['--config', 'a/b.cfg'] }).file, path.join(dir, 'a', 'b.cfg'));
   assert.equal(load(dir, { argv: ['--config=c.cfg'] }).file, path.join(dir, 'c.cfg'));
   assert.equal(fs.existsSync(path.join(dir, 'a', 'b.cfg')), true);
+});
+
+test('config: the world\'s language, rus by default; eng taken, anything else a warning', () => {
+  const dir = tempDir();
+  assert.equal(load(dir).server.language, 'rus');
+  fs.writeFileSync(path.join(dir, 'server.cfg'), '[server]\nlanguage = ENG\n');
+  const eng = load(dir);
+  assert.equal(eng.server.language, 'eng');
+  assert.deepEqual(eng.warnings, []);
+  fs.writeFileSync(path.join(dir, 'server.cfg'), '[server]\nlanguage = ukr\n');
+  const bad = load(dir);
+  assert.equal(bad.server.language, 'rus');
+  assert.match(bad.warnings[0], /language/);
 });

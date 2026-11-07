@@ -1987,3 +1987,39 @@ test('the admin window: the world\'s events go to the sim master (a stop of a st
     server.close();
   }
 });
+
+test('the host process tells host_down through the emitter, apart from the world\'s events', async () => {
+  const server = await startServer(options());
+  try {
+    const seen = [];
+    server.coop.on('host_down', (e) => seen.push(e));
+    assert.equal(typeof server.coop.emitter.emit, 'function'); // host.js: events.emit('host_down', ...)
+    server.coop.emitter.emit('host_down', { code: 1, restarting: true });
+    assert.deepEqual(seen, [{ code: 1, restarting: true }]);
+    assert.equal(typeof server.coop.events, 'function'); // the admin page's and the bot's world events
+  } finally {
+    server.close();
+  }
+});
+
+test('the world\'s language goes to the games with the settings (the host runs in it) and is in the public status', async () => {
+  const server = await startServer({ ...options(), hostSecret: 'f00d', language: 'eng' });
+  const { port } = server.address();
+  try {
+    const h = await connect(port);
+    h.send(M.HELLO, hostHello('host', 'f00d'));
+    await h.next();
+    await settle(h);
+    assert.match(h.settings.at(-1), /^language=eng$/m);
+    assert.equal(server.coop.publicStatus().language, 'eng');
+    h.socket.destroy();
+  } finally {
+    server.close();
+  }
+  const plain = await startServer(options());
+  try {
+    assert.equal(plain.coop.publicStatus().language, 'rus');
+  } finally {
+    plain.close();
+  }
+});

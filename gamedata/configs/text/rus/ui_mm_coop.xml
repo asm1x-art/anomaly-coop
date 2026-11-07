@@ -59,7 +59,7 @@
 		<text>Тут уже чисто, но не твоими стараниями. Заказ снят.</text>
 	</string>
 	<string id="st_coop_event_taken_over">
-		<text>Тот, кто вёл оборону, ушёл. Теперь на тебе, сталкер, — держитесь!</text>
+		<text>Тот, кто вёл оборону, ушёл. Теперь на тебе, сталкер, - держитесь!</text>
 	</string>
 	<string id="st_coop_event_continued">
 		<text>Оборону без тебя продолжил %s. Задание снято.</text>
@@ -278,7 +278,7 @@
 		<text>%s готов. Проверьте и нажмите «Готов».</text>
 	</string>
 	<string id="st_coop_trade_choose">
-		<text>Двойной щелчок или перетаскивание переносит вещь в обмен и обратно. Оранжевые клетки — надетое и на поясе.</text>
+		<text>Двойной щелчок или перетаскивание переносит вещь в обмен и обратно. Оранжевые клетки - надетое и на поясе.</text>
 	</string>
 	<string id="st_coop_trade_cancelled">
 		<text>Обмен с %s отменён.</text>
@@ -368,7 +368,7 @@
 		<text>С какого сохранения продолжить?</text>
 	</string>
 	<string id="st_coop_choice_hint">
-		<text>Вы вышли из игры, не сохранившись: сервер сохранил персонажа при выходе. Выберите, с чего продолжить. Сверху — самое новое.</text>
+		<text>Вы вышли из игры, не сохранившись: сервер сохранил персонажа при выходе. Выберите, с чего продолжить. Сверху - самое новое.</text>
 	</string>
 	<string id="st_coop_choice_go">
 		<text>Продолжить с выбранного</text>
@@ -464,10 +464,10 @@
 		<text>Ждём ответа остальных игроков...</text>
 	</string>
 	<string id="st_coop_pause_ask">
-		<text>%s предлагает поставить мир на паузу. Согласны: %s, нет — не отвечайте.</text>
+		<text>%s предлагает поставить мир на паузу. Согласны: %s, нет - не отвечайте.</text>
 	</string>
 	<string id="st_coop_resume_ask">
-		<text>%s предлагает снять паузу. Согласны: %s, нет — не отвечайте.</text>
+		<text>%s предлагает снять паузу. Согласны: %s, нет - не отвечайте.</text>
 	</string>
 	<string id="st_coop_pause_1">
 		<text>Не вышло: %s против.</text>
@@ -536,7 +536,7 @@
 		<text>%s отказался от твоего сюжета.</text>
 	</string>
 	<string id="st_coop_story_group_on">
-		<text>В группе общий сюжет: шаги одного — у всех.</text>
+		<text>В группе общий сюжет: шаги одного - у всех.</text>
 	</string>
 	<string id="st_coop_story_group_off">
 		<text>Общий сюжет в группе выключен.</text>
@@ -564,5 +564,42 @@
 	</string>
 	<string id="ui_mm_coop_general_raid_timer_desc">
 		<text>Сколько осталось до закрытия окна «Охлаждения», в углу экрана во время рейда (реальные минуты).</text>
+	</string>
+	<!-- co-op messages in the game (coop_sync.script, coop_fps.script) -->
+	<string id="st_coop_share_stash">
+		<text>Поделиться с отрядом</text>
+	</string>
+	<string id="st_coop_news_title">
+		<text>Кооператив</text>
+	</string>
+	<string id="st_coop_saving_auto">
+		<text>Автосохранение мира</text>
+	</string>
+	<string id="st_coop_saving">
+		<text>Сохранение мира</text>
+	</string>
+	<string id="st_coop_saved_auto">
+		<text>Автосохранение мира.</text>
+	</string>
+	<string id="st_coop_saved_named">
+		<text>Мир сохранён: «%s» (%s).</text>
+	</string>
+	<string id="st_coop_saved_join">
+		<text>Мир сохранён: входит %s.</text>
+	</string>
+	<string id="st_coop_saved_leave">
+		<text>Мир сохранён: вышел %s.</text>
+	</string>
+	<string id="st_coop_saved_other">
+		<text>Мир сохранён (%s).</text>
+	</string>
+	<string id="st_coop_peer_joined">
+		<text>%s вошёл в мир.</text>
+	</string>
+	<string id="st_coop_peer_left">
+		<text>%s вышел из мира.</text>
+	</string>
+	<string id="st_coop_ms">
+		<text>мс</text>
 	</string>
 </string_table>

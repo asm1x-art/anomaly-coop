@@ -505,7 +505,7 @@
 		<text>Хост убирает тела и мусор, на которых нет ничего ценного (раньше: [coop_cleanup] cleaner).</text>
 	</string>
 	<string id="st_coop_adm_h_bar_events">
-		<text>События бара в убежище раз в 20–40 часов мира (раньше: [shelter_events] enabled).</text>
+		<text>События бара в убежище раз в 20-40 часов мира (раньше: [shelter_events] enabled).</text>
 	</string>
 	<string id="st_coop_adm_h_scorcher">
 		<text>Путь к Выжигателю мозгов: окна, дешифратор, белая зона (раньше: [shelter_scorcher] enabled).</text>
