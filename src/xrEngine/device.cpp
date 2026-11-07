@@ -639,11 +639,11 @@ void mt_DiscordThread(void*)
 {
 	while (true)
 	{
+		// the game is closing: nothing goes to the log now, it may already be gone (Core._destroy frees the string
+		// container a log line needs, and this thread, asleep up to discord_update_rate, may wake after it: a crash on
+		// exit in AddOne)
 		if (!pApp)
-		{
-			Msg("[Discord] pApp destroyed, killing thread");
 			return;
-		}
 
 		//Discord
 		if (use_discord && psDeviceFlags2.test(rsDiscord))

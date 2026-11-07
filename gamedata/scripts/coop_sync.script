@@ -883,7 +883,12 @@ local function keep_faction()
 			return
 		end
 		db.actor:set_character_community(community, 0, 0)
-		alife_storage_manager.get_state().default_faction = string.gsub(community, "^actor_", "")
+		-- the record's community is the one worn (an outfit's disguise, gameplay_disguise): our own faction stays as
+		-- our progress has it, else the disguise became it for good
+		local state = alife_storage_manager.get_state()
+		if not state.default_faction then
+			state.default_faction = string.gsub(community, "^actor_", "")
+		end
 		printf("[coop] our faction: %s", community)
 	end)
 end
