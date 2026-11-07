@@ -266,6 +266,12 @@ namespace coop
 
 	bool allow_time_jump(u32 ms)
 	{
+		if (is_connected() && is_host())
+		{
+			// the headless host is nobody's player: its sleeps and the like never move the world's clock
+			Msg("[coop] time doesn't jump %u game min: the host's", ms / 60000);
+			return false;
+		}
 		if (!is_connected() || !g_set || !runs_shared_world())
 			return true;
 		const STimeSettings& s = settings();

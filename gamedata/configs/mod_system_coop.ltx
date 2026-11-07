@@ -326,7 +326,8 @@ yan_stalker_sakharov_psi_helmet_upgrade
 ; the server's game time; the sim master's game picks the weather and when surges and psi storms come.
 [coop_time]
 jumps                = alone ; sleep, the medic, a guide...: alone - the whole world's time jumps, but only while
-                             ; nobody else is in the world (with others it doesn't jump); all - always; never
+                             ; nobody else is in the world (with others it doesn't jump); all - always; never.
+                             ; The headless host's never move it (coop_time.cpp allow_time_jump)
 drift_tolerance_ms   = 250   ; real ms: how far our count may stray from the server's before we take its time
 max_hold_s           = 120   ; game s: ahead of the world by less, our clock waits for it; by more, it goes back
 reselect_weather_s   = 600   ; game s: a step of the clock this big (coming into the world, a jump) picks the weather again
