@@ -388,6 +388,18 @@ end
 -------------------------------------------------------------------------------
 -- the rolls, kept as se vars
 
+-- containers (a lead box, AAM, AAC, IAM with an artefact in it: a section of their own, af_X_lead_box...) carry
+-- the artefact's roll: its grade, tooltip and price are the artefact's
+local CONTAINERS = { "_lead_box", "_af_iam", "_af_aac", "_af_aam" }
+
+local function arty_of_combo(sec)
+	for _, suffix in ipairs(CONTAINERS) do
+		if #sec > #suffix and string.sub(sec, -#suffix) == suffix then
+			return string.sub(sec, 1, -#suffix - 1)
+		end
+	end
+end
+
 local cache = {} -- id -> { rec, sec, d }
 local pending = {} -- id -> { sec, rec, t }: a roll from another game for an artefact not here yet
 local npending = 0
@@ -472,18 +484,6 @@ function info(obj)
 		return nil
 	end
 	return data(obj:id(), obj:section(), obj:name())
-end
-
--- containers (a lead box, AAM, AAC, IAM with an artefact in it: a section of their own, af_X_lead_box...) carry
--- the artefact's roll: its grade, tooltip and price are the artefact's
-local CONTAINERS = { "_lead_box", "_af_iam", "_af_aac", "_af_aam" }
-
-local function arty_of_combo(sec)
-	for _, suffix in ipairs(CONTAINERS) do
-		if #sec > #suffix and string.sub(sec, -#suffix) == suffix then
-			return string.sub(sec, 1, -#suffix - 1)
-		end
-	end
 end
 
 -- a new artefact here: its roll (taken over, or by the running source), sent to the others. A roll left under its id
