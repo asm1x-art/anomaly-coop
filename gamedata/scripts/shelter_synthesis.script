@@ -891,6 +891,10 @@ local function made(c, ends)
 		end
 		local panel = alife_object(shelter.state("chamber_panel_" .. n, 65535))
 		if not (result and panel and ini_sys:section_exist(result)) then
+			if stab then -- nothing comes out: the roll waits for no one
+				af_quality.expect(nil)
+				shelter.set_state("af_stab_" .. n, nil)
+			end
 			return
 		end
 		local se = alife_create(result, vector():set(c.window, WALL.cell_floor + 0.3, WALL.cell_z), panel.m_level_vertex_id,
