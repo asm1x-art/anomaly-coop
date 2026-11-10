@@ -77,7 +77,8 @@ export function setFaction(coop, id, value = '') {
 // The world's events an admin starts and stops (server.js worldEvent; in the game coop_world_events.script). The game
 // that runs the world's timetable does it (the sim master: the host while it runs the world); to stop a surge or a
 // psi storm, and for the weather, every game in the world is told (each runs its own). danger: the action asked
-// about first, with what it does to the players.
+// about first, with what it does to the players. zone: one of the Zone's events (coop_zone_events.script): start on a
+// level of its own list (none: one of them), stop (over now, no outcome) or outcome (over now with its outcome).
 export const WORLD_EVENTS = [
   { id: 'surge', title: 'Выброс', stop: true, danger: 'start',
     warn: 'Выброс у всех игроков на открытых локациях: кто не в укрытии, погибнет в конце.' },
@@ -85,6 +86,7 @@ export const WORLD_EVENTS = [
     warn: 'Пси-шторм у всех игроков на открытых локациях: кто не в укрытии, получит пси-урон и может погибнуть.' },
   { id: 'cooling', title: 'Охлаждение (окно рейда)', stop: true, danger: 'stop',
     warn: 'Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.' },
+  { id: 'calm', title: 'Мёртвый штиль', stop: true, zone: true },
   { id: 'bar_rumour', title: 'Бар: слух о тайнике' },
   { id: 'bar_quarrel', title: 'Бар: ссора' },
   { id: 'bar_spender', title: 'Бар: гуляет отряд' },
@@ -99,6 +101,11 @@ export const WORLD_EVENTS = [
   { id: 'weather_foggy', title: 'Погода: туман' },
 ];
 export const worldEventOf = (id) => WORLD_EVENTS.find((e) => e.id === id) ?? null;
+// the actions an event takes
+export const eventActions = (e) => (e.zone ? ['start', 'stop', 'outcome'] : e.stop ? ['start', 'stop'] : ['start']);
+// a Zone's event's levels as its game reported them ("<id>_levels" = "level:name,..."): [{ id, name }]
+export const zoneLevels = (values, id) => String(values?.[`${id}_levels`] ?? '').split(',').filter(Boolean)
+  .map((x) => { const [level, name] = x.split(':'); return { id: level, name: name || level }; });
 // every game in the world does it, not the sim master alone
 export const toEveryGame = (id, action) => id.startsWith('weather_') || ((id === 'surge' || id === 'psi') && action === 'stop');
 
@@ -123,6 +130,10 @@ export function eventsText(events) {
     ? `окно открыто, ещё ${gameTime(Number(v.cool_left), factor)}` : `через ${Math.max(0, Number(v.cool_next) || 0)} ч игровых`}`);
   lines.push(`События бара: ${v.bar_rule === '0' ? 'выключены правилом' : v.barman === '1'
     ? `следующее через ${Math.max(0, Math.round(Number(v.bar_next) || 0))} ч игровых` : 'нет бармена'}`);
+  for (const e of WORLD_EVENTS.filter((x) => x.zone)) {
+    const where = zoneLevels(v, e.id).find((l) => l.id === v[`${e.id}_level`])?.name ?? v[`${e.id}_level`];
+    lines.push(`${e.title}: ${v[e.id] === '1' ? `идёт, ${where}, ещё ${gameTime(Number(v[`${e.id}_left`]), factor)}` : 'нет'}`);
+  }
   if (v.weather) lines.push(`Погода: ${WEATHER[v.weather] ?? v.weather}`);
   if (events.result) lines.push(`Последнее: ${events.result.text}`);
   return lines;

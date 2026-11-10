@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { FACTIONS } from './settings.js';
-import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel, WORLD_EVENTS, worldEventOf, eventsText } from './admin_commands.js';
+import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel, WORLD_EVENTS, worldEventOf, eventsText, eventActions, zoneLevels } from './admin_commands.js';
 
 // The Telegram bot: what the admin page does, for the admins listed in server.cfg, and news for them (a player
 // joined or left, the host went down, a save failed). Long polling (getUpdates), so no port has to be open;
@@ -124,14 +124,19 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
   });
 
   // the world's events: their state and how to start one; one started or stopped (the dangerous asked about first)
-  const worldEvent = (chat, id = '', action = 'start') => {
+  const worldEvent = (chat, id = '', action = 'start', level = '') => {
     if (typeof coop.worldEvent !== 'function') return say(chat, NOT_YET);
     const e = worldEventOf(id);
     if (!e) {
-      return say(chat, [...eventsText(coop.events()), '', 'Запустить: /event <событие> start, остановить: /event <событие> stop.',
-        ...WORLD_EVENTS.map((x) => `${x.id} — ${x.title}${x.stop ? ' (start/stop)' : ''}`)].join('\n'));
+      const now = coop.events();
+      const zones = WORLD_EVENTS.filter((x) => x.zone)
+        .map((x) => `${x.id}: локации ${zoneLevels(now?.values, x.id).map((l) => l.id).join(', ') || '?'}`);
+      return say(chat, [...eventsText(now), '', 'Запустить: /event <событие> start, остановить: /event <событие> stop.',
+        'События Зоны: /event <событие> start [локация], stop, outcome (исход сейчас).',
+        ...WORLD_EVENTS.map((x) => `${x.id} — ${x.title}${eventActions(x).length > 1 ? ` (${eventActions(x).join('/')})` : ''}`),
+        ...zones].join('\n'));
     }
-    const run = () => say(chat, coop.worldEvent(e.id, action, 'бот'));
+    const run = () => say(chat, coop.worldEvent(e.id, action, 'бот', level));
     if (e.danger === action) return confirm(chat, `${e.title}: ${action === 'start' ? 'начать' : 'остановить'}? ${e.warn}`,
       action === 'start' ? 'Начать' : 'Остановить', run);
     return run();
