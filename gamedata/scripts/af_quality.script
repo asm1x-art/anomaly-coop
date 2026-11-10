@@ -453,6 +453,7 @@ end
 
 -- the derived numbers of an artefact by id and section, nil for anything not graded
 function data(id, sec, name)
+	sec = sec and arty_of_combo(sec) or sec -- a container: the artefact in it
 	if not (settings().enabled and id and sec and props_of(sec)) then
 		return nil
 	end
@@ -473,11 +474,28 @@ function info(obj)
 	return data(obj:id(), obj:section(), obj:name())
 end
 
+-- containers (a lead box, AAM, AAC, IAM with an artefact in it: a section of their own, af_X_lead_box...) carry
+-- the artefact's roll: its grade, tooltip and price are the artefact's
+local CONTAINERS = { "_lead_box", "_af_iam", "_af_aac", "_af_aam" }
+
+local function arty_of_combo(sec)
+	for _, suffix in ipairs(CONTAINERS) do
+		if #sec > #suffix and string.sub(sec, -#suffix) == suffix then
+			return string.sub(sec, 1, -#suffix - 1)
+		end
+	end
+end
+
 -- a new artefact here: its roll (taken over, or by the running source), sent to the others. A roll left under its id
--- is an old object's (an id comes free and back within a frame): a new one is always rolled.
+-- is an old object's (an id comes free and back within a frame): a new one is always rolled. A container takes only
+-- the roll given to it (the artefact put in).
 local function take_new(se_obj, at_register)
 	local id, sec = se_obj.id, se_obj:section_name()
-	if not (settings().enabled and props_of(sec)) then
+	local combo = arty_of_combo(sec)
+	if not (settings().enabled and props_of(combo or sec)) then
+		return
+	end
+	if combo and not (expected and expected.sec == sec) then
 		return
 	end
 	if not at_register and fresh[id] then
@@ -534,6 +552,11 @@ local function on_event(sender, payload)
 	end
 	local se = alife_object(id)
 	if se and se:section_name() == sec then
+		local mine = record(id)
+		if rec.lz and mine and not mine.lz then
+			send(id, sec, mine) -- a first-sight roll of a game that saw it before our roll came: ours stands, again for all
+			return
+		end
 		store(id, se:name(), rec)
 		apply_online(id)
 	else
@@ -555,7 +578,7 @@ end
 -- into the game object
 
 function apply(obj)
-	local d = info(obj)
+	local d = IsArtefact(obj) and info(obj)
 	if not d then
 		return
 	end
@@ -680,16 +703,6 @@ end
 -------------------------------------------------------------------------------
 -- containers make a new object: the roll goes over to it
 
-local CONTAINERS = { "_lead_box", "_af_iam", "_af_aac", "_af_aam" }
-
-local function arty_of_combo(sec)
-	for _, suffix in ipairs(CONTAINERS) do
-		if #sec > #suffix and string.sub(sec, -#suffix) == suffix then
-			return string.sub(sec, 1, -#suffix - 1)
-		end
-	end
-end
-
 local function wrap_containers()
 	wrap(itms_manager, "dropdrop_ArtyContainer", function(original, obj_1, obj_2, sec_1, sec_2, ...)
 		local rec = obj_1 and record(obj_1:id())
@@ -730,6 +743,9 @@ local function on_get_item_cost(kind, obj, profile, calculated_cost, ret)
 		f = d.price
 	else
 		f = d.grade == 1 and c.blind_unstable or c.blind
+		if profile and profile.mode == 2 then
+			f = math.max(f, d.price) -- a trader sells a better one at its grade's price: none to buy cheap and sell to a scientist
+		end
 	end
 	ret.new_cost = (tonumber(ret.new_cost) or calculated_cost) * f
 end
@@ -1091,7 +1107,13 @@ function plan(obj, cap)
 	new.st = (rec.st or 0) + 1
 	local p = props_of(sec)
 	local c = settings()
-	local price = math.floor(math.max(c.bunker_min, (p.cost or 0) * math.max(0, nd.price - d.price) * c.bunker_share))
+	-- at least what the new grade adds at a trader who doesn't know grades (unstable 0.5x -> dim, shown as common, 1x):
+	-- no gain in stabilising there and selling to him
+	local function blind(g)
+		return g == 1 and c.blind_unstable or c.blind
+	end
+	local price = math.floor(math.max(c.bunker_min, (p.cost or 0) * math.max(0, nd.price - d.price) * c.bunker_share,
+		(p.cost or 0) * math.max(0, blind(nd.grade) - blind(d.grade))))
 	return { id = obj:id(), sec = sec, from = d.grade, to = nd.grade, rec = new, d = nd, price = price }
 end
 
