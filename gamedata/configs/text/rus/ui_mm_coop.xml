@@ -511,6 +511,12 @@
 	<string id="st_coop_wheel_story">
 		<text>Поделиться сюжетом</text>
 	</string>
+	<string id="st_coop_wheel_in_group">
+		<text>в группе</text>
+	</string>
+	<string id="st_coop_wheel_not_in_group">
+		<text>не в группе</text>
+	</string>
 	<string id="st_coop_story_sent">
 		<text>Твой сюжет отправлен игроку %s.</text>
 	</string>

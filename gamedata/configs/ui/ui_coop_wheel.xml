@@ -1,51 +1,56 @@
 <w>
-	<!-- Co-op: what to do with another player (coop_wheel.script): our modern dark wheel, its art from
-	     tools/coop/wheel_ui.py (gamedata/textures/ui/coop/wheel_*.dds). The icons go over the buttons; the hint in
-	     the middle names what the button under the cursor does -->
-	<wheel x="292" y="164" width="440" height="420" stretch="1">
-		<background x="0" y="0" width="440" height="420" stretch="1">
-			<texture>ui\coop\wheel_bg</texture>
+	<!-- Co-op: what to do with another player (coop_wheel.script), in the look of the game's own companion wheel: its
+	     backing and plate are the game's textures, the buttons' discs and the icons ours (tools/coop/wheel_ui.py,
+	     gamedata/textures/ui/coop/wheel_*.dds; the icons white, tinted grey or amber by the script). Laid out in
+	     square units, as on a 4:3 screen: the script narrows it for a wider one. The hint in the middle names what
+	     the button under the cursor does -->
+	<wheel x="317" y="169" width="390" height="373" stretch="1">
+		<background x="10" y="10" width="370" height="353" stretch="1">
+			<texture a="242">ui_hud2_wheel_ammo</texture>
 		</background>
 
-		<btn_trade x="170" y="15" width="100" height="100" stretch="1">
+		<btn_trade x="149" y="6" width="91" height="91" stretch="1">
 			<texture>ui\coop\wheel_btn</texture>
 		</btn_trade>
-		<icon_trade x="192" y="37" width="56" height="56" stretch="1"/>
+		<icon_trade x="179" y="36" width="31" height="31" stretch="1"/>
 
-		<btn_group x="308" y="115" width="100" height="100" stretch="1">
+		<btn_group x="278" y="99" width="91" height="91" stretch="1">
 			<texture>ui\coop\wheel_btn</texture>
 		</btn_group>
-		<icon_group x="330" y="137" width="56" height="56" stretch="1"/>
+		<icon_group x="308" y="129" width="31" height="31" stretch="1"/>
 
-		<btn_routes x="255" y="277" width="100" height="100" stretch="1">
+		<btn_routes x="229" y="250" width="91" height="91" stretch="1">
 			<texture>ui\coop\wheel_btn</texture>
 		</btn_routes>
-		<icon_routes x="277" y="299" width="56" height="56" stretch="1"/>
+		<icon_routes x="259" y="280" width="31" height="31" stretch="1"/>
 
-		<btn_notes x="85" y="277" width="100" height="100" stretch="1">
+		<btn_notes x="70" y="250" width="91" height="91" stretch="1">
 			<texture>ui\coop\wheel_btn</texture>
 		</btn_notes>
-		<icon_notes x="107" y="299" width="56" height="56" stretch="1"/>
+		<icon_notes x="100" y="280" width="31" height="31" stretch="1"/>
 
-		<btn_story x="32" y="115" width="100" height="100" stretch="1">
+		<btn_story x="21" y="99" width="91" height="91" stretch="1">
 			<texture>ui\coop\wheel_btn</texture>
 		</btn_story>
-		<icon_story x="54" y="137" width="56" height="56" stretch="1"/>
+		<icon_story x="51" y="129" width="31" height="31" stretch="1"/>
 
-		<hint x="140" y="160" width="160" height="40" stretch="1">
-			<text complex_mode="0" r="226" g="236" b="236" align="c" vert_align="c" font="letterica18"/>
+		<hint x="95" y="155" width="200" height="26" stretch="1">
+			<text complex_mode="0" r="240" g="217" b="182" align="c" vert_align="c" font="graffiti22"/>
 		</hint>
-		<hint_desc x="146" y="198" width="148" height="66" stretch="1">
-			<text complex_mode="1" r="150" g="170" b="175" align="c" vert_align="t" font="letterica16"/>
+		<hint_desc x="120" y="184" width="150" height="54" stretch="1">
+			<text complex_mode="1" r="200" g="200" b="200" align="c" vert_align="t" font="letterica16"/>
 		</hint_desc>
 	</wheel>
 
-	<info x="341" y="589" width="341" height="60" stretch="1">
-		<background x="0" y="0" width="341" height="60" stretch="1">
-			<texture>ui\coop\wheel_plate</texture>
+	<info x="391" y="553" width="242" height="46" stretch="1">
+		<background x="0" y="0" width="242" height="46" stretch="1">
+			<texture>ui_inGame2_message_box</texture>
 		</background>
-		<name x="20" y="14" width="300" height="33" stretch="1">
-			<text complex_mode="1" r="46" g="196" b="170" align="c" vert_align="c" font="letterica18"/>
+		<name x="8" y="4" width="226" height="21" stretch="1">
+			<text complex_mode="0" r="240" g="240" b="240" align="c" vert_align="c" font="letterica18"/>
 		</name>
+		<status x="8" y="24" width="226" height="17" stretch="1">
+			<text complex_mode="0" r="140" g="140" b="140" align="c" vert_align="c" font="letterica16"/>
+		</status>
 	</info>
 </w>

@@ -43,6 +43,22 @@ local ACTIONS = {
 	},
 }
 
+local ICON = GetARGB(255, 200, 200, 200) -- the icons' grey, amber under the cursor
+local ICON_LIT = GetARGB(255, 238, 155, 23)
+
+-- how much narrower a square unit is across than down: the layout is made as for a 4:3 screen
+local function narrowing()
+	return (1024 / 768) / (device().width / device().height)
+end
+
+-- a part laid out for 4:3 put right on this screen: a top one stays centred, a part inside its parent keeps its place
+local function narrow(wnd, k, top)
+	local pos, w = wnd:GetWndPos(), wnd:GetWidth()
+	local x = top and 512 + (pos.x - 512) * k or pos.x * k
+	wnd:SetWndPos(vector2():set(x, pos.y))
+	wnd:SetWndSize(vector2():set(w * k, wnd:GetHeight()))
+end
+
 class "UICoopWheel" (CUIScriptWnd)
 
 function UICoopWheel:__init() super()
@@ -52,7 +68,7 @@ function UICoopWheel:__init() super()
 	local xml = CScriptXmlInit()
 	xml:ParseFile("ui_coop_wheel.xml")
 	self.dialog = xml:InitStatic("wheel", self)
-	xml:InitStatic("wheel:background", self.dialog)
+	local parts = { xml:InitStatic("wheel:background", self.dialog) }
 	self.buttons, self.icons = {}, {}
 	for action in pairs(ACTIONS) do
 		self.buttons[action] = xml:Init3tButton("wheel:btn_" .. action, self.dialog)
@@ -60,12 +76,24 @@ function UICoopWheel:__init() super()
 		self:AddCallback("btn_" .. action, ui_events.BUTTON_CLICKED, function() self:Do(action) end, self)
 		self.icons[action] = xml:InitStatic("wheel:icon_" .. action, self.dialog) -- over its button
 		self:SetIcon(action, action)
+		parts[#parts + 1] = self.buttons[action]
+		parts[#parts + 1] = self.icons[action]
 	end
 	self.hint = xml:InitTextWnd("wheel:hint", self.dialog)
 	self.hint_desc = xml:InitTextWnd("wheel:hint_desc", self.dialog)
 	local info = xml:InitStatic("info", self)
-	xml:InitStatic("info:background", info)
+	parts[#parts + 1] = xml:InitStatic("info:background", info)
 	self.name = xml:InitTextWnd("info:name", info)
+	self.status = xml:InitTextWnd("info:status", info)
+	for _, part in ipairs({ self.hint, self.hint_desc, self.name, self.status }) do
+		parts[#parts + 1] = part
+	end
+	self.k = narrowing()
+	narrow(self.dialog, self.k, true)
+	narrow(info, self.k, true)
+	for _, part in ipairs(parts) do
+		narrow(part, self.k)
+	end
 end
 
 function UICoopWheel:__finalize()
@@ -75,23 +103,31 @@ end
 function UICoopWheel:SetIcon(action, picture)
 	self.icons[action]:InitTexture("ui\\coop\\wheel_" .. picture)
 	self.icons[action]:SetStretchTexture(true)
+	self.icons[action]:SetTextureColor(ICON)
 end
 
 function UICoopWheel:Reset(id, name)
 	self.id, self.player = id, name
 	self.name:SetText(name)
-	self:SetIcon("group", coop_group.has(name) and "group_remove" or "group_add") -- leave or put out: a minus
+	local in_group = coop_group.has(name)
+	self.status:SetText(game.translate_string(in_group and "st_coop_wheel_in_group" or "st_coop_wheel_not_in_group"))
+	-- invite: a plus; put out (the leader): a minus; leave: a door
+	self:SetIcon("group", not in_group and "group_add" or coop_group.is_leader() and "group_remove" or "group_leave")
 end
 
 function UICoopWheel:Update()
 	CUIScriptWnd.Update(self)
+	local lit
 	for action, button in pairs(self.buttons) do
-		if button:IsCursorOverWindow() then
-			local hint = ACTIONS[action].hint(self.id, self.player)
-			self.hint:SetText(game.translate_string(hint))
-			self.hint_desc:SetText(game.translate_string(hint .. "_d"))
-			return
-		end
+		local over = not lit and button:IsCursorOverWindow()
+		self.icons[action]:SetTextureColor(over and ICON_LIT or ICON)
+		lit = lit or over and action
+	end
+	if lit then
+		local hint = ACTIONS[lit].hint(self.id, self.player)
+		self.hint:SetText(game.translate_string(hint))
+		self.hint_desc:SetText(game.translate_string(hint .. "_d"))
+		return
 	end
 	self.hint:SetText("")
 	self.hint_desc:SetText("")
@@ -114,7 +150,7 @@ function UICoopWheel:OnKeyboard(dik, keyboard_action)
 end
 
 function open(id, name)
-	if not GUI then
+	if not GUI or math.abs(GUI.k - narrowing()) > 0.001 then -- none yet, or made for another screen shape
 		GUI = UICoopWheel()
 	end
 	if GUI:IsShown() then

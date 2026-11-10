@@ -511,6 +511,12 @@
 	<string id="st_coop_wheel_story">
 		<text>Share the story</text>
 	</string>
+	<string id="st_coop_wheel_in_group">
+		<text>in your group</text>
+	</string>
+	<string id="st_coop_wheel_not_in_group">
+		<text>not in your group</text>
+	</string>
 	<string id="st_coop_story_sent">
 		<text>Your story went to %s.</text>
 	</string>
