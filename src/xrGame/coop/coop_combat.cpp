@@ -629,7 +629,11 @@ namespace coop
 		hit.PACKET_TYPE = GE_HIT;
 		hit.Read_Packet_Cont(P);
 		if (!world_ready())
+		{
+			if (debug_mode)
+				Msg("[coop dbg] peer %u's hit on %u before our world is up: dropped", sender, target);
 			return;
+		}
 
 		if (kind == eHitNpc)
 		{
