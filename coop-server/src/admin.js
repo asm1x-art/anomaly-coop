@@ -193,9 +193,9 @@ export function startAdmin({ port = 8080, host = '0.0.0.0', password, coop, log 
           return res.end(data);
         }
         case 'POST /api/event': {
-          // a world's event started or stopped: { name, action: start|stop }; the server's answer and the state
-          const { name, action } = await readJson(req);
-          const answer = coop.worldEvent(String(name ?? ''), String(action ?? ''), 'админ-страница');
+          // a world's event started or stopped: { name, action: start|stop|outcome, level }; the answer and the state
+          const { name, action, level } = await readJson(req);
+          const answer = coop.worldEvent(String(name ?? ''), String(action ?? ''), 'админ-страница', String(level ?? ''));
           return reply(res, 200, { answer, ...state() });
         }
         case 'POST /api/resume':

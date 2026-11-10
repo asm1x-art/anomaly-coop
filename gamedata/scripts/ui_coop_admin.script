@@ -1063,7 +1063,7 @@ function UICoopAdmin:main_mechanics(box, X, Y, W, H, L)
 	self:text(30, y, W - 60, 60, tr(d.host and d.host.has and "st_coop_adm_host_god" or "st_coop_adm_no_host_offline"), C.dim, box, nil, "s")
 end
 
--- События: the world's events (coop_world_events.script), the server's command "event <id> <start|stop>". Rows:
+-- События: the world's events (coop_world_events.script), the server's command "event <id> <start|stop|outcome> [level]". Rows:
 -- { id, the start's and the stop's captions, the action asked about first }
 local EVENT_ROWS = {
 	{ "surge", "st_coop_adm_ev_start", "st_coop_adm_ev_stop", "start" },
@@ -1073,8 +1073,12 @@ local EVENT_ROWS = {
 local BAR_EVENTS = { "rumour", "quarrel", "spender", "gift", "wounded", "binge" }
 local WEATHERS = { "clear", "partly", "cloudy", "rain", "storm", "foggy" }
 
+-- the Zone's events (coop_zone_events.script): the level picked for a start, an index into its pool (0: any)
+local ZONE_EVENTS = { "calm", "ash" }
+local zone_pick = {}
+
 -- for the search
-EVENT_TITLES = { "surge", "psi", "cooling" }
+EVENT_TITLES = { "surge", "psi", "cooling", "calm", "ash" }
 for _, id in ipairs(BAR_EVENTS) do
 	EVENT_TITLES[#EVENT_TITLES + 1] = "bar_" .. id
 end
@@ -1131,6 +1135,31 @@ function UICoopAdmin:main_events(box, X, Y, W, H, L)
 			self:btn(W - 24 - (3 - i) * bw - (2 - i) * 10, y, bw, 34, caption, ask and function()
 				self:confirm(tr("st_coop_ev_t_" .. id) .. ": " .. caption, tr("st_coop_adm_ev_warn_" .. id, math.floor(lead)), caption, f)
 			end or f, L, box, X, Y, ask and "danger" or "normal")
+		end
+		y = y + 40
+	end
+	-- the Zone's events: the state; the level for a start (a click: the next of its pool), start, stop, outcome now
+	for _, id in ipairs(ZONE_EVENTS) do
+		local pool = coop_zone_events.levels(id)
+		local on = v[id] == "1"
+		local state = on and tr("st_coop_adm_ev_zone_on", level_name(v[id .. "_level"]), duration(tonumber(v[id .. "_left"])))
+			or tr("st_coop_adm_ev_zone_off")
+		self:text(24, y, 150, 30, tr("st_coop_ev_t_" .. id), C.text, box, nil, "m")
+		self:text(180, y, W - 24 - 180, 30, state, on and C.warn or C.dim, box, nil, "s")
+		y = y + 32
+		local i = zone_pick[id] or 0
+		local lvl = i > 0 and pool[i] or nil
+		local lw = math.max(100, W - 48 - 3 * (bw + 10))
+		self:btn(24, y, lw, 30, tr("st_coop_adm_ev_level", lvl and level_name(lvl) or tr("st_coop_adm_ev_level_any")), function()
+			zone_pick[id] = ((zone_pick[id] or 0) + 1) % (#pool + 1)
+			self:build_main()
+		end, L, box, X, Y)
+		for k, action in ipairs({ "start", "stop", "outcome" }) do
+			local caption = tr(action == "start" and "st_coop_adm_ev_start" or action == "stop" and "st_coop_adm_ev_stop"
+				or "st_coop_adm_ev_outcome")
+			self:btn(24 + lw + 10 + (k - 1) * (bw + 10), y, bw, 30, caption, function()
+				command("event", id, action, action == "start" and lvl or "")
+			end, L, box, X, Y)
 		end
 		y = y + 40
 	end

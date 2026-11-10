@@ -11,6 +11,8 @@
 --   bar_<id>       one of the bar's events now (shelter_events.force), if the one it needs is in the shelter.
 --   weather_<c>    the weather cycle c now (clear, partly, cloudy, rain, storm, foggy): the master picks it and
 --                  publishes it, the other games take it at once.
+--   calm ...       the Zone's events (coop_zone_events.script): start [level] (none: one of its pool), stop (over
+--                  now, no outcome), outcome (over now, its outcome as at the timer's end).
 -- After each the master reports where the events are ("coop_admin_events": key=value fields, result: what it did,
 -- for the admins' journal); also when the server asks (events_report).
 
@@ -82,6 +84,7 @@ function report(result)
 	local wm = level_weathers.get_weather_manager()
 	put("weather", wm and wm.cycle)
 	put("factor", level.get_time_factor())
+	coop_zone_events.report(put)
 	put("result", result)
 	coop_sync.send_event("coop_admin_events", unpack(f))
 end
@@ -184,8 +187,8 @@ end
 
 -------------------------------------------------------------------------------
 
--- the server said so (coop_admin_do.script): name, start|stop, the admin
-function run(name, action, admin)
+-- the server said so (coop_admin_do.script): name, start|stop|outcome, the admin, a level (the Zone's events)
+function run(name, action, admin, lvl)
 	if not db.actor then
 		return
 	end
@@ -211,6 +214,8 @@ function run(name, action, admin)
 			return
 		elseif storm then
 			result = storm_start(name)
+		elseif coop_zone_events.is_event(name) then
+			result = coop_zone_events.admin(name, action, admin, lvl)
 		elseif name == "cooling" then
 			result = cooling(action)
 		elseif bar_id then

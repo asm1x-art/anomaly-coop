@@ -9,7 +9,8 @@
 // them; a world reset drops them (the news of an old world).
 
 export const NEWS_FACT = 'news';
-export const DEFAULT_NEWS_TYPES = ['cooling', 'cooling_end', 'surge', 'surge_end', 'psi', 'psi_end', 'raid', 'bar', 'shelter'];
+export const DEFAULT_NEWS_TYPES = ['cooling', 'cooling_end', 'surge', 'surge_end', 'psi', 'psi_end', 'raid', 'bar', 'shelter',
+  'zone_event', 'zone_event_end'];
 const TEXT_MAX = 400;
 const WORLD_MAX = 40;
 

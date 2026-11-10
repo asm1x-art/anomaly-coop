@@ -1,0 +1,81 @@
+; The Zone's events (coop_zone_events.script; Notion "События Зоны"). A world-state event lies on one level for some
+; hours: started by the director after a surge, or by an admin (the admin window's "События", the admin page, the
+; bot: event <id> start [level] | stop | outcome). At most one world-state event and one scene at a time.
+; Times are game hours (the world runs x6: 1 game hour = 10 real minutes).
+
+[zone_events]
+enabled             = true      ; the director's own starts (an admin's start works either way)
+check_s             = 2         ; real seconds between looks at the events (every game)
+after_surge_s       = 45        ; real seconds after a surge's end before the director rolls (its news first)
+quiet_s             = 20        ; a game that has just loaded the world settles a surge it missed: no roll then
+end_news_hours      = 12        ; a player who heard an event begin hears its end only this many game hours after it
+
+; prices while an event runs, by category: what an item's "kind" is (ammo also by its own kind of price)
+[zone_events_price_kinds]
+ammo                = ammo
+mutant              = i_mutant_raw, i_mutant_cooked, i_mutant_belt
+artefact            = i_arty, i_arty_cont
+medical             = i_medical
+
+; ---------------------------------------------------------------------------------------------------------------
+; Мёртвый штиль: every anomaly on one level goes out, fields and single ones alike; the artefacts lying there go with
+; them and none is born there meanwhile; at the end the anomalies come back and bear artefacts as after a surge.
+; Southern surface levels with anomalies (not the Bar).
+[zone_event_calm]
+enabled             = true
+slot                = world     ; world (a world state) or scene
+chance              = 0.25      ; the director's chance after a surge
+cooldown_hours      = 48        ; game hours since the last calm ended before the director starts another
+hours_min           = 6
+hours_max           = 12
+levels              = l01_escape, l02_garbage, l03_agroprom, l04_darkvalley, l06_rostok, l07_military, l08_yantar, l09_deadcity, k00_marsh, k01_darkscape, k02_trucks_cemetery, y04_pole
+; prices while it runs: buy_<category> what the player pays traders, sell_<category> what traders pay the player
+; (categories: [zone_events_price_kinds]; none given: 1)
+sell_artefact       = 1.1
+; smarts of its level closed to squads whose section has one of these in it (none for the calm)
+closed_to_squads    =
+; it puts out every anomaly of the level (anything Anomaly binds as an anomaly field), radiation spots too, but these:
+; sections starting so (campfires, teleports, the Monolith's wish-granter zone, the Generators' generators)
+keep_sections       = campfire, zone_teleport, zone_monolith, generator_
+keep_fields         =           ; object names never put out (story anomalies), comma separated
+
+; ---------------------------------------------------------------------------------------------------------------
+; Пепельный фронт: fire hotspots in the Red Forest, the wind carries the ash to Yantar, Jupiter or Zaton; or the surge
+; has shaken up the old machinery of the Truck Cemetery. The level's weather turns to ash, the background radiation
+; there is deadly but in a sealed scientific suit, its people sit it out in a shelter. Players may always go there.
+[zone_event_ash]
+enabled             = true
+slot                = world
+chance              = 0.2       ; the director's chance after a surge
+cooldown_hours      = 72        ; game hours since the last front ended before the director starts another
+real_hours_min      = 3         ; real hours (at the world's speed when it begins)
+real_hours_max      = 4
+levels              = l10_red_forest, l08_yantar, jupiter, zaton, k02_trucks_cemetery
+weather             = w_zev_ash ; environment\weathers\w_zev_ash.ltx
+buy_medical         = 1.2       ; anti-rad in demand
+; squads that may still take the level's smarts as targets: parts of their sections (the sealed gear's people; mercs in
+; SEVA have no squad section of their own yet)
+only_squads         = ecolog_, monolith_
+; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
+sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit
+; the dose without one: radiation per second rad_rate + rad_grow * seconds there; past rad_harm_from of radiation the
+; health goes by rad_health * radiation per second (death in about 3-4 minutes without anti-rad: to tune in tests)
+rad_rate            = 0.004
+rad_grow            = 0.00004
+rad_harm_from       = 0.3
+rad_health          = 0.006
+; the shelters: a smart per level; its people (communities; none: all) go in for the front, back after
+shelter_l10_red_forest      = red_smart_terrain_3_2     ; the cave (Sin)
+shelter_communities_l10_red_forest = greh
+shelter_l08_yantar          = yan_smart_terrain_6_4     ; the scientists' bunker
+shelter_communities_l08_yantar = ecolog, stalker
+shelter_jupiter             = jup_a6                    ; Yanov station
+shelter_communities_jupiter = stalker, ecolog, freedom, dolg, csky
+shelter_zaton               = zat_stalker_base_smart    ; Skadovsk and the barges
+shelter_communities_zaton   = stalker, ecolog, freedom, dolg, csky
+shelter_k02_trucks_cemetery = trc_sim_20                ; the bandits' building
+shelter_communities_k02_trucks_cemetery = bandit
+sealed              = jupiter, zaton  ; shelters that let nobody in for the front, players neither
+sealed_radius       = 60        ; metres from the shelter's smart
+return_hours        = 12        ; game hours after the end the squads may take to get back to their smarts
+albino_squads       =           ; albino mutant squads put on the level for the front (none yet: assets later)

@@ -881,7 +881,7 @@
 		<text>Ev</text>
 	</string>
 	<string id="st_coop_adm_events_sub">
-		<text>Surge, psi storm, Cooling, the bar and the weather for every player, with the usual world news. The game that runs the world (the host) does it; what it did goes to the journal.</text>
+		<text>Surge, psi storm, Cooling, the Zone's events, the bar and the weather for every player, with the usual world news. The game that runs the world (the host) does it; what it did goes to the journal.</text>
 	</string>
 	<string id="st_coop_adm_ev_wait">
 		<text>The host has not told about the events yet: nobody runs the world, or the answer is on its way.</text>

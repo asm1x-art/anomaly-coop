@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the Zone's events (coop_zone_events.script, coop_zone_calm.script) -->
+<string_table>
+	<string id="st_zev_t_calm">
+		<text>Мёртвый штиль</text>
+	</string>
+	<string id="st_coop_ev_t_calm">
+		<text>Мёртвый штиль</text>
+	</string>
+	<string id="st_zev_calm_start">
+		<text>Аномалии %s легли! Электры не бьют, жарки не горят, воронки схлопнулись. И артефакты оттуда пропали — как вымело.</text>
+	</string>
+	<string id="st_zev_calm_end">
+		<text>Штиль %s кончился: аномалии снова бьют, скоро там пойдут и артефакты.</text>
+	</string>
+	<string id="st_zev_r_unknown">
+		<text>Нет такого события: %s.</text>
+	</string>
+	<string id="st_zev_r_busy">
+		<text>Уже идёт «%s» (%s): сначала его остановить.</text>
+	</string>
+	<string id="st_zev_r_bad_level">
+		<text>Локации %s нет в списке события «%s».</text>
+	</string>
+	<string id="st_zev_r_no_levels">
+		<text>«%s»: список локаций пуст.</text>
+	</string>
+	<string id="st_zev_r_started">
+		<text>«%s» начался: %s, около %s ч игровых.</text>
+	</string>
+	<string id="st_zev_r_not_running">
+		<text>«%s» сейчас не идёт.</text>
+	</string>
+	<string id="st_zev_r_stopped">
+		<text>«%s» (%s) остановлен, без итога.</text>
+	</string>
+	<string id="st_zev_r_outcome">
+		<text>«%s» (%s) закончен с итогом.</text>
+	</string>
+	<string id="st_zev_r_action">
+		<text>Не знаю действия %s: start, stop или outcome.</text>
+	</string>
+	<string id="st_coop_adm_ev_zone_on">
+		<text>идёт: %s, ещё %s</text>
+	</string>
+	<string id="st_coop_adm_ev_zone_off">
+		<text>не идёт</text>
+	</string>
+	<string id="st_coop_adm_ev_level">
+		<text>Локация: %s</text>
+	</string>
+	<string id="st_coop_adm_ev_level_any">
+		<text>случайная</text>
+	</string>
+	<string id="st_coop_adm_ev_outcome">
+		<text>Исход сейчас</text>
+	</string>
+	<string id="st_zev_t_ash">
+		<text>Пепельный фронт</text>
+	</string>
+	<string id="st_coop_ev_t_ash">
+		<text>Пепельный фронт</text>
+	</string>
+	<string id="st_zev_ash_start">
+		<text>Пепел %s! Фон в десятки раз выше обычного: без замкнутого научного костюма там не выжить.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest">
+		<text>Горит Рыжий лес! Очаги по всему лесу, дым и пепел, фон в десятки раз выше обычного. Без «Севы» или ССП туда не суйтесь, экзоскелет не спасёт. Грешники ушли в пещеру.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar">
+		<text>Горит Рыжий лес, ветер несёт пепел на Янтарь! Фон в десятки раз выше обычного, без «Севы» или ССП — верная смерть. Учёные пустили всех в бункер.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter">
+		<text>Горит Рыжий лес, ветер несёт пепел на Юпитер! Фон в десятки раз выше обычного, без «Севы» или ССП — верная смерть. Янов задраили: внутрь никого не пускают, пока не осядет.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton">
+		<text>Горит Рыжий лес, ветер несёт пепел на Затон! Фон в десятки раз выше обычного, без «Севы» или ССП — верная смерть. Скадовск и баржи задраены: внутрь никого не пускают, пока не осядет.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery">
+		<text>Выброс растряс старую технику на Кладбище техники: машины фонят как никогда, ветер гоняет радиоактивную пыль и пепел. Без «Севы» или ССП — верная смерть. Бандиты засели в здании.</text>
+	</string>
+	<string id="st_zev_ash_end">
+		<text>Пепел %s осел: фон спадает, люди выходят из укрытий.</text>
+	</string>
+	<string id="st_zev_ash_exposed">
+		<text>Пепел! Без замкнутого костюма здесь долго не протянуть: пейте антирад и уходите.</text>
+	</string>
+	<string id="st_zev_ash_sealed">
+		<text>Укрытие задраено до конца пепельного фронта: внутрь никого не пускают.</text>
+	</string>
+	<!-- a level as the news say it: "the anomalies are down <here>" -->
+	<string id="st_zev_on_l01_escape">
+		<text>на Кордоне</text>
+	</string>
+	<string id="st_zev_on_l02_garbage">
+		<text>на Свалке</text>
+	</string>
+	<string id="st_zev_on_l03_agroprom">
+		<text>на Агропроме</text>
+	</string>
+	<string id="st_zev_on_l04_darkvalley">
+		<text>в Тёмной долине</text>
+	</string>
+	<string id="st_zev_on_l05_bar">
+		<text>в Баре</text>
+	</string>
+	<string id="st_zev_on_l06_rostok">
+		<text>на Дикой территории</text>
+	</string>
+	<string id="st_zev_on_l07_military">
+		<text>на Армейских складах</text>
+	</string>
+	<string id="st_zev_on_l08_yantar">
+		<text>на Янтаре</text>
+	</string>
+	<string id="st_zev_on_l09_deadcity">
+		<text>в Мёртвом городе</text>
+	</string>
+	<string id="st_zev_on_k00_marsh">
+		<text>на Болотах</text>
+	</string>
+	<string id="st_zev_on_k01_darkscape">
+		<text>в Тёмной лощине</text>
+	</string>
+	<string id="st_zev_on_k02_trucks_cemetery">
+		<text>на Кладбище техники</text>
+	</string>
+	<string id="st_zev_on_y04_pole">
+		<text>на Поляне</text>
+	</string>
+	<string id="st_zev_on_l10_red_forest">
+		<text>в Рыжем лесу</text>
+	</string>
+	<string id="st_zev_on_l10_radar">
+		<text>на Радаре</text>
+	</string>
+	<string id="st_zev_on_zaton">
+		<text>на Затоне</text>
+	</string>
+	<string id="st_zev_on_jupiter">
+		<text>на Юпитере</text>
+	</string>
+	<string id="st_zev_on_pripyat">
+		<text>в Припяти</text>
+	</string>
+</string_table>

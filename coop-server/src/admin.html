@@ -285,27 +285,53 @@
       li.textContent = line;
       now.append(li);
     }
-    if (eventsBuilt) return;
+    if (eventsBuilt) return zoneLevels(events);
     eventsBuilt = true;
     for (const e of events.list) {
       const row = document.createElement('div');
       const title = document.createElement('span');
       title.textContent = e.title;
       row.append(title);
-      for (const action of e.stop ? ['start', 'stop'] : ['start']) {
+      if (e.zone) {
+        // where it starts: one of its levels as the world's game reported them, or any
+        const select = document.createElement('select');
+        select.id = `event-level-${e.id}`;
+        row.append(select);
+      }
+      for (const action of e.zone ? ['start', 'stop', 'outcome'] : e.stop ? ['start', 'stop'] : ['start']) {
         const button = document.createElement('button');
         if (e.danger === action) button.className = 'danger';
-        button.textContent = action === 'start' ? 'Начать' : 'Остановить';
+        button.textContent = { start: 'Начать', stop: 'Остановить', outcome: 'Исход сейчас' }[action];
         button.addEventListener('click', () => worldEvent(e, action));
         row.append(button);
       }
       $('events').append(row);
     }
+    zoneLevels(events);
+  }
+  // the levels of the Zone's events in their pickers, the pick kept
+  function zoneLevels(events) {
+    for (const e of events.list.filter((x) => x.zone)) {
+      const select = $(`event-level-${e.id}`);
+      const levels = String(events.values?.[`${e.id}_levels`] ?? '').split(',').filter(Boolean).map((x) => x.split(':'));
+      const key = levels.map((l) => l[0]).join(',');
+      if (!select || select.dataset.key === key) continue;
+      const picked = select.value;
+      select.replaceChildren(...[['', 'любая локация'], ...levels].map(([id, name]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name || id;
+        return option;
+      }));
+      select.value = levels.some((l) => l[0] === picked) ? picked : '';
+      select.dataset.key = key;
+    }
   }
   async function worldEvent(e, action) {
     if (e.danger === action && !confirm(`${e.title}: ${action === 'start' ? 'начать' : 'остановить'}? ${e.warn}`)) return;
+    const level = e.zone && action === 'start' ? $(`event-level-${e.id}`)?.value ?? '' : '';
     try {
-      const state = await api('POST', '/api/event', { name: e.id, action });
+      const state = await api('POST', '/api/event', { name: e.id, action, level });
       $('event-note').textContent = state.answer;
       renderStatus(state);
     } catch (err) {

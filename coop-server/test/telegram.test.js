@@ -354,6 +354,27 @@ test('telegram: polling sets the commands, follows the offset, waits out network
   await t.bot.stop();
 });
 
+test('telegram: /event calm start <level> passes the level; the list shows the Zone\'s events and their levels', async () => {
+  const done = [];
+  const coop = fakeCoop({
+    events: () => ({ values: { calm: '1', calm_level: 'l08_yantar', calm_left: '3600', calm_levels: 'l08_yantar:Янтарь,k00_marsh:Болота', factor: '6' } }),
+    worldEvent: (...args) => (done.push(args), 'ok'),
+  });
+  const t = start({ coop });
+  try {
+    await t.say('/event');
+    const list = t.sent()[0].body.text;
+    assert.match(list, /Мёртвый штиль: идёт, Янтарь, ещё 1 ч 0 мин/);
+    assert.match(list, /calm: локации l08_yantar, k00_marsh/);
+    await t.say('/event calm start k00_marsh');
+    assert.deepEqual(done.at(-1), ['calm', 'start', 'бот', 'k00_marsh']);
+    await t.say('/event calm outcome');
+    assert.deepEqual(done.at(-1), ['calm', 'outcome', 'бот', '']);
+  } finally {
+    await t.bot.stop();
+  }
+});
+
 test('telegram: /event shows the world\'s events; a surge waits for a yes, the weather goes at once', async () => {
   const done = [];
   const coop = fakeCoop({
