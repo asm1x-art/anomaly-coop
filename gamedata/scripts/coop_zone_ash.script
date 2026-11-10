@@ -99,7 +99,7 @@ local function update_weather(on)
 		ash_on = false
 		local wm = level_weathers.get_weather_manager()
 		if wm then
-			wm:forced_weather_change() -- the world's weather again
+			wm:select_weather(true) -- the world's weather again, now (forced_weather_change waits for the next game hour)
 		end
 	end
 end
