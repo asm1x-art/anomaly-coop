@@ -81,7 +81,7 @@ local function fill_overview(os)
 	local list = t.positions
 	local worth, units, offs = 0, 0, 0
 	for _, p in ipairs(list) do
-		worth, units = worth + p.count * shelter_trade.unit_cost(p.section) * p.cond, units + p.count
+		worth, units = worth + p.count * shelter_trade.unit_cost(p.section) * p.cond * (p.value or 1), units + p.count
 		offs = offs + (p.on and 0 or 1)
 	end
 	-- the store
@@ -325,7 +325,7 @@ local function position_rows(t)
 		end
 	end
 	local function key(p)
-		local one = shelter_trade.price_of(p.section, p.cond, p.cat)
+		local one = shelter_trade.price_of(p.section, p.cond, p.cat, p.value)
 		return s.sort == "count" and p.count or s.sort == "price" and one or s.sort == "worth" and one * p.count or nil
 	end
 	table.sort(out, function(a, b)
@@ -446,9 +446,9 @@ local function fill_stock(os)
 			end, nil, "tr")
 		end
 		btn(os, col.markup + 92, ry + 2, 30, th - 4, "+", change(step), "flat")
-		os:text(col.price, ry, 76, th, money(shelter_trade.price_of(p.section, p.cond, p.cat)), C.good, body, nil, "s")
+		os:text(col.price, ry, 76, th, money(shelter_trade.price_of(p.section, p.cond, p.cat, p.value)), C.good, body, nil, "s")
 		if wide > 0 then
-			os:text(col.worth, ry, 90, th, money(shelter_trade.price_of(p.section, p.cond, p.cat) * p.count), C.dim, body, nil, "s")
+			os:text(col.worth, ry, 90, th, money(shelter_trade.price_of(p.section, p.cond, p.cat, p.value) * p.count), C.dim, body, nil, "s")
 		end
 		btn(os, col.sale, ry + 3, 148, th - 6, tr(p.on and "st_shelter_tr_on_sale" or "st_shelter_tr_off_sale"), function()
 			shelter_trade.set_own_sale(p.section, p.on and "off" or "on")
