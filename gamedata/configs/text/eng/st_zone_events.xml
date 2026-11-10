@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the Zone's events (coop_zone_events.script, coop_zone_calm.script) -->
+<string_table>
+	<string id="st_zev_t_calm">
+		<text>Dead calm</text>
+	</string>
+	<string id="st_coop_ev_t_calm">
+		<text>Dead calm</text>
+	</string>
+	<string id="st_zev_calm_start">
+		<text>The anomalies are down %s! Electros don't strike, burners don't burn, vortexes have collapsed. And the artefacts there are gone, as if swept away.</text>
+	</string>
+	<string id="st_zev_calm_end">
+		<text>The calm %s is over: the anomalies are active again, and artefacts will soon be born there.</text>
+	</string>
+	<string id="st_zev_r_unknown">
+		<text>No such event: %s.</text>
+	</string>
+	<string id="st_zev_r_busy">
+		<text>"%s" (%s) is already on: stop it first.</text>
+	</string>
+	<string id="st_zev_r_bad_level">
+		<text>%s is not in the levels of "%s".</text>
+	</string>
+	<string id="st_zev_r_no_levels">
+		<text>"%s": its level list is empty.</text>
+	</string>
+	<string id="st_zev_r_started">
+		<text>"%s" began: %s, about %s game hours.</text>
+	</string>
+	<string id="st_zev_r_not_running">
+		<text>"%s" is not on now.</text>
+	</string>
+	<string id="st_zev_r_stopped">
+		<text>"%s" (%s) stopped, no outcome.</text>
+	</string>
+	<string id="st_zev_r_outcome">
+		<text>"%s" (%s) ended with its outcome.</text>
+	</string>
+	<string id="st_zev_r_action">
+		<text>Unknown action %s: start, stop or outcome.</text>
+	</string>
+	<string id="st_coop_adm_ev_zone_on">
+		<text>on: %s, %s left</text>
+	</string>
+	<string id="st_coop_adm_ev_zone_off">
+		<text>not on</text>
+	</string>
+	<string id="st_coop_adm_ev_level">
+		<text>Level: %s</text>
+	</string>
+	<string id="st_coop_adm_ev_level_any">
+		<text>random</text>
+	</string>
+	<string id="st_coop_adm_ev_outcome">
+		<text>Outcome now</text>
+	</string>
+	<!-- a level as the news say it: "the anomalies are down <here>" -->
+	<string id="st_zev_on_l01_escape">
+		<text>at the Cordon</text>
+	</string>
+	<string id="st_zev_on_l02_garbage">
+		<text>at the Garbage</text>
+	</string>
+	<string id="st_zev_on_l03_agroprom">
+		<text>at Agroprom</text>
+	</string>
+	<string id="st_zev_on_l04_darkvalley">
+		<text>in Dark Valley</text>
+	</string>
+	<string id="st_zev_on_l05_bar">
+		<text>at Rostok</text>
+	</string>
+	<string id="st_zev_on_l06_rostok">
+		<text>in the Wild Territory</text>
+	</string>
+	<string id="st_zev_on_l07_military">
+		<text>at the Army Warehouses</text>
+	</string>
+	<string id="st_zev_on_l08_yantar">
+		<text>at Yantar</text>
+	</string>
+	<string id="st_zev_on_l09_deadcity">
+		<text>in Dead City</text>
+	</string>
+	<string id="st_zev_on_k00_marsh">
+		<text>in the Great Swamps</text>
+	</string>
+	<string id="st_zev_on_k01_darkscape">
+		<text>in Darkscape</text>
+	</string>
+	<string id="st_zev_on_k02_trucks_cemetery">
+		<text>at the Truck Cemetery</text>
+	</string>
+	<string id="st_zev_on_y04_pole">
+		<text>in the Meadow</text>
+	</string>
+	<string id="st_zev_on_l10_red_forest">
+		<text>in the Red Forest</text>
+	</string>
+	<string id="st_zev_on_l10_radar">
+		<text>at the Radar</text>
+	</string>
+	<string id="st_zev_on_zaton">
+		<text>at Zaton</text>
+	</string>
+	<string id="st_zev_on_jupiter">
+		<text>at Jupiter</text>
+	</string>
+	<string id="st_zev_on_pripyat">
+		<text>in Pripyat</text>
+	</string>
+</string_table>
