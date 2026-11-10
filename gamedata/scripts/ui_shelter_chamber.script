@@ -185,17 +185,17 @@ local ROW_H = 64
 function UIShelterChamber:draw_stab(win)
 	self.hover = nil
 	local list = af_quality.base_list(self.nature)
-	local per_page = math.floor((H - TOP - 30 - 70) / ROW_H)
+	local per_page = math.floor((H - TOP - 50 - 70) / ROW_H)
 	local pages = math.max(1, math.ceil(#list / per_page))
 	self.page = math.min(self.page, pages)
-	self:text(GRID.x, TOP, W - 36, 24, tr("st_afq_base_title"), C.dim, win, nil, "s")
+	self:text(GRID.x, TOP, W - 36, 44, tr("st_afq_base_title"), C.dim, win, nil, "s")
 	for i = 1, per_page do
 		local e = list[(self.page - 1) * per_page + i]
 		if not e then
 			break
 		end
 		local pl = e.plan
-		local y = TOP + 30 + (i - 1) * ROW_H
+		local y = TOP + 50 + (i - 1) * ROW_H
 		self:round(GRID.x, y, W - 36, ROW_H - 6, C.field, win, 6)
 		self:icon(pl.sec, GRID.x + 6, y + 4, ROW_H - 14, win)
 		self:text(GRID.x + ROW_H + 4, y + 4, 420, 26, ui_item.get_sec_name(pl.sec), C.text, win, nil, "s")

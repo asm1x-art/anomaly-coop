@@ -66,7 +66,7 @@ function UIAfStabilise:draw()
 		self:text(X0 + ROW_H + 4, y + 4, 380, 26, ui_item.get_sec_name(pl.sec), C.text, win, nil, "s")
 		self:text(X0 + ROW_H + 4, y + 30, 400, 26, tr("st_afq_step", af_quality.grade_text(pl.from),
 			af_quality.grade_text(pl.to)), C.dim, win, nil, "s")
-		self:button(W - 18 - 220, y + 9, 210, 40, tr("st_afq_bunker_do", pl.price), function()
+		self:button(W - 18 - 270, y + 9, 260, 40, tr("st_afq_bunker_do", pl.price), function()
 			if af_quality.bunker_do(pl) then
 				actor_menu.set_msg(1, tr("st_afq_bunker_done", ui_item.get_sec_name(pl.sec), af_quality.grade_name(pl.to)), 6)
 			end
@@ -116,6 +116,12 @@ end
 function UIAfStabilise:Close()
 	self:HideDialog()
 	gui = nil
+end
+
+function close()
+	if gui and gui:IsShown() then
+		gui:Close()
+	end
 end
 
 function open_bunker()
