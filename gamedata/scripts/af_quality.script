@@ -394,6 +394,7 @@ local npending = 0
 local expected = nil -- { sec, rec }: the next artefact of sec created here takes this roll (moved, not rolled)
 local sources = {} -- the source stack while known world logic runs
 local fresh = {} -- id -> rolled as it registered, its alife_record still to come
+local keep_cond = {} -- id -> the condition it comes online with (taken out of a chamber)
 
 local function se_table()
 	local m = alife_storage_manager.get_state()
@@ -485,6 +486,7 @@ local function take_new(se_obj, at_register)
 	end
 	local rec
 	if expected and expected.sec == sec then
+		keep_cond[id] = expected.cond
 		rec, expected = copy(expected.rec), nil
 	elseif at_register and #sources == 0 then
 		return -- an engine spawn outside the sources: a remote one, a load, the all.spawn - first sight
@@ -497,9 +499,10 @@ local function take_new(se_obj, at_register)
 	dbg("rolled %s (%s) from %s: q=%.3f", sec, id, tostring(rec.src), rec.q)
 end
 
--- the next artefact of sec created here takes rec (a container, a chamber, a fetch quest's unpacking)
-function expect(sec, rec)
-	expected = rec and sec and { sec = sec, rec = rec } or nil
+-- the next artefact of sec created here takes rec (a container, a chamber, a fetch quest's unpacking), and cond
+-- as it comes online
+function expect(sec, rec, cond)
+	expected = rec and sec and { sec = sec, rec = rec, cond = cond } or nil
 end
 
 local function on_register(se_obj)
@@ -518,6 +521,7 @@ end
 local function on_unregister(se_obj)
 	cache[se_obj.id] = nil
 	fresh[se_obj.id] = nil
+	keep_cond[se_obj.id] = nil
 end
 
 -- another game's roll
@@ -556,6 +560,17 @@ function apply(obj)
 		return
 	end
 	local sec = obj:section()
+	local id, cond = obj:id(), keep_cond[obj:id()]
+	if cond then -- the item's own net_spawn reads the server's condition after the binder's: on the next update
+		keep_cond[id] = nil
+		CreateTimeEvent("af_quality_cond", tostring(id), 0, function()
+			local o = level.object_by_id(id)
+			if o then
+				o:set_condition(cond)
+			end
+			return true
+		end)
+	end
 	local ok, err = pcall(function()
 		for _, key in ipairs(KEYS) do
 			local v = d.v[key] or base_value(sec, key)
@@ -787,10 +802,29 @@ local function wrap_ui()
 		end
 		local line = game.translate_string("st_afq_grade") .. " " .. grade_text(shown_grade(d))
 		if d.grade == 1 then
-			line = line .. "\\n" .. GRADE_COLOR[1] .. game.translate_string("st_afq_unstable_note") .. "%c[default]"
+			line = line .. " \\n" .. GRADE_COLOR[1] .. game.translate_string("st_afq_unstable_note") .. "%c[default]"
 		end
-		return line .. "\\n \\n" .. (desc or "")
+		return line .. " \\n \\n" .. (desc or "")
 	end)
+	-- the inventory grid: an artefact stacks only with ones of the grade it shows (vanilla stacks them all by section)
+	if utils_ui.UICellContainer and utils_ui.UICellContainer.FindSimilar then
+		local find_similar = utils_ui.UICellContainer.FindSimilar
+		utils_ui.UICellContainer.FindSimilar = function(self, obj, sec, ...)
+			local d = obj and not self.disable_stack and not (self.showcase or self.stack_all) and info(obj)
+			if not d then
+				return find_similar(self, obj, sec, ...)
+			end
+			local g, s = shown_grade(d), obj:section()
+			for _, ci in pairs(self.cell) do
+				local other = ci.section == s and ci.ID and level.object_by_id(ci.ID)
+				local od = other and info(other)
+				if od and shown_grade(od) == g then
+					return ci
+				end
+			end
+			return false
+		end
+	end
 	-- the stats: the object's own values (x condition where the tooltip does that)
 	wrap(utils_ui, "get_stats_value", function(original, obj, sec, gr, stat, ...)
 		if obj and VANILLA[stat] and IsArtefact(obj) then
@@ -1120,14 +1154,14 @@ function chamber_expect(nature, sec)
 	return false
 end
 
--- taken out of the cell: its condition (alife_create_item's t), the state cleared
+-- taken out of the cell: its condition as it went in (nil for a synthesis), the state cleared
 function chamber_take(nature, se)
 	local t = chamber_stab(nature)
 	if not t then
 		return nil
 	end
 	shelter.set_state("af_stab_" .. nature, nil)
-	return { cond = t.cond }
+	return t.cond
 end
 
 function base_start(nature, pl)
