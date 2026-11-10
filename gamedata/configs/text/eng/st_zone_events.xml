@@ -55,6 +55,39 @@
 	<string id="st_coop_adm_ev_outcome">
 		<text>Outcome now</text>
 	</string>
+	<string id="st_zev_t_ash">
+		<text>Ash front</text>
+	</string>
+	<string id="st_coop_ev_t_ash">
+		<text>Ash front</text>
+	</string>
+	<string id="st_zev_ash_start">
+		<text>Ash %s! The background radiation is dozens of times the usual: nobody lives there without a sealed scientific suit.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest">
+		<text>The Red Forest is burning! Fires all over the forest, smoke and ash, the background radiation dozens of times the usual. Don't go there without a SEVA or an SSP, an exoskeleton won't save you. The Sin have gone into the cave.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar">
+		<text>The Red Forest is burning, and the wind carries the ash to Yantar! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. The scientists have let everyone into the bunker.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter">
+		<text>The Red Forest is burning, and the wind carries the ash to Jupiter! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Yanov is sealed: nobody gets in until it settles.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton">
+		<text>The Red Forest is burning, and the wind carries the ash to Zaton! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Skadovsk and the barges are sealed: nobody gets in until it settles.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery">
+		<text>The surge has shaken up the old machinery of the Truck Cemetery: the vehicles are hotter than ever, and the wind drives radioactive dust and ash around. Without a SEVA or an SSP it is certain death. The bandits are holed up in the building.</text>
+	</string>
+	<string id="st_zev_ash_end">
+		<text>The ash %s has settled: the background is falling, people come out of the shelters.</text>
+	</string>
+	<string id="st_zev_ash_exposed">
+		<text>Ash! Without a sealed suit you won't last long here: take anti-rad and get out.</text>
+	</string>
+	<string id="st_zev_ash_sealed">
+		<text>The shelter is sealed until the ash front is over: nobody gets in.</text>
+	</string>
 	<!-- a level as the news say it: "the anomalies are down <here>" -->
 	<string id="st_zev_on_l01_escape">
 		<text>at the Cordon</text>

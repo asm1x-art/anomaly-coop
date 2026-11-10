@@ -74,7 +74,7 @@ end
 
 local select_weather, change_period -- level_weathers.WeatherManager's own
 
-local function wrapped_select(wm, now)
+local function pick(wm, now)
 	if not coop_on() then
 		return select_weather(wm, now)
 	end
@@ -94,6 +94,17 @@ local function wrapped_select(wm, now)
 		end
 	end
 	dbg("weather %s (master's %s)", tostring(wm.weather_file), tostring(w and w.file))
+	return res
+end
+
+-- a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the master
+-- publishes stays the world's
+local function wrapped_select(wm, now)
+	local res = pick(wm, now)
+	local over = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
+	if over and not (weather.is_paused() or level.is_wfx_playing()) then
+		level.set_weather(over, now and true or false)
+	end
 	return res
 end
 

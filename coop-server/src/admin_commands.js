@@ -87,6 +87,8 @@ export const WORLD_EVENTS = [
   { id: 'cooling', title: 'Охлаждение (окно рейда)', stop: true, danger: 'stop',
     warn: 'Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.' },
   { id: 'calm', title: 'Мёртвый штиль', stop: true, zone: true },
+  { id: 'ash', title: 'Пепельный фронт', stop: true, zone: true, danger: 'start',
+    warn: 'На локации пепел: игрок без замкнутого научного костюма (СЕВА, ССП) погибнет за несколько минут без антирада.' },
   { id: 'bar_rumour', title: 'Бар: слух о тайнике' },
   { id: 'bar_quarrel', title: 'Бар: ссора' },
   { id: 'bar_spender', title: 'Бар: гуляет отряд' },

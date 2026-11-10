@@ -1074,11 +1074,11 @@ local BAR_EVENTS = { "rumour", "quarrel", "spender", "gift", "wounded", "binge" 
 local WEATHERS = { "clear", "partly", "cloudy", "rain", "storm", "foggy" }
 
 -- the Zone's events (coop_zone_events.script): the level picked for a start, an index into its pool (0: any)
-local ZONE_EVENTS = { "calm" }
+local ZONE_EVENTS = { "calm", "ash" }
 local zone_pick = {}
 
 -- for the search
-EVENT_TITLES = { "surge", "psi", "cooling", "calm" }
+EVENT_TITLES = { "surge", "psi", "cooling", "calm", "ash" }
 for _, id in ipairs(BAR_EVENTS) do
 	EVENT_TITLES[#EVENT_TITLES + 1] = "bar_" .. id
 end
