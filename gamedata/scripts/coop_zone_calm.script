@@ -1,7 +1,7 @@
 -- Co-op: the Zone's event "Dead calm" (coop_zone_events.script, [zone_event_calm] in mod_system_zone_events.ltx). On
--- one level every anomaly goes out for some hours, the fields' and the single ones (all Anomaly binds as anomaly
--- fields, but keep_sections), the artefacts lying there go with them, and none is born there meanwhile. Then the
--- anomalies come back and bear artefacts as after a surge.
+-- one level every anomaly goes out for some hours, the fields' and the single ones, radiation spots too (all Anomaly
+-- binds as anomaly fields, but keep_sections), the artefacts lying there go with them (not those a player dropped),
+-- and none is born there meanwhile. Then the anomalies come back and bear artefacts as after a surge.
 --   anomalies  every game on that level puts them out (and keeps them out when Anomaly's artefact zones switch their
 --              layers); each remembers what it put out (its save) and puts it back once the calm is over there, the
 --              zones' layers as they were
@@ -10,6 +10,8 @@
 --              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
 --              do: the spawn is held back here. The ones lying loose on the level are taken away by the level's
 --              authority (the sim master while nobody is there), once per calm; the zones here forget them.
+--   dropped    an artefact a player put on the ground is his, not the Zone's: the game that dropped it marks it for the
+--              world (the fact "zone_event:drop:<id>", taken off when someone picks it up), the sweep leaves it
 --   the end    a game on the level spawns new artefacts at once, as after a surge (coop_sync: its authority, for
 --              everyone); with nobody there the sim master marks the level for them (the next to load it spawns them)
 
@@ -131,7 +133,7 @@ local function sweep(lvl)
 	local n = 0
 	for id = 1, 65534 do
 		local se = sim:object(id)
-		if se and se.parent_id == 65535 and IsArtefact(nil, se:clsid())
+		if se and se.parent_id == 65535 and IsArtefact(nil, se:clsid()) and not ZE.marked("drop:" .. id)
 			and sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == lvl then
 			alife_release(se)
 			n = n + 1
@@ -213,6 +215,26 @@ function on_game_start()
 		end
 		return spawn(self, ...)
 	end
+
+	-- a player's artefact on the ground: marked for the world a moment after it left his hands (not into a box or a
+	-- trader's: only one lying loose); unmarked when someone takes it
+	RegisterScriptCallback("actor_on_item_drop", function(obj)
+		if obj and IsArtefact(obj) then
+			local id = obj:id()
+			CreateTimeEvent("coop_zone_calm", "drop_" .. id, 1, function()
+				local se = alife_object(id)
+				if se and se.parent_id == 65535 then
+					ZE.mark("drop:" .. id, "1")
+				end
+				return true
+			end)
+		end
+	end)
+	RegisterScriptCallback("actor_on_item_take", function(obj)
+		if obj and IsArtefact(obj) and ZE.marked("drop:" .. obj:id()) then
+			ZE.mark("drop:" .. obj:id(), "")
+		end
+	end)
 
 	RegisterScriptCallback("save_state", function(m_data)
 		m_data.coop_zone_calm = state

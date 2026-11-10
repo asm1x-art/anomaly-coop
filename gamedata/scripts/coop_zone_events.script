@@ -9,8 +9,10 @@
 --     stage  on | end;  how  timer | outcome | stop (how it ended);  data  the event's own "k=v;k=v"
 --   "zone_event:last_<id>" = the world second the last one of that event ended (the director's cooldown)
 -- Every game applies an event's effects itself from the fact, the way it takes the weather: the event's update()
--- each look (the calm: its level's anomalies out), prices (on_get_item_cost), smarts
--- closed to some squads (se_smart_terrain.target_precondition). Each game tells its player the start once and, if he
+-- each look (the calm: its level's anomalies out; the ash: its weather, its shelter), prices (on_get_item_cost), smarts
+-- of its level closed to some squads (se_smart_terrain.target_precondition: closed_to_squads, only_squads).
+-- An event's length: hours_min..hours_max game hours, or real_hours_min..real_hours_max at the world's speed.
+-- mark(key, value) / marked(key): an event's own facts of the world ("zone_event:<key>"). Each game tells its player the start once and, if he
 -- heard it, the end once; the master also tells the server's journal (coop_news: zone_event, zone_event_end).
 -- Without co-op the facts are the actor's variables and this game is the master.
 --
@@ -127,6 +129,15 @@ local function data_text(t)
 	return table.concat(out, ";")
 end
 
+-- an event's own facts ("zone_event:<key>", the world's, for every game): "" none
+function mark(key, value)
+	set_fact(key, value or "")
+end
+
+function marked(key)
+	return fact(key) ~= ""
+end
+
 -- the slot's event as the fact has it, or nil
 function get(slot)
 	local id, lvl, seq, from, till, stage, how, data = string.match(fact(slot),
@@ -230,8 +241,15 @@ function start(id, lvl, by)
 		return nil, tr("st_zev_r_no_levels", title(id))
 	end
 	local section = "zone_event_" .. id
-	local hours = num(section, "hours_min", 6)
-	hours = hours + math.random() * math.max(0, num(section, "hours_max", hours) - hours)
+	local hours
+	local real = ini_sys:r_float_ex(section, "real_hours_min")
+	if real then -- real hours, at the world's speed now
+		real = real + math.random() * math.max(0, num(section, "real_hours_max", real) - real)
+		hours = real * level.get_time_factor()
+	else
+		hours = num(section, "hours_min", 6)
+		hours = hours + math.random() * math.max(0, num(section, "hours_max", hours) - hours)
+	end
 	local t = now()
 	local ev = { slot = slot, id = id, level = lvl, seq = (cur and cur.seq or 0) + 1, from = t,
 		till = t + math.floor(hours * 3600), stage = "on", how = "", data = {} }
@@ -397,7 +415,8 @@ local function on_get_item_cost(kind, obj, profile, cost, ret)
 end
 
 -------------------------------------------------------------------------------
--- smarts of an event's level closed to some squads ("closed_to_squads": parts of their sections)
+-- smarts of an event's level closed to some squads: "closed_to_squads" those whose section has one of these parts,
+-- "only_squads" all but those whose section has one of these parts
 
 local smart_level = {} -- smart id -> its level
 
@@ -414,11 +433,24 @@ local function closed(smart, squad)
 	for _, slot in ipairs(SLOTS) do
 		local ev = get(slot)
 		if ev and ev.stage == "on" then
-			local parts = ini_list("zone_event_" .. ev.id, "closed_to_squads")
-			if #parts > 0 and level_of(smart) == ev.level then
+			local section_of = "zone_event_" .. ev.id
+			local parts = ini_list(section_of, "closed_to_squads")
+			local only = ini_list(section_of, "only_squads")
+			if (#parts > 0 or #only > 0) and level_of(smart) == ev.level then
 				local section = squad and squad.section_name and squad:section_name() or ""
 				for _, part in ipairs(parts) do
 					if string.find(section, part, 1, true) then
+						return true
+					end
+				end
+				if #only > 0 then
+					local allowed = false
+					for _, part in ipairs(only) do
+						if string.find(section, part, 1, true) then
+							allowed = true
+						end
+					end
+					if not allowed then
 						return true
 					end
 				end
