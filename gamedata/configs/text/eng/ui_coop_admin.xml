@@ -739,7 +739,7 @@
 		<text>A bar event (in turn)</text>
 	</string>
 	<string id="st_coop_tests_shelter_dig">
-		<text>Dig 5 times faster (on/off)</text>
+		<text>Dig x5 on/off</text>
 	</string>
 	<string id="st_coop_tests_base_cooling">
 		<text>"Cooling" now</text>

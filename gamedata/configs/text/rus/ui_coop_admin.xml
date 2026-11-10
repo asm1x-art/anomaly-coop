@@ -739,7 +739,7 @@
 		<text>Событие бара (по кругу)</text>
 	</string>
 	<string id="st_coop_tests_shelter_dig">
-		<text>Копать в 5 раз быстрее (вкл/выкл)</text>
+		<text>Копать x5 вкл/выкл</text>
 	</string>
 	<string id="st_coop_tests_base_cooling">
 		<text>«Охлаждение» сейчас</text>

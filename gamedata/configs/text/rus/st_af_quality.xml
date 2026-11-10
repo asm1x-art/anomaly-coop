@@ -80,9 +80,9 @@
 		<text>Лаборатория Базы для стабилизации: выключена.</text>
 	</string>
 	<string id="st_coop_tests_af_base_lab">
-		<text>Артефакты: лаборатория Базы (стабилизация) вкл/выкл</text>
+		<text>Лаборатория Базы вкл/выкл</text>
 	</string>
 	<string id="st_coop_tests_af_kit">
-		<text>Артефакты: по Медузе каждого сорта</text>
+		<text>Медуза каждого сорта</text>
 	</string>
 </string_table>

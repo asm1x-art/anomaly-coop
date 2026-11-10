@@ -80,9 +80,9 @@
 		<text>The Base's stabilisation lab: off.</text>
 	</string>
 	<string id="st_coop_tests_af_base_lab">
-		<text>Artefacts: the Base's lab (stabilisation) on/off</text>
+		<text>The Base's lab on/off</text>
 	</string>
 	<string id="st_coop_tests_af_kit">
-		<text>Artefacts: a Medusa of each grade</text>
+		<text>A Medusa of each grade</text>
 	</string>
 </string_table>
