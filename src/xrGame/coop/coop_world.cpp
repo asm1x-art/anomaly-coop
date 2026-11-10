@@ -287,8 +287,13 @@ namespace coop
 	{
 		const u16 id = P.r_u16();
 		const SBodyPlace place = read_body_place(P);
-		CSE_ALifeCreatureAbstract* body = level_running() ?
-			smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true)) : nullptr;
+		if (!level_running())
+		{
+			if (debug_mode)
+				Msg("[coop dbg] body %u came to rest before our world is up: dropped", id);
+			return;
+		}
+		CSE_ALifeCreatureAbstract* body = smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true));
 		if (body && !body->g_Alive())
 			place_body(body, place);
 	}

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "coop_shadow.h"
 #include "coop_net.h"
+#include "coop_world.h"
 #include "Level.h"
 #include "Actor.h"
 #include "ai_space.h"
@@ -95,7 +96,8 @@ namespace coop
 
 	void update_shadows()
 	{
-		if (!g_actor)
+		// not while a level loads or is torn down: a shadow is spawned into A-Life
+		if (!world_ready())
 			return;
 		for (const auto& [id, peer] : peers())
 			shadow_of(peer.name);
