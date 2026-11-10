@@ -1,0 +1,126 @@
+-- The bunkers' scientists' stabilisation (af_quality.script, from their dialog): the actor's artefacts they can raise
+-- one grade (up to [af_quality_stab] bunker_cap), each for its price, at once. In the shelter's look
+-- (ui_shelter_style.script), in square units: 1024 x 768 on 4:3, wider on a wide screen.
+
+local XML = "ui_shelter_laptop.xml"
+local C = ui_shelter_style.C
+local TOP = ui_shelter_style.TITLE_H + 12
+local W, H = 760, 560
+local ROW_H = 64
+local X0 = 18
+
+local gui
+
+local function tr(id, ...)
+	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
+end
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+class "UIAfStabilise" (CUIScriptWnd)
+ui_shelter_style.apply(UIAfStabilise)
+
+function UIAfStabilise:__init() super()
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(XML)
+	self.x0 = math.floor((math.floor(1024 / self.k + 0.5) - W) / 2)
+	self.y0 = math.floor((768 - H) / 2)
+	self.page = 1
+	self:draw()
+end
+
+function UIAfStabilise:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k - self.x0, p.y - self.y0)
+end
+
+function UIAfStabilise:draw()
+	if self.win then
+		self:DetachChild(self.win)
+	end
+	self.clicks = {}
+	local win = self:chrome(self.x0, self.y0, W, H, tr("st_afq_bunker_window"), "ui\\shelter\\laptop_icon_synth", self,
+		self.clicks, 0, 0, function() self:Close() end)
+	self.win = win
+	local list = af_quality.bunker_list()
+	local per_page = math.floor((H - TOP - 30 - 70) / ROW_H)
+	local pages = math.max(1, math.ceil(#list / per_page))
+	self.page = math.min(self.page, pages)
+	local money = db.actor:money()
+	self:text(X0, TOP, W - 36, 24, tr("st_afq_bunker_title", af_quality.grade_text(af_quality.settings().bunker_cap)),
+		C.dim, win, nil, "s")
+	for i = 1, per_page do
+		local e = list[(self.page - 1) * per_page + i]
+		if not e then
+			break
+		end
+		local pl = e.plan
+		local y = TOP + 30 + (i - 1) * ROW_H
+		self:round(X0, y, W - 36, ROW_H - 6, C.field, win, 6)
+		self:icon(pl.sec, X0 + 6, y + 4, ROW_H - 14, win)
+		self:text(X0 + ROW_H + 4, y + 4, 380, 26, ui_item.get_sec_name(pl.sec), C.text, win, nil, "s")
+		self:text(X0 + ROW_H + 4, y + 30, 400, 26, tr("st_afq_step", af_quality.grade_text(pl.from),
+			af_quality.grade_text(pl.to)), C.dim, win, nil, "s")
+		self:button(W - 18 - 220, y + 9, 210, 40, tr("st_afq_bunker_do", pl.price), function()
+			if af_quality.bunker_do(pl) then
+				actor_menu.set_msg(1, tr("st_afq_bunker_done", ui_item.get_sec_name(pl.sec), af_quality.grade_name(pl.to)), 6)
+			end
+			self:draw()
+		end, self.clicks, win, 0, 0, money >= pl.price and "primary" or "off")
+	end
+	local by = H - 56
+	if #list == 0 then
+		self:text(X0, TOP + 30, W - 36, 60, tr("st_afq_bunker_nothing"), C.faint, win, nil, "s")
+	end
+	if pages > 1 then
+		self:button(X0, by, 34, 40, "<", function() self.page = math.max(1, self.page - 1) self:draw() end, self.clicks,
+			win, 0, 0, self.page == 1 and "off" or "normal")
+		self:text(X0 + 38, by, 80, 40, tr("st_shelter_synth_page", self.page, pages), C.dim, win, CGameFont.alCenter, "s")
+		self:button(X0 + 122, by, 34, 40, ">", function() self.page = math.min(pages, self.page + 1) self:draw() end,
+			self.clicks, win, 0, 0, self.page == pages and "off" or "normal")
+	end
+	self:text(X0 + 170, by, 300, 40, tr("st_afq_money", money), C.dim, win, nil, "s")
+	self:button(W - 18 - 128, by, 128, 40, tr("st_shelter_synth_cancel"), function() self:Close() end, self.clicks, win)
+end
+
+function UIAfStabilise:Update()
+	CUIScriptWnd.Update(self)
+	self:hovers(self:cursor(), { self.clicks })
+end
+
+function UIAfStabilise:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			local p = self:cursor()
+			for i = #self.clicks, 1, -1 do
+				if inside(p, self.clicks[i]) then
+					self.clicks[i][5]()
+					return true
+				end
+			end
+			return true
+		elseif dik_to_bind(dik) == key_bindings.kQUIT or dik_to_bind(dik) == key_bindings.kUSE then
+			self:Close()
+			return true
+		end
+	end
+	return res
+end
+
+function UIAfStabilise:Close()
+	self:HideDialog()
+	gui = nil
+end
+
+function open_bunker()
+	if not (gui and gui:IsShown()) then
+		gui = UIAfStabilise()
+		gui:ShowDialog(true)
+	end
+end

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Artefact stabilisation at the bunkers' scientists (af_quality.script). Put on them by modxml_af_quality.script. -->
+<game_dialogs>
+	<dialog id="af_quality_stab">
+		<precondition>af_quality.dlg_enabled</precondition>
+		<phrase_list>
+			<phrase id="0">
+				<text>st_afq_dlg_0</text>
+				<next>1</next>
+			</phrase>
+			<phrase id="1">
+				<text>st_afq_dlg_1</text>
+				<action>af_quality.dlg_open_bunker</action>
+			</phrase>
+		</phrase_list>
+	</dialog>
+</game_dialogs>
