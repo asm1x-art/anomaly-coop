@@ -346,7 +346,7 @@
 		<text>Cheats on yourself</text>
 	</string>
 	<string id="st_coop_adm_cheats_hint">
-		<text>All through the server, into its journal. "Every fast travel point" (My game › Map) on a test server lets you travel to unseen ones too.</text>
+		<text>All through the server, into its journal. "Every fast travel point" (My game / Map) on a test server lets you travel to unseen ones too.</text>
 	</string>
 	<string id="st_coop_adm_god_on">
 		<text>Immortality: on</text>
@@ -547,7 +547,7 @@
 		<text>The frame counter and the ping to the server.</text>
 	</string>
 	<string id="st_coop_adm_b_fps">
-		<text>Options › Co-op › FPS</text>
+		<text>Options / Co-op / FPS</text>
 	</string>
 	<string id="st_coop_adm_i_rs_stats">
 		<text>Render statistics</text>
@@ -628,7 +628,7 @@
 		<text>The raid's time left on the screen.</text>
 	</string>
 	<string id="st_coop_adm_b_raid_timer">
-		<text>Options › Co-op</text>
+		<text>Options / Co-op</text>
 	</string>
 	<string id="st_coop_adm_i_peer_color">
 		<text>The other players' mark colour</text>
@@ -637,7 +637,7 @@
 		<text>The partners' marks on the map and minimap.</text>
 	</string>
 	<string id="st_coop_adm_b_peer_color">
-		<text>Options › Co-op (sliders), console coop_peer_color</text>
+		<text>Options / Co-op (sliders), console coop_peer_color</text>
 	</string>
 	<string id="st_coop_adm_i_dlss">
 		<text>DLSS</text>
@@ -1010,7 +1010,7 @@
 		<text>%s is already running.</text>
 	</string>
 	<string id="st_coop_ev_r_option_off">
-		<text>%s: off in the host game's options (Options › Events).</text>
+		<text>%s: off in the host game's options (Options / Events).</text>
 	</string>
 	<string id="st_coop_ev_r_held">
 		<text>%s: not now, a world event runs (the barrier or the pump station defence).</text>

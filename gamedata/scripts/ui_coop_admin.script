@@ -1195,14 +1195,38 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 		tr(d.tests and "st_coop_adm_tests_sub" or "st_coop_adm_tests_off")) + 10)
 	local cw = math.floor((W - 48 - 2 * 12) / 3)
 	local bh = math.max(30, 2 * self.line - 6) -- a name over two lines fits its button (a 600-line screen too)
-	local ys = {}
+	-- the cheats on oneself under the tests: their heading and buttons on one row, the hint under it
+	local hint = tr("st_coop_adm_cheats_hint")
+	local bottom = H - (14 + 38 + self:lines(hint, W - 48) * self.line)
+	-- a mode a column; when the longest doesn't fit over the cheats (a 600-line screen), the modes flow down the
+	-- columns one after another, what doesn't fit in one going on in the next
+	local count = {}
+	for _, a in ipairs(coop_admin_tests.LIST) do
+		count[a[2]] = (count[a[2]] or 0) + 1
+	end
+	local flow = false
+	for _, mode in ipairs(TEST_MODES) do
+		flow = flow or top + 30 + (count[mode] or 0) * (bh + 4) > bottom
+	end
+	local col, y, low = 0, top, top
+	local function room(h) -- the column's x, the next column's when h doesn't fit under what is in this one
+		if col == 0 or flow and y + h > bottom and y > top and col < #TEST_MODES then
+			col, y = col + 1, top
+		end
+		return 24 + (col - 1) * (cw + 12)
+	end
 	for i, mode in ipairs(TEST_MODES) do
-		local x = 24 + (i - 1) * (cw + 12)
-		local y = top
+		if not flow then
+			col, y = i, top
+		elseif y > top then
+			y = y + 10
+		end
+		local x = room(30 + 2 * (bh + 4))
 		self:text(x, y, cw, 26, tr("st_coop_adm_tm_" .. mode), C.text, box, nil, "m")
 		y = y + 30
 		for _, a in ipairs(coop_admin_tests.LIST) do
 			if a[2] == mode then
+				x = room(bh)
 				local id, key, danger = a[1], a[3], a[5]
 				local kind = not d.tests and "off" or danger and "danger" or "normal"
 				local f = function()
@@ -1219,20 +1243,19 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 					self:text(x + cw - 56, y, 48, bh, key, C.dim, box, CGameFont.alRight, "s")
 				end
 				y = y + bh + 4
+				low = math.max(low, y)
 			end
 		end
-		ys[i] = y
 	end
 	-- cheats on oneself
-	local y = math.max(ys[1], ys[2], ys[3]) + 14
-	self:text(24, y, W - 48, 24, tr("st_coop_adm_cheats"), C.text, box, nil, "m")
-	y = y + 30
+	y = low + 14
+	self:text(24, y, cw, 32, tr("st_coop_adm_cheats"), C.text, box, nil, "m")
 	local mine = find_player(me())
 	local kind = d.tests and mine and mine.level ~= "" and "normal" or "off"
-	self:btn(24, y, 200, 32, tr(mine and mine.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"),
+	self:btn(24 + cw + 12, y, cw, 32, tr(mine and mine.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"),
 		function() command("god", me(), mine and mine.god and "off" or "on") end, L, box, X, Y, kind)
-	self:btn(234, y, 200, 32, tr("st_coop_adm_heal"), function() command("heal", me()) end, L, box, X, Y, kind)
-	self:text(24, y + 40, W - 48, 40, tr("st_coop_adm_cheats_hint"), C.dim, box, nil, "s")
+	self:btn(24 + 2 * (cw + 12), y, cw, 32, tr("st_coop_adm_heal"), function() command("heal", me()) end, L, box, X, Y, kind)
+	self:text(24, y + 38, W - 48, self:lines(hint, W - 48) * self.line, hint, C.dim, box, nil, "s")
 end
 
 -- Моя игра
