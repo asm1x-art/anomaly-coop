@@ -294,10 +294,11 @@ local function on_level(se)
 	return sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == LEVEL
 end
 
--- one item as goods: { se, section, cat, units, cond }
+-- one item as goods: { se, section, cat, units, cond, value }; value: an artefact's grade (af_quality.script: the bar
+-- knows it, the Base's scientists tell), x its price
 local function good_of(se, cat)
 	local sec = se:section_name()
-	local g = { se = se, section = sec, cat = cat, units = 1, cond = 1 }
+	local g = { se = se, section = sec, cat = cat, units = 1, cond = 1, value = af_quality.price_factor(se.id, sec) }
 	if cat and cat.rounds then
 		local data = utils_stpk.get_ammo_data(se)
 		g.units = data and data.ammo_left or 1
@@ -521,9 +522,9 @@ function on_sale(section, cat)
 	return cat ~= nil and category_on(cat)
 end
 
--- the price of one at a condition
-function price_of(section, cond, cat)
-	return math.max(1, math.floor(unit_cost(section) * markup_of(section, cat) * (cond or 1) + 0.5))
+-- the price of one at a condition (and an artefact's grade's value, 1 for anything else)
+function price_of(section, cond, cat, value)
+	return math.max(1, math.floor(unit_cost(section) * markup_of(section, cat) * (cond or 1) * (value or 1) + 0.5))
 end
 
 function low_stock()
@@ -541,7 +542,7 @@ function positions(goods)
 	local function pos_of(sec, cat)
 		local p = by[sec]
 		if not p then
-			p = { section = sec, cat = cat, crates = 0, ledger = 0, goods = {}, cond_sum = 0, cond_n = 0 }
+			p = { section = sec, cat = cat, crates = 0, ledger = 0, goods = {}, cond_sum = 0, cond_n = 0, value_sum = 0 }
 			by[sec], list[#list + 1] = p, p
 		end
 		return p
@@ -551,6 +552,7 @@ function positions(goods)
 		p.crates = p.crates + g.units
 		p.goods[#p.goods + 1] = g
 		p.cond_sum, p.cond_n = p.cond_sum + g.cond, p.cond_n + 1
+		p.value_sum = p.value_sum + (g.value or 1)
 	end
 	for sec, n in pairs(ledger()) do
 		if n > 0 then
@@ -563,6 +565,7 @@ function positions(goods)
 	for _, p in ipairs(list) do
 		p.count = p.crates + p.ledger
 		p.cond = p.cond_n > 0 and p.cond_sum / p.cond_n or 1
+		p.value = p.cond_n > 0 and p.value_sum / p.cond_n or 1 -- the mean of the boxes' ones
 		p.markup = markup_of(p.section, p.cat)
 		p.on = on_sale(p.section, p.cat)
 	end
@@ -779,7 +782,7 @@ local function take_units(p, want, wallet, sold)
 	local units, money = 0, 0
 	while units < want and #p.goods > 0 do
 		local g = p.goods[#p.goods]
-		local cost = math.max(1, math.floor(unit_cost(p.section) * p.markup * g.cond + 0.5)) * g.units
+		local cost = math.max(1, math.floor(unit_cost(p.section) * p.markup * g.cond * (g.value or 1) + 0.5)) * g.units
 		if cost > wallet - money then
 			break
 		end

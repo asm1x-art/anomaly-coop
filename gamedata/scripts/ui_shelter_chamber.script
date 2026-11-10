@@ -84,6 +84,9 @@ function UIShelterChamber:draw()
 	local win = self:chrome(self.x0, self.y0, W, H, tr("st_shelter_synth_window", tr("st_shelter_chamber_" .. self.nature)),
 		"ui\\shelter\\laptop_icon_synth", self, self.clicks, 0, 0, function() self:Close() end)
 	self.win = win
+	if self.mode == "stab" then
+		return self:draw_stab(win)
+	end
 	-- the things, a page of them
 	local things = self:things()
 	local per_page = GRID.cols * GRID.rows
@@ -167,7 +170,59 @@ function UIShelterChamber:draw()
 		self:Close()
 		shelter_synthesis.load(self.nature, parts)
 	end, self.clicks, win, 0, 0, #self.slots < 2 and "off" or "primary")
+	if af_quality.base_open() then
+		self:button(GRID.x, H - 56, 200, 40, tr("st_afq_base_mode"), function()
+			self.mode = "stab"
+			self.page = 1
+			self:draw()
+		end, self.clicks, win)
+	end
 	self:button(W - 18 - 128, H - 56, 128, 40, tr("st_shelter_synth_cancel"), function() self:Close() end, self.clicks, win)
+end
+
+-- the Base's stabilisation (af_quality.script): the actor's artefacts of the chamber's nature it can raise, one goes in
+local ROW_H = 64
+function UIShelterChamber:draw_stab(win)
+	self.hover = nil
+	local list = af_quality.base_list(self.nature)
+	local per_page = math.floor((H - TOP - 50 - 70) / ROW_H)
+	local pages = math.max(1, math.ceil(#list / per_page))
+	self.page = math.min(self.page, pages)
+	self:text(GRID.x, TOP, W - 36, 44, tr("st_afq_base_title"), C.dim, win, nil, "s")
+	for i = 1, per_page do
+		local e = list[(self.page - 1) * per_page + i]
+		if not e then
+			break
+		end
+		local pl = e.plan
+		local y = TOP + 50 + (i - 1) * ROW_H
+		self:round(GRID.x, y, W - 36, ROW_H - 6, C.field, win, 6)
+		self:icon(pl.sec, GRID.x + 6, y + 4, ROW_H - 14, win)
+		self:text(GRID.x + ROW_H + 4, y + 4, 420, 26, ui_item.get_sec_name(pl.sec), C.text, win, nil, "s")
+		self:text(GRID.x + ROW_H + 4, y + 30, 520, 26, tr("st_afq_step_hours", af_quality.grade_text(pl.from),
+			af_quality.grade_text(pl.to), af_quality.base_hours(pl.to)), C.dim, win, nil, "s")
+		self:button(W - 18 - 200, y + 9, 190, 40, tr("st_afq_base_do"), function()
+			self:Close()
+			af_quality.base_start(self.nature, pl)
+		end, self.clicks, win, 0, 0, "primary")
+	end
+	local by = H - 56
+	if #list == 0 then
+		self:text(GRID.x, TOP + 30, W - 36, 60, tr("st_afq_base_nothing"), C.faint, win, nil, "s")
+	end
+	if pages > 1 then
+		self:button(GRID.x, by, 34, 40, "<", function() self.page = math.max(1, self.page - 1) self:draw() end, self.clicks,
+			win, 0, 0, self.page == 1 and "off" or "normal")
+		self:text(GRID.x + 38, by, 80, 40, tr("st_shelter_synth_page", self.page, pages), C.dim, win, CGameFont.alCenter, "s")
+		self:button(GRID.x + 122, by, 34, 40, ">", function() self.page = math.min(pages, self.page + 1) self:draw() end,
+			self.clicks, win, 0, 0, self.page == pages and "off" or "normal")
+	end
+	self:button(SLOT.x, by, 200, 40, tr("st_afq_synth_mode"), function()
+		self.mode = nil
+		self.page = 1
+		self:draw()
+	end, self.clicks, win)
+	self:button(W - 18 - 128, by, 128, 40, tr("st_shelter_synth_cancel"), function() self:Close() end, self.clicks, win)
 end
 
 function UIShelterChamber:Update()
@@ -175,6 +230,9 @@ function UIShelterChamber:Update()
 	local p = self:cursor()
 	self:hovers(p, { self.clicks })
 	local name = ""
+	if not self.hover then
+		return
+	end
 	for _, c in ipairs(self.cells or {}) do
 		if inside(p, c) then
 			name = ui_item.get_sec_name(c[5])
