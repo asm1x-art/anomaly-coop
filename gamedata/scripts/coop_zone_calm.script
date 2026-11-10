@@ -8,8 +8,8 @@
 --   artefacts  Anomaly's come only from its artefact zones (bind_anomaly_zone spawn_artefact_randomly; single
 --              anomalies bear none: the engine's zones have no artefact birth, dynamic anomalies are off in co-op);
 --              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
---              do: the spawn is held back here. The Zone's ones lying loose on the level (born in a field: their
---              af_quality roll's source) are taken away by the level's authority (the sim master while nobody is
+--              do: the spawn is held back here. The Zone's ones lying loose on the level (born in a field or never
+--              rolled by a known source: zones_own) are taken away by the level's authority (the sim master while nobody is
 --              there), once per calm, a slice of ids each frame; the zones of a game forget the gone ones whenever
 --              it loads a level.
 --   dropped    an artefact a player put on the ground during the calm, on its level, is his, not the Zone's: the game
@@ -134,9 +134,11 @@ end
 -- the Zone's artefacts lying loose on the level, taken away (by its authority, for everyone): sweep_ids ids a frame
 local job = nil -- { lvl, next id, count }
 
+-- the Zone's own: born in a field, or never rolled by a known source (a first sight, junk with no grade); not one
+-- that came from a body, a trader, a stash, a reward, a raid or a chamber: that one went through a player's hands
 local function zones_own(id)
 	local rec = af_quality and af_quality.record and af_quality.record(id)
-	return rec and string.sub(tostring(rec.src), 1, 5) == "field"
+	return not rec or rec.lz or string.sub(tostring(rec.src), 1, 5) == "field"
 end
 
 local function sweep_step()
