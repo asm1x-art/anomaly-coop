@@ -42,7 +42,8 @@ keep_fields         =           ; object names never put out (story anomalies), 
 ; ---------------------------------------------------------------------------------------------------------------
 ; Пепельный фронт: fire hotspots in the Red Forest, the wind carries the ash to Yantar, Jupiter or Zaton; or the surge
 ; has shaken up the old machinery of the Truck Cemetery. The level's weather turns to ash, the background radiation
-; there is deadly but in a sealed scientific suit, its people sit it out in a shelter. Players may always go there.
+; there is deadly but in a sealed scientific suit, its people sit it out in a shelter, the other stalkers leave the
+; level. Players may always go there.
 [zone_event_ash]
 enabled             = true
 slot                = world
@@ -77,5 +78,12 @@ shelter_k02_trucks_cemetery = trc_sim_20                ; the bandits' building
 shelter_communities_k02_trucks_cemetery = bandit
 sealed              = jupiter, zaton  ; shelters that let nobody in for the front, players neither
 sealed_radius       = 60        ; metres from the shelter's smart
+; the other stalker squads on the level (not its shelter's people, not in sealed gear) go to smarts (no bases) of the
+; neighbouring levels for the front, back to their own after; a level with none listed: they stay
+leave_l10_red_forest        = l07_military, l10_limansk, jupiter
+leave_l08_yantar            = l06_rostok, l09_deadcity, l03_agroprom
+leave_jupiter               = l10_red_forest, zaton
+leave_zaton                 = jupiter
+leave_k02_trucks_cemetery   = l04_darkvalley, l05_bar, l07_military
 return_hours        = 12        ; game hours after the end the squads may take to get back to their smarts
 albino_squads       =           ; albino mutant squads put on the level for the front (none yet: assets later)

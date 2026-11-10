@@ -9,11 +9,14 @@
 --              into its shelter (shelter_<level>: a smart) for the front and back to their own smarts after: every game
 --              sets the same targets from the event's data. Story squads and companions stay where they are. A sealed shelter (sealed)
 --              lets nobody in, players neither: one who comes within sealed_radius of it is put back outside
+--   leaving    the level's other stalker squads (not its shelter's people, not in sealed gear: only_squads) go to a smart
+--              of a neighbouring level (leave_<level>: levels) for the front and back to their own smarts after
 --   squads     only squads in sealed gear (only_squads: parts of their sections) take the level's smarts as targets
 --   players    are never kept off the level
 --   albinos    albino_squads (squad sections, none yet: their assets come later) are put on the level's smarts by the
 --              master at the start and taken away at the end
--- The event's data: rel (squad:its own smart's id, the squads sent into the shelter), alb (the albino squads).
+-- The event's data: rel (squad:its own smart's id, the squads sent into the shelter; squad:own:the smart it went to,
+-- the squads sent off the level), alb (the albino squads).
 
 local ID = "ash"
 local S = "zone_event_ash"
@@ -195,16 +198,17 @@ local function relocate(ev, on)
 	local shelter = shelter_name(ev.level)
 	local late = not on and ZE.now() - ev.till > num("return_hours", 12) * 3600
 	for _, entry in ipairs(ids_of(ev.data.rel)) do
-		local id, own = string.match(entry, "^(%d+):(%d+)$")
+		local id, own, away = string.match(entry, "^(%d+):(%d+):?(%d*)$")
 		local squad = id and alife_object(tonumber(id))
 		if squad and squad.squad_members then
 			own = tonumber(own)
 			local own_name = smart_name(own)
+			local target = away ~= "" and smart_name(tonumber(away)) or away == "" and shelter
 			if on then
-				if shelter and squad.scripted_target ~= shelter then
-					squad.scripted_target = shelter
+				if target and squad.scripted_target ~= target then
+					squad.scripted_target = target
 				end
-			elseif squad.scripted_target == shelter or (own_name and squad.scripted_target == own_name) then
+			elseif target and squad.scripted_target == target or (own_name and squad.scripted_target == own_name) then
 				if late or squad.smart_id == own or not own_name then
 					squad.scripted_target = nil -- home: Anomaly's own life again
 				elseif squad.scripted_target ~= own_name then
@@ -229,14 +233,52 @@ local function start(ev)
 	local function theirs(squad)
 		return next(people) == nil or people[squad.get_squad_community and squad:get_squad_community() or ""]
 	end
-	if target then
-		for id in pairs(SIMBOARD.squads) do
-			local squad = alife_object(id)
-			if squad and squad.squad_members and not is_squad_monster[squad.player_id] and not squad.scripted_target
-				and squad.smart_id and squad.smart_id ~= target.id and not get_object_story_id(id)
-				and not (axr_companions and axr_companions.companion_squads[id]) and level_of(squad) == ev.level
-				and theirs(squad) then
-				rel[#rel + 1] = id .. ":" .. squad.smart_id
+	local function sealed_gear(squad)
+		local section = squad:section_name()
+		for _, part in ipairs(ZE.ini_list(S, "only_squads")) do
+			if string.find(section, part, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
+	-- the neighbouring levels' smarts a squad may go to (no bases)
+	local near = {}
+	for _, lvl in ipairs(ZE.ini_list(S, "leave_" .. ev.level)) do
+		near[lvl] = true
+	end
+	local away = {}
+	for _, s in pairs(SIMBOARD.smarts) do
+		if s.smrt and s.smrt.props and (s.smrt.props.base or 0) == 0 and near[level_of(s.smrt)] then
+			away[#away + 1] = s.smrt
+		end
+	end
+	local function away_for(squad)
+		local fit = {}
+		for _, smart in ipairs(away) do
+			local ok, yes = pcall(smart.target_precondition, smart, squad, true, true)
+			if ok and yes then
+				fit[#fit + 1] = smart
+			end
+		end
+		return #fit > 0 and fit[math.random(#fit)] or nil
+	end
+	local gone = 0
+	for id in pairs(SIMBOARD.squads) do
+		local squad = alife_object(id)
+		if squad and squad.squad_members and not is_squad_monster[squad.player_id] and not squad.scripted_target and squad.smart_id and not (target and squad.smart_id == target.id)
+			and not get_object_story_id(id) and not (axr_companions and axr_companions.companion_squads[id])
+			and level_of(squad) == ev.level then
+			if theirs(squad) then
+				if target then
+					rel[#rel + 1] = id .. ":" .. squad.smart_id
+				end
+			elseif squad.player_id ~= "zombied" and not sealed_gear(squad) then
+				local smart = away_for(squad)
+				if smart then
+					rel[#rel + 1] = id .. ":" .. squad.smart_id .. ":" .. smart.id
+					gone = gone + 1
+				end
 			end
 		end
 	end
@@ -272,7 +314,8 @@ local function start(ev)
 		end
 	end
 	ev.data.alb = table.concat(alb, ",")
-	printf("[coop] zone event ash on %s: %s squad(s) into %s, %s albino squad(s)", ev.level, #rel, tostring(shelter), #alb)
+	printf("[coop] zone event ash on %s: %s squad(s) into %s, %s off the level, %s albino squad(s)", ev.level,
+		#rel - gone, tostring(shelter), gone, #alb)
 end
 
 local function finish(ev, how)
