@@ -8,12 +8,16 @@
 --   artefacts  Anomaly's come only from its artefact zones (bind_anomaly_zone spawn_artefact_randomly; single
 --              anomalies bear none: the engine's zones have no artefact birth, dynamic anomalies are off in co-op);
 --              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
---              do: the spawn is held back here. The ones lying loose on the level are taken away by the level's
---              authority (the sim master while nobody is there), once per calm; the zones here forget them.
---   dropped    an artefact a player put on the ground is his, not the Zone's: the game that dropped it marks it for the
---              world (the fact "zone_event:drop:<id>", taken off when someone picks it up), the sweep leaves it
+--              do: the spawn is held back here. The Zone's ones lying loose on the level (born in a field: their
+--              af_quality roll's source) are taken away by the level's authority (the sim master while nobody is
+--              there), once per calm, a slice of ids each frame; the zones of a game forget the gone ones whenever
+--              it loads a level.
+--   dropped    an artefact a player put on the ground during the calm, on its level, is his, not the Zone's: the game
+--              that dropped it marks it for the world (the fact "zone_event:drop:<id>", taken off when someone picks
+--              it up or, by the master, when the object goes), the sweep leaves it
 --   the end    a game on the level spawns new artefacts at once, as after a surge (coop_sync: its authority, for
---              everyone); with nobody there the sim master marks the level for them (the next to load it spawns them)
+--              everyone); with nobody there the sim master marks the level for the world ("zone_event:respawn:<level>"):
+--              the first game to load it as its authority spawns them. Stopped by an admin («Ñòîï»): no new ones.
 
 local ID = "calm"
 local S = "zone_event_calm"
@@ -127,19 +131,37 @@ local function prune()
 	end
 end
 
--- the artefacts lying loose on the level, taken away (by its authority, for everyone)
-local function sweep(lvl)
+-- the Zone's artefacts lying loose on the level, taken away (by its authority, for everyone): sweep_ids ids a frame
+local job = nil -- { lvl, next id, count }
+
+local function zones_own(id)
+	local rec = af_quality and af_quality.record and af_quality.record(id)
+	return rec and string.sub(tostring(rec.src), 1, 5) == "field"
+end
+
+local function sweep_step()
+	if not job then
+		return
+	end
 	local sim, gg = alife(), game_graph()
-	local n = 0
-	for id = 1, 65534 do
+	local last = math.min(65534, job.id + (ini_sys:r_float_ex(S, "sweep_ids") or 2048) - 1)
+	for id = job.id, last do
 		local se = sim:object(id)
-		if se and se.parent_id == 65535 and IsArtefact(nil, se:clsid()) and not ZE.marked("drop:" .. id)
-			and sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == lvl then
+		if se and se.parent_id == 65535 and IsArtefact(nil, se:clsid()) and zones_own(id) and not ZE.marked("drop:" .. id)
+			and sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == job.lvl then
 			alife_release(se)
-			n = n + 1
+			job.n = job.n + 1
 		end
 	end
-	printf("[coop] zone event calm on %s: %s artefact(s) lying there taken away", lvl, n)
+	job.id = last + 1
+	if job.id > 65534 then
+		printf("[coop] zone event calm on %s: %s artefact(s) lying there taken away", job.lvl, job.n)
+		job = nil
+	end
+end
+
+local function sweep(lvl)
+	job = { lvl = lvl, id = 1, n = 0 }
 end
 
 -- new artefacts as after a surge: at once if we are on the level (its authority spawns them, coop_sync), else, if the
@@ -152,10 +174,16 @@ local function respawn(lvl)
 	if not authority(lvl) then
 		return -- a player is on it: his game spawns them
 	end
-	local m_data = alife_storage_manager.get_state()
-	if m_data then
-		m_data.artefact_respawn_levels = m_data.artefact_respawn_levels or {}
-		m_data.artefact_respawn_levels[lvl] = true
+	ZE.mark("respawn:" .. lvl, "1")
+end
+
+-- a level loaded: its zones forget what is gone; the new artefacts the calm's end left for it, if ours to spawn
+local function level_loaded()
+	prune()
+	local lvl = level.name()
+	if ZE.marked("respawn:" .. lvl) and authority(lvl) and not calm_here() then
+		ZE.mark("respawn:" .. lvl, "")
+		bind_anomaly_zone.force_spawn_artefacts()
 	end
 end
 
@@ -183,7 +211,9 @@ local function update(ev)
 		if ev.level == here then
 			prune()
 		end
-		respawn(ev.level)
+		if ev.how ~= "stop" then -- an admin's stop: no outcome
+			respawn(ev.level)
+		end
 	end
 end
 
@@ -216,10 +246,10 @@ function on_game_start()
 		return spawn(self, ...)
 	end
 
-	-- a player's artefact on the ground: marked for the world a moment after it left his hands (not into a box or a
-	-- trader's: only one lying loose); unmarked when someone takes it
+	-- a player's artefact on the ground during the calm on its level: marked for the world a moment after it left his
+	-- hands (not into a box or a trader's: only one lying loose); unmarked when someone takes it or it goes
 	RegisterScriptCallback("actor_on_item_drop", function(obj)
-		if obj and IsArtefact(obj) then
+		if obj and IsArtefact(obj) and calm_here() then
 			local id = obj:id()
 			CreateTimeEvent("coop_zone_calm", "drop_" .. id, 1, function()
 				local se = alife_object(id)
@@ -235,6 +265,18 @@ function on_game_start()
 			ZE.mark("drop:" .. obj:id(), "")
 		end
 	end)
+	RegisterScriptCallback("server_entity_on_unregister", function(se_obj)
+		if se_obj and ZE.master() and IsArtefact(nil, se_obj:clsid()) and ZE.marked("drop:" .. se_obj.id) then
+			ZE.mark("drop:" .. se_obj.id, "")
+		end
+	end)
+	RegisterScriptCallback("actor_on_first_update", function() -- the world's facts come in the first seconds
+		CreateTimeEvent("coop_zone_calm", "level_loaded", 5, function()
+			level_loaded()
+			return true
+		end)
+	end)
+	RegisterScriptCallback("actor_on_update", sweep_step)
 
 	RegisterScriptCallback("save_state", function(m_data)
 		m_data.coop_zone_calm = state
