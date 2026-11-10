@@ -1,0 +1,24 @@
+<w>
+	<!-- Our windows in the game's own look (scripts/ui_stalker_style.script): parts the scripts tint, size and put
+	     together; the frames, cards, buttons, boxes and fields are the game's own textures, set by the script -->
+	<white x="0" y="0" width="8" height="8" stretch="1">
+		<texture>ui\shelter\laptop_white</texture>
+	</white>
+	<image x="0" y="0" width="64" height="64" stretch="1">
+		<texture>ui\shelter\laptop_white</texture>
+	</image>
+	<text_s x="0" y="0" width="100" height="18">
+		<text font="letterica16" r="200" g="200" b="200" align="l" vert_align="c" complex_mode="1"/>
+	</text_s>
+	<text x="0" y="0" width="100" height="18">
+		<text font="letterica18" r="200" g="200" b="200" align="l" vert_align="c" complex_mode="1"/>
+	</text>
+	<text_l x="0" y="0" width="100" height="18">
+		<text font="graffiti22" r="240" g="217" b="182" align="l" vert_align="c" complex_mode="1"/>
+	</text_l>
+	<!-- a field to type in, unseen over the game's edit box the script draws -->
+	<edit x="0" y="0" width="100" height="20">
+		<text x="2" font="letterica16" r="207" g="155" b="80" align="l" vert_align="c"/>
+		<texture>ui\shelter\laptop_clear</texture>
+	</edit>
+</w>

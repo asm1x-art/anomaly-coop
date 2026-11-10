@@ -1,0 +1,225 @@
+-- Our windows in the game's own look (the admin window, ui_coop_admin.script): the same parts and calls as
+-- ui_shelter_style.script (rect, box, image, text, round, framed, button, hover_of, hovers, chrome, apply), so a window
+-- moves from one look to the other by its class's apply, but here the corners are straight, the frames, cards, buttons,
+-- check boxes and fields are the game's own textures (the options window's frame, the message box, the ordinary
+-- buttons, the edit box), the texts grey, the headings warm and Graffiti, what is picked amber. ui_shelter_style stays
+-- the shelter computers' look. Laid out in square units: a window class given these methods keeps self.xml (XML
+-- parsed) and self.k (a square unit across, in the interface's units).
+
+XML = "ui_stalker_style.xml"
+
+-- a colour's fourth number, if any, is its own see-through (an explicit alpha in a call wins)
+C = {
+	surface = { 22, 21, 19 }, raised = { 48, 45, 41 }, field = { 0, 0, 0, 80 }, border = { 74, 67, 62 },
+	line = { 255, 255, 255, 24 }, bar = { 0, 0, 0, 0 }, text = { 200, 200, 200 }, bright = { 240, 240, 240 },
+	head = { 240, 217, 182 }, dim = { 140, 140, 140 }, faint = { 108, 108, 108 }, accent = { 238, 155, 23 },
+	on_accent = { 24, 16, 4 }, good = { 56, 209, 115 }, bad = { 240, 86, 74 }, warn = { 238, 155, 23 },
+	white = { 255, 255, 255 }, black = { 0, 0, 0 }, close = { 150, 40, 30 },
+}
+TITLE_H = 30 -- a window's title band: the frame's top edge
+DIM = 150    -- the world behind a window, darkened (of 255)
+
+local TEXTS = { s = "text_s", m = "text", l = "text_l" } -- Letterica 16, 18, Graffiti 22
+-- the options window's frame (ui_inGame2_opt_main_window), cut in nine: its file, its place there, its edges (top,
+-- left, right, bottom) in the file's pixels and in square units
+local FRAME = { file = "ui\\ui_actor_hint_wnd", x = 508, y = 462, w = 487, h = 462, t = 42, l = 16, r = 16, b = 16 }
+local EDGE = { t = TITLE_H, l = 11, r = 11, b = 11 }
+local BUTTON = "ui_button_ordinary_" -- e, h, t, d
+local CHECK = "ui_inGame2_checkbox_" -- e (empty), t (ticked)
+local CARD = "ui_inGame2_message_box"
+local EDIT = "ui_inGame2_edit_box_1_" -- b (left end), back, e (right end)
+
+function argb(c, a)
+	return GetARGB(a or c[4] or 255, c[1], c[2], c[3])
+end
+
+local M = {}
+
+-- a window put at x, y (in its parent) and sized, in square units, its edges on whole pixels
+function M:place(wnd, x, y, w, h)
+	local sx, sy = device().width / 1024, device().height / 768
+	local x0, x1 = math.floor(x * self.k * sx + 0.5), math.floor((x + w) * self.k * sx + 0.5)
+	local y0, y1 = math.floor(y * sy + 0.5), math.floor((y + h) * sy + 0.5)
+	wnd:SetWndPos(vector2():set((x0 + 0.02) / sx, (y0 + 0.02) / sy))
+	wnd:SetWndSize(vector2():set((x1 - x0) / sx, (y1 - y0) / sy))
+end
+
+function M:rect(x, y, w, h, color, parent, alpha)
+	local s = self.xml:InitStatic("white", parent)
+	self:place(s, x, y, w, h)
+	s:SetTextureColor(argb(color, alpha))
+	return s
+end
+
+-- an unseen holder of parts, to move, hide or drop them together
+function M:box(x, y, w, h, parent)
+	return self:rect(x, y, w, h, C.black, parent, 0)
+end
+
+-- a picture: a texture's id or file, stretched; rect: a part of the file (x, y, w, h in its pixels)
+function M:image(x, y, w, h, texture, parent, color, alpha, rect)
+	local s = self.xml:InitStatic("image", parent)
+	s:InitTexture(texture)
+	if rect then
+		s:SetTextureRect(Frect():set(rect[1], rect[2], rect[1] + rect[3], rect[2] + rect[4]))
+	end
+	s:SetStretchTexture(true)
+	if color or alpha then
+		s:SetTextureColor(argb(color or C.white, alpha))
+	end
+	self:place(s, x, y, w, h)
+	return s
+end
+
+-- straight corners here: r is the other look's
+function M:round(x, y, w, h, color, parent, r, alpha)
+	return self:rect(x, y, w, h, color, parent, alpha)
+end
+
+-- a box with a thin border
+function M:framed(x, y, w, h, fill, parent, r, border)
+	self:rect(x, y, w, h, border or C.border, parent)
+	return self:rect(x + 1, y + 1, w - 2, h - 2, fill, parent)
+end
+
+-- a card: the game's message box
+function M:card(x, y, w, h, parent, alpha)
+	return self:image(x, y, w, h, CARD, parent, nil, alpha)
+end
+
+-- what is picked: an amber light with an amber line round it
+function M:picked(x, y, w, h, parent)
+	self:rect(x, y, w, h, C.accent, parent, 33)
+	self:rect(x, y, w, 1, C.accent, parent, 97)
+	self:rect(x, y + h - 1, w, 1, C.accent, parent, 97)
+	self:rect(x, y + 1, 1, h - 2, C.accent, parent, 97)
+	self:rect(x + w - 1, y + 1, 1, h - 2, C.accent, parent, 97)
+end
+
+-- the options window's frame at x, y, w, h: its corners and edges kept, its middle stretched
+function M:window(x, y, w, h, parent)
+	local F, E = FRAME, EDGE
+	local cols = { { 0, E.l, F.x, F.l }, { E.l, w - E.l - E.r, F.x + F.l, F.w - F.l - F.r }, { w - E.r, E.r, F.x + F.w - F.r, F.r } }
+	local rows = { { 0, E.t, F.y, F.t }, { E.t, h - E.t - E.b, F.y + F.t, F.h - F.t - F.b }, { h - E.b, E.b, F.y + F.h - F.b, F.b } }
+	local win = self:box(x, y, w, h, parent)
+	for _, r in ipairs(rows) do
+		for _, c in ipairs(cols) do
+			self:image(c[1], r[1], c[2], r[2], F.file, win, nil, nil, { c[3], r[3], c[4], r[4] })
+		end
+	end
+	return win
+end
+
+-- the game's edit box under a field
+function M:edit_back(x, y, w, h, parent)
+	local e = math.max(2, math.floor(h * 3 / 25 + 0.5))
+	self:image(x, y, e, h, EDIT .. "b", parent)
+	self:image(x + e, y, w - 2 * e, h, EDIT .. "back", parent)
+	self:image(x + w - e, y, e, h, EDIT .. "e", parent)
+end
+
+-- the game's check box, ticked or not
+function M:check(x, y, on, parent)
+	return self:image(x, y, 20, 17, CHECK .. (on and "t" or "e"), parent)
+end
+
+-- a text: size "s", "m" (the default) or "l" (a heading)
+function M:text(x, y, w, h, str, color, parent, align, size)
+	local t = self.xml:InitTextWnd(TEXTS[size or "m"], parent)
+	self:place(t, x, y, w, h)
+	t:SetTextAlignment(align or CGameFont.alLeft)
+	t:SetTextColor(argb(color or (size == "l" and C.head or C.text)))
+	t:SetText(str)
+	return t
+end
+
+-- an item's icon fitted into a box, its shape kept
+function M:icon(sec, x, y, box, parent)
+	local ico = utils_xml.get_item_axis(sec)
+	if ico.w <= 0 or ico.h <= 0 then
+		return
+	end
+	local s = self.xml:InitStatic("image", parent)
+	s:InitTexture(utils_xml.get_icons_texture(sec))
+	s:SetTextureRect(Frect():set(ico.x1, ico.y1, ico.x2, ico.y2))
+	s:SetStretchTexture(true)
+	local scale = math.min(box / ico.w, box / ico.h)
+	local w, h = ico.w * scale, ico.h * scale
+	self:place(s, x + (box - w) / 2, y + (box - h) / 2, w, h)
+end
+
+-- the hover of a click's area: a light over it, seen while the cursor is there
+function M:hover_of(x, y, w, h, parent, r, color, alpha)
+	local hb = self:box(x, y, w, h, parent)
+	self:rect(0, 0, w, h, color or C.white, hb, alpha or 16)
+	hb:Show(false)
+	return hb
+end
+
+-- a button, f on a click (list: its clicks; ax, ay: the parent's place in the clicks' frame). kind: "primary" (amber
+-- text), "normal", "danger" (red text), "on" (picked, pressed), "flat" (no face) or "off" (not to be pressed). Returns
+-- its click's entry (for "off" one in no list), to be tagged.
+function M:button(x, y, w, h, str, f, list, parent, ax, ay, kind)
+	kind = kind or "normal"
+	local hb
+	if kind == "flat" then
+		hb = self:hover_of(x, y, w, h, parent)
+	else
+		self:image(x, y, w, h, BUTTON .. (kind == "on" and "t" or kind == "off" and "d" or "e"), parent)
+		if kind ~= "off" then
+			hb = self:box(x, y, w, h, parent)
+			self:image(0, 0, w, h, BUTTON .. "h", hb)
+			hb:Show(false)
+		end
+	end
+	local color = kind == "primary" and C.accent or kind == "danger" and C.bad or kind == "on" and C.head
+		or kind == "off" and { 112, 112, 112 } or C.text
+	self:text(x, y, w, h, str, color, parent, CGameFont.alCenter, "s")
+	local c = { (ax or 0) + x, (ay or 0) + y, w, h, f, hover = hb }
+	if kind ~= "off" then
+		list[#list + 1] = c
+	end
+	return c
+end
+
+-- a window's frame: the options window's, its title on the top edge, a close button (its click into list, with the
+-- window's place ax, ay in the clicks' frame); returns the window, its content below TITLE_H. icon: the other look's
+function M:chrome(x, y, w, h, title, icon, parent, list, ax, ay, on_close)
+	local win = self:window(x, y, w, h, parent)
+	self:text(EDGE.l + 6, 0, w - 2 * EDGE.l - 60, TITLE_H, title, C.head, win, nil, "l")
+	self:button(w - EDGE.r - 40, 4, 36, TITLE_H - 8, "X", on_close, list, win, ax, ay)
+	return win
+end
+
+-- the hovers of clicks' lists (the first list's on top): only that under the cursor p is lit (as ui_shelter_style)
+function M:hovers(p, lists)
+	local lit, still
+	for _, list in ipairs(lists) do
+		for i = #list, 1, -1 do
+			local c = list[i]
+			if not lit and c.hover and p.x >= c[1] and p.x < c[1] + c[3] and p.y >= c[2] and p.y < c[2] + c[4] then
+				lit = c
+			end
+			still = still or c == self.lit
+		end
+	end
+	if not still then
+		self.lit = nil
+	end
+	if lit ~= self.lit then
+		if self.lit then
+			self.lit.hover:Show(false)
+		end
+		if lit then
+			lit.hover:Show(true)
+		end
+		self.lit = lit
+	end
+end
+
+-- the methods to a window class
+function apply(cls)
+	for name, f in pairs(M) do
+		cls[name] = f
+	end
+end

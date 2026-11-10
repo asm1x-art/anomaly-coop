@@ -10,10 +10,10 @@
 -- A status bar on top, the card of the picked thing on the right, a search over everything, pinned toggles under the
 -- sections. The server's state comes every [coop_admin] poll_seconds while it is open. The password is asked once:
 -- the server gives a token for it, kept per server in <appdata>\coop_admin.txt (the password never is). Below
--- [coop_admin] compact_below pixels of screen width the sections show as short marks. The look: ui_shelter_style.
+-- [coop_admin] compact_below pixels of screen width the sections show as short marks. The look: ui_stalker_style (the game's own).
 
-local C = ui_shelter_style.C
-local XML = "ui_shelter_laptop.xml"
+local C = ui_stalker_style.C
+local XML = ui_stalker_style.XML
 local S = "coop_admin"
 local FILE = "coop_admin.txt"
 
@@ -322,7 +322,7 @@ end
 -- the window
 
 class "UICoopAdmin" (CUIScriptWnd)
-ui_shelter_style.apply(UICoopAdmin)
+ui_stalker_style.apply(UICoopAdmin)
 
 function UICoopAdmin:__init(owner) super()
 	self.owner = owner
@@ -362,13 +362,17 @@ end
 -- the panel's regions, in square units from the screen's corner
 function UICoopAdmin:layout()
 	local pad = self.compact and 12 or 36
-	local x, y, w, h = pad, self.compact and 10 or 24, self.W - 2 * pad, self.H - (self.compact and 20 or 48)
-	local top = 46
+	local T = ui_stalker_style.TITLE_H
+	local w = math.min(self.W, 1024) - 2 * pad -- the 4:3 middle of a wider screen
+	local x, y, h = math.floor((self.W - w) / 2), self.compact and 10 or 24, self.H - (self.compact and 20 or 48)
+	local frame = { x, y, w, h }
+	x, y, w, h = x + 11, y + T, w - 22, h - T - 11 -- inside the frame's edges, its title on the top one
+	local top = 40
 	local nav = self.compact and 52 or 196
 	local aside = self.compact and 250 or 300
 	local status = 30
 	self.L = {
-		panel = { x, y, w, h },
+		panel = frame,
 		top = { x, y, w, top },
 		nav = { x, y + top, nav, h - top - status },
 		main = { x + nav, y + top, w - nav - aside, h - top - status },
@@ -380,12 +384,9 @@ end
 -- the frame: the dimmed screen, the panel, its top bar (with the search) and the status line, made once
 function UICoopAdmin:frame()
 	self:layout()
-	self:rect(0, 0, self.W, self.H, C.black, self, self.owner and 235 or 170)
+	self:rect(0, 0, self.W, self.H, C.black, self, self.owner and 235 or ui_stalker_style.DIM)
 	local P = self.L.panel
-	for i = 4, 1, -1 do
-		self:round(P[1] - 2 * i, P[2] + 3 - i, P[3] + 4 * i, P[4] + 4 * i, C.black, self, 10 + 2 * i, 16)
-	end
-	self:framed(P[1], P[2], P[3], P[4], C.surface, self, 12)
+	self:window(P[1], P[2], P[3], P[4], self)
 	self.r = {}
 	self:build_top()
 	self.top_region = self.r.top
@@ -419,7 +420,7 @@ end
 
 -- a field to type in: name keys its text over rebuilds
 function UICoopAdmin:field(name, x, y, w, h, parent, ax, ay, list, hint)
-	self:framed(x, y, w, h, C.field, parent, 6)
+	self:edit_back(x, y, w, h, parent)
 	local edit = self.xml:InitEditBox("edit", parent)
 	self:place(edit, x + 8, y + math.floor((h - 26) / 2), w - 16, 26)
 	if self.edit_text[name] then
@@ -452,17 +453,13 @@ end
 function UICoopAdmin:build_top()
 	local box, X, Y, W, H = self:region("top")
 	local L = self.clicks.top
-	self:round(14, 11, 24, 24, C.accent, box, 6)
-	self:text(14, 11, 24, 24, "A", C.on_accent, box, CGameFont.alCenter, "m")
-	self:text(48, 0, 220, H, tr("st_coop_adm_title"), C.text, box, nil, "l")
-	local cx = W - 48
-	local hb = self:hover_of(cx, 6, 40, H - 12, box, 6, C.close, 255)
-	self:image(cx + 14, H / 2 - 6, 12, 12, "ui\\shelter\\os_close", box, C.dim)
-	L[#L + 1] = { X + cx, Y + 6, 40, H - 12, function() self:Close() end, hover = hb }
+	local T = ui_stalker_style.TITLE_H -- the title and the close button on the frame's top edge, over this
+	self:text(6, -T, 400, T, tr("st_coop_adm_title"), C.head, box, nil, "l")
+	self:button(W - 40, 4 - T, 40, T - 8, "X", function() self:Close() end, L, box, X, Y)
 	local sw = self.compact and 200 or 320
-	local sx = cx - 10 - sw
-	self:field("search", sx, 7, sw, H - 14, box, X, Y, L, tr("st_coop_adm_search"))
-	self.chips_x = 290
+	local sx = W - sw
+	self:field("search", sx, 6, sw, H - 14, box, X, Y, L, tr("st_coop_adm_search"))
+	self.chips_x = 0
 	self.chips = self:box(self.chips_x, 0, sx - self.chips_x - 10, H, box)
 	self:rect(1, H - 1, W - 2, 1, C.line, box)
 end
@@ -473,10 +470,10 @@ function UICoopAdmin:build_chips()
 	box:DetachChild(self.chips) -- the top region's; made again in it
 	self.chips = self:box(self.chips_x, 0, 1, self.L.top[4], box)
 	local x = 0
-	local function chip(text, fg, bg, alpha)
-		local cw = math.min(300, 20 + string.len(text) * self.char)
-		self:round(x, 11, cw, 24, bg or C.raised, self.chips, 6, alpha)
-		self:text(x, 11, cw, 24, text, fg or C.dim, self.chips, CGameFont.alCenter, "s")
+	local function chip(text, fg)
+		local cw = math.min(300, 24 + string.len(text) * self.char)
+		self:card(x, 6, cw, 26, self.chips)
+		self:text(x, 6, cw, 26, text, fg or C.dim, self.chips, CGameFont.alCenter, "s")
 		x = x + cw + 8
 	end
 	local address = connected() and coop.server_address() or ""
@@ -486,7 +483,7 @@ function UICoopAdmin:build_chips()
 	if not connected() then
 		chip(tr("st_coop_adm_chip_offline"), C.warn)
 	elseif logged_in then
-		chip(tr("st_coop_adm_chip_admin"), C.accent, C.accent, 45)
+		chip(tr("st_coop_adm_chip_admin"), C.good)
 		if data and data.tests then
 			chip(tr("st_coop_adm_chip_tests"), C.warn)
 		end
@@ -561,10 +558,10 @@ function UICoopAdmin:build_nav()
 		local on = self.section == s.id and self.search == ""
 		local h = self.compact and 36 or 32
 		if on then
-			self:round(6, y, W - 12, h, C.accent, box, 7, 45)
+			self:picked(6, y, W - 12, h, box)
 		end
 		local hb = self:hover_of(6, y, W - 12, h, box, 7)
-		local color = on and C.text or self:locked(s.group) and C.faint or C.dim
+		local color = on and C.head or self:locked(s.group) and C.faint or C.text
 		if self.compact then
 			self:text(6, y, W - 12, h, tr("st_coop_adm_abbr_" .. s.id), color, box, CGameFont.alCenter, "m")
 		else
@@ -600,28 +597,17 @@ end
 -- parts
 
 function UICoopAdmin:switch(x, y, on, parent)
-	self:round(x, y, 36, 20, on and C.accent or C.border, parent, 10)
-	self:round(x + (on and 18 or 2), y + 2, 16, 16, on and C.white or { 201, 206, 214 }, parent, 8)
+	self:check(x + 8, y + 1, on, parent) -- the game's check box in a switch's place
 end
 
 -- a button at x, y of a region box (ax, ay its place); kind: "primary", "normal", "danger", "on", "off", "flat"
 function UICoopAdmin:btn(x, y, w, h, text, f, list, box, ax, ay, kind)
-	if kind == "danger" then
-		self:round(x, y, w, h, C.bad, box, 6, 40)
-		local hb = self:hover_of(x, y, w, h, box, 6)
-		self:text(x, y, w, h, text, { 255, 138, 128 }, box, CGameFont.alCenter, "s")
-		list[#list + 1] = { ax + x, ay + y, w, h, f, hover = hb }
-		return
-	end
-	local t = self:button(x, y, w, h, "", f, list, box, ax, ay, kind)
-	self:text(x, y, w, h, text, kind == "primary" and C.on_accent or kind == "off" and C.faint or C.text, box,
-		CGameFont.alCenter, "s")
-	return t
+	return self:button(x, y, w, h, text, f, list, box, ax, ay, kind)
 end
 
 function UICoopAdmin:heading(x, y, w, text, box, sub)
 	local th = math.max(30, math.floor(self.line * 1.6))
-	self:text(x, y, w, th, text, C.text, box, nil, "l")
+	self:text(x, y, w, th, text, C.head, box, nil, "l")
 	local sh = sub and self:lines(sub, w) * self.line or 0
 	if sub then
 		self:text(x, y + th, w, sh, sub, C.dim, box, nil, "s")
@@ -631,15 +617,15 @@ end
 
 -- a tile of the status row
 function UICoopAdmin:tile(x, y, w, key, value, sub, box, color)
-	self:round(x, y, w, 64, C.raised, box, 8)
+	self:card(x, y, w, 64, box)
 	self:text(x + 12, y + 6, w - 20, 18, key, C.dim, box, nil, "s")
-	self:text(x + 12, y + 22, w - 20, 24, value, color or C.text, box, nil, "m")
+	self:text(x + 12, y + 22, w - 20, 24, value, color or C.bright, box, nil, "m")
 	if sub then
 		self:text(x + 12, y + 42, w - 20, 18, sub, C.dim, box, nil, "s")
 	end
 end
 
--- a modern yes/no box of our own over everything
+-- a yes/no box of our own over everything
 function UICoopAdmin:confirm(title, text, action, f)
 	self.modal_on = true
 	-- texts are drawn after every picture: what is under the box is hidden, not covered
@@ -651,25 +637,20 @@ function UICoopAdmin:confirm(title, text, action, f)
 	self.clicks.modal = {}
 	local L = self.clicks.modal
 	self:rect(0, 0, self.W, self.H, C.black, box, 140)
-	local w, h = 480, 170
+	local T = ui_stalker_style.TITLE_H
+	local w, h = 480, 180
 	local x, y = math.floor((self.W - w) / 2), math.floor((self.H - h) / 2)
-	for i = 4, 1, -1 do
-		self:round(x - 2 * i, y + 3 - i, w + 4 * i, h + 4 * i, C.black, box, 10 + 2 * i, 18)
-	end
-	self:framed(x, y, w, h, C.surface, box, 12)
-	self:text(x + 20, y + 14, w - 40, 30, title, C.text, box, nil, "l")
-	self:text(x + 20, y + 50, w - 40, 60, text, C.dim, box, nil, "s")
+	self:window(x, y, w, h, box)
+	self:text(x + 16, y, w - 32, T, title, C.head, box, nil, "l")
+	self:text(x + 20, y + T + 12, w - 40, 60, text, C.text, box, nil, "s")
 	local close = function()
 		self:close_modal()
 	end
-	self:btn(x + w - 20 - 110 - 8 - 170, y + h - 50, 110, 34, tr("st_coop_adm_cancel"), close, L, box, 0, 0)
-	self:round(x + w - 20 - 170, y + h - 50, 170, 34, { 200, 71, 62 }, box, 6)
-	local hb = self:hover_of(x + w - 20 - 170, y + h - 50, 170, 34, box, 6)
-	self:text(x + w - 20 - 170, y + h - 50, 170, 34, action, C.white, box, CGameFont.alCenter, "s")
-	L[#L + 1] = { x + w - 20 - 170, y + h - 50, 170, 34, function()
+	self:btn(x + w - 20 - 110 - 8 - 170, y + h - 52, 110, 34, tr("st_coop_adm_cancel"), close, L, box, 0, 0)
+	self:btn(x + w - 20 - 170, y + h - 52, 170, 34, action, function()
 		close()
 		f()
-	end, hover = hb }
+	end, L, box, 0, 0, "danger")
 end
 
 function UICoopAdmin:close_modal()
@@ -837,8 +818,7 @@ function UICoopAdmin:main_players(box, X, Y, W, H, L)
 		local p = d.players[i]
 		local sel = self.sel.kind == "player" and self.sel.id == p.name
 		if sel then
-			self:rect(24, y, W - 48, 40, C.accent, box, 22)
-			self:rect(24, y, 3, 40, C.accent, box)
+			self:picked(24, y, W - 48, 40, box)
 		end
 		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
 		self:round(cols[1] + 12, y + 15, 10, 10, p.level ~= "" and C.good or C.faint, box, 5)
@@ -888,7 +868,7 @@ end
 function UICoopAdmin:setting_row(s, x, y, w, box, X, Y, L)
 	local sel = self.sel.kind == "rule" and self.sel.id == s.key
 	if sel then
-		self:round(x - 6, y, w + 12, 34, C.accent, box, 6, 30)
+		self:picked(x - 6, y, w + 12, 34, box)
 	end
 	local hb = self:hover_of(x - 6, y, w + 12, 34, box, 6)
 	L[#L + 1] = { X + x - 6, Y + y, w - 120, 34, function() self:pick({ kind = "rule", id = s.key }) end, hover = hb }
@@ -1003,8 +983,7 @@ function UICoopAdmin:main_saves(box, X, Y, W, H, L)
 	for _, s in ipairs(d.saves) do
 		local sel = self.sel.kind == "save" and self.sel.id == s.revision
 		if sel then
-			self:rect(24, y, W - 48, 40, C.accent, box, 22)
-			self:rect(24, y, 3, 40, C.accent, box)
+			self:picked(24, y, W - 48, 40, box)
 		end
 		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
 		self:text(40, y, 80, 40, "#" .. s.revision, C.text, box, nil, "m")
@@ -1254,7 +1233,7 @@ function UICoopAdmin:main_my(section, box, X, Y, W, H, L)
 				bx, y = 24, y + 46
 			end
 			if sel then
-				self:round(18, y, w + 12, 40, C.accent, box, 6, 30)
+				self:picked(18, y, w + 12, 40, box)
 			end
 			local hb = self:hover_of(18, y, w + 12, 40, box, 6)
 			L[#L + 1] = { X + 18, Y + y, w - 220, 40, function() self:pick({ kind = "my", id = it.id }) end, hover = hb }
@@ -1527,7 +1506,7 @@ function UICoopAdmin:build_spawn_list()
 			local y = n * 34
 			local picked = self.spawn.picked == it[1]
 			if picked then
-				self:round(0, y, W - 32, 32, C.accent, box, 6, 45)
+				self:picked(0, y, W - 32, 32, box)
 			end
 			local hb = self:hover_of(0, y, W - 32, 32, box, 6)
 			self:icon(it[1], 2, y + 2, 28, box)
