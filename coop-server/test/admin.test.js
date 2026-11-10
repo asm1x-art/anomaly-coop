@@ -313,6 +313,16 @@ test('admin: the world\'s events listed with their state; one started from the p
     assert.match(st.answer, /Охлаждение \(окно рейда\): остановка - отправлено мастеру симуляции \(Мастер\)/);
     await settle();
     assert.ok(got.some((p) => p.includes('event\tcooling\tstop')));
+    // a Zone's event: started on a level, ended with its outcome; no outcome for a surge
+    st = await (await s.call('POST', '/api/event', { name: 'calm', action: 'start', level: 'l08_yantar' })).json();
+    assert.match(st.answer, /Мёртвый штиль: запуск \(l08_yantar\)/);
+    st = await (await s.call('POST', '/api/event', { name: 'calm', action: 'outcome' })).json();
+    assert.match(st.answer, /Мёртвый штиль: исход/);
+    st = await (await s.call('POST', '/api/event', { name: 'surge', action: 'outcome' })).json();
+    assert.match(st.answer, /Как: event surge start\|stop\./);
+    await settle();
+    assert.ok(got.some((p) => p.includes('event\tcalm\tstart\tl08_yantar\t')));
+    assert.ok(got.some((p) => p.includes('event\tcalm\toutcome\t')));
     const kept = fs.readFileSync(path.join(s.dataDir, 'admin_log.jsonl'), 'utf8');
     assert.match(kept, /админ-страница/);
     master.destroy();

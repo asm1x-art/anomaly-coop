@@ -552,12 +552,29 @@ namespace coop
 
 	//------------------------------------------------------------------------------------------------
 
+	static u32 g_early_states = 0; // dropped while the host's world loads (a restarted host: players stream on)
+
 	void on_npc_states(u32 sender, NET_Packet& P)
 	{
 		shared_str level;
 		P.r_stringZ(level);
 		if (is_host())
+		{
+			// no A-Life yet to look the squads up in; a stream, the next ones fill g_streamed again
+			if (!world_ready())
+			{
+				if (!g_early_states++ && debug_mode)
+					Msg("[coop dbg] NPC states before our world is up: dropped until it is");
+				return;
+			}
+			if (g_early_states)
+			{
+				if (debug_mode)
+					Msg("[coop dbg] world up: %u NPC state message(s) dropped while it loaded", g_early_states);
+				g_early_states = 0;
+			}
 			return note_streamed(level, P);
+		}
 		// only the authority of a level sends; we may have been it a moment ago
 		if (!g_pGameLevel || level != Level().name() || is_authority(level))
 			return;

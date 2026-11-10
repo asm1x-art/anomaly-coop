@@ -6,7 +6,7 @@ import { M, REFUSED, ROLLBACK, LOAD, GROUP, GROUP_NOTE, GROUP_FLAG, PROTOCOL_VER
   EXIT_SAVE_NAME, AUTO_SAVE_NAME, TIME_FLAG, TIME_SET, TIME_TICK_MS, encode, createDecoder, readStringZ, readStringsZ, stringZ, u16, u32 } from './protocol.js';
 import { openStorage, WORLD_FILES } from './storage.js';
 import { settingsText, FACTIONS } from './settings.js';
-import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo, WORLD_EVENTS, worldEventOf, toEveryGame } from './admin_commands.js';
+import { WORLD, RULES, FACTION_NAMES, setSetting, setFaction, saveLabel, yesNo, WORLD_EVENTS, worldEventOf, toEveryGame, eventActions } from './admin_commands.js';
 import { createClock } from './clock.js';
 import { createBuildCheck } from './builds.js';
 import { createNews, NEWS_FACT, DEFAULT_NEWS_TYPES } from './news.js';
@@ -539,17 +539,22 @@ tests=1` : ''));
       journalAdmin(from, result);
     }
   };
-  // an event started or stopped by an admin (who): the answer for them
-  const worldEvent = (name, action, who) => {
+  // an event started or stopped by an admin (who): the answer for them; level: where a Zone's event starts
+  const worldEvent = (name, action, who, level = '') => {
     const e = worldEventOf(name);
     if (!e) return `Нет такого события: ${name || '?'}. Есть: ${WORLD_EVENTS.map((x) => x.id).join(', ')}.`;
-    if (action !== 'start' && action !== 'stop') return `Как: event ${name} start|stop.`;
-    if (action === 'stop' && !e.stop) return `${e.title}: остановить нельзя, это разовое событие.`;
+    const actions = eventActions(e);
+    if (!actions.includes(action)) {
+      if (action === 'stop') return `${e.title}: остановить нельзя, это разовое событие.`;
+      return `Как: event ${name} ${actions.join('|')}${e.zone ? ' [локация]' : ''}.`;
+    }
     const master = clients.get(masterId());
     if (!master?.inWorld) return 'Мир сейчас никто не держит (ни хоста, ни игроков в мире): запускать некому.';
     const to = toEveryGame(name, action) ? [...clients.values()].filter((c) => c.inWorld) : [master];
-    for (const c of to) adminEvent(c, 'event', name, action, who);
-    return `${e.title}: ${action === 'start' ? 'запуск' : 'остановка'} - отправлено ${master.host ? 'хосту' : `мастеру симуляции (${master.name})`}.`
+    const where = e.zone && action === 'start' && /^\w+$/.test(level) ? [level] : [];
+    for (const c of to) adminEvent(c, 'event', name, action, ...where, who);
+    const done = { start: 'запуск', stop: 'остановка', outcome: 'исход' }[action];
+    return `${e.title}: ${done}${where.length ? ` (${level})` : ''} - отправлено ${master.host ? 'хосту' : `мастеру симуляции (${master.name})`}.`
       + (emptyPaused ? ' Мир без игроков сейчас стоит (offline_sim выключено): пойдёт, когда кто-то войдёт.' : '');
   };
   const SAVES_PAGE = 10;
@@ -681,7 +686,7 @@ tests=1` : ''));
         return to.length ? `Отправлено ${to.length} игрок(ам).` : 'В мире никого: сообщение некому показать.';
       }
       case 'event':
-        return worldEvent(a, b, client.name);
+        return worldEvent(a, b, client.name, c ?? '');
       case 'test':
         if (!allowTests) return 'Тест-режимы - только на тестовом сервере (allow_tests в server.cfg).';
         if (!client.inWorld) return 'Сначала войдите в мир.';
@@ -1269,10 +1274,11 @@ tests=1` : ''));
       askReports();
       return { ...worldEvents, result: eventResult };
     },
-    worldEvent(name, action, who) {
-      const answer = worldEvent(name, action, who);
-      log(`${who} (admin): event ${name} ${action} - ${answer}`);
-      journalAdmin(who, `event ${name} ${action} - ${answer}`);
+    worldEvent(name, action, who, level = '') {
+      const answer = worldEvent(name, action, who, level);
+      const what = `event ${name} ${action}${level ? ` ${level}` : ''}`;
+      log(`${who} (admin): ${what} - ${answer}`);
+      journalAdmin(who, `${what} - ${answer}`);
       return answer;
     },
     // that player is off the server (their game says it lost the connection)

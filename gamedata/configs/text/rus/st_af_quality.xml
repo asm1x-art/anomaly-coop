@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Artefact grades and stabilisation (af_quality.script) -->
+<string_table>
+	<string id="st_afq_grade">
+		<text>Сорт:</text>
+	</string>
+	<string id="st_afq_grade_unstable">
+		<text>Нестабильный</text>
+	</string>
+	<string id="st_afq_grade_dim">
+		<text>Тусклый</text>
+	</string>
+	<string id="st_afq_grade_common">
+		<text>Обычный</text>
+	</string>
+	<string id="st_afq_grade_good">
+		<text>Хороший</text>
+	</string>
+	<string id="st_afq_grade_excellent">
+		<text>Отличный</text>
+	</string>
+	<string id="st_afq_grade_perfect">
+		<text>Идеальный</text>
+	</string>
+	<string id="st_afq_unstable_note">
+		<text>Нестабилен: фонит и мерцает.</text>
+	</string>
+	<string id="st_afq_step">
+		<text>%s  »  %s</text>
+	</string>
+	<string id="st_afq_step_hours">
+		<text>%s  »  %s, %s ч в камере</text>
+	</string>
+	<string id="st_afq_base_mode">
+		<text>Стабилизация</text>
+	</string>
+	<string id="st_afq_synth_mode">
+		<text>Синтез</text>
+	</string>
+	<string id="st_afq_base_title">
+		<text>Учёные Базы поднимут сорт артефакта этой природы на ступень, до Отличного. Камера будет занята, капсула останется.</text>
+	</string>
+	<string id="st_afq_base_do">
+		<text>Поместить в камеру</text>
+	</string>
+	<string id="st_afq_base_nothing">
+		<text>Нет артефактов этой природы, которые можно стабилизировать.</text>
+	</string>
+	<string id="st_afq_base_started">
+		<text>%s: стабилизация артефакта началась.</text>
+	</string>
+	<string id="st_afq_bunker_window">
+		<text>Стабилизация артефактов</text>
+	</string>
+	<string id="st_afq_bunker_title">
+		<text>Сорт поднимается на одну ступень, не выше чем до: %s. Сразу, за плату.</text>
+	</string>
+	<string id="st_afq_bunker_do">
+		<text>Стабилизировать: %s RU</text>
+	</string>
+	<string id="st_afq_bunker_done">
+		<text>%s: теперь сорт %s.</text>
+	</string>
+	<string id="st_afq_bunker_nothing">
+		<text>У вас нет артефактов, которые здесь можно стабилизировать.</text>
+	</string>
+	<string id="st_afq_money">
+		<text>Деньги: %s RU</text>
+	</string>
+	<string id="st_afq_dlg_0">
+		<text>Можете стабилизировать артефакт?</text>
+	</string>
+	<string id="st_afq_dlg_1">
+		<text>Нестабильный или тусклый? Покажите. До обычного сорта доведём, выше — нет: на это здесь нет оборудования.</text>
+	</string>
+	<string id="st_afq_test_lab_on">
+		<text>Лаборатория Базы для стабилизации: включена (тест).</text>
+	</string>
+	<string id="st_afq_test_lab_off">
+		<text>Лаборатория Базы для стабилизации: выключена.</text>
+	</string>
+	<string id="st_coop_tests_af_base_lab">
+		<text>Лаборатория Базы вкл/выкл</text>
+	</string>
+	<string id="st_coop_tests_af_kit">
+		<text>Медуза каждого сорта</text>
+	</string>
+</string_table>

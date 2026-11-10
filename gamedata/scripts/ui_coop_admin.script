@@ -10,10 +10,10 @@
 -- A status bar on top, the card of the picked thing on the right, a search over everything, pinned toggles under the
 -- sections. The server's state comes every [coop_admin] poll_seconds while it is open. The password is asked once:
 -- the server gives a token for it, kept per server in <appdata>\coop_admin.txt (the password never is). Below
--- [coop_admin] compact_below pixels of screen width the sections show as short marks. The look: ui_shelter_style.
+-- [coop_admin] compact_below pixels of screen width the sections show as short marks. The look: ui_stalker_style (the game's own).
 
-local C = ui_shelter_style.C
-local XML = "ui_shelter_laptop.xml"
+local C = ui_stalker_style.C
+local XML = ui_stalker_style.XML
 local S = "coop_admin"
 local FILE = "coop_admin.txt"
 
@@ -322,7 +322,7 @@ end
 -- the window
 
 class "UICoopAdmin" (CUIScriptWnd)
-ui_shelter_style.apply(UICoopAdmin)
+ui_stalker_style.apply(UICoopAdmin)
 
 function UICoopAdmin:__init(owner) super()
 	self.owner = owner
@@ -362,13 +362,18 @@ end
 -- the panel's regions, in square units from the screen's corner
 function UICoopAdmin:layout()
 	local pad = self.compact and 12 or 36
-	local x, y, w, h = pad, self.compact and 10 or 24, self.W - 2 * pad, self.H - (self.compact and 20 or 48)
-	local top = 46
+	local T = ui_stalker_style.TITLE_H
+	-- the 4:3 middle of a wider screen; the full layout (names down the side, the card) a little wider, or its middle is too narrow
+	local w = math.min(self.W, self.compact and 1024 or 1280) - 2 * pad
+	local x, y, h = math.floor((self.W - w) / 2), self.compact and 10 or 24, self.H - (self.compact and 20 or 48)
+	local frame = { x, y, w, h }
+	x, y, w, h = x + 11, y + T, w - 22, h - T - 11 -- inside the frame's edges, its title on the top one
+	local top = 40
 	local nav = self.compact and 52 or 196
 	local aside = self.compact and 250 or 300
 	local status = 30
 	self.L = {
-		panel = { x, y, w, h },
+		panel = frame,
 		top = { x, y, w, top },
 		nav = { x, y + top, nav, h - top - status },
 		main = { x + nav, y + top, w - nav - aside, h - top - status },
@@ -380,12 +385,9 @@ end
 -- the frame: the dimmed screen, the panel, its top bar (with the search) and the status line, made once
 function UICoopAdmin:frame()
 	self:layout()
-	self:rect(0, 0, self.W, self.H, C.black, self, self.owner and 235 or 170)
+	self:rect(0, 0, self.W, self.H, C.black, self, self.owner and 235 or ui_stalker_style.DIM)
 	local P = self.L.panel
-	for i = 4, 1, -1 do
-		self:round(P[1] - 2 * i, P[2] + 3 - i, P[3] + 4 * i, P[4] + 4 * i, C.black, self, 10 + 2 * i, 16)
-	end
-	self:framed(P[1], P[2], P[3], P[4], C.surface, self, 12)
+	self:window(P[1], P[2], P[3], P[4], self)
 	self.r = {}
 	self:build_top()
 	self.top_region = self.r.top
@@ -419,7 +421,7 @@ end
 
 -- a field to type in: name keys its text over rebuilds
 function UICoopAdmin:field(name, x, y, w, h, parent, ax, ay, list, hint)
-	self:framed(x, y, w, h, C.field, parent, 6)
+	self:edit_back(x, y, w, h, parent)
 	local edit = self.xml:InitEditBox("edit", parent)
 	self:place(edit, x + 8, y + math.floor((h - 26) / 2), w - 16, 26)
 	if self.edit_text[name] then
@@ -452,17 +454,13 @@ end
 function UICoopAdmin:build_top()
 	local box, X, Y, W, H = self:region("top")
 	local L = self.clicks.top
-	self:round(14, 11, 24, 24, C.accent, box, 6)
-	self:text(14, 11, 24, 24, "A", C.on_accent, box, CGameFont.alCenter, "m")
-	self:text(48, 0, 220, H, tr("st_coop_adm_title"), C.text, box, nil, "l")
-	local cx = W - 48
-	local hb = self:hover_of(cx, 6, 40, H - 12, box, 6, C.close, 255)
-	self:image(cx + 14, H / 2 - 6, 12, 12, "ui\\shelter\\os_close", box, C.dim)
-	L[#L + 1] = { X + cx, Y + 6, 40, H - 12, function() self:Close() end, hover = hb }
+	local T = ui_stalker_style.TITLE_H -- the title and the close button on the frame's top edge, over this
+	self:text(6, -T, 400, T, tr("st_coop_adm_title"), C.head, box, nil, "l")
+	self:button(W - 40, 4 - T, 40, T - 8, "X", function() self:Close() end, L, box, X, Y)
 	local sw = self.compact and 200 or 320
-	local sx = cx - 10 - sw
-	self:field("search", sx, 7, sw, H - 14, box, X, Y, L, tr("st_coop_adm_search"))
-	self.chips_x = 290
+	local sx = W - sw
+	self:field("search", sx, 6, sw, H - 14, box, X, Y, L, tr("st_coop_adm_search"))
+	self.chips_x = 0
 	self.chips = self:box(self.chips_x, 0, sx - self.chips_x - 10, H, box)
 	self:rect(1, H - 1, W - 2, 1, C.line, box)
 end
@@ -473,10 +471,10 @@ function UICoopAdmin:build_chips()
 	box:DetachChild(self.chips) -- the top region's; made again in it
 	self.chips = self:box(self.chips_x, 0, 1, self.L.top[4], box)
 	local x = 0
-	local function chip(text, fg, bg, alpha)
-		local cw = math.min(300, 20 + string.len(text) * self.char)
-		self:round(x, 11, cw, 24, bg or C.raised, self.chips, 6, alpha)
-		self:text(x, 11, cw, 24, text, fg or C.dim, self.chips, CGameFont.alCenter, "s")
+	local function chip(text, fg)
+		local cw = math.min(300, 24 + string.len(text) * self.char)
+		self:card(x, 6, cw, 26, self.chips)
+		self:text(x, 6, cw, 26, text, fg or C.dim, self.chips, CGameFont.alCenter, "s")
 		x = x + cw + 8
 	end
 	local address = connected() and coop.server_address() or ""
@@ -486,7 +484,7 @@ function UICoopAdmin:build_chips()
 	if not connected() then
 		chip(tr("st_coop_adm_chip_offline"), C.warn)
 	elseif logged_in then
-		chip(tr("st_coop_adm_chip_admin"), C.accent, C.accent, 45)
+		chip(tr("st_coop_adm_chip_admin"), C.good)
 		if data and data.tests then
 			chip(tr("st_coop_adm_chip_tests"), C.warn)
 		end
@@ -561,10 +559,10 @@ function UICoopAdmin:build_nav()
 		local on = self.section == s.id and self.search == ""
 		local h = self.compact and 36 or 32
 		if on then
-			self:round(6, y, W - 12, h, C.accent, box, 7, 45)
+			self:picked(6, y, W - 12, h, box)
 		end
 		local hb = self:hover_of(6, y, W - 12, h, box, 7)
-		local color = on and C.text or self:locked(s.group) and C.faint or C.dim
+		local color = on and C.head or self:locked(s.group) and C.faint or C.text
 		if self.compact then
 			self:text(6, y, W - 12, h, tr("st_coop_adm_abbr_" .. s.id), color, box, CGameFont.alCenter, "m")
 		else
@@ -600,28 +598,17 @@ end
 -- parts
 
 function UICoopAdmin:switch(x, y, on, parent)
-	self:round(x, y, 36, 20, on and C.accent or C.border, parent, 10)
-	self:round(x + (on and 18 or 2), y + 2, 16, 16, on and C.white or { 201, 206, 214 }, parent, 8)
+	self:check(x + 8, y + 1, on, parent) -- the game's check box in a switch's place
 end
 
 -- a button at x, y of a region box (ax, ay its place); kind: "primary", "normal", "danger", "on", "off", "flat"
 function UICoopAdmin:btn(x, y, w, h, text, f, list, box, ax, ay, kind)
-	if kind == "danger" then
-		self:round(x, y, w, h, C.bad, box, 6, 40)
-		local hb = self:hover_of(x, y, w, h, box, 6)
-		self:text(x, y, w, h, text, { 255, 138, 128 }, box, CGameFont.alCenter, "s")
-		list[#list + 1] = { ax + x, ay + y, w, h, f, hover = hb }
-		return
-	end
-	local t = self:button(x, y, w, h, "", f, list, box, ax, ay, kind)
-	self:text(x, y, w, h, text, kind == "primary" and C.on_accent or kind == "off" and C.faint or C.text, box,
-		CGameFont.alCenter, "s")
-	return t
+	return self:button(x, y, w, h, text, f, list, box, ax, ay, kind)
 end
 
 function UICoopAdmin:heading(x, y, w, text, box, sub)
 	local th = math.max(30, math.floor(self.line * 1.6))
-	self:text(x, y, w, th, text, C.text, box, nil, "l")
+	self:text(x, y, w, th, text, C.head, box, nil, "l")
 	local sh = sub and self:lines(sub, w) * self.line or 0
 	if sub then
 		self:text(x, y + th, w, sh, sub, C.dim, box, nil, "s")
@@ -631,15 +618,15 @@ end
 
 -- a tile of the status row
 function UICoopAdmin:tile(x, y, w, key, value, sub, box, color)
-	self:round(x, y, w, 64, C.raised, box, 8)
+	self:card(x, y, w, 64, box)
 	self:text(x + 12, y + 6, w - 20, 18, key, C.dim, box, nil, "s")
-	self:text(x + 12, y + 22, w - 20, 24, value, color or C.text, box, nil, "m")
+	self:text(x + 12, y + 22, w - 20, 24, value, color or C.bright, box, nil, "m")
 	if sub then
 		self:text(x + 12, y + 42, w - 20, 18, sub, C.dim, box, nil, "s")
 	end
 end
 
--- a modern yes/no box of our own over everything
+-- a yes/no box of our own over everything
 function UICoopAdmin:confirm(title, text, action, f)
 	self.modal_on = true
 	-- texts are drawn after every picture: what is under the box is hidden, not covered
@@ -651,25 +638,20 @@ function UICoopAdmin:confirm(title, text, action, f)
 	self.clicks.modal = {}
 	local L = self.clicks.modal
 	self:rect(0, 0, self.W, self.H, C.black, box, 140)
-	local w, h = 480, 170
+	local T = ui_stalker_style.TITLE_H
+	local w, h = 480, 180
 	local x, y = math.floor((self.W - w) / 2), math.floor((self.H - h) / 2)
-	for i = 4, 1, -1 do
-		self:round(x - 2 * i, y + 3 - i, w + 4 * i, h + 4 * i, C.black, box, 10 + 2 * i, 18)
-	end
-	self:framed(x, y, w, h, C.surface, box, 12)
-	self:text(x + 20, y + 14, w - 40, 30, title, C.text, box, nil, "l")
-	self:text(x + 20, y + 50, w - 40, 60, text, C.dim, box, nil, "s")
+	self:window(x, y, w, h, box)
+	self:text(x + 16, y, w - 32, T, title, C.head, box, nil, "l")
+	self:text(x + 20, y + T + 12, w - 40, 60, text, C.text, box, nil, "s")
 	local close = function()
 		self:close_modal()
 	end
-	self:btn(x + w - 20 - 110 - 8 - 170, y + h - 50, 110, 34, tr("st_coop_adm_cancel"), close, L, box, 0, 0)
-	self:round(x + w - 20 - 170, y + h - 50, 170, 34, { 200, 71, 62 }, box, 6)
-	local hb = self:hover_of(x + w - 20 - 170, y + h - 50, 170, 34, box, 6)
-	self:text(x + w - 20 - 170, y + h - 50, 170, 34, action, C.white, box, CGameFont.alCenter, "s")
-	L[#L + 1] = { x + w - 20 - 170, y + h - 50, 170, 34, function()
+	self:btn(x + w - 20 - 110 - 8 - 170, y + h - 52, 110, 34, tr("st_coop_adm_cancel"), close, L, box, 0, 0)
+	self:btn(x + w - 20 - 170, y + h - 52, 170, 34, action, function()
 		close()
 		f()
-	end, hover = hb }
+	end, L, box, 0, 0, "danger")
 end
 
 function UICoopAdmin:close_modal()
@@ -837,8 +819,7 @@ function UICoopAdmin:main_players(box, X, Y, W, H, L)
 		local p = d.players[i]
 		local sel = self.sel.kind == "player" and self.sel.id == p.name
 		if sel then
-			self:rect(24, y, W - 48, 40, C.accent, box, 22)
-			self:rect(24, y, 3, 40, C.accent, box)
+			self:picked(24, y, W - 48, 40, box)
 		end
 		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
 		self:round(cols[1] + 12, y + 15, 10, 10, p.level ~= "" and C.good or C.faint, box, 5)
@@ -888,7 +869,7 @@ end
 function UICoopAdmin:setting_row(s, x, y, w, box, X, Y, L)
 	local sel = self.sel.kind == "rule" and self.sel.id == s.key
 	if sel then
-		self:round(x - 6, y, w + 12, 34, C.accent, box, 6, 30)
+		self:picked(x - 6, y, w + 12, 34, box)
 	end
 	local hb = self:hover_of(x - 6, y, w + 12, 34, box, 6)
 	L[#L + 1] = { X + x - 6, Y + y, w - 120, 34, function() self:pick({ kind = "rule", id = s.key }) end, hover = hb }
@@ -1003,8 +984,7 @@ function UICoopAdmin:main_saves(box, X, Y, W, H, L)
 	for _, s in ipairs(d.saves) do
 		local sel = self.sel.kind == "save" and self.sel.id == s.revision
 		if sel then
-			self:rect(24, y, W - 48, 40, C.accent, box, 22)
-			self:rect(24, y, 3, 40, C.accent, box)
+			self:picked(24, y, W - 48, 40, box)
 		end
 		local hb = self:hover_of(24, y, W - 48, 40, box, 0)
 		self:text(40, y, 80, 40, "#" .. s.revision, C.text, box, nil, "m")
@@ -1063,7 +1043,7 @@ function UICoopAdmin:main_mechanics(box, X, Y, W, H, L)
 	self:text(30, y, W - 60, 60, tr(d.host and d.host.has and "st_coop_adm_host_god" or "st_coop_adm_no_host_offline"), C.dim, box, nil, "s")
 end
 
--- События: the world's events (coop_world_events.script), the server's command "event <id> <start|stop>". Rows:
+-- События: the world's events (coop_world_events.script), the server's command "event <id> <start|stop|outcome> [level]". Rows:
 -- { id, the start's and the stop's captions, the action asked about first }
 local EVENT_ROWS = {
 	{ "surge", "st_coop_adm_ev_start", "st_coop_adm_ev_stop", "start" },
@@ -1073,8 +1053,12 @@ local EVENT_ROWS = {
 local BAR_EVENTS = { "rumour", "quarrel", "spender", "gift", "wounded", "binge" }
 local WEATHERS = { "clear", "partly", "cloudy", "rain", "storm", "foggy" }
 
+-- the Zone's events (coop_zone_events.script): the level picked for a start, an index into its pool (0: any)
+local ZONE_EVENTS = { "calm", "ash" }
+local zone_pick = {}
+
 -- for the search
-EVENT_TITLES = { "surge", "psi", "cooling" }
+EVENT_TITLES = { "surge", "psi", "cooling", "calm", "ash" }
 for _, id in ipairs(BAR_EVENTS) do
 	EVENT_TITLES[#EVENT_TITLES + 1] = "bar_" .. id
 end
@@ -1134,6 +1118,36 @@ function UICoopAdmin:main_events(box, X, Y, W, H, L)
 		end
 		y = y + 40
 	end
+	-- the Zone's events: the state; the level for a start (a click: the next of its pool), start, stop, outcome now
+	for _, id in ipairs(ZONE_EVENTS) do
+		local pool = coop_zone_events.levels(id)
+		local on = v[id] == "1"
+		local state = on and tr("st_coop_adm_ev_zone_on", level_name(v[id .. "_level"]), duration(tonumber(v[id .. "_left"])))
+			or tr("st_coop_adm_ev_zone_off")
+		self:text(24, y, 150, 30, tr("st_coop_ev_t_" .. id), C.text, box, nil, "m")
+		self:text(180, y, W - 24 - 180, 30, state, on and C.warn or C.dim, box, nil, "s")
+		y = y + 32
+		local i = zone_pick[id] or 0
+		local lvl = i > 0 and pool[i] or nil
+		local lw = math.max(100, W - 48 - 3 * (bw + 10))
+		self:btn(24, y, lw, 30, tr("st_coop_adm_ev_level", lvl and level_name(lvl) or tr("st_coop_adm_ev_level_any")), function()
+			zone_pick[id] = ((zone_pick[id] or 0) + 1) % (#pool + 1)
+			self:build_main()
+		end, L, box, X, Y)
+		for k, action in ipairs({ "start", "stop", "outcome" }) do
+			local caption = tr(action == "start" and "st_coop_adm_ev_start" or action == "stop" and "st_coop_adm_ev_stop"
+				or "st_coop_adm_ev_outcome")
+			local f = function()
+				command("event", id, action, action == "start" and lvl or "")
+			end
+			-- a start asks first, as on the admin page and in the bot
+			self:btn(24 + lw + 10 + (k - 1) * (bw + 10), y, bw, 30, caption, action == "start" and function()
+				self:confirm(tr("st_coop_ev_t_" .. id) .. ": " .. caption, tr("st_coop_adm_ev_warn_" .. id,
+					lvl and level_name(lvl) or tr("st_coop_adm_ev_level_any")), caption, f)
+			end or f, L, box, X, Y, action == "start" and "danger" or "normal")
+		end
+		y = y + 40
+	end
 	-- buttons in three columns
 	local cw = math.floor((W - 48 - 2 * 10) / 3)
 	local function grid(ids, prefix)
@@ -1180,14 +1194,39 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 	local top = math.max(72, self:heading(24, 14, W - 48, tr("st_coop_adm_sec_tests"), box,
 		tr(d.tests and "st_coop_adm_tests_sub" or "st_coop_adm_tests_off")) + 10)
 	local cw = math.floor((W - 48 - 2 * 12) / 3)
-	local ys = {}
+	local bh = math.max(30, 2 * self.line - 6) -- a name over two lines fits its button (a 600-line screen too)
+	-- the cheats on oneself under the tests: their heading and buttons on one row, the hint under it
+	local hint = tr("st_coop_adm_cheats_hint")
+	local bottom = H - (14 + 38 + self:lines(hint, W - 48) * self.line)
+	-- a mode a column; when the longest doesn't fit over the cheats (a 600-line screen), the modes flow down the
+	-- columns one after another, what doesn't fit in one going on in the next
+	local count = {}
+	for _, a in ipairs(coop_admin_tests.LIST) do
+		count[a[2]] = (count[a[2]] or 0) + 1
+	end
+	local flow = false
+	for _, mode in ipairs(TEST_MODES) do
+		flow = flow or top + 30 + (count[mode] or 0) * (bh + 4) > bottom
+	end
+	local col, y, low = 0, top, top
+	local function room(h) -- the column's x, the next column's when h doesn't fit under what is in this one
+		if col == 0 or flow and y + h > bottom and y > top and col < #TEST_MODES then
+			col, y = col + 1, top
+		end
+		return 24 + (col - 1) * (cw + 12)
+	end
 	for i, mode in ipairs(TEST_MODES) do
-		local x = 24 + (i - 1) * (cw + 12)
-		local y = top
+		if not flow then
+			col, y = i, top
+		elseif y > top then
+			y = y + 10
+		end
+		local x = room(30 + 2 * (bh + 4))
 		self:text(x, y, cw, 26, tr("st_coop_adm_tm_" .. mode), C.text, box, nil, "m")
 		y = y + 30
 		for _, a in ipairs(coop_admin_tests.LIST) do
 			if a[2] == mode then
+				x = room(bh)
 				local id, key, danger = a[1], a[3], a[5]
 				local kind = not d.tests and "off" or danger and "danger" or "normal"
 				local f = function()
@@ -1198,26 +1237,25 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 						command("test", id)
 					end
 				end
-				self:btn(x, y, cw, 30, "", d.tests and f or function() end, L, box, X, Y, kind)
-				self:text(x + 10, y, cw - 60, 30, tr("st_coop_tests_" .. id), d.tests and C.text or C.faint, box, nil, "s")
+				self:btn(x, y, cw, bh, "", d.tests and f or function() end, L, box, X, Y, kind)
+				self:text(x + 10, y, cw - 60, bh, tr("st_coop_tests_" .. id), d.tests and C.text or C.faint, box, nil, "s")
 				if key ~= "" then
-					self:text(x + cw - 56, y, 48, 30, key, C.dim, box, CGameFont.alRight, "s")
+					self:text(x + cw - 56, y, 48, bh, key, C.dim, box, CGameFont.alRight, "s")
 				end
-				y = y + 34
+				y = y + bh + 4
+				low = math.max(low, y)
 			end
 		end
-		ys[i] = y
 	end
 	-- cheats on oneself
-	local y = math.max(ys[1], ys[2], ys[3]) + 14
-	self:text(24, y, W - 48, 24, tr("st_coop_adm_cheats"), C.text, box, nil, "m")
-	y = y + 30
+	y = low + 14
+	self:text(24, y, cw, 32, tr("st_coop_adm_cheats"), C.text, box, nil, "m")
 	local mine = find_player(me())
 	local kind = d.tests and mine and mine.level ~= "" and "normal" or "off"
-	self:btn(24, y, 200, 32, tr(mine and mine.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"),
+	self:btn(24 + cw + 12, y, cw, 32, tr(mine and mine.god and "st_coop_adm_god_off" or "st_coop_adm_god_on"),
 		function() command("god", me(), mine and mine.god and "off" or "on") end, L, box, X, Y, kind)
-	self:btn(234, y, 200, 32, tr("st_coop_adm_heal"), function() command("heal", me()) end, L, box, X, Y, kind)
-	self:text(24, y + 40, W - 48, 40, tr("st_coop_adm_cheats_hint"), C.dim, box, nil, "s")
+	self:btn(24 + 2 * (cw + 12), y, cw, 32, tr("st_coop_adm_heal"), function() command("heal", me()) end, L, box, X, Y, kind)
+	self:text(24, y + 38, W - 48, self:lines(hint, W - 48) * self.line, hint, C.dim, box, nil, "s")
 end
 
 -- Моя игра
@@ -1254,7 +1292,7 @@ function UICoopAdmin:main_my(section, box, X, Y, W, H, L)
 				bx, y = 24, y + 46
 			end
 			if sel then
-				self:round(18, y, w + 12, 40, C.accent, box, 6, 30)
+				self:picked(18, y, w + 12, 40, box)
 			end
 			local hb = self:hover_of(18, y, w + 12, 40, box, 6)
 			L[#L + 1] = { X + 18, Y + y, w - 220, 40, function() self:pick({ kind = "my", id = it.id }) end, hover = hb }
@@ -1527,7 +1565,7 @@ function UICoopAdmin:build_spawn_list()
 			local y = n * 34
 			local picked = self.spawn.picked == it[1]
 			if picked then
-				self:round(0, y, W - 32, 32, C.accent, box, 6, 45)
+				self:picked(0, y, W - 32, 32, box)
 			end
 			local hb = self:hover_of(0, y, W - 32, 32, box, 6)
 			self:icon(it[1], 2, y + 2, 28, box)

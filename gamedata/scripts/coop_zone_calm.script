@@ -1,0 +1,292 @@
+-- Co-op: the Zone's event "Dead calm" (coop_zone_events.script, [zone_event_calm] in mod_system_zone_events.ltx). On
+-- one level every anomaly goes out for some hours, the fields' and the single ones, radiation spots too (all Anomaly
+-- binds as anomaly fields, but keep_sections), the artefacts lying there go with them (not those a player dropped),
+-- and none is born there meanwhile. Then the anomalies come back and bear artefacts as after a surge.
+--   anomalies  every game on that level puts them out (and keeps them out when Anomaly's artefact zones switch their
+--              layers); each remembers what it put out (its save) and puts it back once the calm is over there, the
+--              zones' layers as they were
+--   artefacts  Anomaly's come only from its artefact zones (bind_anomaly_zone spawn_artefact_randomly; single
+--              anomalies bear none: the engine's zones have no artefact birth, dynamic anomalies are off in co-op);
+--              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
+--              do: the spawn is held back here. The Zone's ones lying loose on the level (born in a field or never
+--              rolled by a known source: zones_own) are taken away by the level's authority (the sim master while nobody is
+--              there), once per calm, a slice of ids each frame; the zones of a game forget the gone ones whenever
+--              it loads a level.
+--   dropped    an artefact a player put on the ground during the calm, on its level, is his, not the Zone's: the game
+--              that dropped it marks it for the world (the fact "zone_event:drop:<id>", taken off when someone picks
+--              it up or, by the master, when the object goes), the sweep leaves it
+--   the end    a game on the level spawns new artefacts at once, as after a surge (coop_sync: its authority, for
+--              everyone); with nobody there the sim master marks the level for the world ("zone_event:respawn:<level>"):
+--              the first game to load it as its authority spawns them. Stopped by an admin («Ñòîï»): no new ones.
+
+local ID = "calm"
+local S = "zone_event_calm"
+local ZE -- coop_zone_events
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function authority(lvl)
+	return not in_coop() or coop.is_authority(lvl)
+end
+
+-------------------------------------------------------------------------------
+-- the anomalies (every game on the level)
+
+local state = { off = {}, swept = 0, seen = 0, done = 0 } -- kept in the save: off = level -> { name = true }
+local kept = {} -- object name -> not ours to put out
+
+local function kept_section(section)
+	for _, prefix in ipairs(ZE.ini_list(S, "keep_sections")) do
+		if string.sub(section, 1, #prefix) == prefix then
+			return true
+		end
+	end
+	return false
+end
+
+local function ours(binder)
+	local name = binder.object:name()
+	local k = kept[name]
+	if k == nil then
+		k = kept_section(binder.object:section())
+		for _, keep in ipairs(ZE.ini_list(S, "keep_fields")) do
+			if keep == name then
+				k = true
+			end
+		end
+		kept[name] = k
+	end
+	return not k
+end
+
+local function calm_here()
+	return ZE.on_level(ID, level.name()) ~= nil
+end
+
+local function put_out()
+	local lvl = level.name()
+	state.off[lvl] = state.off[lvl] or {}
+	local n = 0
+	for name, binder in pairs(bind_anomaly_field.fields_by_names) do
+		if binder.object and ours(binder) and binder.object:is_enabled_anomaly() then
+			binder.object:disable_anomaly()
+			state.off[lvl][name] = true
+			n = n + 1
+		end
+	end
+	if n > 0 then
+		printf("[coop] zone event calm on %s: %s anomaly(ies) out", lvl, n)
+	end
+end
+
+local function put_back()
+	local lvl = level.name()
+	local names = state.off[lvl]
+	if not (names and next(names)) then
+		return false
+	end
+	local n = 0
+	for name in pairs(names) do
+		local binder = bind_anomaly_field.fields_by_names[name]
+		if binder and binder.object then
+			binder.object:enable_anomaly()
+			n = n + 1
+		end
+	end
+	state.off[lvl] = nil
+	-- the artefact zones' layers as they were: the fields of their other layers out again
+	for _, zone in pairs(db.anomaly_by_name or {}) do
+		if zone.disable_anomaly_fields then
+			pcall(zone.disable_anomaly_fields, zone)
+		end
+	end
+	printf("[coop] zone event calm over on %s: %s anomaly(ies) back", lvl, n)
+	return true
+end
+
+-------------------------------------------------------------------------------
+-- the artefacts
+
+-- the zones here forget their artefacts that are gone (taken away, released by another game): their count frees
+local function prune()
+	local sim = alife()
+	for _, zone in pairs(db.anomaly_by_name or {}) do
+		if zone.artefact_ways_by_id then
+			for id in pairs(zone.artefact_ways_by_id) do
+				local se = sim:object(id)
+				if not se or se.parent_id ~= 65535 then
+					zone.artefact_ways_by_id[id] = nil
+					if zone.artefact_points_by_id then
+						zone.artefact_points_by_id[id] = nil
+					end
+					bind_anomaly_zone.artefact_ways_by_id[id] = nil
+					bind_anomaly_zone.artefact_points_by_id[id] = nil
+					bind_anomaly_zone.parent_zones_by_artefact_id[id] = nil
+					zone.spawned_count = math.max(0, (zone.spawned_count or 1) - 1)
+				end
+			end
+		end
+	end
+end
+
+-- the Zone's artefacts lying loose on the level, taken away (by its authority, for everyone): sweep_ids ids a frame
+local job = nil -- { lvl, next id, count }
+
+-- the Zone's own: born in a field, or never rolled by a known source (a first sight, junk with no grade); not one
+-- that came from a body, a trader, a stash, a reward, a raid or a chamber: that one went through a player's hands
+local function zones_own(id)
+	local rec = af_quality and af_quality.record and af_quality.record(id)
+	return not rec or rec.lz or string.sub(tostring(rec.src), 1, 5) == "field"
+end
+
+local function sweep_step()
+	if not job then
+		return
+	end
+	local sim, gg = alife(), game_graph()
+	local last = math.min(65534, job.id + (ini_sys:r_float_ex(S, "sweep_ids") or 2048) - 1)
+	for id = job.id, last do
+		local se = sim:object(id)
+		if se and se.parent_id == 65535 and IsArtefact(nil, se:clsid()) and zones_own(id) and not ZE.marked("drop:" .. id)
+			and sim:level_name(gg:vertex(se.m_game_vertex_id):level_id()) == job.lvl then
+			alife_release(se)
+			job.n = job.n + 1
+		end
+	end
+	job.id = last + 1
+	if job.id > 65534 then
+		printf("[coop] zone event calm on %s: %s artefact(s) lying there taken away", job.lvl, job.n)
+		job = nil
+	end
+end
+
+local function sweep(lvl)
+	job = { lvl = lvl, id = 1, n = 0 }
+end
+
+-- new artefacts as after a surge: at once if we are on the level (its authority spawns them, coop_sync), else, if the
+-- level is ours (nobody is on it: the sim master's), when the next one loads it
+local function respawn(lvl)
+	if level.name() == lvl then
+		bind_anomaly_zone.force_spawn_artefacts()
+		return
+	end
+	if not authority(lvl) then
+		return -- a player is on it: his game spawns them
+	end
+	ZE.mark("respawn:" .. lvl, "1")
+end
+
+-- a level loaded: its zones forget what is gone; the new artefacts the calm's end left for it, if ours to spawn
+local function level_loaded()
+	prune()
+	local lvl = level.name()
+	if ZE.marked("respawn:" .. lvl) and authority(lvl) and not calm_here() then
+		ZE.mark("respawn:" .. lvl, "")
+		bind_anomaly_zone.force_spawn_artefacts()
+	end
+end
+
+-------------------------------------------------------------------------------
+-- each look (every game)
+
+local function update(ev)
+	local here = level.name()
+	if ev and ev.stage == "on" then
+		state.seen = ev.seq
+		if ev.level == here then
+			put_out()
+			prune()
+		end
+		if state.swept ~= ev.seq and authority(ev.level) then
+			state.swept = ev.seq
+			sweep(ev.level)
+		end
+		return
+	end
+	put_back()
+	-- over: once, in a game that saw it going on
+	if ev and ev.stage == "end" and state.seen == ev.seq and state.done ~= ev.seq then
+		state.done = ev.seq
+		if ev.level == here then
+			prune()
+		end
+		if ev.how ~= "stop" then -- an admin's stop: no outcome
+			respawn(ev.level)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+
+function on_game_start()
+	ZE = coop_zone_events
+	ZE.register(ID, { update = update })
+
+	-- an anomaly the artefact zones turn on (their layers, a surge's respawn) stays out during the calm
+	local field = bind_anomaly_field.anomaly_field_binder
+	local set_enable = field.set_enable
+	field.set_enable = function(self, enable)
+		if enable and self.object and ours(self) and calm_here() then
+			local lvl = level.name()
+			state.off[lvl] = state.off[lvl] or {}
+			state.off[lvl][self.object:name()] = true
+			return self.object:disable_anomaly()
+		end
+		return set_enable(self, enable)
+	end
+	-- no artefact born there meanwhile
+	local zone = bind_anomaly_zone.anomaly_zone_binder
+	local spawn = zone.spawn_artefact_randomly
+	zone.spawn_artefact_randomly = function(self, ...)
+		if calm_here() then
+			ZE.dbg("calm: no artefact in %s", self.object and self.object:name() or "?")
+			return
+		end
+		return spawn(self, ...)
+	end
+
+	-- a player's artefact on the ground during the calm on its level: marked for the world a moment after it left his
+	-- hands (not into a box or a trader's: only one lying loose); unmarked when someone takes it or it goes
+	RegisterScriptCallback("actor_on_item_drop", function(obj)
+		if obj and IsArtefact(obj) and calm_here() then
+			local id = obj:id()
+			CreateTimeEvent("coop_zone_calm", "drop_" .. id, 1, function()
+				local se = alife_object(id)
+				if se and se.parent_id == 65535 then
+					ZE.mark("drop:" .. id, "1")
+				end
+				return true
+			end)
+		end
+	end)
+	RegisterScriptCallback("actor_on_item_take", function(obj)
+		if obj and IsArtefact(obj) and ZE.marked("drop:" .. obj:id()) then
+			ZE.mark("drop:" .. obj:id(), "")
+		end
+	end)
+	RegisterScriptCallback("server_entity_on_unregister", function(se_obj)
+		if se_obj and ZE.master() and IsArtefact(nil, se_obj:clsid()) and ZE.marked("drop:" .. se_obj.id) then
+			ZE.mark("drop:" .. se_obj.id, "")
+		end
+	end)
+	RegisterScriptCallback("actor_on_first_update", function() -- the world's facts come in the first seconds
+		CreateTimeEvent("coop_zone_calm", "level_loaded", 5, function()
+			level_loaded()
+			return true
+		end)
+	end)
+	RegisterScriptCallback("actor_on_update", sweep_step)
+
+	RegisterScriptCallback("save_state", function(m_data)
+		m_data.coop_zone_calm = state
+	end)
+	RegisterScriptCallback("load_state", function(m_data)
+		local s = m_data.coop_zone_calm
+		if type(s) == "table" then
+			state = { off = s.off or {}, swept = s.swept or 0, seen = s.seen or 0, done = s.done or 0 }
+		end
+	end)
+end

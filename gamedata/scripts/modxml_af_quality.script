@@ -1,0 +1,21 @@
+-- Artefact stabilisation (af_quality.script): the dialog af_quality_stab (gameplay\dialogs_af_quality.xml) on the
+-- bunkers' scientists, Sakharov and Herman
+local dialogs = {
+	[ [[gameplay\character_desc_yantar.xml]] ] = "yan_stalker_sakharov",
+	[ [[gameplay\character_desc_jupiter.xml]] ] = "jup_b6_scientist_nuclear_physicist",
+}
+
+function on_xml_read()
+	RegisterScriptCallback("on_xml_read", function(xml_file_name, xml_obj)
+		local id = dialogs[xml_file_name]
+		if not id then
+			return
+		end
+		local character = xml_obj:query("specific_character[id=" .. id .. "]")[1]
+		if not character then
+			printf("! [af_quality] %s: no %s to give the dialog to", xml_file_name, id)
+			return
+		end
+		xml_obj:insertFromXMLString("<actor_dialog>af_quality_stab</actor_dialog>", character, 0)
+	end)
+end

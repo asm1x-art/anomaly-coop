@@ -1,0 +1,1368 @@
+-- Artefact grades ("сорта") and stabilisation. Design: Notion, STALKER > "Артефакты"; settings: mod_system_af_quality.ltx.
+--
+-- Every real artefact (kind = i_arty with at least one property; junk, belt gear and the [af_quality] skip list are
+-- left alone) has a roll: a quality Q, a seed and, for some unstable ones, an extra minus. Everything else comes out of
+-- it and the .ltx: each property's t = Q + N(0, jitter) (drawn from the seed), pluses x pos_knots(t), minuses x
+-- neg_knots(t), the radiation it gives off, its weight, the grade by S (the mean t), the price x price_knots(S), the
+-- wear. So the .ltx can be tuned while artefacts exist, and a roll is a few numbers.
+--
+-- Where the roll lives: the artefact's se var "afq" (m_data.se_object[id].afq), saved with the game. In co-op that is
+-- what already goes with an item (coop_sync.item_lua: the engine sends it with the item's state when a player hands
+-- it over, drops or trades it, and puts it back from a character's save) and what the host's world save keeps.
+--
+-- Who rolls (one authority, no double rolls): the game that creates the artefact. A Lua creation (alife_record after
+-- alife_create / alife_create_item) or an engine one inside a known source (a trader's restock, a field after an
+-- emission, a body's loot...: server_entity_on_register while that runs) is rolled there, with that source's grade
+-- weights, and the roll goes to everyone as the event "afq" (id, section, roll). The others get the artefact as a
+-- remote spawn (the engine, no Lua creation: never rolled there) and take the roll from the event, whichever comes
+-- first (an early one waits in `pending`). The holder sends its roll again whenever its actor takes an artefact, so a
+-- game that missed the event comes round. An artefact nobody rolled (the new game's all.spawn, an old save, an engine
+-- spawn outside the sources) gets a roll on first sight that is a hash of its id and section: the same in every game.
+
+local S = "af_quality"
+local STAB = "af_quality_stab"
+local M31 = 2147483647
+local GRADE_ID = { "unstable", "dim", "common", "good", "excellent", "perfect" }
+local GRADE_COLOR = { -- a, r, g, b in the tooltip
+	"%c[255,240,98,88]", "%c[255,150,150,150]", "%c[255,225,225,225]", "%c[255,92,210,128]", "%c[255,90,160,255]",
+	"%c[255,255,200,60]",
+}
+
+-- the properties an artefact can have: the engine keeps them in the object (CArtefact), set per object here
+local DIRECT = {
+	health_restore_speed = "set_artefact_health",
+	radiation_restore_speed = "set_artefact_radiation",
+	satiety_restore_speed = "set_artefact_satiety",
+	power_restore_speed = "set_artefact_power",
+	bleeding_restore_speed = "set_artefact_bleeding",
+	additional_inventory_weight = "set_artefact_additional_inventory_weight",
+}
+local IMMUNITY = {
+	burn_immunity = hit.burn, shock_immunity = hit.shock, radiation_immunity = hit.radiation,
+	telepatic_immunity = hit.telepatic, chemical_burn_immunity = hit.chemical_burn, wound_immunity = hit.wound,
+	fire_wound_immunity = hit.fire_wound, explosion_immunity = hit.explosion, strike_immunity = hit.strike,
+	light_burn_immunity = hit.light_burn,
+}
+-- the vanilla tooltip's units (utils_ui stats_table["artefact"]): the .ltx's own ranges are in them
+local VANILLA = {
+	health_restore_speed = { 6600, "" }, radiation_restore_speed = { 47000, "st_msv_sec" },
+	satiety_restore_speed = { 100, "" }, power_restore_speed = { 30000, "st_perc" },
+	bleeding_restore_speed = { 15000, "st_ml_min" }, burn_immunity = { 84800, "st_perc" },
+	shock_immunity = { 8000, "st_kv" }, radiation_immunity = { 750, "st_perc" }, telepatic_immunity = { 5800, "st_perc" },
+	chemical_burn_immunity = { 19100, "st_perc" }, wound_immunity = { 2500, "st_j" }, fire_wound_immunity = { 2500, "st_j" },
+	explosion_immunity = { 2500, "st_j" }, strike_immunity = { 2500, "st_j" }, additional_inventory_weight = { 1, "st_kg" },
+	light_burn_immunity = { 84800, "st_perc" },
+}
+local KEYS = {} -- all of them, in a fixed order: the rolls are drawn in it
+for k in pairs(DIRECT) do KEYS[#KEYS + 1] = k end
+for k in pairs(IMMUNITY) do KEYS[#KEYS + 1] = k end
+table.sort(KEYS)
+
+-------------------------------------------------------------------------------
+-- settings
+
+local cfg
+
+local function nums(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,%s]+") do
+		t[#t + 1] = tonumber(v) or 0
+	end
+	return t
+end
+
+local function names(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,%s]+") do
+		t[#t + 1] = v
+	end
+	return t
+end
+
+local function set_of(s)
+	local t = {}
+	for _, v in ipairs(names(s)) do
+		t[v] = true
+	end
+	return t
+end
+
+-- "key: value, key: value" in order
+local function pairs_of(s)
+	local out = {}
+	for item in string.gmatch(s or "", "[^,]+") do
+		local k, v = string.match(item, "^%s*([%w_]+)%s*:%s*(.-)%s*$")
+		if k then
+			out[#out + 1] = { k, v }
+		end
+	end
+	local i = 0
+	return function()
+		i = i + 1
+		if out[i] then
+			return out[i][1], out[i][2]
+		end
+	end
+end
+
+function settings()
+	if cfg then
+		return cfg
+	end
+	local function r(key, sec) return ini_sys:r_string_ex(sec or S, key) end
+	local function f(key, def, sec) return ini_sys:r_float_ex(sec or S, key) or def end
+	cfg = {
+		enabled = ini_sys:r_bool_ex(S, "enabled", true),
+		X = nums(r("bands")),
+		weights = nums(r("grades")),
+		jitter = f("jitter", 0.08),
+		pos = nums(r("pos_knots")),
+		neg = nums(r("neg_knots")),
+		price = nums(r("price_knots")),
+		rad_follow = f("rad_follow_q", 0.7),
+		rad_range = nums(r("rad_range")),
+		weight_range = nums(r("weight_range")),
+		unstable_mods = nums(r("unstable_mods")),
+		dim_mods = nums(r("dim_mods")),
+		extra_chance = f("unstable_extra_chance", 0),
+		extra = {},
+		experts = names(r("expert_trade_cfgs")),
+		blind = f("blind_trader_factor", 1),
+		blind_unstable = f("blind_unstable_factor", 0.5),
+		dim_as_common = ini_sys:r_bool_ex(S, "show_dim_as_common", true),
+		vanilla_scale = ini_sys:r_bool_ex(S, "tooltip_vanilla_scale", true),
+		skip = set_of(r("skip")),
+		north = set_of(r("north_levels")),
+		wear_ms = f("wear_check_ms", 500),
+		sources = {},
+		bunker_cap = f("bunker_cap", 3, STAB),
+		bunker_share = f("bunker_price_share", 0.5, STAB),
+		bunker_min = f("bunker_price_min", 0, STAB),
+		base_cap = f("base_cap", 5, STAB),
+		base_hours = nums(r("base_hours", STAB)),
+		base_enabled = ini_sys:r_bool_ex(STAB, "base_enabled", false),
+		base_need_scientists = ini_sys:r_bool_ex(STAB, "base_need_scientists", true),
+		nature_extra = {},
+	}
+	for key, v in pairs_of(r("unstable_extra")) do
+		if DIRECT[key] or IMMUNITY[key] then
+			cfg.extra[#cfg.extra + 1] = { key = key, value = tonumber(v) }
+		end
+	end
+	for sec, nature in pairs_of(r("nature_extra", STAB)) do
+		cfg.nature_extra[sec] = nature
+	end
+	return cfg
+end
+
+local function weights_of(source)
+	local c = settings()
+	if not source then
+		return c.weights
+	end
+	local w = c.sources[source]
+	if w == nil then
+		local s = ini_sys:r_string_ex("af_quality_source_" .. source, "grades")
+		w = s and nums(s) or false
+		c.sources[source] = w
+	end
+	return w or c.weights
+end
+
+local function dbg(fmt, ...)
+	local ok, on = pcall(function() return get_console():get_integer("coop_debug") == 1 end)
+	if ok and on then
+		printf("[af_quality] %s", string.format(fmt, ...))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- numbers
+
+local function clamp(v, a, b)
+	return v < a and a or v > b and b or v
+end
+
+local function lerp(a, b, t)
+	return a + (b - a) * t
+end
+
+-- the knots' broken line through the grade borders at x
+local function interp(x, X, Y)
+	if x <= X[1] then
+		return Y[1]
+	end
+	for i = 2, #X do
+		if x <= X[i] then
+			return lerp(Y[i - 1], Y[i], (x - X[i - 1]) / math.max(1e-9, X[i] - X[i - 1]))
+		end
+	end
+	return Y[#Y]
+end
+
+function grade_of(s)
+	local X = settings().X
+	for g = 1, 6 do
+		if s < X[g + 1] then
+			return g
+		end
+	end
+	return 6
+end
+
+-- Park-Miller: the same numbers from the same seed in every game
+local function rng(seed)
+	local s = math.floor(seed or 1) % M31
+	if s <= 0 then
+		s = s + M31 - 1
+	end
+	local function nxt()
+		s = (s * 16807) % M31
+		return s
+	end
+	nxt() nxt() nxt()
+	local r = {}
+	function r.u()
+		return nxt() / M31
+	end
+	function r.n()
+		local u1, u2 = r.u(), r.u()
+		return math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
+	end
+	return r
+end
+
+local function hash(str, h)
+	h = h or 7
+	for i = 1, #str do
+		h = (h * 31 + string.byte(str, i)) % M31
+	end
+	return h
+end
+
+-------------------------------------------------------------------------------
+-- a section's properties
+
+local sec_props = {}
+
+-- an artefact that gets a grade: nil, or { list = { {key, base, kind, lo, hi} }, have = {key}, weight, cost }
+function props_of(sec)
+	local p = sec_props[sec]
+	if p ~= nil then
+		return p or nil
+	end
+	p = false
+	local c = settings()
+	if sec and ini_sys:section_exist(sec) and SYS_GetParam(0, sec, "kind") == "i_arty" and not c.skip[sec] then
+		local abs = SYS_GetParam(0, sec, "hit_absorbation_sect")
+		abs = abs and ini_sys:section_exist(abs) and abs or nil
+		local own = "af_quality_" .. sec
+		own = ini_sys:section_exist(own) and own or nil
+		local list, have = {}, {}
+		for _, key in ipairs(KEYS) do
+			local base
+			if IMMUNITY[key] then
+				base = abs and SYS_GetParam(2, abs, key, 0) or 0
+			else
+				base = SYS_GetParam(2, sec, key, 0) or 0
+			end
+			if base ~= 0 then
+				local kind = (key == "radiation_restore_speed" and base > 0) and "rad" or (base > 0 and "pos" or "neg")
+				local e = { key = key, base = base, kind = kind }
+				local range = own and kind ~= "rad" and nums(ini_sys:r_string_ex(own, key))
+				if range and #range == 2 and VANILLA[key] then
+					e.lo, e.hi = range[1] / VANILLA[key][1], range[2] / VANILLA[key][1]
+				end
+				list[#list + 1] = e
+				have[key] = true
+			end
+		end
+		if #list > 0 then
+			p = { list = list, have = have, weight = SYS_GetParam(2, sec, "inv_weight", 0) or 0,
+				cost = SYS_GetParam(2, sec, "cost", 0) or 0 }
+		end
+	end
+	sec_props[sec] = p
+	return p or nil
+end
+
+local function base_value(sec, key)
+	if IMMUNITY[key] then
+		local abs = SYS_GetParam(0, sec, "hit_absorbation_sect")
+		return abs and ini_sys:section_exist(abs) and SYS_GetParam(2, abs, key, 0) or 0
+	end
+	return SYS_GetParam(2, sec, key, 0) or 0
+end
+
+local function shaped(e, t, X, K)
+	local k = interp(t, X, K)
+	if e.lo then
+		return lerp(e.lo, e.hi, (k - K[1]) / ((K[#K] - K[1]) ~= 0 and (K[#K] - K[1]) or 1))
+	end
+	return e.base * k
+end
+
+-- what a roll makes of a section: { S, grade, price, wear, weight, v = { key = value as in the configs }, extra }
+function derive(sec, rec)
+	local c, p = settings(), props_of(sec)
+	if not (p and rec and rec.q) then
+		return nil
+	end
+	local r = rng(rec.s)
+	local q = clamp(rec.q, 0, 1)
+	local t, sum, n = {}, 0, 0
+	for _, e in ipairs(p.list) do
+		t[e.key] = clamp(q + r.n() * c.jitter, 0, 1)
+		if e.kind ~= "rad" then
+			sum, n = sum + t[e.key], n + 1
+		end
+	end
+	local u_rad, u_weight, n_extra = r.u(), r.u(), r.n()
+	local d = { q = q, v = {} }
+	d.S = n > 0 and sum / n or q
+	d.grade = grade_of(d.S)
+	for _, e in ipairs(p.list) do
+		if e.kind == "pos" then
+			d.v[e.key] = shaped(e, t[e.key], c.X, c.pos)
+		elseif e.kind == "neg" then
+			d.v[e.key] = shaped(e, t[e.key], c.X, c.neg)
+		else
+			local m
+			if d.grade == 1 then
+				m = lerp(c.unstable_mods[1], c.unstable_mods[2], u_rad)
+			elseif d.grade == 2 then
+				m = lerp(c.dim_mods[1], c.dim_mods[2], u_rad)
+			else
+				m = lerp(c.rad_range[1], c.rad_range[2], c.rad_follow * q + (1 - c.rad_follow) * u_rad)
+			end
+			d.v[e.key] = e.base * m
+		end
+	end
+	if d.grade == 1 and rec.x and not p.have[rec.x] then
+		for _, e in ipairs(c.extra) do
+			if e.key == rec.x and e.value then
+				d.v[e.key] = e.value * interp(clamp(q + n_extra * c.jitter, 0, 1), c.X, c.neg)
+				d.extra = e.key
+			end
+		end
+	end
+	d.weight = p.weight * lerp(c.weight_range[1], c.weight_range[2], u_weight)
+	d.price = interp(d.S, c.X, c.price)
+	d.wear = d.grade == 1 and (c.unstable_mods[3] or 1) or d.grade == 2 and (c.dim_mods[3] or 1) or 1
+	return d
+end
+
+-- a new roll by a source's weights; with det, drawn from it (the same in every game)
+function roll(sec, source, det)
+	local c = settings()
+	local r = det and rng(det)
+	local function u() return r and r.u() or math.random() end
+	local w, total = weights_of(source), 0
+	for i = 1, 6 do
+		total = total + math.max(0, w[i] or 0)
+	end
+	local pick, g = u() * total, 3
+	for i = 1, 6 do
+		pick = pick - math.max(0, w[i] or 0)
+		if pick < 0 then
+			g = i
+			break
+		end
+	end
+	local rec = { q = lerp(c.X[g], c.X[g + 1], u()), s = det or math.random(1, M31 - 1), src = source or "none" }
+	local p = props_of(sec)
+	if p and u() < c.extra_chance then
+		local free = {}
+		for _, e in ipairs(c.extra) do
+			if not p.have[e.key] and e.value then
+				free[#free + 1] = e.key
+			end
+		end
+		if #free > 0 then
+			rec.x = free[math.min(#free, math.floor(u() * #free) + 1)]
+		end
+	end
+	return rec
+end
+
+-------------------------------------------------------------------------------
+-- the rolls, kept as se vars
+
+-- containers (a lead box, AAM, AAC, IAM with an artefact in it: a section of their own, af_X_lead_box...) carry
+-- the artefact's roll: its grade, tooltip and price are the artefact's
+local CONTAINERS = { "_lead_box", "_af_iam", "_af_aac", "_af_aam" }
+
+local function arty_of_combo(sec)
+	for _, suffix in ipairs(CONTAINERS) do
+		if #sec > #suffix and string.sub(sec, -#suffix) == suffix then
+			return string.sub(sec, 1, -#suffix - 1)
+		end
+	end
+end
+
+local cache = {} -- id -> { rec, sec, d }
+local pending = {} -- id -> { sec, rec, t }: a roll from another game for an artefact not here yet
+local npending = 0
+local expected = nil -- { sec, rec }: the next artefact of sec created here takes this roll (moved, not rolled)
+local sources = {} -- the source stack while known world logic runs
+local fresh = {} -- id -> rolled as it registered, its alife_record still to come
+local keep_cond = {} -- id -> the condition it comes online with (taken out of a chamber)
+
+local function se_table()
+	local m = alife_storage_manager.get_state()
+	m.se_object = m.se_object or {}
+	return m.se_object
+end
+
+function record(id)
+	local e = id and se_table()[id]
+	return e and e.afq or nil
+end
+
+local function store(id, name, rec)
+	local t = se_table()
+	t[id] = t[id] or { name = name }
+	t[id].afq = rec
+	cache[id] = nil
+end
+
+local function coop_on()
+	return coop and coop.connected and coop.connected()
+end
+
+local function copy(rec)
+	local t = {}
+	for k, v in pairs(rec) do
+		t[k] = v
+	end
+	return t
+end
+
+local function send(id, sec, rec)
+	if coop_on() and rec then
+		coop_sync.send_event("afq", tostring(id), sec, coop_sync.serialize(rec))
+	end
+end
+
+local function apply_online(id)
+	local obj = level.object_by_id(id)
+	if obj then
+		apply(obj)
+	end
+end
+
+-- a game object's or server object's roll, made on first sight if it has none
+local function rec_of(id, sec, name)
+	local rec = record(id)
+	if not rec and props_of(sec) then
+		rec = roll(sec, nil, hash(sec, id + 1))
+		rec.lz = true
+		store(id, name, rec)
+		dbg("first sight of %s (%s): q=%.3f", sec, id, rec.q)
+	end
+	return rec
+end
+
+-- the derived numbers of an artefact by id and section, nil for anything not graded
+function data(id, sec, name)
+	sec = sec and arty_of_combo(sec) or sec -- a container: the artefact in it
+	if not (settings().enabled and id and sec and props_of(sec)) then
+		return nil
+	end
+	local rec = rec_of(id, sec, name)
+	local c = cache[id]
+	if c and c.rec == rec and c.sec == sec then
+		return c.d
+	end
+	local d = derive(sec, rec)
+	cache[id] = { rec = rec, sec = sec, d = d }
+	return d
+end
+
+function info(obj)
+	if not obj then
+		return nil
+	end
+	return data(obj:id(), obj:section(), obj:name())
+end
+
+-- a new artefact here: its roll (taken over, or by the running source), sent to the others. A roll left under its id
+-- is an old object's (an id comes free and back within a frame): a new one is always rolled. A container takes only
+-- the roll given to it (the artefact put in).
+local function take_new(se_obj, at_register)
+	local id, sec = se_obj.id, se_obj:section_name()
+	local combo = arty_of_combo(sec)
+	if not (settings().enabled and props_of(combo or sec)) then
+		return
+	end
+	if combo and not (expected and expected.sec == sec) then
+		return
+	end
+	if not at_register and fresh[id] then
+		fresh[id] = nil
+		return
+	end
+	local rec
+	if expected and expected.sec == sec then
+		keep_cond[id] = expected.cond
+		rec, expected = copy(expected.rec), nil
+	elseif at_register and #sources == 0 then
+		return -- an engine spawn outside the sources: a remote one, a load, the all.spawn - first sight
+	else
+		rec = roll(sec, sources[#sources])
+	end
+	store(id, se_obj:name(), rec)
+	send(id, sec, rec)
+	fresh[id] = at_register or nil
+	dbg("rolled %s (%s) from %s: q=%.3f", sec, id, tostring(rec.src), rec.q)
+end
+
+-- the next artefact of sec created here takes rec (a container, a chamber, a fetch quest's unpacking), and cond
+-- as it comes online
+function expect(sec, rec, cond)
+	expected = rec and sec and { sec = sec, rec = rec, cond = cond } or nil
+end
+
+local function on_register(se_obj)
+	local id = se_obj.id
+	local p = pending[id]
+	if p then
+		pending[id], npending = nil, npending - 1
+		if p.sec == se_obj:section_name() then
+			store(id, se_obj:name(), p.rec)
+			return
+		end
+	end
+	take_new(se_obj, true)
+end
+
+local function on_unregister(se_obj)
+	cache[se_obj.id] = nil
+	fresh[se_obj.id] = nil
+	keep_cond[se_obj.id] = nil
+end
+
+-- another game's roll
+local function on_event(sender, payload)
+	local id, sec, text = string.match(payload or "", "^(%d+)\t([^\t]+)\t(.+)$")
+	id = tonumber(id)
+	local rec = id and coop_sync.deserialize(text)
+	if type(rec) ~= "table" or not rec.q then
+		return
+	end
+	local se = alife_object(id)
+	if se and se:section_name() == sec then
+		local mine = record(id)
+		if rec.lz and mine and not mine.lz then
+			send(id, sec, mine) -- a first-sight roll of a game that saw it before our roll came: ours stands, again for all
+			return
+		end
+		store(id, se:name(), rec)
+		apply_online(id)
+	else
+		if not pending[id] then
+			npending = npending + 1
+		end
+		pending[id] = { sec = sec, rec = rec, t = time_global() }
+		if npending > 256 then -- the others' corpse loot we never get: forget the old ones
+			for k, v in pairs(pending) do
+				if time_global() - v.t > 600000 then
+					pending[k], npending = nil, npending - 1
+				end
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- into the game object
+
+function apply(obj)
+	local d = IsArtefact(obj) and info(obj)
+	if not d then
+		return
+	end
+	local sec = obj:section()
+	local id, cond = obj:id(), keep_cond[obj:id()]
+	if cond then -- the item's own net_spawn reads the server's condition after the binder's: on the next update
+		keep_cond[id] = nil
+		CreateTimeEvent("af_quality_cond", tostring(id), 0, function()
+			local o = level.object_by_id(id)
+			if o then
+				o:set_condition(cond)
+			end
+			return true
+		end)
+	end
+	local ok, err = pcall(function()
+		for _, key in ipairs(KEYS) do
+			local v = d.v[key] or base_value(sec, key)
+			if IMMUNITY[key] then
+				obj:set_artefact_immunity(IMMUNITY[key], v)
+			else
+				obj[DIRECT[key]](obj, v)
+			end
+		end
+		if d.weight > 0 then
+			obj:set_weight(d.weight)
+		end
+	end)
+	if not ok then
+		printf("! [af_quality] %s: %s", obj:name(), tostring(err))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- sources: world logic that creates artefacts, wrapped to say where they come from
+
+function with_source(source, f, ...)
+	sources[#sources + 1] = source
+	local res = { pcall(f, ...) }
+	table.remove(sources)
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+local function wrap(tbl, name, wrapper)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [af_quality] %s not found, not wrapped", name)
+		return
+	end
+	tbl[name] = function(...)
+		return wrapper(original, ...)
+	end
+end
+
+local function on_raid_level()
+	return raid and raid.is_raid_level and raid.is_raid_level(level.name()) or false
+end
+
+local function field_source()
+	if on_raid_level() then
+		return "raid"
+	end
+	return settings().north[level.name()] and "field_north" or "field_south"
+end
+
+local function is_expert_cfg(path)
+	if not path then
+		return false
+	end
+	for _, name in ipairs(settings().experts) do
+		if string.find(path, name, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function wrap_sources()
+	wrap(bind_anomaly_zone.anomaly_zone_binder, "spawn_artefact_randomly", function(original, self, ...)
+		return with_source(field_source(), original, self, ...)
+	end)
+	wrap(death_manager, "create_release_item", function(original, npc, ...)
+		return with_source(on_raid_level() and "raid" or "npc_loot", original, npc, ...)
+	end)
+	wrap(trade_manager, "update", function(original, npc, ...)
+		local cfg_ltx = npc and trade_manager.get_trade_profile(npc:id(), "cfg_ltx")
+		return with_source(is_expert_cfg(cfg_ltx) and "trader_scientist" or "trader_blind", original, npc, ...)
+	end)
+	-- a stash a task rewards with a toolkit is the rare one ("rich"): marked on the box when it's set
+	wrap(treasure_manager, "set_random_stash", function(original, no_spot, hint, bonus_items, id, dbg_mode, ...)
+		local before = db.actor and load_var(db.actor, "toolkit_reward_last")
+		local res = original(no_spot, hint, bonus_items, id, dbg_mode, ...)
+		local after = db.actor and load_var(db.actor, "toolkit_reward_last")
+		local se = id and not dbg_mode and alife_object(id)
+		if se and after ~= before then
+			se_save_var(id, se:name(), "afq_rich", true)
+		end
+		return res
+	end)
+	wrap(treasure_manager, "try_spawn_treasure", function(original, box, ...)
+		local rich = box and se_load_var(box:id(), box:name(), "afq_rich")
+		return with_source(on_raid_level() and "raid" or rich and "stash_rich" or "stash", original, box, ...)
+	end)
+	if raid_loot then
+		wrap(raid_loot, "fill_rich", function(original, ...)
+			return with_source("raid", original, ...)
+		end)
+	end
+	for _, name in ipairs({ "reward_item", "reward_random_item", "drx_sl_reward_random_artefact", "give_reward",
+		"give_item", "give_items" }) do
+		if xr_effects[name] then
+			wrap(xr_effects, name, function(original, ...)
+				return with_source("reward", original, ...)
+			end)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- containers make a new object: the roll goes over to it
+
+local function wrap_containers()
+	wrap(itms_manager, "dropdrop_ArtyContainer", function(original, obj_1, obj_2, sec_1, sec_2, ...)
+		local rec = obj_1 and record(obj_1:id())
+		expect(rec and (sec_1 .. "_" .. sec_2), rec)
+		local res = { pcall(original, obj_1, obj_2, sec_1, sec_2, ...) }
+		expect(nil)
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end)
+	wrap(itms_manager, "use_arty_container", function(original, obj, ...)
+		local rec = obj and record(obj:id())
+		expect(rec and arty_of_combo(obj:section()), rec)
+		local res = { pcall(original, obj, ...) }
+		expect(nil)
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- prices: the trade window (utils_item.get_item_cost's callback)
+
+local function on_get_item_cost(kind, obj, profile, calculated_cost, ret)
+	if kind ~= "condition_based" then
+		return
+	end
+	local d = info(obj)
+	if not d then
+		return
+	end
+	local c = settings()
+	local f
+	if profile and is_expert_cfg(profile.cfg) then
+		f = d.price
+	else
+		f = d.grade == 1 and c.blind_unstable or c.blind
+		if profile and profile.mode == 2 then
+			f = math.max(f, d.price) -- a trader sells a better one at its grade's price: none to buy cheap and sell to a scientist
+		end
+	end
+	ret.new_cost = (tonumber(ret.new_cost) or calculated_cost) * f
+end
+
+-- the value of one at full condition by its grade (no trader): the bar, the quests
+function price_factor(id, sec)
+	local d = data(id, sec)
+	return d and d.price or 1
+end
+
+-------------------------------------------------------------------------------
+-- the bad grades wear faster: on the belt, what the condition lost gets (wear - 1) times more
+
+local wear_seen = {}
+local wear_at = 0
+
+local function actor_on_update()
+	local now = time_global()
+	if now < wear_at then
+		return
+	end
+	wear_at = now + settings().wear_ms
+	local seen = {}
+	db.actor:iterate_belt(function(_, obj)
+		local d = info(obj)
+		if d and d.wear ~= 1 then
+			local id, cond = obj:id(), obj:condition()
+			local last = wear_seen[id]
+			if last and cond < last then
+				cond = math.max(0.01, cond - (last - cond) * (d.wear - 1))
+				obj:set_condition(cond)
+			end
+			seen[id] = cond
+		end
+	end)
+	wear_seen = seen
+end
+
+-------------------------------------------------------------------------------
+-- what the player sees
+
+-- the grade a tooltip shows: a dim one looks common without an expert (the trade window of one)
+local function shown_grade(d)
+	if d.grade == 2 and settings().dim_as_common then
+		local gui = ui_inventory and ui_inventory.GUI
+		local expert = gui and gui.mode == "trade" and gui.npc_id
+			and is_expert_cfg(trade_manager.get_trade_profile(gui.npc_id, "cfg_ltx"))
+		if not expert then
+			return 3
+		end
+	end
+	return d.grade
+end
+
+function grade_name(g)
+	return game.translate_string("st_afq_grade_" .. GRADE_ID[g])
+end
+
+function grade_text(g)
+	return GRADE_COLOR[g] .. grade_name(g) .. "%c[default]"
+end
+
+local function wrap_ui()
+	-- the quality line over the description
+	wrap(ui_item, "get_obj_desc", function(original, obj, ...)
+		local desc = original(obj, ...)
+		local d = info(obj)
+		if not d then
+			return desc
+		end
+		local line = game.translate_string("st_afq_grade") .. " " .. grade_text(shown_grade(d))
+		if d.grade == 1 then
+			line = line .. " \\n" .. GRADE_COLOR[1] .. game.translate_string("st_afq_unstable_note") .. "%c[default]"
+		end
+		return line .. " \\n \\n" .. (desc or "")
+	end)
+	-- the inventory grid: an artefact stacks only with ones of the grade it shows (vanilla stacks them all by section)
+	if utils_ui.UICellContainer and utils_ui.UICellContainer.FindSimilar then
+		local find_similar = utils_ui.UICellContainer.FindSimilar
+		utils_ui.UICellContainer.FindSimilar = function(self, obj, sec, ...)
+			local d = obj and not self.disable_stack and not (self.showcase or self.stack_all) and info(obj)
+			if not d then
+				return find_similar(self, obj, sec, ...)
+			end
+			local g, s = shown_grade(d), obj:section()
+			for _, ci in pairs(self.cell) do
+				local other = ci.section == s and ci.ID and level.object_by_id(ci.ID)
+				local od = other and info(other)
+				if od and shown_grade(od) == g then
+					return ci
+				end
+			end
+			return false
+		end
+	end
+	-- the stats: the object's own values (x condition where the tooltip does that)
+	wrap(utils_ui, "get_stats_value", function(original, obj, sec, gr, stat, ...)
+		if obj and VANILLA[stat] and IsArtefact(obj) then
+			local d = info(obj)
+			local row = type(gr) == "string" and utils_ui.stats_table[gr] or gr
+			if d and row and not row.value_functor and d.v[stat] ~= nil then
+				local v = d.v[stat]
+				if row.condition then
+					v = v * obj:condition()
+				end
+				return v ~= 0 and v or nil
+			end
+		end
+		return original(obj, sec, gr, stat, ...)
+	end)
+	-- the inventory's belt totals read the configs: the belt's objects instead
+	if ui_inventory and ui_inventory.UIInventory and ui_inventory.UIInventory.UpdateStats then
+		local update_stats = ui_inventory.UIInventory.UpdateStats
+		ui_inventory.UIInventory.UpdateStats = function(self, ...)
+			local belt, i, cur, cur_abs = {}, 0, nil, nil
+			if db.actor then
+				db.actor:iterate_belt(function(_, o) belt[#belt + 1] = o end)
+			end
+			ui_inventory.SYS_GetParam = function(typ, sec, key, def, ...)
+				if typ == 2 and key == "health_restore_speed" and belt[i + 1] and belt[i + 1]:section() == sec then
+					i = i + 1
+					cur = belt[i]
+					cur_abs = SYS_GetParam(0, sec, "hit_absorbation_sect")
+				end
+				if cur and typ == 2 and (sec == cur:section() or sec == cur_abs) then
+					local d = info(cur)
+					if d and VANILLA[key] then
+						return d.v[key] or base_value(cur:section(), key)
+					end
+				end
+				return SYS_GetParam(typ, sec, key, def, ...)
+			end
+			local res = { pcall(update_stats, self, ...) }
+			ui_inventory.SYS_GetParam = nil
+			if not res[1] then
+				error(res[2], 0)
+			end
+			return unpack(res, 2)
+		end
+	end
+	-- the psi protection of the belt (the psi storms' and fields' damage)
+	if arszi_psy and arszi_psy.get_telepatic_protection_artefacts then
+		arszi_psy.get_telepatic_protection_artefacts = function()
+			local total = 0
+			db.actor:iterate_belt(function(_, obj)
+				local d = info(obj)
+				local v = d and d.v.telepatic_immunity or base_value(obj:section(), "telepatic_immunity")
+				total = total + obj:condition() * (v or 0)
+			end)
+			return total
+		end
+	end
+end
+
+-- GRA's tooltip shows protections as its own percents; in the vanilla units the numbers match the .ltx and the design
+local function vanilla_scale()
+	if not settings().vanilla_scale then
+		return
+	end
+	local t = utils_ui.stats_table and utils_ui.stats_table["artefact"]
+	for key, row in pairs(t or {}) do
+		local v = VANILLA[key]
+		if v and IMMUNITY[key] then
+			row.magnitude, row.unit = v[1], v[2]
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- fetch quests (tasks_fetch): a quest that pays by the things' value pays by the artefact's grade. The quests with a
+-- fixed reward (remove_artefact_item: an artefact's "breed") pay as they did. Vanilla's fetch_reward_and_remove with
+-- the grade's price factor, and the roll taken out of a container with the artefact. Both take the actor's cheapest
+-- copies of an artefact first.
+
+-- the actor's things of sec; for an artefact the cheapest first (its grade's price x condition squared, as the quest
+-- pays)
+local function cheapest_first(sec)
+	local list = {}
+	db.actor:iterate_inventory(function(_, obj)
+		if obj:section() == sec then
+			list[#list + 1] = obj
+		end
+	end, nil)
+	if list[1] and IsArtefact(list[1]) then
+		local function value(obj)
+			local d = info(obj)
+			return (d and d.price or 1) * obj:condition() * obj:condition()
+		end
+		table.sort(list, function(a, b) return value(a) < value(b) end)
+	end
+	return list
+end
+
+local remove_artefact_item -- vanilla's
+
+-- vanilla's remove_artefact_item gives away the first copy it finds: the cheapest one instead (out of a container
+-- only when there is none loose, as vanilla's)
+local function remove_cheapest_artefact(actor, npc, p)
+	local sec = load_var(db.actor, p[1])
+	local obj = sec and cheapest_first(sec)[1]
+	if not obj then
+		return remove_artefact_item(actor, npc, p)
+	end
+	local trade_npc = get_speaker()
+	if trade_npc then
+		db.actor:transfer_item(obj, trade_npc)
+	else
+		alife_release(obj)
+	end
+end
+
+local function fetch_reward_and_remove(actor, npc, p)
+	local sec = load_var(db.actor, p[1])
+	if not (sec) then return end
+
+	if string.find(sec, "af_") and (not db.actor:object(sec)) then
+		local break_con, break_arty, id_combo
+		local search_cont = { "lead_box", "af_aam", "af_aac", "af_iam" }
+		for i = 1, #search_cont do
+			if db.actor:object(sec .. "_" .. search_cont[i]) then
+				break_arty = sec
+				break_con = search_cont[i]
+				id_combo = db.actor:object(sec .. "_" .. search_cont[i]):id()
+				break
+			end
+		end
+		if id_combo and break_con and break_arty and ini_sys:section_exist(break_con) then
+			expect(break_arty, record(id_combo))
+			alife_create_item(break_arty, db.actor)
+			expect(nil)
+			alife_create_item(break_con, db.actor)
+			alife_release_id(id_combo)
+			level.add_cam_effector('camera_effects\\item_use.anm', 8053, false, '')
+			xr_effects.play_inv_aac_open()
+		end
+	end
+
+	local function timer()
+		local count = load_var(db.actor, (p[1] .. "_count")) or 1
+		local mult = tonumber(p[2]) or 1
+		local max_use = IsItem("multiuse", sec) or 1
+		local cost = ini_sys:r_float_ex(sec, "cost") * (1 / max_use)
+
+		local last_obj
+		local collected_itms = {}
+		local total_cost, remain = 0, 0
+		local cur_count = count
+		local use_con = (max_use == 1) and (not IsItem("device", sec)) and (not IsItem("battery", sec)) and true or false
+		local function itr(temp, obj)
+			if (obj:section() == sec) then
+				local cnt = (max_use > 1) and obj:get_remaining_uses() or 1
+				local con = use_con and obj:condition() or 1
+				local d = info(obj)
+				collected_itms[obj:id()] = cnt
+				total_cost = total_cost + (cost * cnt * (con * con) * mult * (d and d.price or 1))
+				cur_count = cur_count - cnt
+				last_obj = obj
+			end
+			if (cur_count <= 0) then
+				if (cur_count < 0) then
+					remain = math.abs(cur_count)
+				end
+				return true
+			end
+		end
+		for _, obj in ipairs(cheapest_first(sec)) do
+			if itr(nil, obj) then
+				break
+			end
+		end
+
+		if is_empty(collected_itms) then
+			printe("! ERROR: fetch_reward_and_remove | no fetch item found!")
+			return true
+		end
+		if (total_cost < 50) then
+			total_cost = 50
+		end
+		if IsArtefact(last_obj) then
+			local eco = game_difficulties.get_eco_factor("type") or 0.5
+			local factor = (eco == 3 and 0.4) or (eco == 2 and 0.5) or 0.6
+			total_cost = total_cost * factor
+		end
+		local delta = math.floor(total_cost * 0.1)
+		xr_effects.reward_random_money(actor, npc, { total_cost - delta, total_cost + delta })
+
+		for k, v in pairs(collected_itms) do
+			alife_release_id(k)
+		end
+		if (remain > 0) and IsItem("multiuse", sec) then
+			alife_create_item(sec, db.actor, { uses = remain })
+			local last_obj_uses = last_obj:get_remaining_uses()
+			if last_obj_uses and (last_obj_uses > remain) then
+				alife_process_item(last_obj:section(), last_obj:id(), { uses = last_obj_uses - remain })
+			end
+		end
+		news_manager.relocate_item(db.actor, "out", sec, count)
+		return true
+	end
+	CreateTimeEvent(0, "delay_reward", 1, timer)
+end
+
+-------------------------------------------------------------------------------
+-- stabilisation: one grade up, Q moved into the next grade's band (the same seed: the same profile, stronger)
+
+-- the nature of a section by items\settings\artefacts.ltx (af_class_<nature>), nil for none
+local natures
+function nature_of(sec)
+	if not natures then
+		natures = {}
+		local ini = ini_file("items\\settings\\artefacts.ltx")
+		for _, nature in ipairs({ "gravi", "thermo", "chem", "electro" }) do
+			local list = "af_class_" .. nature
+			for i = 0, ini:section_exist(list) and ini:line_count(list) - 1 or -1 do
+				local _, name = ini:r_line(list, i, "", "")
+				natures[name] = nature
+			end
+		end
+		for k, v in pairs(settings().nature_extra) do
+			natures[k] = v
+		end
+	end
+	local arty = arty_of_combo(sec) or sec
+	return natures[arty]
+end
+
+-- a step up for an artefact: { id, sec, from, to, rec (the new roll), d (its numbers), price (the bunker's) }, or nil
+-- with why: "max" (at the cap), "none" (not graded)
+function plan(obj, cap)
+	local d = info(obj)
+	if not d then
+		return nil, "none"
+	end
+	if d.grade >= cap or d.grade >= 6 then
+		return nil, "max"
+	end
+	local sec, rec = obj:section(), record(obj:id())
+	local to = d.grade + 1
+	local X = settings().X
+	local width = X[to + 1] - X[to]
+	local want = X[to] + width * (0.15 + 0.7 * math.random())
+	local new = copy(rec)
+	new.lz = nil
+	local lo, hi = 0, 1
+	for _ = 1, 40 do
+		new.q = (lo + hi) / 2
+		if derive(sec, new).S < want then
+			lo = new.q
+		else
+			hi = new.q
+		end
+	end
+	new.q = hi
+	local nd = derive(sec, new)
+	if nd.grade ~= to then -- the jitter's cuts at 0 and 1: as close as it gets
+		new.q = lo
+		nd = derive(sec, new)
+	end
+	new.st = (rec.st or 0) + 1
+	local p = props_of(sec)
+	local c = settings()
+	-- at least what the new grade adds at a trader who doesn't know grades (unstable 0.5x -> dim, shown as common, 1x):
+	-- no gain in stabilising there and selling to him
+	local function blind(g)
+		return g == 1 and c.blind_unstable or c.blind
+	end
+	local price = math.floor(math.max(c.bunker_min, (p.cost or 0) * math.max(0, nd.price - d.price) * c.bunker_share,
+		(p.cost or 0) * math.max(0, blind(nd.grade) - blind(d.grade))))
+	return { id = obj:id(), sec = sec, from = d.grade, to = nd.grade, rec = new, d = nd, price = price }
+end
+
+-- the plan's roll onto the artefact, for everyone
+function commit(pl)
+	local se = alife_object(pl.id)
+	if not se then
+		return false
+	end
+	store(pl.id, se:name(), pl.rec)
+	send(pl.id, pl.sec, pl.rec)
+	apply_online(pl.id)
+	dbg("stabilised %s (%s): %s -> %s", pl.sec, pl.id, GRADE_ID[pl.from], GRADE_ID[pl.to])
+	return true
+end
+
+-- the bunkers' scientists: the actor's artefacts below their cap, each with its plan
+function bunker_list()
+	local t = {}
+	db.actor:iterate_inventory(function(_, obj)
+		local pl = not arty_of_combo(obj:section()) and plan(obj, settings().bunker_cap)
+		if pl then
+			t[#t + 1] = { obj = obj, plan = pl }
+		end
+	end)
+	table.sort(t, function(a, b) return a.plan.from < b.plan.from end)
+	return t
+end
+
+function bunker_do(pl)
+	if db.actor:money() < pl.price then
+		return false
+	end
+	if commit(pl) then
+		db.actor:give_money(-pl.price)
+		news_manager.relocate_money(db.actor, "out", pl.price)
+		return true
+	end
+	return false
+end
+
+-- dialogs (dialogs_af_quality.xml)
+function dlg_enabled(a, b)
+	return settings().enabled
+end
+
+function dlg_open_bunker(a, b)
+	a:stop_talk()
+	b:stop_talk()
+	CreateTimeEvent("af_quality", "bunker", 0.3, function()
+		ui_af_quality.open_bunker()
+		return true
+	end)
+end
+
+-- The Base: the chamber of the artefact's nature (shelter_synthesis), with the Base's scientists and their lab. The lab
+-- isn't in the game yet: base_enabled stands for it; the world's state af_base_lab (the test mode) opens it all.
+function base_open()
+	local c = settings()
+	if not c.enabled then
+		return false
+	end
+	if shelter and shelter.state("af_base_lab", false) then
+		return true
+	end
+	return c.base_enabled and (not c.base_need_scientists or (shelter_base and shelter_base.has_scientists()))
+end
+
+function base_hours(to)
+	return settings().base_hours[to - 1] or 24
+end
+
+-- the actor's artefacts of a nature the Base can raise, each with its plan
+function base_list(nature)
+	local t = {}
+	db.actor:iterate_inventory(function(_, obj)
+		if not arty_of_combo(obj:section()) and nature_of(obj:section()) == nature then
+			local pl = plan(obj, settings().base_cap)
+			if pl then
+				t[#t + 1] = { obj = obj, plan = pl }
+			end
+		end
+	end)
+	table.sort(t, function(a, b) return a.plan.from < b.plan.from end)
+	return t
+end
+
+-- in the chamber while it works: the world's state af_stab_<nature> = the roll it comes out with and its condition
+function chamber_stab(nature)
+	local v = shelter.state("af_stab_" .. nature, nil)
+	local t = v and coop_sync.deserialize(tostring(v))
+	return type(t) == "table" and t or nil
+end
+
+-- what made() of shelter_synthesis creates in the cell takes the stabilised roll
+function chamber_expect(nature, sec)
+	local t = chamber_stab(nature)
+	if t and t.sec == sec then
+		expect(sec, t.rec)
+		return true
+	end
+	return false
+end
+
+-- taken out of the cell: its condition as it went in (nil for a synthesis), the state cleared
+function chamber_take(nature, se)
+	local t = chamber_stab(nature)
+	if not t then
+		return nil
+	end
+	shelter.set_state("af_stab_" .. nature, nil)
+	return t.cond
+end
+
+function base_start(nature, pl)
+	local obj = level.object_by_id(pl.id)
+	if not (obj and base_open() and shelter_synthesis.start_stabilisation) then
+		return false
+	end
+	local state = coop_sync.serialize({ sec = pl.sec, rec = pl.rec, cond = obj:condition() })
+	if not shelter_synthesis.start_stabilisation(nature, obj, base_hours(pl.to)) then
+		return false
+	end
+	shelter.set_state("af_stab_" .. nature, state)
+	return true
+end
+
+-------------------------------------------------------------------------------
+-- tests (the admin window's test modes, coop_admin_tests.script; devcmd)
+
+function test_base_lab()
+	local on = not shelter.state("af_base_lab", false)
+	shelter.set_state("af_base_lab", on or nil)
+	actor_menu.set_msg(1, game.translate_string(on and "st_afq_test_lab_on" or "st_afq_test_lab_off"), 6)
+	return on
+end
+
+-- one artefact of each grade of sec into the actor's inventory (Q in the middle of the band)
+function test_kit(sec)
+	sec = sec or "af_medusa"
+	local X = settings().X
+	for g = 1, 6 do
+		local rec = roll(sec, nil)
+		rec.q, rec.src = (X[g] + X[g + 1]) / 2, "test"
+		if g == 1 then
+			for _, e in ipairs(settings().extra) do
+				if not props_of(sec).have[e.key] then
+					rec.x = e.key
+					break
+				end
+			end
+		end
+		expect(sec, rec)
+		alife_create_item(sec, db.actor)
+		expect(nil)
+	end
+end
+
+-- n rolls of sec from a source, without objects: { grade share in %, mean price factor, mean plus and minus factor }
+function test_stats(sec, source, n)
+	n = n or 10000
+	local p = props_of(sec)
+	if not p then
+		return nil
+	end
+	local count, price, plus, minus, np, nm = { 0, 0, 0, 0, 0, 0 }, 0, 0, 0, 0, 0
+	for i = 1, n do
+		local d = derive(sec, roll(sec, source))
+		count[d.grade] = count[d.grade] + 1
+		price = price + d.price
+		for _, e in ipairs(p.list) do
+			if e.kind == "pos" then
+				plus, np = plus + d.v[e.key] / e.base, np + 1
+			elseif e.kind == "neg" then
+				minus, nm = minus + d.v[e.key] / e.base, nm + 1
+			end
+		end
+	end
+	for g = 1, 6 do
+		count[g] = math.floor(count[g] * 1000 / n + 0.5) / 10
+	end
+	return { grades = count, price = price / n, plus = np > 0 and plus / np or 0, minus = nm > 0 and minus / nm or 0 }
+end
+
+-------------------------------------------------------------------------------
+
+local function actor_on_item_take(obj)
+	local rec = obj and props_of(obj:section()) and record(obj:id())
+	if rec then
+		send(obj:id(), obj:section(), rec)
+	end
+end
+
+local function actor_on_first_update()
+	vanilla_scale()
+end
+
+local function on_console_execute(cmd)
+	if cmd == "g_game_difficulty" then -- GRA's scale comes back with it
+		CreateTimeEvent("af_quality", "scale", 0, function()
+			vanilla_scale()
+			return true
+		end)
+	end
+end
+
+function on_game_start()
+	if not settings().enabled then
+		return
+	end
+	RegisterScriptCallback("server_entity_on_register", on_register)
+	RegisterScriptCallback("server_entity_on_unregister", on_unregister)
+	RegisterScriptCallback("on_get_item_cost", on_get_item_cost)
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_item_take", actor_on_item_take)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("on_console_execute", on_console_execute)
+
+	-- Lua creations: alife_create / alife_create_item record each new object
+	local alife_record = _G.alife_record
+	_G.alife_record = function(se_obj, state, ...)
+		local res = alife_record(se_obj, state, ...)
+		if state and se_obj then
+			local ok, err = pcall(take_new, se_obj, false)
+			if not ok then
+				printf("! [af_quality] %s", tostring(err))
+			end
+		end
+		return res
+	end
+	-- the binder puts the roll into the object each time it comes online (CArtefact::Load reads the section)
+	wrap(item_artefact.artefact_binder, "net_spawn", function(original, self, se_abstract, ...)
+		local res = original(self, se_abstract, ...)
+		if res then
+			apply(self.object)
+		end
+		return res
+	end)
+	wrap_sources()
+	wrap_containers()
+	wrap_ui()
+	if tasks_fetch and xr_effects.fetch_reward_and_remove then
+		xr_effects.fetch_reward_and_remove = fetch_reward_and_remove
+	end
+	if tasks_fetch and xr_effects.remove_artefact_item then
+		remove_artefact_item = xr_effects.remove_artefact_item
+		xr_effects.remove_artefact_item = remove_cheapest_artefact
+	end
+	if coop_sync and coop_sync.on_event then
+		coop_sync.on_event("afq", on_event)
+	end
+end

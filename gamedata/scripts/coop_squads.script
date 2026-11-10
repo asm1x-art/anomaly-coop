@@ -31,7 +31,7 @@ local function send_squads()
 	local sim = alife()
 	for id in pairs(SIMBOARD.squads) do
 		local squad = sim:object(id)
-		if squad and not squad.online and not coop.squad_online_elsewhere(id) then
+		if squad and not squad.online and not coop.squad_online_elsewhere(id) and squad.m_game_vertex_id ~= NO_TARGET then
 			local target = squad.assigned_target_id or NO_TARGET
 			local key = string.format("%d,%d,%d", squad.m_game_vertex_id, squad.m_level_vertex_id, target)
 			if full or sent[id] ~= key then
@@ -58,7 +58,8 @@ local function on_squads(sender, payload)
 		"(%d+),(%d+),(%d+),([%-%d%.]+),([%-%d%.]+),([%-%d%.]+),(%d+)") do
 		id, gvid, lvid, target = tonumber(id), tonumber(gvid), tonumber(lvid), tonumber(target)
 		local squad = SIMBOARD.squads[id] and sim:object(id)
-		if squad and not squad.online then
+		-- a squad not placed yet on the host (gvid 65535: one just made) is no place: teleport_object would die on it
+		if squad and not squad.online and game_graph():valid_vertex_id(gvid) then
 			if squad.m_game_vertex_id ~= gvid or squad.m_level_vertex_id ~= lvid then
 				TeleportSquad(squad, vector():set(tonumber(x), tonumber(y), tonumber(z)), lvid, gvid)
 				moved = moved + 1

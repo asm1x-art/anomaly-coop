@@ -1,0 +1,393 @@
+-- Co-op: the Zone's event "Ash front" (coop_zone_events.script, [zone_event_ash] in mod_system_zone_events.ltx). Fire
+-- hotspots in the Red Forest, the wind carries the ash to Yantar, Jupiter or Zaton; or the surge has shaken up the old
+-- machinery of the Truck Cemetery. For 3-4 real hours on one level:
+--   ash        the level's weather is w_zev_ash over the world's, in each game on it (coop_time asks weather())
+--   radiation  a player there without a sealed suit (sealed_suits: parts of the outfit's section; an exoskeleton is not
+--              one) and outside the level's shelter (shelter_radius of its smart, sealed or not) takes a rising dose
+--              and, past rad_harm_from, loses health by it: death in some minutes without anti-rad. Each game its own
+--              player's; nobody else is hurt (NPCs offline or online)
+--   shelter    the level's stalker squads of the shelter's people (shelter_communities_<level>; none listed: all) go
+--              into its shelter (shelter_<level>: a smart) for the front and back to their own smarts after: every game
+--              sets the same targets from the fact ash_rel. Story squads and companions stay where they are. A sealed
+--              shelter (sealed) lets nobody in, players neither: one who walks in within shelter_radius of it is put
+--              back where he was outside; one who comes into the world (or was) inside sits the front out there
+--   leaving    the level's other stalker squads (not its shelter's people, not in sealed gear: only_squads) go to a smart
+--              of a neighbouring level (leave_<level>: levels) for the front and back to their own smarts after
+--   squads     only squads in sealed gear (only_squads: parts of their sections) take the level's smarts as targets
+--   players    are never kept off the level
+--   albinos    albino_squads (squad sections, none yet: their assets come later) are put on the level's smarts by the
+--              master at the start and taken away at the end
+-- The event's data: alb (the albino squads). The squads sent away are the fact "zone_event:ash_rel" =
+-- "<level>|<when it ended, real s; 0 while on>|<rel>", rel: squad:its own smart's id (into the shelter) or
+-- squad:own:the smart it went to (off the level). Kept apart from the event's slot: the squads come back
+-- (return_real_hours) even when another world-state event takes the slot; the master clears it after.
+
+local ID = "ash"
+local S = "zone_event_ash"
+local ZE -- coop_zone_events
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function tr(key, ...)
+	if select("#", ...) > 0 then
+		return strformat(game.translate_string(key), ...)
+	end
+	return game.translate_string(key)
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function ghost()
+	return in_coop() and coop.is_host() -- the headless host has no player
+end
+
+local function ids_of(text)
+	local t = {}
+	for n in string.gmatch(text or "", "[^,]+") do
+		t[#t + 1] = n
+	end
+	return t
+end
+
+local function level_of(se_obj)
+	return alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+end
+
+local function shelter_name(lvl)
+	return ini_sys:r_string_ex(S, "shelter_" .. tostring(lvl))
+end
+
+local function sealed(lvl)
+	for _, l in ipairs(ZE.ini_list(S, "sealed")) do
+		if l == lvl then
+			return true
+		end
+	end
+	return false
+end
+
+local function here()
+	return ZE.on_level(ID, level.name())
+end
+
+-- the level's shelter smart and how far from it the shelter goes
+local function shelter_smart(lvl)
+	return SIMBOARD.smarts_by_names[shelter_name(lvl) or ""], num("shelter_radius", 60)
+end
+
+-------------------------------------------------------------------------------
+-- the weather (every game on the level)
+
+local ash_on = false
+
+-- the weather over the world's while the front is on this level (coop_time's pick of the weather asks it)
+function weather()
+	if here() then
+		return ini_sys:r_string_ex(S, "weather") or "w_zev_ash"
+	end
+end
+
+local function update_weather(on)
+	if on and not ash_on then
+		ash_on = true
+		level.set_weather(weather(), false)
+	elseif not on and ash_on then
+		ash_on = false
+		local wm = level_weathers.get_weather_manager()
+		if wm then
+			wm:select_weather(true) -- the world's weather again, now (forced_weather_change waits for the next game hour)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the radiation (each game its own player)
+
+local exposed_since, last_dose, warned = nil, nil, false
+
+local function sealed_suit()
+	local outfit = db.actor:item_in_slot(7)
+	local section = outfit and outfit:section()
+	if not section then
+		return false
+	end
+	for _, part in ipairs(ZE.ini_list(S, "sealed_suits")) do
+		if string.find(section, part, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function in_shelter()
+	local smart, radius = shelter_smart(level.name())
+	return smart and db.actor:position():distance_to(smart.position) <= radius or false
+end
+
+local function dose(on)
+	local now = time_global()
+	if not on or ghost() or sealed_suit() or in_shelter() then
+		exposed_since, last_dose = nil, nil
+		if not on then
+			warned = false
+		end
+		return
+	end
+	if not warned then
+		warned = true
+		actor_menu.set_msg(1, tr("st_zev_ash_exposed"), 8)
+	end
+	exposed_since = exposed_since or now
+	local dt = last_dose and (now - last_dose) / 1000 or 0
+	last_dose = now
+	if dt <= 0 or dt > 5 then
+		return -- the first look, or a long pause (a load, a menu)
+	end
+	local t = (now - exposed_since) / 1000
+	db.actor:change_radiation((num("rad_rate", 0.004) + num("rad_grow", 0.00004) * t) * dt)
+	local rad = db.actor.radiation
+	if rad >= num("rad_harm_from", 0.3) then
+		local health = db.actor.health - num("rad_health", 0.006) * rad * dt
+		if health <= 0.02 then
+			db.actor:kill(db.actor)
+		else
+			db.actor:set_health_ex(health)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the sealed shelter (each game its own player)
+
+local outside = nil -- where our player last stood outside it (nil: not seen outside since he came onto the level)
+
+local function keep_out(ev)
+	local smart, radius = shelter_smart(ev.level)
+	if not (smart and sealed(ev.level)) or ghost() then
+		outside = nil
+		return
+	end
+	local pos = db.actor:position()
+	local d = pos:distance_to(smart.position)
+	if d > radius + 2 then
+		outside = vector():set(pos)
+		return
+	end
+	if d > radius or not outside then
+		return -- at its edge; or inside since he came into the world (a save there) or the front came: he stays
+	end
+	db.actor:set_actor_position(outside)
+	actor_menu.set_msg(1, tr("st_zev_ash_sealed"), 5)
+end
+
+-------------------------------------------------------------------------------
+-- the shelter's squads (every game: the same targets from the event's data)
+
+local function smart_name(id)
+	local s = id and SIMBOARD.smarts[id]
+	return s and s.smrt and s.smrt:name()
+end
+
+local function relocate()
+	local lvl, ended, rel = string.match(ZE.mark_of("ash_rel"), "^([^|]+)|(%d+)|(.*)$")
+	if not lvl then
+		return
+	end
+	ended = tonumber(ended)
+	local on = ended == 0
+	local shelter = shelter_name(lvl)
+	local back = num("return_real_hours", 2) * 3600
+	local late = not on and ZE.now() - ended > back
+	if late and ZE.master() and ZE.now() - ended > back + 600 then
+		ZE.mark("ash_rel", "") -- every game has sent them home by now
+		return
+	end
+	for _, entry in ipairs(ids_of(rel)) do
+		local id, own, away = string.match(entry, "^(%d+):(%d+):?(%d*)$")
+		local squad = id and alife_object(tonumber(id))
+		if squad and squad.squad_members then
+			own = tonumber(own)
+			local own_name = smart_name(own)
+			local target = away ~= "" and smart_name(tonumber(away)) or away == "" and shelter
+			if on then
+				if target and squad.scripted_target ~= target then
+					squad.scripted_target = target
+				end
+			elseif target and squad.scripted_target == target or (own_name and squad.scripted_target == own_name) then
+				if late or squad.smart_id == own or not own_name then
+					squad.scripted_target = nil -- home: Anomaly's own life again
+				elseif squad.scripted_target ~= own_name then
+					squad.scripted_target = own_name
+				end
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the master: who goes into the shelter, the albinos
+
+local function start(ev)
+	local shelter = shelter_name(ev.level)
+	local target = shelter and SIMBOARD.smarts_by_names[shelter]
+	local rel = {}
+	local people = {}
+	for _, c in ipairs(ZE.ini_list(S, "shelter_communities_" .. ev.level)) do
+		people[c] = true
+	end
+	local function theirs(squad)
+		return next(people) == nil or people[squad.get_squad_community and squad:get_squad_community() or ""]
+	end
+	local function sealed_gear(squad)
+		local section = squad:section_name()
+		for _, part in ipairs(ZE.ini_list(S, "only_squads")) do
+			if string.find(section, part, 1, true) then
+				return true
+			end
+		end
+		return false
+	end
+	-- the neighbouring levels' smarts a squad may go to (no bases)
+	local near = {}
+	for _, lvl in ipairs(ZE.ini_list(S, "leave_" .. ev.level)) do
+		near[lvl] = true
+	end
+	local away = {}
+	for _, s in pairs(SIMBOARD.smarts) do
+		if s.smrt and s.smrt.props and (s.smrt.props.base or 0) == 0 and near[level_of(s.smrt)] then
+			away[#away + 1] = s.smrt
+		end
+	end
+	local function away_for(squad)
+		local fit = {}
+		for _, smart in ipairs(away) do
+			local ok, yes = pcall(smart.target_precondition, smart, squad, true, true)
+			if ok and yes then
+				fit[#fit + 1] = smart
+			end
+		end
+		return #fit > 0 and fit[math.random(#fit)] or nil
+	end
+	-- a squad with a story NPC (a trader, a mechanic: jup_cont_trader_bandit...) stays: its people are needed there
+	local function story(squad)
+		for m in squad:squad_members() do
+			if get_object_story_id(m.id) then
+				return true
+			end
+		end
+		return false
+	end
+	local gone = 0
+	for id in pairs(SIMBOARD.squads) do
+		local squad = alife_object(id)
+		if squad and squad.squad_members and not is_squad_monster[squad.player_id] and not squad.scripted_target and squad.smart_id and not (target and squad.smart_id == target.id)
+			and not get_object_story_id(id) and not (axr_companions and axr_companions.companion_squads[id])
+			and level_of(squad) == ev.level and not story(squad) then
+			if theirs(squad) then
+				if target then
+					rel[#rel + 1] = id .. ":" .. squad.smart_id
+				end
+			elseif squad.player_id ~= "zombied" and not sealed_gear(squad) then
+				local smart = away_for(squad)
+				if smart then
+					rel[#rel + 1] = id .. ":" .. squad.smart_id .. ":" .. smart.id
+					gone = gone + 1
+				end
+			end
+		end
+	end
+	ZE.mark("ash_rel", ev.level .. "|0|" .. table.concat(rel, ","))
+	local alb = {}
+	local sections = ZE.ini_list(S, "albino_squads")
+	if #sections > 0 then
+		local smarts = {}
+		for _, s in pairs(SIMBOARD.smarts) do
+			if s.smrt and level_of(s.smrt) == ev.level and not (s.smrt.props and (s.smrt.props.base or 0) > 0) then
+				smarts[#smarts + 1] = s.smrt
+			end
+		end
+		if #smarts > 0 then
+			if in_coop() then
+				coop.begin_shared() -- the master's spawn is everyone's
+			end
+			local ok, err = pcall(function()
+				for _, section in ipairs(sections) do
+					local squad = ini_sys:section_exist(section) and SIMBOARD:create_squad(smarts[math.random(#smarts)], section)
+					if squad then
+						alb[#alb + 1] = squad.id
+					end
+				end
+			end)
+			if in_coop() then
+				coop.end_shared()
+				coop_sync.send_squad_members()
+			end
+			if not ok then
+				printf("! [coop] zone event ash: albinos: %s", tostring(err))
+			end
+		end
+	end
+	ev.data.alb = table.concat(alb, ",")
+	printf("[coop] zone event ash on %s: %s squad(s) into %s, %s off the level, %s albino squad(s)", ev.level,
+		#rel - gone, tostring(shelter), gone, #alb)
+end
+
+local function finish(ev, how)
+	-- the squads home from now on (relocate, in every game)
+	local lvl, _, rel = string.match(ZE.mark_of("ash_rel"), "^([^|]+)|(%d+)|(.*)$")
+	if lvl == ev.level then
+		ZE.mark("ash_rel", lvl .. "|" .. math.max(1, ZE.now()) .. "|" .. rel)
+	end
+	for _, s in ipairs(ids_of(ev.data.alb)) do
+		local id = tonumber(s)
+		local squad = id and alife_object(id)
+		if squad and squad.squad_members and not squad.online and not (in_coop() and coop.squad_online_elsewhere(id)) then
+			SIMBOARD:remove_squad(squad)
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- each look
+
+local function update(ev)
+	local on = ev and ev.stage == "on"
+	local on_here = on and ev.level == level.name()
+	update_weather(on_here)
+	if on_here then
+		keep_out(ev)
+	else
+		outside = nil
+	end
+	relocate()
+end
+
+local function news_start(ev)
+	local key = "st_zev_ash_start_" .. ev.level
+	local text = game.translate_string(key)
+	if text == key then
+		return tr("st_zev_ash_start", ZE.where(ev.level))
+	end
+	return text
+end
+
+-------------------------------------------------------------------------------
+
+local next_dose = 0
+
+function on_game_start()
+	ZE = coop_zone_events
+	ZE.register(ID, { start = start, finish = finish, update = update, news_start = news_start })
+	RegisterScriptCallback("actor_on_update", function()
+		local now = time_global()
+		if now < next_dose then
+			return
+		end
+		next_dose = now + 1000
+		dose(here() ~= nil)
+	end)
+end

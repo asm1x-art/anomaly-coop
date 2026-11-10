@@ -465,6 +465,8 @@ LIST = {
 	{ "base_radar", "base", "F8", base_radar },
 	{ "base_health", "base", "F10", base_health },
 	{ "base_clock", "base", "J", base_clock, true },
+	{ "af_base_lab", "base", "", function() af_quality.test_base_lab() end, true },
+	{ "af_kit", "base", "", function() af_quality.test_kit() end },
 	{ "ai_obs20", "ai", "PgUp", function() observe(20) end },
 	{ "ai_obs40", "ai", "PgDn", function() observe(40) end },
 	{ "ai_clear", "ai", "Del", ai_clear },

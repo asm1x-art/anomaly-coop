@@ -346,7 +346,7 @@
 		<text>Cheats on yourself</text>
 	</string>
 	<string id="st_coop_adm_cheats_hint">
-		<text>All through the server, into its journal. "Every fast travel point" (My game › Map) on a test server lets you travel to unseen ones too.</text>
+		<text>All through the server, into its journal. "Every fast travel point" (My game / Map) on a test server lets you travel to unseen ones too.</text>
 	</string>
 	<string id="st_coop_adm_god_on">
 		<text>Immortality: on</text>
@@ -547,7 +547,7 @@
 		<text>The frame counter and the ping to the server.</text>
 	</string>
 	<string id="st_coop_adm_b_fps">
-		<text>Options › Co-op › FPS</text>
+		<text>Options / Co-op / FPS</text>
 	</string>
 	<string id="st_coop_adm_i_rs_stats">
 		<text>Render statistics</text>
@@ -628,7 +628,7 @@
 		<text>The raid's time left on the screen.</text>
 	</string>
 	<string id="st_coop_adm_b_raid_timer">
-		<text>Options › Co-op</text>
+		<text>Options / Co-op</text>
 	</string>
 	<string id="st_coop_adm_i_peer_color">
 		<text>The other players' mark colour</text>
@@ -637,7 +637,7 @@
 		<text>The partners' marks on the map and minimap.</text>
 	</string>
 	<string id="st_coop_adm_b_peer_color">
-		<text>Options › Co-op (sliders), console coop_peer_color</text>
+		<text>Options / Co-op (sliders), console coop_peer_color</text>
 	</string>
 	<string id="st_coop_adm_i_dlss">
 		<text>DLSS</text>
@@ -739,7 +739,7 @@
 		<text>A bar event (in turn)</text>
 	</string>
 	<string id="st_coop_tests_shelter_dig">
-		<text>Dig 5 times faster (on/off)</text>
+		<text>Dig x5 on/off</text>
 	</string>
 	<string id="st_coop_tests_base_cooling">
 		<text>"Cooling" now</text>
@@ -881,7 +881,7 @@
 		<text>Ev</text>
 	</string>
 	<string id="st_coop_adm_events_sub">
-		<text>Surge, psi storm, Cooling, the bar and the weather for every player, with the usual world news. The game that runs the world (the host) does it; what it did goes to the journal.</text>
+		<text>Surge, psi storm, Cooling, the Zone's events, the bar and the weather for every player, with the usual world news. The game that runs the world (the host) does it; what it did goes to the journal.</text>
 	</string>
 	<string id="st_coop_adm_ev_wait">
 		<text>The host has not told about the events yet: nobody runs the world, or the answer is on its way.</text>
@@ -952,6 +952,12 @@
 	<string id="st_coop_adm_ev_warn_cooling">
 		<text>The raid window closes now: whoever is in the raid loses health to psi until out.</text>
 	</string>
+	<string id="st_coop_adm_ev_warn_calm">
+		<text>Level: %s. Every anomaly there goes out with the artefacts lying in it; at the end they come back and bear new ones.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_ash">
+		<text>Level: %s. Ash on it: a player without a sealed scientific suit (SEVA, SSP) dies in a few minutes without anti-rad.</text>
+	</string>
 	<string id="st_coop_ev_t_surge">
 		<text>Surge</text>
 	</string>
@@ -1004,7 +1010,7 @@
 		<text>%s is already running.</text>
 	</string>
 	<string id="st_coop_ev_r_option_off">
-		<text>%s: off in the host game's options (Options › Events).</text>
+		<text>%s: off in the host game's options (Options / Events).</text>
 	</string>
 	<string id="st_coop_ev_r_held">
 		<text>%s: not now, a world event runs (the barrier or the pump station defence).</text>

@@ -1,0 +1,47 @@
+-- Co-op: a surge's earthquake keeps shaking the camera after a landing. Anomaly's surge_manager runs it as camera
+-- effector 2, the engine's own type for the jolt of a landing (eCEFall, src/xrGame/CameraEffector.h). Each landing
+-- adds one, and the camera manager first drops the effector of the same type (CCameraManager::UpdateDeffered): the
+-- earthquake was gone until the surge's next stage - none from 106 s to 200 s, so one player shook and the other,
+-- who had jumped, didn't. Here the earthquake anims go on an effector id of their own; surge_manager stays Anomaly's.
+
+local FALL = 2 -- eCEFall: surge_manager's earthquake_cam_eff
+-- no engine type (1-19) and none Anomaly's scripts or the mods take (grok's recoil 5000-30000, the cutscenes' 210408)
+local QUAKE = 30802
+local add, remove -- level's own
+local quake_on = false -- an earthquake of surge_manager's runs on QUAKE
+
+local function dbg(fmt, ...)
+	if coop and get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] surge shake: " .. fmt, ...)
+	end
+end
+
+local function is_quake(anim)
+	return type(anim) == "string" and string.find(string.lower(anim), "camera_effects\\earthquake", 1, true) == 1
+end
+
+local function add_cam_effector(anim, id, ...)
+	if id == FALL and is_quake(anim) then
+		quake_on = true
+		dbg("%s on %s, not %s", anim, QUAKE, id)
+		return add(anim, QUAKE, ...)
+	end
+	return add(anim, id, ...)
+end
+
+local function remove_cam_effector(id, ...)
+	if id == FALL and quake_on then
+		quake_on = false
+		dbg("removed %s, not %s", QUAKE, id)
+		return remove(QUAKE, ...)
+	end
+	return remove(id, ...)
+end
+
+function on_game_start()
+	if level.add_cam_effector ~= add_cam_effector then
+		add, remove = level.add_cam_effector, level.remove_cam_effector
+		level.add_cam_effector = add_cam_effector
+		level.remove_cam_effector = remove_cam_effector
+	end
+end

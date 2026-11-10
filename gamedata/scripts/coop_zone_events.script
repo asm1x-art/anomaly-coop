@@ -1,0 +1,575 @@
+-- Co-op: the Zone's events (Notion "—обыти€ «оны"; settings: mod_system_zone_events.ltx). An event lies on one level
+-- for some game hours. The game that runs the world (the sim master: the headless host while it runs the world)
+-- starts and ends them - the director by chance after a surge, or an admin (coop_world_events.script: event <id>
+-- start [level] | stop | outcome) - and keeps each as a fact of the server, so it outlives a host's restart and is
+-- there with nobody online:
+--   "zone_event:<slot>" = "<id>|<level>|<seq>|<from>|<till>|<stage>|<how>|<data>"
+--     slot   world (a world state: Dead calm, Ash front) or scene; at most one event in each
+--     from, till  real seconds (UTC, os.time) it began and ends (once over: when it ended): an event lasts real time,
+--                 a player's sleep or the world's speed (a surge's x10) neither shortens nor stretches it
+--     stage  on | end;  how  timer | outcome | stop (how it ended);  data  the event's own "k=v;k=v"
+--   "zone_event:last_<id>" = the real second the last one of that event ended (the director's cooldown);
+--   "zone_event:last_slot_<slot>" = when the slot's last one ended (the director's gap between world-state events)
+-- Every game applies an event's effects itself from the fact, the way it takes the weather: the event's update()
+-- each look (the calm: its level's anomalies out; the ash: its weather, its shelter), prices (on_get_item_cost), smarts
+-- of its level closed to some squads (se_smart_terrain.target_precondition: closed_to_squads, only_squads).
+-- An event's length: real_hours_min..real_hours_max real hours.
+-- mark(key, value) / marked(key): an event's own facts of the world ("zone_event:<key>"). Each game tells its player the start once and, if he
+-- heard it, the end once; the master also tells the server's journal (coop_news: zone_event, zone_event_end).
+-- Without co-op the facts are the actor's variables and this game is the master.
+--
+-- An event is a module that calls register(id, def) at its on_game_start. def (all optional; texts st_zev_t_<id>, st_zev_<id>_start, st_zev_<id>_end):
+--   start(ev)            master: make what it needs (spawns); may put into ev.data
+--   finish(ev, how)      master: resolve the outcome into ev.data (how ~= "stop") and clean up
+--   update(ev)           every game, each look: ev the slot's event of this id (on or over), nil if the slot holds
+--                        none of it; put the event's effects on or take them off
+--   news_start(ev), news_end(ev)  the texts (each game's language)
+
+local S = "zone_events"
+local SLOTS = { "world", "scene" }
+local FACT = "zone_event:"
+
+local defs = {} -- id -> def
+local ids = {}  -- in registration order
+
+local function num(section, key, default)
+	return ini_sys:r_float_ex(section, key) or default
+end
+
+local function tr(key, ...)
+	if select("#", ...) > 0 then
+		return strformat(game.translate_string(key), ...)
+	end
+	return game.translate_string(key)
+end
+
+-- "a, b, c" -> { "a", "b", "c" } (nothing for "")
+function list(value)
+	local t = {}
+	for item in string.gmatch(value or "", "[^,]+") do
+		item = string.match(item, "^%s*(.-)%s*$")
+		if item ~= "" then
+			t[#t + 1] = item
+		end
+	end
+	return t
+end
+
+function ini_list(section, key)
+	return list(ini_sys:r_string_ex(section, key))
+end
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+function master()
+	return not in_coop() or coop.is_sim_master()
+end
+
+function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] zone events: " .. fmt, ...)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the events' clock: real seconds (UTC). The world's game time won't do: a player's sleep moves it for everyone and
+-- its speed changes (a surge runs x10). The master decides an event's end by its own clock.
+
+function now()
+	return os.time()
+end
+
+-------------------------------------------------------------------------------
+-- the facts
+
+local function fact(key)
+	if in_coop() then
+		return coop.fact(FACT .. key)
+	end
+	return db.actor and load_var(db.actor, "zev_" .. key, "") or ""
+end
+
+local function set_fact(key, value)
+	if in_coop() then
+		coop.report_fact(FACT .. key, value or "")
+	elseif db.actor then
+		save_var(db.actor, "zev_" .. key, value ~= "" and value or nil)
+	end
+end
+
+local function parse_data(text)
+	local t = {}
+	for k, v in string.gmatch(text or "", "([^;=]+)=([^;]*)") do
+		t[k] = v
+	end
+	return t
+end
+
+local function data_text(t)
+	local keys = {}
+	for k in pairs(t) do
+		keys[#keys + 1] = k
+	end
+	table.sort(keys)
+	local out = {}
+	for _, k in ipairs(keys) do
+		out[#out + 1] = k .. "=" .. string.gsub(tostring(t[k]), "[|;=]", "")
+	end
+	return table.concat(out, ";")
+end
+
+-- an event's own facts ("zone_event:<key>", the world's, for every game): "" none
+function mark(key, value)
+	set_fact(key, value or "")
+end
+
+function marked(key)
+	return fact(key) ~= ""
+end
+
+function mark_of(key)
+	return fact(key)
+end
+
+-- the slot's event as the fact has it, or nil
+function get(slot)
+	local id, lvl, seq, from, till, stage, how, data = string.match(fact(slot),
+		"^([^|]*)|([^|]*)|(%d+)|([%-%d]+)|([%-%d]+)|(%a+)|(%a*)|(.*)$")
+	if not id then
+		return nil
+	end
+	return { slot = slot, id = id, level = lvl, seq = tonumber(seq), from = tonumber(from), till = tonumber(till),
+		stage = stage, how = how, data = parse_data(data) }
+end
+
+local function put(ev)
+	set_fact(ev.slot, table.concat({ ev.id, ev.level, ev.seq, math.floor(ev.from), math.floor(ev.till), ev.stage,
+		ev.how or "", data_text(ev.data) }, "|"))
+end
+
+-- the event of that id going on now, or nil
+function running(id)
+	for _, slot in ipairs(SLOTS) do
+		local ev = get(slot)
+		if ev and ev.stage == "on" and (not id or ev.id == id) then
+			return ev
+		end
+	end
+end
+
+-- an event of that id going on on that level now
+function on_level(id, lvl)
+	local ev = running(id)
+	return ev and ev.level == lvl and ev or nil
+end
+
+-------------------------------------------------------------------------------
+-- texts
+
+-- "на янтаре": the level as the news say it
+function where(lvl)
+	local key = "st_zev_on_" .. tostring(lvl)
+	local text = game.translate_string(key)
+	if text == key then
+		return game.translate_string(lvl)
+	end
+	return text
+end
+
+function title(id)
+	return tr("st_zev_t_" .. id)
+end
+
+local function news_start(ev)
+	local def = defs[ev.id]
+	return def and def.news_start and def.news_start(ev) or tr("st_zev_" .. ev.id .. "_start", where(ev.level))
+end
+
+local function news_end(ev)
+	local def = defs[ev.id]
+	return def and def.news_end and def.news_end(ev) or tr("st_zev_" .. ev.id .. "_end", where(ev.level))
+end
+
+-------------------------------------------------------------------------------
+-- start and end (the master)
+
+local function slot_of(id)
+	local s = ini_sys:r_string_ex("zone_event_" .. id, "slot")
+	return s == "scene" and "scene" or "world"
+end
+
+function levels(id)
+	return ini_list("zone_event_" .. id, "levels")
+end
+
+local function level_allowed(id, lvl)
+	for _, l in ipairs(levels(id)) do
+		if l == lvl then
+			return true
+		end
+	end
+	return false
+end
+
+-- starts it; nil and why not when it can't
+function start(id, lvl, by)
+	local def = defs[id]
+	if not def then
+		return nil, tr("st_zev_r_unknown", tostring(id))
+	end
+	local slot = slot_of(id)
+	local cur = get(slot)
+	if cur and cur.stage == "on" then
+		return nil, tr("st_zev_r_busy", title(cur.id), game.translate_string(cur.level))
+	end
+	local pool = levels(id)
+	if lvl and lvl ~= "" then
+		if not level_allowed(id, lvl) then
+			return nil, tr("st_zev_r_bad_level", tostring(lvl), title(id))
+		end
+	else
+		lvl = #pool > 0 and pool[math.random(#pool)] or nil
+	end
+	if not lvl then
+		return nil, tr("st_zev_r_no_levels", title(id))
+	end
+	local section = "zone_event_" .. id
+	local hours = num(section, "real_hours_min", 1) -- real hours
+	hours = hours + math.random() * math.max(0, num(section, "real_hours_max", hours) - hours)
+	local t = now()
+	local ev = { slot = slot, id = id, level = lvl, seq = (cur and cur.seq or 0) + 1, from = t,
+		till = t + math.floor(hours * 3600), stage = "on", how = "", data = {} }
+	if def.start then
+		local ok, err = pcall(def.start, ev)
+		if not ok then
+			printf("! [coop] zone event %s on %s: its start failed: %s", id, lvl, tostring(err))
+		end
+	end
+	put(ev)
+	printf("[coop] zone event %s on %s for %s real h (%s), #%s", id, lvl, string.format("%.2f", hours), tostring(by), ev.seq)
+	coop_news.publish("zone_event", title(id) .. ". " .. news_start(ev))
+	return ev
+end
+
+-- ends the slot's event now: how timer | outcome (its outcome resolved) | stop (none)
+function finish(slot, how)
+	local ev = get(slot)
+	if not (ev and ev.stage == "on") then
+		return nil
+	end
+	ev.stage, ev.how, ev.till = "end", how, now()
+	local def = defs[ev.id]
+	if def and def.finish then
+		local ok, err = pcall(def.finish, ev, how)
+		if not ok then
+			printf("! [coop] zone event %s on %s: its end failed: %s", ev.id, ev.level, tostring(err))
+		end
+	end
+	put(ev)
+	set_fact("last_" .. ev.id, tostring(math.floor(ev.till)))
+	set_fact("last_slot_" .. ev.slot, tostring(math.floor(ev.till)))
+	printf("[coop] zone event %s on %s over (%s), #%s", ev.id, ev.level, how, ev.seq)
+	coop_news.publish("zone_event_end", title(ev.id) .. ". " .. news_end(ev))
+	return ev
+end
+
+-------------------------------------------------------------------------------
+-- the admin's (coop_world_events.run): start [level] | stop | outcome; the answer for the admins' journal
+
+function is_event(id)
+	return defs[id] ~= nil
+end
+
+function admin(id, action, who, lvl)
+	if action == "start" then
+		local ev, why = start(id, lvl, who)
+		if not ev then
+			return why
+		end
+		return tr("st_zev_r_started", title(id), game.translate_string(ev.level), string.format("%.1f", (ev.till - ev.from) / 3600))
+	end
+	local ev = running(id)
+	if not ev then
+		return tr("st_zev_r_not_running", title(id))
+	end
+	if action == "stop" or action == "outcome" then
+		ev = finish(ev.slot, action)
+		return tr(action == "stop" and "st_zev_r_stopped" or "st_zev_r_outcome", title(id), game.translate_string(ev.level))
+	end
+	return tr("st_zev_r_action", tostring(action))
+end
+
+-- the admin window's fields: <id> 1|0, <id>_level, <id>_left (real s), <id>_levels (level:name, ...)
+function report(put_field)
+	for _, id in ipairs(ids) do
+		local ev = running(id)
+		put_field(id, ev and 1 or 0)
+		if ev then
+			put_field(id .. "_level", ev.level)
+			put_field(id .. "_left", math.max(0, math.floor(ev.till - now())))
+		end
+		local names = {}
+		for _, l in ipairs(levels(id)) do
+			names[#names + 1] = l .. ":" .. string.gsub(game.translate_string(l), "[,:]", "")
+		end
+		put_field(id .. "_levels", table.concat(names, ","))
+	end
+end
+
+function all()
+	return ids
+end
+
+-------------------------------------------------------------------------------
+-- the director: after a surge, each event by its chance, while its slot is free, past its cooldown and, for a
+-- world-state one, past min_gap_real_hours since the last world-state event ended
+
+local started_at = nil
+local roll_at = nil
+
+local function director_roll()
+	if not ini_sys:r_bool_ex(S, "enabled", true) then
+		return
+	end
+	local order = {}
+	for _, id in ipairs(ids) do
+		table.insert(order, math.random(#order + 1), id)
+	end
+	for _, id in ipairs(order) do
+		local section = "zone_event_" .. id
+		local cur = get(slot_of(id))
+		local last = tonumber(fact("last_" .. id))
+		local cooled = not last or now() - last >= num(section, "cooldown_real_hours", 8) * 3600
+		local gap = tonumber(fact("last_slot_" .. slot_of(id)))
+		cooled = cooled and (slot_of(id) ~= "world" or not gap or now() - gap >= num(S, "min_gap_real_hours", 1) * 3600)
+		local roll = math.random()
+		dbg("director: %s free %s cooled %s roll %s of %s", id, tostring(not (cur and cur.stage == "on")),
+			tostring(cooled), string.format("%.2f", roll), num(section, "chance", 0))
+		if ini_sys:r_bool_ex(section, "enabled", true) and not (cur and cur.stage == "on") and cooled
+			and roll < num(section, "chance", 0) then
+			start(id, nil, "director")
+		end
+	end
+end
+
+local function actor_on_interaction(typ, obj, name)
+	if typ ~= "anomalies" or name ~= "emission_end" or not master() then
+		return
+	end
+	if not started_at or time_global() - started_at < num(S, "quiet_s", 20) * 1000 then
+		return -- a surge this game missed while away, settled on load
+	end
+	roll_at = time_global() + num(S, "after_surge_s", 45) * 1000
+end
+
+-------------------------------------------------------------------------------
+-- prices: buy_<category> (the player buys) and sell_<category> (the player sells) of every running event
+
+local kinds = nil -- kind -> category
+
+local function category(obj, kind)
+	if not kinds then
+		kinds = {}
+		local n = ini_sys:line_count("zone_events_price_kinds")
+		for i = 0, n - 1 do
+			local _, cat, value = ini_sys:r_line_ex("zone_events_price_kinds", i, "", "")
+			for _, k in ipairs(list(value)) do
+				kinds[k] = cat
+			end
+		end
+	end
+	if kind == "ammo" then
+		return kinds.ammo
+	end
+	local k = SYS_GetParam(0, obj:section(), "kind")
+	return k and kinds[k]
+end
+
+local function on_get_item_cost(kind, obj, profile, cost, ret)
+	if not (obj and profile) then
+		return
+	end
+	local factor = 1
+	for _, slot in ipairs(SLOTS) do
+		local ev = get(slot)
+		if ev and ev.stage == "on" then
+			local cat = category(obj, kind)
+			if cat then
+				factor = factor * num("zone_event_" .. ev.id, (profile.mode == 2 and "buy_" or "sell_") .. cat, 1)
+			end
+		end
+	end
+	if factor ~= 1 then
+		ret.new_cost = (tonumber(ret.new_cost) or cost) * factor
+	end
+end
+
+-------------------------------------------------------------------------------
+-- smarts of an event's level closed to some squads: "closed_to_squads" those whose section has one of these parts,
+-- "only_squads" all but those whose section has one of these parts
+
+local smart_level = {} -- smart id -> its level
+local rules, rules_at = {}, 0 -- the running events' { level, parts, only }, read again each check_s (the host asks per squad)
+
+local function level_of(se_obj)
+	local lvl = smart_level[se_obj.id]
+	if not lvl then
+		lvl = alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+		smart_level[se_obj.id] = lvl
+	end
+	return lvl
+end
+
+local function closed(smart, squad)
+	local t = time_global()
+	if t >= rules_at then
+		rules_at = t + num(S, "check_s", 2) * 1000
+		rules = {}
+		for _, slot in ipairs(SLOTS) do
+			local ev = get(slot)
+			if ev and ev.stage == "on" then
+				local section_of = "zone_event_" .. ev.id
+				local parts = ini_list(section_of, "closed_to_squads")
+				local only = ini_list(section_of, "only_squads")
+				if #parts > 0 or #only > 0 then
+					rules[#rules + 1] = { level = ev.level, parts = parts, only = only }
+				end
+			end
+		end
+	end
+	if #rules == 0 then
+		return false
+	end
+	for _, r in ipairs(rules) do
+		if level_of(smart) == r.level then
+			local section = squad and squad.section_name and squad:section_name() or ""
+			for _, part in ipairs(r.parts) do
+				if string.find(section, part, 1, true) then
+					return true
+				end
+			end
+			if #r.only > 0 then
+				local allowed = false
+				for _, part in ipairs(r.only) do
+					if string.find(section, part, 1, true) then
+						allowed = true
+					end
+				end
+				if not allowed then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+-------------------------------------------------------------------------------
+-- each game: the events' effects, the news
+
+local function heard_key(slot)
+	return "zev_heard_" .. slot
+end
+
+-- an event is known to a character by its start (real seconds: unique, unlike seq, which starts over in a new world
+-- while the characters stay)
+local function hear(ev)
+	local heard = load_var(db.actor, heard_key(ev.slot), 0)
+	local told_end = load_var(db.actor, "zev_told_end_" .. ev.slot, 0)
+	local text
+	if ev.stage == "on" and ev.from ~= heard then
+		save_var(db.actor, heard_key(ev.slot), ev.from)
+		text = news_start(ev)
+	elseif ev.stage == "end" and ev.from == heard and told_end ~= ev.from then
+		save_var(db.actor, "zev_told_end_" .. ev.slot, ev.from)
+		if now() - ev.till <= num(S, "end_news_real_hours", 2) * 3600 then
+			text = news_end(ev)
+		end
+	end
+	if text and not (in_coop() and coop.is_host()) then -- the headless host has no player
+		db.actor:give_game_news(title(ev.id), text, "ui_inGame2_Radiopomehi", 0, 20000)
+		xr_sound.set_sound_play(AC_ID, "pda_tips")
+	end
+end
+
+local check_at = 0
+
+function check_now()
+	check_at = 0
+end
+
+local function update()
+	local t = time_global()
+	if t < check_at or not db.actor then
+		return
+	end
+	check_at = t + num(S, "check_s", 2) * 1000
+	if master() then
+		if roll_at and t >= roll_at then
+			roll_at = nil
+			director_roll()
+		end
+		for _, slot in ipairs(SLOTS) do
+			local ev = get(slot)
+			if ev and ev.stage == "on" and now() >= ev.till then
+				finish(slot, "timer")
+			end
+		end
+	end
+	local current = {}
+	for _, slot in ipairs(SLOTS) do
+		local ev = get(slot)
+		if ev then
+			current[ev.id] = ev
+			hear(ev)
+		end
+	end
+	for _, id in ipairs(ids) do
+		local def = defs[id]
+		if def.update then
+			local ok, err = pcall(def.update, current[id])
+			if not ok then
+				printf("! [coop] zone event %s: %s", id, tostring(err))
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+
+function register(id, def)
+	if not defs[id] then
+		ids[#ids + 1] = id
+	end
+	defs[id] = def
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_first_update", function()
+		started_at = time_global()
+		check_at = time_global() + 3000 -- the facts are ours after coop_facts' first update
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+	RegisterScriptCallback("actor_on_interaction", actor_on_interaction)
+	RegisterScriptCallback("on_get_item_cost", on_get_item_cost)
+	if coop_facts and coop_facts.on_fact then
+		coop_facts.on_fact(FACT, function()
+			check_now()
+			rules_at = 0
+		end)
+	end
+	local class = smart_terrain and smart_terrain.se_smart_terrain
+	local original = class and class.target_precondition
+	if type(original) == "function" then
+		class.target_precondition = function(self, squad, ...)
+			if squad and closed(self, squad) then
+				return false
+			end
+			return original(self, squad, ...)
+		end
+	else
+		printf("! [coop] se_smart_terrain.target_precondition not found: zone events close no smarts")
+	end
+end

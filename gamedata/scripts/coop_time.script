@@ -74,7 +74,7 @@ end
 
 local select_weather, change_period -- level_weathers.WeatherManager's own
 
-local function wrapped_select(wm, now)
+local function pick(wm, now)
 	if not coop_on() then
 		return select_weather(wm, now)
 	end
@@ -94,6 +94,17 @@ local function wrapped_select(wm, now)
 		end
 	end
 	dbg("weather %s (master's %s)", tostring(wm.weather_file), tostring(w and w.file))
+	return res
+end
+
+-- a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the master
+-- publishes stays the world's
+local function wrapped_select(wm, now)
+	local res = pick(wm, now)
+	local over = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
+	if over and not (weather.is_paused() or level.is_wfx_playing()) then
+		level.set_weather(over, now and true or false)
+	end
 	return res
 end
 
@@ -136,6 +147,7 @@ local function ctime(text)
 end
 
 local taken = {} -- fact -> the master's timetable we took last
+local entered = {} -- fact -> the master's timetable whose surge (psi storm) ours has run: not gone into again
 
 -- the admin's events (coop_world_events.script): the master's timetable goes out at the next update, not at the
 -- next look
@@ -149,39 +161,55 @@ function weather_now()
 	weather_now_until = time_global() + 15000
 end
 
--- mgr: the manager, last: its field with the last one's time
-local function sync_timetable(fact, mgr, last)
+-- mgr: the manager, last: its field with the last one's time, duration: its field with how long one lasts (real s)
+local function sync_timetable(fact, mgr, last, duration)
 	if not (mgr and mgr[last] and mgr._delta) then
 		return
 	end
 	if master() then
 		return publish(fact, stamp(mgr[last]) .. "|" .. mgr._delta)
 	end
-	if mgr.started then
-		return -- ours runs; the next one is set when it ends
-	end
-	-- each timetable the master publishes is taken once, and again while ours is not it: a game that has just loaded
-	-- the world skips the surge its save missed and rolls a timetable of its own, often after ours took the master's.
-	-- One already due isn't taken: the master hasn't run it (the host's ghost, a paused world), and ours would start
-	-- it at once, skip it as missed («a surge happened in the Zone»), set a timetable of its own, and take the
-	-- master's again two seconds later: the news over and over
 	local value = coop.fact(fact)
 	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
-	if value == taken[fact] and (not when or stamp(mgr[last]) == when and mgr._delta == tonumber(delta)) then
+	local t = when and ctime(when)
+	delta = tonumber(delta)
+	if mgr.started then
+		-- ours runs; the next one is set when it ends. When it is the master's (it began at the same game second),
+		-- it isn't gone into again once ours is over (an admin's stop ends ours before the master's next timetable
+		-- comes)
+		if t and mgr.inited_time and math.abs(mgr.inited_time:diffSec(t) - delta) < 1 then
+			entered[fact] = value
+		end
+		return
+	end
+	-- each timetable the master publishes is taken once, and again while ours is not it: a game that has just loaded
+	-- the world skips the surge its save missed and rolls a timetable of its own, often after ours took the master's
+	if value == taken[fact] and (not when or stamp(mgr[last]) == when and mgr._delta == delta) then
 		return
 	end
 	taken[fact] = value
-	local t = when and ctime(when)
 	if not t then
 		return
 	end
-	if game.get_game_time():diffSec(t) >= tonumber(delta) then
-		dbg("%s timetable not taken, already due: last %s, next in %s game s", fact, when, delta)
-		return
+	local since = game.get_game_time():diffSec(t) - delta -- game s since the master's one began
+	if since >= 0 then
+		-- already due. One the master runs now is gone into at its stage: a game that comes into the world, loads or
+		-- changes level during it starts ours at once at the master's game second (start() sets it, the stages run
+		-- up to it), and its own timetable no longer comes. One past its end, or one ours has run, isn't taken: the
+		-- master hasn't run it (the host's ghost, a paused world) or it is over for us, and ours would skip it as
+		-- missed («a surge happened in the Zone»), set a timetable of its own and take the master's again two seconds
+		-- later: the news over and over. Past its end is start()'s own test, at the same clock
+		local stage = math.ceil(since / level.get_time_factor())
+		if entered[fact] == value or stage + 6 > (mgr[duration] or 0) then
+			dbg("%s timetable not taken, already due: last %s, next in %s game s (%s s in)", fact, when, delta, stage)
+			return
+		end
+		entered[fact] = value
+		dbg("%s runs: ours goes into it %s s in", fact, stage)
 	end
-	if stamp(mgr[last]) ~= when or mgr._delta ~= tonumber(delta) then
+	if stamp(mgr[last]) ~= when or mgr._delta ~= delta then
 		mgr[last] = t
-		mgr._delta = tonumber(delta)
+		mgr._delta = delta
 		dbg("%s timetable taken: last %s, next in %s game s", fact, when, delta)
 	end
 end
@@ -195,8 +223,8 @@ local function check()
 	if master() and wm and wm.weather_file then
 		publish_weather(wm)
 	end
-	sync_timetable("surge", surge_manager.get_surge_manager(), "last_surge_time")
-	sync_timetable("psi", psi_storm_manager.get_psi_storm_manager(), "last_psi_storm_time")
+	sync_timetable("surge", surge_manager.get_surge_manager(), "last_surge_time", "surge_time")
+	sync_timetable("psi", psi_storm_manager.get_psi_storm_manager(), "last_psi_storm_time", "psi_storm_duration")
 end
 
 -- the NPCs a surge or psi storm kills: the level's authority's

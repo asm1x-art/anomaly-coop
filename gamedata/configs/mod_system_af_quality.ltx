@@ -1,0 +1,96 @@
+; Artefact grades and stabilisation (af_quality.script). Design: Notion, STALKER > "Артефакты".
+; Every real artefact (kind = i_arty, with at least one property) gets a quality Q on its first sight; each property
+; wanders round Q by jitter, the grade and the price go by S, the mean of the properties' rolls. All numbers here.
+
+; the scientists' stabilisation dialog (put on Sakharov and Herman by modxml_af_quality.script)
+![dialogs]
+>files = dialogs_af_quality
+
+[af_quality]
+enabled               = true
+; grade borders on Q / S: unstable, dim, common, good, excellent, perfect lie between them
+bands                 = 0, 0.10, 0.30, 0.60, 0.82, 0.95, 1.00
+; weights of the grades (unstable, dim, common, good, excellent, perfect) for an artefact with no known source
+grades                = 5, 12, 45, 25, 10, 3
+jitter                = 0.08                 ; each property's roll: Q + N(0, jitter), cut to 0..1
+; multipliers at the borders above: of a plus, of a minus (the worse the grade, the stronger), of the price (by S)
+pos_knots             = 0.50, 0.65, 0.85, 1.05, 1.18, 1.27, 1.30
+neg_knots             = 2.25, 1.80, 1.15, 0.90, 0.70, 0.55, 0.50
+price_knots           = 0.25, 0.40, 0.70, 1.10, 1.45, 1.80, 2.00
+; the radiation an artefact gives off: x rad_range by t = rad_follow_q * Q + (1 - rad_follow_q) * random
+rad_follow_q          = 0.7
+rad_range             = 0.60, 1.40
+weight_range          = 0.85, 1.15           ; weight, uniform; the price doesn't care
+; the two bad grades: radiation from .. to (whatever the strength), wear multiplier
+unstable_mods         = 1.40, 1.80, 1.5
+dim_mods              = 1.00, 1.20, 1.2
+; an unstable one has an extra minus, one of these it doesn't have (property: value as in the configs, then x neg_knots)
+unstable_extra_chance = 0.5
+unstable_extra        = telepatic_immunity: -0.0072, power_restore_speed: -0.00087, radiation_immunity: -0.002, chemical_burn_immunity: -0.00021, burn_immunity: -0.00116, shock_immunity: -0.0623, wound_immunity: -0.034, strike_immunity: -0.034
+; traders: those who know the grade pay by S (their trade config's file name); the rest pay as for a common one
+expert_trade_cfgs     = trade_ecolog_sakharov, trade_ecolog_hermann
+blind_trader_factor   = 1.0                  ; x the base price at a trader who doesn't know the grade
+blind_unstable_factor = 0.5                  ; ... for an unstable one: it shows
+show_dim_as_common    = true                 ; the tooltip shows a dim one as common (no expertise), unless at an expert
+tooltip_vanilla_scale = false                ; true: the artefact tooltip in vanilla units (as these ranges); false: GRA's percents
+; artefacts that are never graded (story ones, copies, no properties) besides junk (i_arty_junk) and belt gear (i_attach)
+skip                  = jup_b1_half_artifact, af_quest_b14_twisted, marker, af_vaselisk, af_geliy, af_gimlet
+; where a field after an emission is "north": field_north weights there, field_south elsewhere
+north_levels          = l10_radar, l10_red_forest, l10_limansk, l11_hospital, l11_pripyat, pripyat, jupiter, zaton, l12_stancia, l12_stancia_2, l13_generators
+wear_check_ms         = 500                  ; how often the belt's artefacts are looked at for the bad grades' extra wear
+
+; A source's weights: unstable, dim, common, good, excellent, perfect
+[af_quality_source_field_south]
+grades = 5, 12, 47, 25, 10, 1
+
+[af_quality_source_field_north]
+grades = 5, 12, 42, 25, 10, 6
+
+[af_quality_source_npc_loot]
+grades = 10, 18, 45, 20, 6, 1
+
+[af_quality_source_trader_blind]
+grades = 8, 17, 50, 25, 0, 0
+
+[af_quality_source_trader_scientist]
+grades = 0, 0, 60, 40, 0, 0
+
+[af_quality_source_stash]
+grades = 5, 12, 45, 25, 10, 3
+
+[af_quality_source_stash_rich]
+grades = 0, 0, 30, 40, 22, 8
+
+[af_quality_source_raid]
+grades = 0, 0, 30, 40, 22, 8
+
+[af_quality_source_reward]
+grades = 0, 0, 2, 70, 25, 3
+
+; An artefact's own range for a plus or a minus instead of the multipliers: property = worst, best (at Q 0 and Q 1, in the vanilla tooltip's
+; units: health x6600, radiation x47000, stamina x30000, bleeding x15000, satiety x100, thermo x84800, electro x8000,
+; radiation protection x750, psi x5800, chemical x19100, rupture/bullet/explosion/strike x2500, carry weight kg).
+; The knots' shape is stretched over it. For example:
+;[af_quality_af_medusa]
+;wound_immunity      = 138, 358
+;fire_wound_immunity = 121, 315
+
+; Stabilisation: one step = one grade up, Q moved into the next grade's band and everything rolled again by it
+[af_quality_stab]
+; the bunkers' scientists (Sakharov, Herman), at once, for money: up to this grade (1 unstable .. 6 perfect)
+bunker_cap         = 3
+bunker_price_share = 0.5                     ; x (price of the new grade - price of the old one) x the base price
+bunker_price_min   = 1500
+; the Base: a chamber of the artefact's nature (shelter_synthesis), busy meanwhile, its capsule stays; up to this grade
+base_cap           = 5
+base_hours         = 6, 12, 24, 48           ; game hours by the grade it goes to: dim, common, good, excellent
+; the Base's lab for the scientists isn't in the game yet: base_enabled stands for it. The admin window's test mode
+; "af_base_lab" (or the world's state af_base_lab) turns it on for tests.
+base_enabled       = false
+base_need_scientists = true
+; natures of artefacts not in items\settings\artefacts.ltx's af_class_* lists: section: gravi/thermo/chem/electro
+; Compass: gravi (cuts through anomaly fields, a bullet's protection), Oasis Heart: chem (a plant, heals like Soul or
+; Kolobok), Volat: electro (its strongest plus is electricity); Shadow of Chernobyl's: Mica, Slime, Slug (Fruit Punch),
+; Pellicle (chemical protection) and the Thorn, Crystal Thorn and Sea Urchin (Burnt Fuzz) chem, Drops (Burner) thermo,
+; Spring (stamina, as Flash and Battery) electro
+nature_extra       = af_compass: gravi, af_oasis_heart: chem, af_monolith: electro, af_ameba_mica: chem, af_ameba_slime: chem, af_ameba_slug: chem, af_dummy_pellicle: chem, af_rusty_thorn: chem, af_rusty_kristall: chem, af_rusty_sea: chem, af_drops: thermo, af_dummy_spring: electro

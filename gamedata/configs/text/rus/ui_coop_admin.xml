@@ -346,7 +346,7 @@
 		<text>Читы для себя</text>
 	</string>
 	<string id="st_coop_adm_cheats_hint">
-		<text>Всё через сервер, в его журнал. «Все точки быстрого перемещения» (Моя игра › Карта) на тестовом сервере дают и перемещаться к непосещённым.</text>
+		<text>Всё через сервер, в его журнал. «Все точки быстрого перемещения» (Моя игра / Карта) на тестовом сервере дают и перемещаться к непосещённым.</text>
 	</string>
 	<string id="st_coop_adm_god_on">
 		<text>Бессмертие: включить</text>
@@ -547,7 +547,7 @@
 		<text>Счётчик кадров и пинг до сервера.</text>
 	</string>
 	<string id="st_coop_adm_b_fps">
-		<text>Опции › Кооп › FPS</text>
+		<text>Опции / Кооп / FPS</text>
 	</string>
 	<string id="st_coop_adm_i_rs_stats">
 		<text>Статистика рендера</text>
@@ -628,7 +628,7 @@
 		<text>Сколько осталось до конца рейда - на экране.</text>
 	</string>
 	<string id="st_coop_adm_b_raid_timer">
-		<text>Опции › Кооп</text>
+		<text>Опции / Кооп</text>
 	</string>
 	<string id="st_coop_adm_i_peer_color">
 		<text>Цвет меток других игроков</text>
@@ -637,7 +637,7 @@
 		<text>Цвет значков напарников на карте и миникарте.</text>
 	</string>
 	<string id="st_coop_adm_b_peer_color">
-		<text>Опции › Кооп (ползунки), консоль coop_peer_color</text>
+		<text>Опции / Кооп (ползунки), консоль coop_peer_color</text>
 	</string>
 	<string id="st_coop_adm_i_dlss">
 		<text>DLSS</text>
@@ -739,7 +739,7 @@
 		<text>Событие бара (по кругу)</text>
 	</string>
 	<string id="st_coop_tests_shelter_dig">
-		<text>Копать в 5 раз быстрее (вкл/выкл)</text>
+		<text>Копать x5 вкл/выкл</text>
 	</string>
 	<string id="st_coop_tests_base_cooling">
 		<text>«Охлаждение» сейчас</text>
@@ -881,7 +881,7 @@
 		<text>Сб</text>
 	</string>
 	<string id="st_coop_adm_events_sub">
-		<text>Выброс, пси-шторм, Охлаждение, бар и погода у всех игроков, с обычными новостями мира. Запускает игра, которая держит мир (хост); что она сделала - в журнале.</text>
+		<text>Выброс, пси-шторм, Охлаждение, события Зоны, бар и погода у всех игроков, с обычными новостями мира. Запускает игра, которая держит мир (хост); что она сделала - в журнале.</text>
 	</string>
 	<string id="st_coop_adm_ev_wait">
 		<text>Хост ещё не рассказал о событиях: мир никто не держит или ответ в пути.</text>
@@ -952,6 +952,12 @@
 	<string id="st_coop_adm_ev_warn_cooling">
 		<text>Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.</text>
 	</string>
+	<string id="st_coop_adm_ev_warn_calm">
+		<text>Локация: %s. Все аномалии там погаснут вместе с лежащими в них артефактами; в конце вернутся и родят новые.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_ash">
+		<text>Локация: %s. На ней пепел: игрок без замкнутого научного костюма (СЕВА, ССП) погибнет за несколько минут без антирада.</text>
+	</string>
 	<string id="st_coop_ev_t_surge">
 		<text>Выброс</text>
 	</string>
@@ -1004,7 +1010,7 @@
 		<text>%s уже идёт.</text>
 	</string>
 	<string id="st_coop_ev_r_option_off">
-		<text>%s: выключено в настройках игры хоста (Настройки › События).</text>
+		<text>%s: выключено в настройках игры хоста (Настройки / События).</text>
 	</string>
 	<string id="st_coop_ev_r_held">
 		<text>%s: сейчас нельзя - идёт событие мира (оборона барьера или насосной).</text>
