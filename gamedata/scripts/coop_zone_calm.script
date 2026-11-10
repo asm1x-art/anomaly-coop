@@ -10,8 +10,8 @@
 --              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
 --              do: the spawn is held back here. The ones lying loose on the level are taken away by the level's
 --              authority (the sim master while nobody is there), once per calm; the zones here forget them.
---   the end    the level is marked for new artefacts as after a surge (each game's mark: the next authority to load
---              it spawns them); a game on the level spawns them at once (coop_sync: its authority, for everyone)
+--   the end    a game on the level spawns new artefacts at once, as after a surge (coop_sync: its authority, for
+--              everyone); with nobody there the sim master marks the level for them (the next to load it spawns them)
 
 local ID = "calm"
 local S = "zone_event_calm"
@@ -140,12 +140,15 @@ local function sweep(lvl)
 	printf("[coop] zone event calm on %s: %s artefact(s) lying there taken away", lvl, n)
 end
 
--- new artefacts as after a surge: at once if we are on the level (its authority spawns them, coop_sync), else when the
--- next authority loads it
+-- new artefacts as after a surge: at once if we are on the level (its authority spawns them, coop_sync), else, if the
+-- level is ours (nobody is on it: the sim master's), when the next one loads it
 local function respawn(lvl)
 	if level.name() == lvl then
 		bind_anomaly_zone.force_spawn_artefacts()
 		return
+	end
+	if not authority(lvl) then
+		return -- a player is on it: his game spawns them
 	end
 	local m_data = alife_storage_manager.get_state()
 	if m_data then
