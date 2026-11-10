@@ -952,6 +952,12 @@
 	<string id="st_coop_adm_ev_warn_cooling">
 		<text>The raid window closes now: whoever is in the raid loses health to psi until out.</text>
 	</string>
+	<string id="st_coop_adm_ev_warn_calm">
+		<text>Level: %s. Every anomaly there goes out with the artefacts lying in it; at the end they come back and bear new ones.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_ash">
+		<text>Level: %s. Ash on it: a player without a sealed scientific suit (SEVA, SSP) dies in a few minutes without anti-rad.</text>
+	</string>
 	<string id="st_coop_ev_t_surge">
 		<text>Surge</text>
 	</string>

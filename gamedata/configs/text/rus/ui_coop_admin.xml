@@ -952,6 +952,12 @@
 	<string id="st_coop_adm_ev_warn_cooling">
 		<text>Окно рейда закроется сейчас: кто в рейде, начнёт терять здоровье от пси, пока не выйдет.</text>
 	</string>
+	<string id="st_coop_adm_ev_warn_calm">
+		<text>Локация: %s. Все аномалии там погаснут вместе с лежащими в них артефактами; в конце вернутся и родят новые.</text>
+	</string>
+	<string id="st_coop_adm_ev_warn_ash">
+		<text>Локация: %s. На ней пепел: игрок без замкнутого научного костюма (СЕВА, ССП) погибнет за несколько минут без антирада.</text>
+	</string>
 	<string id="st_coop_ev_t_surge">
 		<text>Выброс</text>
 	</string>

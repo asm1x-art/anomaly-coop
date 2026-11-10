@@ -1137,9 +1137,14 @@ function UICoopAdmin:main_events(box, X, Y, W, H, L)
 		for k, action in ipairs({ "start", "stop", "outcome" }) do
 			local caption = tr(action == "start" and "st_coop_adm_ev_start" or action == "stop" and "st_coop_adm_ev_stop"
 				or "st_coop_adm_ev_outcome")
-			self:btn(24 + lw + 10 + (k - 1) * (bw + 10), y, bw, 30, caption, function()
+			local f = function()
 				command("event", id, action, action == "start" and lvl or "")
-			end, L, box, X, Y)
+			end
+			-- a start asks first, as on the admin page and in the bot
+			self:btn(24 + lw + 10 + (k - 1) * (bw + 10), y, bw, 30, caption, action == "start" and function()
+				self:confirm(tr("st_coop_ev_t_" .. id) .. ": " .. caption, tr("st_coop_adm_ev_warn_" .. id,
+					lvl and level_name(lvl) or tr("st_coop_adm_ev_level_any")), caption, f)
+			end or f, L, box, X, Y, action == "start" and "danger" or "normal")
 		end
 		y = y + 40
 	end
