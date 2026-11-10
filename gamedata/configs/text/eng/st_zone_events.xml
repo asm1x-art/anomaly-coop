@@ -26,7 +26,7 @@
 		<text>"%s": its level list is empty.</text>
 	</string>
 	<string id="st_zev_r_started">
-		<text>"%s" began: %s, about %s game hours.</text>
+		<text>"%s" began: %s, about %s real hours.</text>
 	</string>
 	<string id="st_zev_r_not_running">
 		<text>"%s" is not on now.</text>
@@ -41,7 +41,7 @@
 		<text>Unknown action %s: start, stop or outcome.</text>
 	</string>
 	<string id="st_coop_adm_ev_zone_on">
-		<text>on: %s, %s left</text>
+		<text>on: %s, %s of real time left</text>
 	</string>
 	<string id="st_coop_adm_ev_zone_off">
 		<text>not on</text>

@@ -118,6 +118,11 @@ const gameTime = (seconds, factor) => {
   const real = factor > 0 ? Math.round(s / factor / 60) : null;
   return real === null ? text : `${text} (~${real < 60 ? `${real} мин` : `${Math.floor(real / 60)} ч ${real % 60} мин`} реальных)`;
 };
+// real seconds as the admins read them
+const realTime = (seconds) => {
+  const s = Math.max(0, Math.round(seconds));
+  return s < 3600 ? `${Math.floor(s / 60)} мин` : `${Math.floor(s / 3600)} ч ${Math.floor(s % 3600 / 60)} мин`;
+};
 const WEATHER = { clear: 'ясно', partly: 'переменная облачность', cloudy: 'облачно', rain: 'дождь', storm: 'гроза',
   foggy: 'туман', pre_blowout: 'перед выбросом' };
 
@@ -134,7 +139,8 @@ export function eventsText(events) {
     ? `следующее через ${Math.max(0, Math.round(Number(v.bar_next) || 0))} ч игровых` : 'нет бармена'}`);
   for (const e of WORLD_EVENTS.filter((x) => x.zone)) {
     const where = zoneLevels(v, e.id).find((l) => l.id === v[`${e.id}_level`])?.name ?? v[`${e.id}_level`];
-    lines.push(`${e.title}: ${v[e.id] === '1' ? `идёт, ${where}, ещё ${gameTime(Number(v[`${e.id}_left`]), factor)}` : 'нет'}`);
+    // the Zone's events last real time: <id>_left is real seconds
+    lines.push(`${e.title}: ${v[e.id] === '1' ? `идёт, ${where}, ещё ${realTime(Number(v[`${e.id}_left`]))} реальных` : 'нет'}`);
   }
   if (v.weather) lines.push(`Погода: ${WEATHER[v.weather] ?? v.weather}`);
   if (events.result) lines.push(`Последнее: ${events.result.text}`);
