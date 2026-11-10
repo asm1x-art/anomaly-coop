@@ -900,8 +900,46 @@ end
 
 -------------------------------------------------------------------------------
 -- fetch quests (tasks_fetch): a quest that pays by the things' value pays by the artefact's grade. The quests with a
--- fixed reward (remove_artefact_item: an artefact's "breed") stay as they are. Vanilla's fetch_reward_and_remove with
--- the grade's price factor, and the roll taken out of a container with the artefact.
+-- fixed reward (remove_artefact_item: an artefact's "breed") pay as they did. Vanilla's fetch_reward_and_remove with
+-- the grade's price factor, and the roll taken out of a container with the artefact. Both take the actor's cheapest
+-- copies of an artefact first.
+
+-- the actor's things of sec; for an artefact the cheapest first (its grade's price x condition squared, as the quest
+-- pays)
+local function cheapest_first(sec)
+	local list = {}
+	db.actor:iterate_inventory(function(_, obj)
+		if obj:section() == sec then
+			list[#list + 1] = obj
+		end
+	end, nil)
+	if list[1] and IsArtefact(list[1]) then
+		local function value(obj)
+			local d = info(obj)
+			return (d and d.price or 1) * obj:condition() * obj:condition()
+		end
+		table.sort(list, function(a, b) return value(a) < value(b) end)
+	end
+	return list
+end
+
+local remove_artefact_item -- vanilla's
+
+-- vanilla's remove_artefact_item gives away the first copy it finds: the cheapest one instead (out of a container
+-- only when there is none loose, as vanilla's)
+local function remove_cheapest_artefact(actor, npc, p)
+	local sec = load_var(db.actor, p[1])
+	local obj = sec and cheapest_first(sec)[1]
+	if not obj then
+		return remove_artefact_item(actor, npc, p)
+	end
+	local trade_npc = get_speaker()
+	if trade_npc then
+		db.actor:transfer_item(obj, trade_npc)
+	else
+		alife_release(obj)
+	end
+end
 
 local function fetch_reward_and_remove(actor, npc, p)
 	local sec = load_var(db.actor, p[1])
@@ -957,7 +995,11 @@ local function fetch_reward_and_remove(actor, npc, p)
 				return true
 			end
 		end
-		db.actor:iterate_inventory(itr, nil)
+		for _, obj in ipairs(cheapest_first(sec)) do
+			if itr(nil, obj) then
+				break
+			end
+		end
 
 		if is_empty(collected_itms) then
 			printe("! ERROR: fetch_reward_and_remove | no fetch item found!")
@@ -1293,6 +1335,10 @@ function on_game_start()
 	wrap_ui()
 	if tasks_fetch and xr_effects.fetch_reward_and_remove then
 		xr_effects.fetch_reward_and_remove = fetch_reward_and_remove
+	end
+	if tasks_fetch and xr_effects.remove_artefact_item then
+		remove_artefact_item = xr_effects.remove_artefact_item
+		xr_effects.remove_artefact_item = remove_cheapest_artefact
 	end
 	if coop_sync and coop_sync.on_event then
 		coop_sync.on_event("afq", on_event)
