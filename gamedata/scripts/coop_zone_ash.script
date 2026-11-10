@@ -3,20 +3,24 @@
 -- machinery of the Truck Cemetery. For 3-4 real hours on one level:
 --   ash        the level's weather is w_zev_ash over the world's, in each game on it (coop_time asks weather())
 --   radiation  a player there without a sealed suit (sealed_suits: parts of the outfit's section; an exoskeleton is not
---              one) takes a rising dose and, past rad_harm_from, loses health by it: death in some minutes without
---              anti-rad. Each game its own player's; nobody else is hurt (NPCs offline or online)
+--              one) and outside the level's shelter (shelter_radius of its smart, sealed or not) takes a rising dose
+--              and, past rad_harm_from, loses health by it: death in some minutes without anti-rad. Each game its own
+--              player's; nobody else is hurt (NPCs offline or online)
 --   shelter    the level's stalker squads of the shelter's people (shelter_communities_<level>; none listed: all) go
 --              into its shelter (shelter_<level>: a smart) for the front and back to their own smarts after: every game
---              sets the same targets from the event's data. Story squads and companions stay where they are. A sealed shelter (sealed)
---              lets nobody in, players neither: one who comes within sealed_radius of it is put back outside
+--              sets the same targets from the fact ash_rel. Story squads and companions stay where they are. A sealed
+--              shelter (sealed) lets nobody in, players neither: one who walks in within shelter_radius of it is put
+--              back where he was outside; one who comes into the world (or was) inside sits the front out there
 --   leaving    the level's other stalker squads (not its shelter's people, not in sealed gear: only_squads) go to a smart
 --              of a neighbouring level (leave_<level>: levels) for the front and back to their own smarts after
 --   squads     only squads in sealed gear (only_squads: parts of their sections) take the level's smarts as targets
 --   players    are never kept off the level
 --   albinos    albino_squads (squad sections, none yet: their assets come later) are put on the level's smarts by the
 --              master at the start and taken away at the end
--- The event's data: rel (squad:its own smart's id, the squads sent into the shelter; squad:own:the smart it went to,
--- the squads sent off the level), alb (the albino squads).
+-- The event's data: alb (the albino squads). The squads sent away are the fact "zone_event:ash_rel" =
+-- "<level>|<when it ended, real s; 0 while on>|<rel>", rel: squad:its own smart's id (into the shelter) or
+-- squad:own:the smart it went to (off the level). Kept apart from the event's slot: the squads come back
+-- (return_real_hours) even when another world-state event takes the slot; the master clears it after.
 
 local ID = "ash"
 local S = "zone_event_ash"
@@ -70,6 +74,11 @@ local function here()
 	return ZE.on_level(ID, level.name())
 end
 
+-- the level's shelter smart and how far from it the shelter goes
+local function shelter_smart(lvl)
+	return SIMBOARD.smarts_by_names[shelter_name(lvl) or ""], num("shelter_radius", 60)
+end
+
 -------------------------------------------------------------------------------
 -- the weather (every game on the level)
 
@@ -114,9 +123,14 @@ local function sealed_suit()
 	return false
 end
 
+local function in_shelter()
+	local smart, radius = shelter_smart(level.name())
+	return smart and db.actor:position():distance_to(smart.position) <= radius or false
+end
+
 local function dose(on)
 	local now = time_global()
-	if not on or ghost() or sealed_suit() then
+	if not on or ghost() or sealed_suit() or in_shelter() then
 		exposed_since, last_dose = nil, nil
 		if not on then
 			warned = false
@@ -149,40 +163,24 @@ end
 -------------------------------------------------------------------------------
 -- the sealed shelter (each game its own player)
 
-local outside = nil -- where our player last stood outside it
+local outside = nil -- where our player last stood outside it (nil: not seen outside since he came onto the level)
 
 local function keep_out(ev)
-	local smart = SIMBOARD.smarts_by_names[shelter_name(ev.level) or ""]
+	local smart, radius = shelter_smart(ev.level)
 	if not (smart and sealed(ev.level)) or ghost() then
 		outside = nil
 		return
 	end
-	local center = smart.position
 	local pos = db.actor:position()
-	local radius = num("sealed_radius", 60)
-	local d = pos:distance_to(center)
+	local d = pos:distance_to(smart.position)
 	if d > radius + 2 then
 		outside = vector():set(pos)
 		return
 	end
-	if d > radius then
-		return
+	if d > radius or not outside then
+		return -- at its edge; or inside since he came into the world (a save there) or the front came: he stays
 	end
-	local back = outside
-	if not back then -- in it when the front came: out the nearest way
-		local dir = vector():set(pos):sub(center)
-		dir.y = 0
-		if dir:magnitude() < 0.1 then
-			dir = vector():set(1, 0, 0)
-		end
-		local p = vector():set(center):add(dir:normalize():mul(radius + 5))
-		local lvid = level.vertex_id(p)
-		if lvid >= 4294967295 then
-			return
-		end
-		back = level.vertex_position(lvid)
-	end
-	db.actor:set_actor_position(back)
+	db.actor:set_actor_position(outside)
 	actor_menu.set_msg(1, tr("st_zev_ash_sealed"), 5)
 end
 
@@ -194,10 +192,21 @@ local function smart_name(id)
 	return s and s.smrt and s.smrt:name()
 end
 
-local function relocate(ev, on)
-	local shelter = shelter_name(ev.level)
-	local late = not on and ZE.now() - ev.till > num("return_hours", 12) * 3600
-	for _, entry in ipairs(ids_of(ev.data.rel)) do
+local function relocate()
+	local lvl, ended, rel = string.match(ZE.mark_of("ash_rel"), "^([^|]+)|(%d+)|(.*)$")
+	if not lvl then
+		return
+	end
+	ended = tonumber(ended)
+	local on = ended == 0
+	local shelter = shelter_name(lvl)
+	local back = num("return_real_hours", 2) * 3600
+	local late = not on and ZE.now() - ended > back
+	if late and ZE.master() and ZE.now() - ended > back + 600 then
+		ZE.mark("ash_rel", "") -- every game has sent them home by now
+		return
+	end
+	for _, entry in ipairs(ids_of(rel)) do
 		local id, own, away = string.match(entry, "^(%d+):(%d+):?(%d*)$")
 		local squad = id and alife_object(tonumber(id))
 		if squad and squad.squad_members then
@@ -282,7 +291,7 @@ local function start(ev)
 			end
 		end
 	end
-	ev.data.rel = table.concat(rel, ",")
+	ZE.mark("ash_rel", ev.level .. "|0|" .. table.concat(rel, ","))
 	local alb = {}
 	local sections = ZE.ini_list(S, "albino_squads")
 	if #sections > 0 then
@@ -319,6 +328,11 @@ local function start(ev)
 end
 
 local function finish(ev, how)
+	-- the squads home from now on (relocate, in every game)
+	local lvl, _, rel = string.match(ZE.mark_of("ash_rel"), "^([^|]+)|(%d+)|(.*)$")
+	if lvl == ev.level then
+		ZE.mark("ash_rel", lvl .. "|" .. math.max(1, ZE.now()) .. "|" .. rel)
+	end
 	for _, s in ipairs(ids_of(ev.data.alb)) do
 		local id = tonumber(s)
 		local squad = id and alife_object(id)
@@ -340,9 +354,7 @@ local function update(ev)
 	else
 		outside = nil
 	end
-	if ev then
-		relocate(ev, on)
-	end
+	relocate()
 end
 
 local function news_start(ev)
