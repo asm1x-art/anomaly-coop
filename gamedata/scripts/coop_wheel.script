@@ -75,7 +75,7 @@ function UICoopWheel:__init() super()
 		self:Register(self.buttons[action], "btn_" .. action)
 		self:AddCallback("btn_" .. action, ui_events.BUTTON_CLICKED, function() self:Do(action) end, self)
 		self.icons[action] = xml:InitStatic("wheel:icon_" .. action, self.dialog) -- over its button
-		self:SetIcon(action, action)
+		self:SetIcon(action, action == "group" and "group_add" or action) -- the group's is set for the player (Reset)
 		parts[#parts + 1] = self.buttons[action]
 		parts[#parts + 1] = self.icons[action]
 	end

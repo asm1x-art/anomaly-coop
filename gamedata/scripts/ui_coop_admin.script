@@ -363,7 +363,8 @@ end
 function UICoopAdmin:layout()
 	local pad = self.compact and 12 or 36
 	local T = ui_stalker_style.TITLE_H
-	local w = math.min(self.W, 1024) - 2 * pad -- the 4:3 middle of a wider screen
+	-- the 4:3 middle of a wider screen; the full layout (names down the side, the card) a little wider, or its middle is too narrow
+	local w = math.min(self.W, self.compact and 1024 or 1280) - 2 * pad
 	local x, y, h = math.floor((self.W - w) / 2), self.compact and 10 or 24, self.H - (self.compact and 20 or 48)
 	local frame = { x, y, w, h }
 	x, y, w, h = x + 11, y + T, w - 22, h - T - 11 -- inside the frame's edges, its title on the top one
@@ -1159,6 +1160,7 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 	local top = math.max(72, self:heading(24, 14, W - 48, tr("st_coop_adm_sec_tests"), box,
 		tr(d.tests and "st_coop_adm_tests_sub" or "st_coop_adm_tests_off")) + 10)
 	local cw = math.floor((W - 48 - 2 * 12) / 3)
+	local bh = math.max(30, 2 * self.line - 6) -- a name over two lines fits its button (a 600-line screen too)
 	local ys = {}
 	for i, mode in ipairs(TEST_MODES) do
 		local x = 24 + (i - 1) * (cw + 12)
@@ -1177,12 +1179,12 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 						command("test", id)
 					end
 				end
-				self:btn(x, y, cw, 30, "", d.tests and f or function() end, L, box, X, Y, kind)
-				self:text(x + 10, y, cw - 60, 30, tr("st_coop_tests_" .. id), d.tests and C.text or C.faint, box, nil, "s")
+				self:btn(x, y, cw, bh, "", d.tests and f or function() end, L, box, X, Y, kind)
+				self:text(x + 10, y, cw - 60, bh, tr("st_coop_tests_" .. id), d.tests and C.text or C.faint, box, nil, "s")
 				if key ~= "" then
-					self:text(x + cw - 56, y, 48, 30, key, C.dim, box, CGameFont.alRight, "s")
+					self:text(x + cw - 56, y, 48, bh, key, C.dim, box, CGameFont.alRight, "s")
 				end
-				y = y + 34
+				y = y + bh + 4
 			end
 		end
 		ys[i] = y
