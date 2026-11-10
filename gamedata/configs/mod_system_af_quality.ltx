@@ -89,4 +89,8 @@ base_hours         = 6, 12, 24, 48           ; game hours by the grade it goes t
 base_enabled       = false
 base_need_scientists = true
 ; natures of artefacts not in items\settings\artefacts.ltx's af_class_* lists: section: gravi/thermo/chem/electro
-nature_extra       =
+; Compass: gravi (cuts through anomaly fields, a bullet's protection), Oasis Heart: chem (a plant, heals like Soul or
+; Kolobok), Volat: electro (its strongest plus is electricity); Shadow of Chernobyl's: Mica, Slime, Slug (Fruit Punch),
+; Pellicle (chemical protection) and the Thorn, Crystal Thorn and Sea Urchin (Burnt Fuzz) chem, Drops (Burner) thermo,
+; Spring (stamina, as Flash and Battery) electro
+nature_extra       = af_compass: gravi, af_oasis_heart: chem, af_monolith: electro, af_ameba_mica: chem, af_ameba_slime: chem, af_ameba_slug: chem, af_dummy_pellicle: chem, af_rusty_thorn: chem, af_rusty_kristall: chem, af_rusty_sea: chem, af_drops: thermo, af_dummy_spring: electro
