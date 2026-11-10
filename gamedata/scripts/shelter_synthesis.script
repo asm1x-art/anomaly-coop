@@ -747,12 +747,17 @@ local function panel_tip(nature)
 	return string.format(game.translate_string("st_shelter_chamber_tip_load"), chamber_text)
 end
 
--- what was made, out of the cell into the actor's inventory
+-- what was made, out of the cell into the actor's inventory (an artefact keeps its grade, af_quality.script; a
+-- stabilised one its condition too)
 local function take_out(nature, se)
 	local sec = se:section_name()
+	local rec = af_quality.record(se.id)
+	local t = af_quality.chamber_take(nature, se)
 	shelter.everyones(function()
 		alife_release(se)
-		alife_create_item(sec, db.actor)
+		af_quality.expect(sec, rec)
+		alife_create_item(sec, db.actor, t)
+		af_quality.expect(nil)
 	end)
 	shelter.set_state("synth_out_" .. nature, nil)
 	news_manager.relocate_item(db.actor, "in", sec, 1)
@@ -794,6 +799,25 @@ function load(nature, parts, by_staff)
 	shelter.set_state("synth_start_" .. nature, now)
 	shelter.set_state("synth_" .. nature, math.floor(now + hours_for(parts) * 3600))
 	msg("st_shelter_synth_started", chamber_name(nature))
+end
+
+-- An artefact's stabilisation by the Base's scientists (af_quality.script): the chamber of its nature works for hours
+-- as on a load, the artefact in it, and gives it back a grade up (made below, no journal entry). The capsule stays.
+function start_stabilisation(nature, obj, hours)
+	if not installed(nature) or work(nature) then
+		return false
+	end
+	local sec, now = obj:section(), game_sec()
+	news_manager.relocate_item(db.actor, "out", sec, 1)
+	alife_release(obj)
+	shelter.set_state("synth_result_" .. nature, sec)
+	shelter.set_state("synth_load_" .. nature, sec)
+	shelter.set_state("synth_resonance_" .. nature, 0)
+	shelter.set_state("synth_who_" .. nature, (string.gsub(db.actor:character_name() or "", "|", "/")))
+	shelter.set_state("synth_start_" .. nature, now)
+	shelter.set_state("synth_" .. nature, math.floor(now + hours * 3600))
+	msg("st_afq_base_started", chamber_name(nature))
+	return true
 end
 
 -- the materials scientist tries on his own: in a free installed chamber, from what one carries, a load never tried, one
@@ -854,20 +878,24 @@ local function made(c, ends)
 	shelter.once("synth_made_" .. c.nature .. "_" .. ends, function()
 		local n = c.nature
 		local result = shelter.state("synth_result_" .. n, nil)
+		local stab = result and af_quality.chamber_expect(n, result) -- a stabilisation: the artefact back, no entry
 		local entry = table.concat({ result or STONE, tostring(shelter.state("synth_load_" .. n, "") or ""),
 			shelter.state("synth_resonance_" .. n, 0) or 0, ends, tostring(shelter.state("synth_who_" .. n, "") or "") }, "|")
 		for _, s in ipairs(WORK_STATES) do
 			shelter.set_state(s .. n, nil)
 		end
-		local count = logs(n) + 1
-		shelter.set_state("synth_log_" .. n .. "_" .. count, entry)
-		shelter.set_state("synth_logs_" .. n, count)
+		if not stab then
+			local count = logs(n) + 1
+			shelter.set_state("synth_log_" .. n .. "_" .. count, entry)
+			shelter.set_state("synth_logs_" .. n, count)
+		end
 		local panel = alife_object(shelter.state("chamber_panel_" .. n, 65535))
 		if not (result and panel and ini_sys:section_exist(result)) then
 			return
 		end
 		local se = alife_create(result, vector():set(c.window, WALL.cell_floor + 0.3, WALL.cell_z), panel.m_level_vertex_id,
 			panel.m_game_vertex_id)
+		af_quality.expect(nil)
 		shelter.set_state("synth_out_" .. n, se and se.id or nil)
 	end)
 end
