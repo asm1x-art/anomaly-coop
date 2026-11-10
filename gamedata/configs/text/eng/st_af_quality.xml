@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Artefact grades and stabilisation (af_quality.script) -->
+<string_table>
+	<string id="st_afq_grade">
+		<text>Grade:</text>
+	</string>
+	<string id="st_afq_grade_unstable">
+		<text>Unstable</text>
+	</string>
+	<string id="st_afq_grade_dim">
+		<text>Dull</text>
+	</string>
+	<string id="st_afq_grade_common">
+		<text>Common</text>
+	</string>
+	<string id="st_afq_grade_good">
+		<text>Good</text>
+	</string>
+	<string id="st_afq_grade_excellent">
+		<text>Excellent</text>
+	</string>
+	<string id="st_afq_grade_perfect">
+		<text>Perfect</text>
+	</string>
+	<string id="st_afq_unstable_note">
+		<text>Unstable: it radiates and flickers.</text>
+	</string>
+	<string id="st_afq_step">
+		<text>%s  »  %s</text>
+	</string>
+	<string id="st_afq_step_hours">
+		<text>%s  »  %s, %s h in the chamber</text>
+	</string>
+	<string id="st_afq_base_mode">
+		<text>Stabilisation</text>
+	</string>
+	<string id="st_afq_synth_mode">
+		<text>Synthesis</text>
+	</string>
+	<string id="st_afq_base_title">
+		<text>The Base's scientists raise an artefact of this nature one grade, up to Excellent. The chamber will be busy, the capsule stays.</text>
+	</string>
+	<string id="st_afq_base_do">
+		<text>Put into the chamber</text>
+	</string>
+	<string id="st_afq_base_nothing">
+		<text>No artefacts of this nature that can be stabilised.</text>
+	</string>
+	<string id="st_afq_base_started">
+		<text>%s: the artefact's stabilisation has begun.</text>
+	</string>
+	<string id="st_afq_bunker_window">
+		<text>Artefact stabilisation</text>
+	</string>
+	<string id="st_afq_bunker_title">
+		<text>One grade up, no higher than %s. At once, for a fee.</text>
+	</string>
+	<string id="st_afq_bunker_do">
+		<text>Stabilise: %s RU</text>
+	</string>
+	<string id="st_afq_bunker_done">
+		<text>%s: now %s.</text>
+	</string>
+	<string id="st_afq_bunker_nothing">
+		<text>You have no artefacts that can be stabilised here.</text>
+	</string>
+	<string id="st_afq_money">
+		<text>Money: %s RU</text>
+	</string>
+	<string id="st_afq_dlg_0">
+		<text>Can you stabilise an artefact?</text>
+	</string>
+	<string id="st_afq_dlg_1">
+		<text>Unstable or dull? Let's see it. We can bring it up to common, no higher: there's no equipment here for that.</text>
+	</string>
+	<string id="st_afq_test_lab_on">
+		<text>The Base's stabilisation lab: on (test).</text>
+	</string>
+	<string id="st_afq_test_lab_off">
+		<text>The Base's stabilisation lab: off.</text>
+	</string>
+	<string id="st_coop_tests_af_base_lab">
+		<text>Artefacts: the Base's lab (stabilisation) on/off</text>
+	</string>
+	<string id="st_coop_tests_af_kit">
+		<text>Artefacts: a Medusa of each grade</text>
+	</string>
+</string_table>
