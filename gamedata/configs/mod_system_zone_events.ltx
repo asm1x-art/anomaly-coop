@@ -72,13 +72,24 @@ rad_health          = 0.011
 cover_rad_decay     = 0.004     ; radiation a second off in cover (the shelter's air): 0.5 gone in about 2 minutes
 ; NPCs (the level's stalkers, not in sealed gear: the outfit of their visual or only_squads) out of cover lose health
 ; evenly from npc_harm_after_s and die npc_death_s real seconds after they were first out of it (each game the NPCs it
-; runs). Offline squads of the level out of the shelter are taken away after offline_death_min real minutes. Story
-; NPCs, companions, players' stand-ins and immune_communities (e.g. zombied: Yantar's zombies would die out) never
+; runs; the shelter's people npc_walk_in_s later). Offline squads of the level out of the shelter are taken away after
+; offline_death_min real minutes. Story NPCs, companions, players' stand-ins and immune_communities (e.g. zombied:
+; Yantar's zombies would die out) never
 npc_harm_after_s    = 10
 npc_death_s         = 210
 offline_death_min   = 8
 immune_communities  = zombied
-npc_shelter_radius  = 40        ; metres: an NPC of the shelter's smart this near it counts as in cover (its jobs)
+offline_shelter_radius = 40     ; metres: an offline squad of the shelter's smart this near it is in (online: only the covers)
+npc_walk_in_s       = 180       ; real s more for the shelter's people (its smart's, or on their way in) to get into a cover
+; going in: for the front the shelter's people who must hide (not sealed, not story) take only jobs of its smart that are
+; in its covers (its surge jobs among them), as in an emission; those left over take hide_jobs walker jobs on the paths
+; hide_paths_<level> (in the covers: checked against all.spawn). The front over: their own jobs again
+hide_jobs           = 12
+hide_paths_l10_red_forest      = red_smart_terrain_3_2_walker_1_walk, red_smart_terrain_3_2_collector_2_walk, red_smart_terrain_3_2_sleep_1
+hide_paths_l08_yantar          = yan_smart_terrain_6_4_surge_1_walk, yan_smart_terrain_6_4_surge_2_walk, yan_smart_terrain_6_4_surge_3_walk, yan_smart_terrain_6_4_1_1_walk, yan_smart_terrain_6_4_2_2_walk, yan_smart_terrain_6_4_3_3_walk, yan_smart_terrain_6_4_4_4_walk, yan_smart_terrain_6_4_povarhide_1_walk
+hide_paths_jupiter             = jup_a6_duty_guard_walk, jup_a6_duty_leader_walk, jup_a6_freedom_leader_walk
+hide_paths_zaton               = zat_stalker_base_smart_garmata_4_walk, zat_stalker_base_smart_gonta_4_walk, zat_stalker_base_smart_zat_b33_stalker_snag_walk, zat_stalker_base_smart_b29_rival_leader_walk
+hide_paths_k02_trucks_cemetery = trc_sim_20_surge_1_walk, trc_sim_20_surge_2_walk, trc_sim_20_surge_3_walk, trc_sim_20_surge_4_walk, trc_sim_20_guard_2_walk
 rescan_s            = 60        ; real s: the master sends squads that came onto the level since into cover or away
 no_respawn          = true      ; the level's smarts respawn nobody for the front
 ; the shelters: a smart per level; its people (communities; none: all) go in for the front, back after
