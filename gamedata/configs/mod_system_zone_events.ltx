@@ -61,26 +61,26 @@ buy_medical         = 1.2       ; anti-rad in demand
 only_squads         = ecolog_, monolith_
 ; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
 sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit
-; a player out of cover without one: radiation rad_rate a second up to rad_max (0.2-0.3 within 20-30 s); past
-; rad_harm_from the health goes by at least rad_health * radiation a second, what the engine's own radiation harm (per
-; game second: radiation_health_v 0.0018 x the world's speed, x6) or anything else takes counting towards it. Death in
-; about 3.5 minutes without anti-rad at the world's x6 (sooner past x6: then the engine's own harm is the larger)
-rad_rate            = 0.01
-rad_max             = 0.5
+; a player out of cover without one: radiation rad_rate a second up to rad_max (0.15-0.3 within 5-10 s, the max in
+; 20 s); past rad_harm_from the health goes by at least rad_health * radiation a second, what the engine's own radiation
+; harm (per game second: radiation_health_v 0.0018 x the world's speed, x6) or anything else takes counting towards it.
+; Death in about 90 s without anti-rad (health lost by t s: rad_health * (5.8 + rad_max * (t - 20)))
+rad_rate            = 0.03
+rad_max             = 0.6
 rad_harm_from       = 0.1
-rad_health          = 0.011
-cover_rad_decay     = 0.004     ; radiation a second off in cover (the shelter's air): 0.5 gone in about 2 minutes
+rad_health          = 0.02
+cover_rad_decay     = 0.02      ; radiation a second off in cover (the shelter's air): 0.6 gone in 30 s (~0.1 health on the way)
 ; NPCs (the level's stalkers, not in sealed gear: the outfit of their visual or only_squads) out of cover lose health
 ; evenly from npc_harm_after_s and die npc_death_s real seconds after they were first out of it (each game the NPCs it
 ; runs; the shelter's people npc_walk_in_s later). Offline squads of the level out of the shelter are taken away after
 ; offline_death_min real minutes. Story NPCs, companions, players' stand-ins and immune_communities (e.g. zombied:
 ; Yantar's zombies would die out) never
-npc_harm_after_s    = 10
-npc_death_s         = 210
+npc_harm_after_s    = 5
+npc_death_s         = 90
 offline_death_min   = 8
 immune_communities  = zombied
 offline_shelter_radius = 40     ; metres: an offline squad of the shelter's smart this near it is in (online: only the covers)
-npc_walk_in_s       = 180       ; real s more for the shelter's people (its smart's, or on their way in) to get into a cover
+npc_walk_in_s       = 60        ; real s more for the shelter's people (its smart's, or on their way in) to get into a cover
 ; going in: for the front the shelter's people who must hide (not sealed, not story) take only jobs of its smart that are
 ; in its covers (its surge jobs among them), as in an emission; those left over take hide_jobs walker jobs on the paths
 ; hide_paths_<level> (in the covers: checked against all.spawn). The front over: their own jobs again

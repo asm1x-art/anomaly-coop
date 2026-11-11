@@ -7,7 +7,7 @@
 --   radiation  a player there without a sealed suit (sealed_suits: parts of the outfit's section; an exoskeleton is not
 --              one) and out of cover takes rad_rate a second up to rad_max and, past rad_harm_from, loses at least
 --              rad_health * radiation of health a second (what the engine's radiation or anything else takes counts
---              towards it): death in about 3.5 minutes without anti-rad. In cover the radiation goes down by
+--              towards it): death in about 90 s without anti-rad. In cover the radiation goes down by
 --              cover_rad_decay a second. Each game its own player's
 --   NPCs       the level's stalkers out of cover and not in sealed gear (the outfit of their visual, or their squad's
 --              section: only_squads) die of it, each game the NPCs it runs: the level's authority. Online ones lose
