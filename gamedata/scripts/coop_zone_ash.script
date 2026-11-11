@@ -273,8 +273,8 @@ local function dose(on)
 	end
 	if now >= next_dbg then
 		next_dbg = now + 10000
-		ZE.dbg("ash: radiation %.2f, health %.2f (lost %.4f by itself, %.4f more by the ash)", rad, health, lost,
-			math.max(0, extra))
+		ZE.dbg("%s", string.format("ash: radiation %.2f, health %.2f (lost %.4f by itself, %.4f more by the ash)", rad,
+			health, lost, math.max(0, extra)))
 	end
 end
 
@@ -544,7 +544,7 @@ end
 
 local function update_hide(ev, on_here)
 	local smart = on_here and authority(ev.level) and shelter_smart(ev.level)
-	local id = smart and smart.id
+	local id = smart and smart.id or nil
 	if (hide and hide.smart) == id then
 		return
 	end
