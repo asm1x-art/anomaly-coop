@@ -598,7 +598,7 @@
 		<text>Show every level transition</text>
 	</string>
 	<string id="st_coop_adm_h_all_transitions">
-		<text>A mark on every transition on the PDA map, its hint where it leads. Closed and unfound ones too.</text>
+		<text>A mark on every transition on the PDA map, its hint where it leads. Closed and unfound ones too; an open one keeps only the game's own mark.</text>
 	</string>
 	<string id="st_coop_adm_b_all_transitions">
 		<text>Nowhere before (new).</text>
