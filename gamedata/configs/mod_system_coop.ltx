@@ -419,6 +419,11 @@ poll_seconds  = 5         ; the server's state asked this often while it is open
 compact_below = 1600      ; a screen narrower than this (pixels): the sections as short marks
 ping_warn     = 150       ; ms: a ping above it is lit
 
+; Co-op: "Моя игра" in the admin window (coop_my_game.script): every level transition on the PDA map
+[coop_my_game]
+transition_pair_m = 40 ; m: a level changer this near the drop point of the game's own transition (sr_teleport) is that
+                       ; transition, and has no mark of ours while the game shows its own
+
 ; Co-op: the world's events an admin starts (coop_world_events.script, the admin window's "Events")
 [coop_admin_events]
 lead_s = 15 ; real s: a surge or psi storm an admin starts begins this long after (every game takes the timetable first)
