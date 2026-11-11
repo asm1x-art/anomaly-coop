@@ -1,7 +1,8 @@
 -- Co-op: "Моя игра", the admin window's options of this game alone (ui_coop_admin.script), open to every player
 -- without the admin password: what this game shows, never what the world does. Kept in <appdata>\coop_my_game.txt
 -- ("key=value" lines), apart from the console's and the options' own (those the window sets where they live).
---   all_transitions  a mark on every level transition on the PDA map, its hint where it leads
+--   all_transitions  a mark on every level transition on the PDA map, its hint where it leads; not on one the
+--                    game marks itself (an open route, txr_routes), so a transition has one mark
 --   all_travel       every fast travel point of the faction on the map, not only those seen (travel to one not
 --                    seen: a test server's cheat, coop_travel.script)
 --   raid_debug_map   the raid's debug view on the shelter laptop's map (ui_shelter_laptop.script)
@@ -69,6 +70,7 @@ end
 -- every level transition on the PDA map (the engine gives a transition's destination to scripts: dest_game_vertex_id)
 
 local SPOT = "coop_transition"
+local sr_teleport_ini = ini_file("sr_teleport_sections.ltx")
 
 local function level_of(gvid)
 	local gg = game_graph()
@@ -78,6 +80,59 @@ local function level_of(gvid)
 	return alife():level_name(gg:vertex(gvid):level_id())
 end
 
+local function level_id_of(se)
+	local gg = game_graph()
+	return gg:valid_vertex_id(se.m_game_vertex_id) and gg:vertex(se.m_game_vertex_id):level_id() or nil
+end
+
+-- Where Anomaly's transition (an sr_teleport restrictor: a dialog, then a drop into the level changer behind it)
+-- puts the actor: its "position" (x,y,z) or the first point of its "path" (ui_sr_teleport.script).
+local function drop_point(name)
+	local pos = sr_teleport_ini:r_string_ex(name, "position")
+	if pos then
+		local p = str_explode(pos, ",")
+		local x, y, z = tonumber(p[1]), tonumber(p[2]), tonumber(p[3])
+		return x and y and z and vector():set(x, y, z) or nil
+	end
+	local path = sr_teleport_ini:r_string_ex(name, "path")
+	if path and level.patrol_path_exists(path) then
+		return patrol(path):point(0)
+	end
+	return nil
+end
+
+-- Level changers whose transition the game marks itself: the restrictor's own spot (sr_teleport_sections.ltx
+-- "spot", put by se_zones/txr_routes once the route is open) is on the map. The restrictor stands a little before
+-- its changer, so the changer nearest its drop point on its level, within [coop_my_game] transition_pair_m.
+local function marked_by_game(changers, teleports)
+	local radius = ini_sys:r_float_ex("coop_my_game", "transition_pair_m") or 40
+	local marked, lids = {}, {}
+	for i, lc in ipairs(changers) do
+		lids[i] = level_id_of(lc)
+	end
+	for _, se in ipairs(teleports) do
+		local name = se:name()
+		local spot = sr_teleport_ini:r_string_ex(name, "spot")
+		local drop = spot and level.map_has_object_spot(se.id, spot) ~= 0 and drop_point(name)
+		local lid = drop and level_id_of(se)
+		if lid then
+			local best, best_d = nil, radius
+			for i, lc in ipairs(changers) do
+				if lids[i] == lid then
+					local d = lc.position:distance_to(drop)
+					if d <= best_d then
+						best, best_d = lc.id, d
+					end
+				end
+			end
+			if best then
+				marked[best] = true
+			end
+		end
+	end
+	return marked
+end
+
 function refresh_transitions()
 	if not (db.actor and level.present()) then
 		return
@@ -85,21 +140,45 @@ function refresh_transitions()
 	-- the marks are kept in the save: those of a time it was on go when it is off
 	local on = flag("all_transitions")
 	local sim = alife()
+	local changers, teleports = {}, {}
 	for id = 1, 65534 do
 		local se = sim:object(id)
-		if se and se:clsid() == clsid.level_changer_s then
-			local has = level.map_has_object_spot(id, SPOT) ~= 0
-			if on and not has then
-				local to = level_of(se.dest_game_vertex_id)
-				level.map_add_object_spot(id, SPOT, to and strformat(game.translate_string("st_coop_transition_to"),
-					game.translate_string(to)) or game.translate_string("st_coop_transition"))
-			elseif has and not on then
-				level.map_remove_object_spot(id, SPOT)
+		if se then
+			local cls = se:clsid()
+			if cls == clsid.level_changer_s then
+				changers[#changers + 1] = se
+			elseif on and cls == clsid.script_restr and sr_teleport_ini:section_exist(se:name()) then
+				teleports[#teleports + 1] = se
 			end
+		end
+	end
+	local marked = on and marked_by_game(changers, teleports) or {}
+	for _, se in ipairs(changers) do
+		local id = se.id
+		local has = level.map_has_object_spot(id, SPOT) ~= 0
+		local want = on and not marked[id]
+		if want and not has then
+			local to = level_of(se.dest_game_vertex_id)
+			level.map_add_object_spot(id, SPOT, to and strformat(game.translate_string("st_coop_transition_to"),
+				game.translate_string(to)) or game.translate_string("st_coop_transition"))
+		elseif has and not want then
+			level.map_remove_object_spot(id, SPOT)
 		end
 	end
 end
 
 function on_game_start()
 	RegisterScriptCallback("actor_on_first_update", refresh_transitions)
+	-- a route opened in the game (a guide, a map, co-op's shared routes) gets the game's own mark: ours goes, once
+	-- for a batch of routes
+	local open_route = txr_routes.open_route
+	txr_routes.open_route = function(...)
+		open_route(...)
+		if flag("all_transitions") then
+			CreateTimeEvent("coop_my_game", "transitions", 0, function()
+				refresh_transitions()
+				return true
+			end)
+		end
+	end
 end

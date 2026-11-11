@@ -61,12 +61,43 @@ buy_medical         = 1.2       ; anti-rad in demand
 only_squads         = ecolog_, monolith_
 ; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
 sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit
-; the dose without one: radiation per second rad_rate + rad_grow * seconds there; past rad_harm_from of radiation the
-; health goes by rad_health * radiation per second (death in about 3-4 minutes without anti-rad: to tune in tests)
-rad_rate            = 0.004
-rad_grow            = 0.00004
-rad_harm_from       = 0.3
-rad_health          = 0.006
+; a player out of cover without one: radiation rad_rate a second up to rad_max (0.15-0.3 within 5-10 s, the max in
+; 20 s); past rad_harm_from the health goes by at least rad_health * radiation a second, what the engine's own radiation
+; harm (per game second: radiation_health_v 0.0018 x the world's speed, x6) or anything else takes counting towards it.
+; Death in about 90 s without anti-rad (health lost by t s: rad_health * (5.8 + rad_max * (t - 20)))
+rad_rate            = 0.03
+rad_max             = 0.6
+rad_harm_from       = 0.1
+rad_health          = 0.02
+cover_rad_decay     = 0.02      ; radiation a second off in cover (the shelter's air): 0.6 gone in 30 s (~0.1 health on the way)
+; anti-rad on the front's level: the ash's radiation and its health floor stop for antirad_pause_s real seconds (another
+; one in the pause starts it over, no stacking; the engine's radiation and the drug's own boosts as usual). The items:
+; Anomaly's dedicated anti-radiation drugs (radiation restore or protection is what they are for); not vodka, food,
+; medkits (scientific/survival kits, Rebirth) or water tablets
+antirad_items       = antirad, antirad_kalium, antirad_cystamine, drug_radioprotector
+antirad_pause_s     = 60
+; NPCs (the level's stalkers, not in sealed gear: the outfit of their visual or only_squads) out of cover lose health
+; evenly from npc_harm_after_s and die npc_death_s real seconds after they were first out of it (each game the NPCs it
+; runs; the shelter's people npc_walk_in_s later). Offline squads of the level out of the shelter are taken away after
+; offline_death_min real minutes. Story NPCs, companions, players' stand-ins and immune_communities (e.g. zombied:
+; Yantar's zombies would die out) never
+npc_harm_after_s    = 5
+npc_death_s         = 90
+offline_death_min   = 8
+immune_communities  = zombied
+offline_shelter_radius = 40     ; metres: an offline squad of the shelter's smart this near it is in (online: only the covers)
+npc_walk_in_s       = 60        ; real s more for the shelter's people (its smart's, or on their way in) to get into a cover
+; going in: for the front the shelter's people who must hide (not sealed, not story) take only jobs of its smart that are
+; in its covers (its surge jobs among them), as in an emission; those left over take hide_jobs walker jobs on the paths
+; hide_paths_<level> (in the covers: checked against all.spawn). The front over: their own jobs again
+hide_jobs           = 12
+hide_paths_l10_red_forest      = red_smart_terrain_3_2_walker_1_walk, red_smart_terrain_3_2_collector_2_walk, red_smart_terrain_3_2_sleep_1
+hide_paths_l08_yantar          = yan_smart_terrain_6_4_surge_1_walk, yan_smart_terrain_6_4_surge_2_walk, yan_smart_terrain_6_4_surge_3_walk, yan_smart_terrain_6_4_1_1_walk, yan_smart_terrain_6_4_2_2_walk, yan_smart_terrain_6_4_3_3_walk, yan_smart_terrain_6_4_4_4_walk, yan_smart_terrain_6_4_povarhide_1_walk
+hide_paths_jupiter             = jup_a6_duty_guard_walk, jup_a6_duty_leader_walk, jup_a6_freedom_leader_walk
+hide_paths_zaton               = zat_stalker_base_smart_garmata_4_walk, zat_stalker_base_smart_gonta_4_walk, zat_stalker_base_smart_zat_b33_stalker_snag_walk, zat_stalker_base_smart_b29_rival_leader_walk
+hide_paths_k02_trucks_cemetery = trc_sim_20_surge_1_walk, trc_sim_20_surge_2_walk, trc_sim_20_surge_3_walk, trc_sim_20_surge_4_walk, trc_sim_20_guard_2_walk
+rescan_s            = 60        ; real s: the master sends squads that came onto the level since into cover or away
+no_respawn          = true      ; the level's smarts respawn nobody for the front
 ; the shelters: a smart per level; its people (communities; none: all) go in for the front, back after
 shelter_l10_red_forest      = red_smart_terrain_3_2     ; the cave (Sin)
 shelter_communities_l10_red_forest = greh
@@ -78,8 +109,16 @@ shelter_zaton               = zat_stalker_base_smart    ; Skadovsk and the barge
 shelter_communities_zaton   = stalker, ecolog, freedom, dolg, csky
 shelter_k02_trucks_cemetery = trc_sim_20                ; the bandits' building
 shelter_communities_k02_trucks_cemetery = bandit
+; the cover itself: Anomaly's surge covers of the shelter (space restrictors; misc\surge_manager.ltx). Inside one: no
+; dose. None of them on the level: within cover_fallback_radius metres of the shelter's smart
+shelter_covers_l10_red_forest      = red_smart_terrain_3_2_surge_hide_a1
+shelter_covers_l08_yantar          = yan_smart_terrain_6_4_surge_hide_a1, yan_space_restrictor_no_weapon_actor_base_cut2
+shelter_covers_jupiter             = jup_surge_hide_a6
+shelter_covers_zaton               = zat_surge_hide_a2
+shelter_covers_k02_trucks_cemetery = trc_sim_20_surge_hide_1, trc_sim_20_surge_hide_2, trc_sim_20_surge_hide_3, trc_sim_20_surge_hide_4
+cover_fallback_radius = 10
 sealed              = jupiter, zaton  ; shelters that let nobody in for the front, players neither
-shelter_radius      = 60        ; metres from the shelter's smart: no dose within, sealed ones let nobody walk in
+shelter_radius      = 60        ; metres from a sealed shelter's smart nobody walks into
 ; the other stalker squads on the level (not its shelter's people, not in sealed gear) go to smarts (no bases) of the
 ; neighbouring levels for the front, back to their own after; a level with none listed: they stay
 leave_l10_red_forest        = l07_military, l10_limansk, jupiter

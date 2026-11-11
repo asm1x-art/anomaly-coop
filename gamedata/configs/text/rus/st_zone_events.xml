@@ -85,6 +85,12 @@
 	<string id="st_zev_ash_exposed">
 		<text>Пепел! Без замкнутого костюма здесь долго не протянуть: пейте антирад и уходите.</text>
 	</string>
+	<string id="st_zev_ash_antirad">
+		<text>Антирад сдерживает пепел ещё %s с: успейте дойти до укрытия.</text>
+	</string>
+	<string id="st_zev_ash_antirad_end">
+		<text>Антирад выдохся: пепел снова берёт своё.</text>
+	</string>
 	<string id="st_zev_ash_sealed">
 		<text>Укрытие задраено до конца пепельного фронта: внутрь никого не пускают.</text>
 	</string>
