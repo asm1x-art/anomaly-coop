@@ -9,6 +9,10 @@
 --              rad_health * radiation of health a second (what the engine's radiation or anything else takes counts
 --              towards it): death in about 90 s without anti-rad. In cover the radiation goes down by
 --              cover_rad_decay a second. Each game its own player's
+--   anti-rad   one of antirad_items used on the front's level stops both (the ash's radiation and its health floor) for
+--              antirad_pause_s real seconds: time to reach a cover. Another one in the pause starts it over (no
+--              stacking); the engine's own radiation and the drug's boosts work as usual. A load or the front's end
+--              ends the pause
 --   NPCs       the level's stalkers out of cover and not in sealed gear (the outfit of their visual, or their squad's
 --              section: only_squads) die of it, each game the NPCs it runs: the level's authority. Online ones lose
 --              health evenly from npc_harm_after_s and die npc_death_s after they were first out of cover; the
@@ -183,8 +187,42 @@ local function sealed_suit()
 	return section and has_part(section, "sealed_suits") or false
 end
 
+local pause_until = nil -- time_global() the anti-rad's pause of the ash's dose ends at
+
+local function pause_ms()
+	return num("antirad_pause_s", 60) * 1000
+end
+
+-- the anti-rad's pause: on till pause_until; over with the front, or after a load (the clock went back)
+local function paused(now, on)
+	if not pause_until then
+		return false
+	end
+	local left = pause_until - now
+	if on and left > 0 and left <= pause_ms() then
+		return true
+	end
+	pause_until = nil
+	if on and left <= 0 then
+		actor_menu.set_msg(1, tr("st_zev_ash_antirad_end"), 5)
+		ZE.dbg("ash: the anti-rad's pause is over")
+	end
+	return false
+end
+
+local function on_item_use(item, sec)
+	sec = sec or (item and item:section())
+	if not sec or ghost() or not here() or not listed(sec, "antirad_items") then
+		return
+	end
+	pause_until = time_global() + pause_ms()
+	actor_menu.set_msg(1, tr("st_zev_ash_antirad", math.floor(pause_ms() / 1000)), 6)
+	ZE.dbg("ash: %s used, the ash's dose stops for %s s", sec, pause_ms() / 1000)
+end
+
 local function dose(on)
 	local now = time_global()
+	local pause = paused(now, on and not ghost())
 	local covered = on and not ghost() and in_cover(db.actor:position(), level.name())
 	if not on or ghost() or sealed_suit() or covered then
 		if covered and db.actor.radiation > 0 and last_dose then
@@ -201,6 +239,10 @@ local function dose(on)
 	if not warned then
 		warned = true
 		actor_menu.set_msg(1, tr("st_zev_ash_exposed"), 8)
+	end
+	if pause then
+		last_dose, last_health = nil, nil -- the next look after the pause only starts the count
+		return
 	end
 	local health = db.actor.health
 	-- what took health since our last look (the engine's own radiation harm, wounds...): it counts towards ours
@@ -798,6 +840,7 @@ function on_game_start()
 		next_dose = now + 1000
 		dose(here() ~= nil)
 	end)
+	RegisterScriptCallback("actor_on_item_use", on_item_use)
 	-- the level's smarts respawn nobody for the front
 	RegisterScriptCallback("on_try_respawn", function(smart, flags)
 		if ini_sys:r_bool_ex(S, "no_respawn", true) then

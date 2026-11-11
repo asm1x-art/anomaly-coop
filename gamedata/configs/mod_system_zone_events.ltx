@@ -70,6 +70,12 @@ rad_max             = 0.6
 rad_harm_from       = 0.1
 rad_health          = 0.02
 cover_rad_decay     = 0.02      ; radiation a second off in cover (the shelter's air): 0.6 gone in 30 s (~0.1 health on the way)
+; anti-rad on the front's level: the ash's radiation and its health floor stop for antirad_pause_s real seconds (another
+; one in the pause starts it over, no stacking; the engine's radiation and the drug's own boosts as usual). The items:
+; Anomaly's dedicated anti-radiation drugs (radiation restore or protection is what they are for); not vodka, food,
+; medkits (scientific/survival kits, Rebirth) or water tablets
+antirad_items       = antirad, antirad_kalium, antirad_cystamine, drug_radioprotector
+antirad_pause_s     = 60
 ; NPCs (the level's stalkers, not in sealed gear: the outfit of their visual or only_squads) out of cover lose health
 ; evenly from npc_harm_after_s and die npc_death_s real seconds after they were first out of it (each game the NPCs it
 ; runs; the shelter's people npc_walk_in_s later). Offline squads of the level out of the shelter are taken away after

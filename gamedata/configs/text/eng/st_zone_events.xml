@@ -85,6 +85,12 @@
 	<string id="st_zev_ash_exposed">
 		<text>Ash! Without a sealed suit you won't last long here: take anti-rad and get out.</text>
 	</string>
+	<string id="st_zev_ash_antirad">
+		<text>The anti-rad holds the ash off for %s s: get to a shelter.</text>
+	</string>
+	<string id="st_zev_ash_antirad_end">
+		<text>The anti-rad has worn off: the ash is getting to you again.</text>
+	</string>
 	<string id="st_zev_ash_sealed">
 		<text>The shelter is sealed until the ash front is over: nobody gets in.</text>
 	</string>
