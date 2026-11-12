@@ -696,12 +696,16 @@ namespace coop
 	static void respawn_into(CSE_ALifeDynamicObject* object, CSE_ALifeDynamicObject* holder)
 	{
 		NET_Packet packet;
+		const u16 parent_was = object->ID_Parent;
 		object->ID_Parent = holder->ID;
 		object->Spawn_Write(packet, FALSE);
-		object->ID_Parent = NO_ID;
+		// Released with its own parent, so that it leaves that holder's children (a player's shadow):
+		// left there, giving it back attached it to the shadow twice ("Item is already inside the inventory").
+		object->ID_Parent = parent_was;
 
 		g_applying = true;
 		alife_rw().release(object, true); // frees the id, Process_spawn takes it again
+		g_taken_from.erase(object->ID); // not taken by our actor: it was moved here
 		spawn_online(packet);
 		g_applying = false;
 	}
