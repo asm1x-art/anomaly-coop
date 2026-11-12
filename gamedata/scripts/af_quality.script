@@ -143,6 +143,8 @@ function settings()
 		base_enabled = ini_sys:r_bool_ex(STAB, "base_enabled", false),
 		base_need_scientists = ini_sys:r_bool_ex(STAB, "base_need_scientists", true),
 		nature_extra = {},
+		stack_mode = r("stack_mode") or "none",
+		sort_by_grade = ini_sys:r_bool_ex(S, "sort_by_grade", true),
 	}
 	for key, v in pairs_of(r("unstable_extra")) do
 		if DIRECT[key] or IMMUNITY[key] then
@@ -808,6 +810,12 @@ function grade_text(g)
 	return GRADE_COLOR[g] .. grade_name(g) .. "%c[default]"
 end
 
+-- the grade the grids order an artefact's copies by (the one it shows, best first: item_marks.script), nil for none
+function sort_grade(obj)
+	local d = settings().sort_by_grade and obj and info(obj)
+	return d and shown_grade(d) or nil
+end
+
 local function wrap_ui()
 	-- the quality line over the description
 	wrap(ui_item, "get_obj_desc", function(original, obj, ...)
@@ -822,11 +830,20 @@ local function wrap_ui()
 		end
 		return line .. " \\n \\n" .. (desc or "")
 	end)
-	-- the inventory grid: an artefact stacks only with ones of the grade it shows (vanilla stacks them all by section)
+	-- the inventory grids' stacks of artefacts, by stack_mode: "none" a cell each (two of a grade still differ), "grade"
+	-- only ones of the grade it shows, "section" as vanilla. In every grid, the item picker's ones (stack_all) too;
+	-- item_marks.script keeps pinned and favourite things apart on top of this
 	if utils_ui.UICellContainer and utils_ui.UICellContainer.FindSimilar then
 		local find_similar = utils_ui.UICellContainer.FindSimilar
 		utils_ui.UICellContainer.FindSimilar = function(self, obj, sec, ...)
-			local d = obj and not self.disable_stack and not (self.showcase or self.stack_all) and info(obj)
+			local mode = settings().stack_mode
+			if not obj or self.showcase or self.disable_stack or mode == "section" then
+				return find_similar(self, obj, sec, ...)
+			end
+			local d = info(obj)
+			if mode == "none" and (d or IsArtefact(obj)) then
+				return false
+			end
 			if not d then
 				return find_similar(self, obj, sec, ...)
 			end
@@ -920,12 +937,20 @@ end
 -- the grade's price factor, and the roll taken out of a container with the artefact. Both take the actor's cheapest
 -- copies of an artefact first.
 
--- the actor's things of sec; for an artefact the cheapest first (its grade's price x condition squared, as the quest
--- pays)
+-- a quest takes none of the things the player pinned (item_marks.script): the first of the actor's other copies of sec
+local function quest_object(sec)
+	if item_marks then
+		return item_marks.actor_object(sec)
+	end
+	return db.actor:object(sec)
+end
+
+-- the actor's things of sec but the pinned ones; for an artefact the cheapest first (its grade's price x condition
+-- squared, as the quest pays)
 local function cheapest_first(sec)
 	local list = {}
 	db.actor:iterate_inventory(function(_, obj)
-		if obj:section() == sec then
+		if obj:section() == sec and not (item_marks and item_marks.is_pinned(obj)) then
 			list[#list + 1] = obj
 		end
 	end, nil)
@@ -947,7 +972,31 @@ local function remove_cheapest_artefact(actor, npc, p)
 	local sec = load_var(db.actor, p[1])
 	local obj = sec and cheapest_first(sec)[1]
 	if not obj then
-		return remove_artefact_item(actor, npc, p)
+		if not item_marks then
+			return remove_artefact_item(actor, npc, p)
+		end
+		-- none loose: one in a container, as vanilla's, but not a pinned one (vanilla's would take a pinned loose copy)
+		local cont
+		for _, c in ipairs({ "lead_box", "af_aam", "af_aac", "af_iam" }) do
+			obj = quest_object(sec .. "_" .. c)
+			if obj then
+				cont = c
+				break
+			end
+		end
+		if not obj then
+			return
+		end
+		local trade_npc = get_speaker()
+		if trade_npc then
+			db.actor:transfer_item(obj, trade_npc)
+		else
+			alife_release(obj)
+		end
+		alife_create_item(cont, db.actor)
+		level.add_cam_effector('camera_effects\\item_use.anm', 8053, false, '')
+		xr_effects.play_inv_aac_open()
+		return
 	end
 	local trade_npc = get_speaker()
 	if trade_npc then
@@ -961,14 +1010,14 @@ local function fetch_reward_and_remove(actor, npc, p)
 	local sec = load_var(db.actor, p[1])
 	if not (sec) then return end
 
-	if string.find(sec, "af_") and (not db.actor:object(sec)) then
+	if string.find(sec, "af_") and (not quest_object(sec)) then
 		local break_con, break_arty, id_combo
 		local search_cont = { "lead_box", "af_aam", "af_aac", "af_iam" }
 		for i = 1, #search_cont do
-			if db.actor:object(sec .. "_" .. search_cont[i]) then
+			if quest_object(sec .. "_" .. search_cont[i]) then
 				break_arty = sec
 				break_con = search_cont[i]
-				id_combo = db.actor:object(sec .. "_" .. search_cont[i]):id()
+				id_combo = quest_object(sec .. "_" .. search_cont[i]):id()
 				break
 			end
 		end

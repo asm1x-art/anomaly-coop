@@ -1,0 +1,17 @@
+; Inventory windows: the player's marks on things (item_marks.script) and Shift moving stacks (inv_shift_move.script).
+; The artefacts' own stacks and order: mod_system_af_quality.ltx (stack_mode, sort_by_grade).
+
+[item_marks]
+enabled              = true
+fav_color            = 70, 60, 190, 255     ; a favourite cell's background: alpha, red, green, blue (0..255); not orange: coop_trade tints worn things so
+fav_first            = true                 ; favourites first in every grid (at each full redraw of it)
+pin_icon             = true                 ; a lock in the top right corner of a pinned thing's cell
+pin_icon_size        = 13                   ; its size, in the icons' pixels (one cell is 50)
+refuse_shelter_store = true                 ; a pinned thing doesn't go into the shelter bar's store or orders boxes
+forget_delay_s       = 5                    ; a marked thing's id freed: forgotten unless the same kind of thing has it again by then
+cleanup_delay_s      = 30                   ; after a load: marks of things gone from the world are dropped this much later
+
+[inv_shift_move]
+enabled              = true
+hover                = true                 ; Shift held: the cell under the cursor moves its whole stack (once per visit)
+click                = true                 ; Shift + left click on a cell moves its whole stack

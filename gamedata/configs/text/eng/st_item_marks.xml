@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- The player's marks on their things (item_marks.script) -->
+<string_table>
+	<string id="st_item_marks_pin">
+		<text>Pin</text>
+	</string>
+	<string id="st_item_marks_unpin">
+		<text>Unpin</text>
+	</string>
+	<string id="st_item_marks_fav">
+		<text>Add to favourites</text>
+	</string>
+	<string id="st_item_marks_unfav">
+		<text>Remove from favourites</text>
+	</string>
+	<string id="st_item_marks_no_sell">
+		<text>Pinned: traders don't get it. Unpin it in the item's menu.</text>
+	</string>
+	<string id="st_item_marks_no_store">
+		<text>Pinned: it stays out of the bar's store. Unpin it in the item's menu.</text>
+	</string>
+</string_table>

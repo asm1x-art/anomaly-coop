@@ -1,0 +1,724 @@
+-- The player's own marks on their things, from the item's context menu: pinned ("Закрепить") and favourite
+-- ("В избранное"). Settings: mod_system_inv_ui.ltx [item_marks].
+-- * Pinned: no quest counts or takes it (a quest sees the next copy, or none), no trader buys it (the sell table
+--   refuses it, the tooltip says why), the shelter bar's store and orders boxes refuse it; it can still be dropped or put
+--   into a stash. A lock in the cell's corner.
+-- * Favourite: a background of its own (fav_color) and the first places in the grids, at each full redraw of a grid
+--   (opening it, sorting, a mark changed): a thing that comes in while the window is open takes a free place.
+-- Marked and plain things never share a stack (with the artefact grades' stacks of af_quality.script).
+-- The marks are the player's: the actor's variable item_marks { [id] = { s = section, p = pinned, f = favourite } }
+-- (the actor's variables are personal in co-op: coop_progress.script). They stay with the id, not with the thing:
+-- someone else sees it plain, and it is marked again when it comes back. An id freed (the thing used up, sold on)
+-- is forgotten; one taken by another kind of thing doesn't count. Lost where a script makes a thing anew: an artefact
+-- taken out of its container, what is left of a multi-use item a quest took part of, ammo boxes merged into one.
+
+local KEY = "item_marks"
+local CONTAINERS = { "lead_box", "af_aam", "af_aac", "af_iam" } -- an artefact's containers (tasks_fetch)
+
+local cfg
+function settings()
+	if cfg then
+		return cfg
+	end
+	local S = "item_marks"
+	local function f(key, def) return ini_sys:r_float_ex(S, key) or def end
+	local function b(key, def) return ini_sys:r_bool_ex(S, key, def) end
+	local c = str_explode(ini_sys:r_string_ex(S, "fav_color") or "", ",")
+	cfg = {
+		enabled = b("enabled", true),
+		fav_color = GetARGB(tonumber(c[1]) or 70, tonumber(c[2]) or 60, tonumber(c[3]) or 190, tonumber(c[4]) or 255),
+		fav_first = b("fav_first", true),
+		pin_icon = b("pin_icon", true),
+		pin_icon_size = f("pin_icon_size", 13),
+		shelter_store = b("refuse_shelter_store", true),
+		forget_delay = f("forget_delay_s", 5),
+		cleanup_delay = f("cleanup_delay_s", 30),
+	}
+	return cfg
+end
+
+local function dbg(fmt, ...)
+	local ok, on = pcall(function() return get_console():get_integer("coop_debug") == 1 end)
+	if ok and on then
+		printf("[item_marks] %s", string.format(fmt, ...))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the marks
+
+local function marks()
+	if not db.actor then
+		return {}
+	end
+	local t = load_var(db.actor, KEY)
+	if type(t) ~= "table" then
+		t = {}
+		save_var(db.actor, KEY, t)
+	end
+	return t
+end
+
+local function save()
+	if db.actor then
+		save_var(db.actor, KEY, marks())
+	end
+end
+
+-- the marks of the thing with this id and section, nil for none
+function mark_of(id, sec)
+	local e = id and marks()[id]
+	if e and (not sec or e.s == sec) then
+		return e
+	end
+	return nil
+end
+
+function is_pinned(obj)
+	local e = obj and mark_of(obj:id(), obj:section())
+	return e and e.p and true or false
+end
+
+function is_fav(obj)
+	local e = obj and mark_of(obj:id(), obj:section())
+	return e and e.f and true or false
+end
+
+local function set_mark(id, sec, kind, on)
+	local t = marks()
+	local e = t[id]
+	if e and e.s ~= sec then
+		e = nil
+	end
+	if on then
+		e = e or { s = sec }
+		e[kind] = true
+		t[id] = e
+	elseif e then
+		e[kind] = nil
+		t[id] = (e.p or e.f) and e or nil
+	end
+	save_var(db.actor, KEY, t)
+end
+
+local function has_pins()
+	for _, e in pairs(marks()) do
+		if e.p then
+			return true
+		end
+	end
+	return false
+end
+
+-- the stack key: things with other marks never share a cell
+local function key_of(id, sec)
+	local e = mark_of(id, sec)
+	return e and ((e.p and "p" or "") .. (e.f and "f" or "")) or ""
+end
+
+-- a cell's marks: none for a cell of sections (the co-op partner's things in coop_trade.script)
+local function cell_mark(ci)
+	if ci and ci.ID and ci.showcase == 0 then
+		return mark_of(ci.ID, ci.section)
+	end
+	return nil
+end
+
+-- an id freed: forgotten unless the same kind of thing has it again by then (co-op makes some things anew, same id)
+local function forget_if_gone(id)
+	local e = marks()[id]
+	local se = e and alife_object(id)
+	if e and not (se and se:section_name() == e.s) then
+		marks()[id] = nil
+		save()
+		dbg("forgot %s (%s)", id, e.s)
+	end
+	return true
+end
+
+local function on_unregister(se_obj)
+	local id = se_obj and se_obj.id
+	if id and db.actor and marks()[id] then
+		CreateTimeEvent("item_marks", "forget_" .. id, settings().forget_delay, forget_if_gone, id)
+	end
+end
+
+-- after a load: what is gone, or another kind of thing now, is forgotten
+local function cleanup()
+	local t, n = marks(), 0
+	for id, e in pairs(t) do
+		local se = alife_object(id)
+		if not (se and se:section_name() == e.s) then
+			t[id], n = nil, n + 1
+		end
+	end
+	if n > 0 then
+		save()
+		dbg("forgot %s marks of things gone", n)
+	end
+	return true
+end
+
+-------------------------------------------------------------------------------
+-- the actor's things a quest may count or take: all but the pinned ones
+
+-- the first of the actor's unpinned things of sec (as db.actor:object(sec)), nil for none
+function actor_object(sec)
+	local found
+	db.actor:iterate_inventory(function(_, obj)
+		if not found and obj:section() == sec and not is_pinned(obj) then
+			found = obj
+		end
+	end, nil)
+	return found
+end
+
+-- how many of sec the actor has but the pinned ones, as utils_item.get_amount(db.actor, sec, mode)
+function actor_amount(sec, mode)
+	local amount = 0
+	local is_multi, is_ammo = IsItem("multiuse", sec), IsItem("ammo", sec)
+	db.actor:iterate_inventory(function(_, obj)
+		if obj:section() == sec and not is_pinned(obj) then
+			if mode == 0 then
+				amount = amount + 1
+			elseif is_multi then
+				amount = amount + obj:get_remaining_uses()
+			elseif is_ammo and mode ~= 1 then
+				amount = amount + obj:ammo_get_count()
+			else
+				amount = amount + 1
+			end
+		end
+	end, nil)
+	return amount
+end
+
+local function actor_list(sec)
+	local list = {}
+	db.actor:iterate_inventory(function(_, obj)
+		if obj:section() == sec and not is_pinned(obj) then
+			list[#list + 1] = obj
+		end
+	end, nil)
+	return list
+end
+
+-- does the actor carry a pinned thing of sec? Where not, every quest path below runs as it was
+local function pins_of(sec)
+	if not (sec and db.actor and has_pins()) then
+		return false
+	end
+	local found = false
+	db.actor:iterate_inventory(function(_, obj)
+		if not found and obj:section() == sec and is_pinned(obj) then
+			found = true
+		end
+	end, nil)
+	return found
+end
+
+local function wrap(tbl, name, wrapper)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [item_marks] %s not found, pinned things count there", name)
+		return
+	end
+	tbl[name] = function(...)
+		return wrapper(original, ...)
+	end
+end
+
+-- tasks_fetch: the fetch task's status, as vanilla's but without the pinned things
+local function fetch_status(tsk, task_id)
+	local actor = db.actor
+	local section = actor and load_var(actor, task_id .. "_fetch")
+	if not section then
+		return
+	end
+	local item = actor_object(section)
+	if item then
+		if task_id == "esc_2_12_stalker_nimble_task_1" or task_id == "jup_b220_trapper_task_3" then
+			tsk.stage = item:condition() >= 0.9 and 1 or 0
+		else
+			local count = load_var(actor, task_id .. "_fetch_count")
+			if count and count > 1 then
+				tsk.stage = actor_amount(section, 1) >= count and 1 or 0
+				return
+			end
+			tsk.stage = 1
+		end
+	elseif string.find(section, "af_") then
+		tsk.stage = 0
+		for _, c in ipairs(CONTAINERS) do
+			if actor_object(section .. "_" .. c) then
+				tsk.stage = 1
+				break
+			end
+		end
+	else
+		tsk.stage = 0
+	end
+end
+
+local function wrap_fetch()
+	if not (tasks_fetch and task_status_functor) then
+		return
+	end
+	wrap(task_status_functor, "actor_has_fetch_item", function(original, tsk, task_id, ...)
+		local section = db.actor and load_var(db.actor, task_id .. "_fetch")
+		if not (section and has_pins()) then
+			return original(tsk, task_id, ...)
+		end
+		return fetch_status(tsk, task_id)
+	end)
+	wrap(task_status_functor, "actor_has_fetch_weapon_warfare", function(original, tsk, task_id, ...)
+		local section = db.actor and load_var(db.actor, task_id .. "_fetch")
+		if not pins_of(section) then
+			return original(tsk, task_id, ...)
+		end
+		local item = actor_object(section)
+		tsk.stage = item and item:condition() >= 0.6 and 1 or 0
+	end)
+	wrap(xr_effects, "remove_fetch_item", function(original, actor, npc, p, ...)
+		local section = load_var(db.actor, p[1])
+		if not pins_of(section) then
+			return original(actor, npc, p, ...)
+		end
+		if not actor_object(section) then
+			return
+		end
+		local amt = tonumber(p[2]) or load_var(db.actor, p[1] .. "_count") or 1
+		local trade_npc = get_speaker()
+		if trade_npc then
+			for _, itm in ipairs(actor_list(section)) do
+				if amt <= 0 then
+					break
+				end
+				db.actor:transfer_item(itm, trade_npc)
+				amt = amt - 1
+			end
+		else
+			xr_effects.remove_item(actor, npc, { section, amt })
+		end
+	end)
+end
+
+-- xr_effects / xr_conditions / dialogs: the generic "has it" and "take it" of quests and dialogs
+local function wrap_generic()
+	wrap(xr_effects, "remove_item", function(original, actor, npc, p, ...)
+		local sec = p and p[1]
+		if not pins_of(sec) then
+			return original(actor, npc, p, ...)
+		end
+		local amt = p[2] and tonumber(p[2]) or 1
+		local removed = 0
+		for _, item in ipairs(actor_list(sec)) do
+			if amt <= 0 then
+				break
+			end
+			local se_item = alife_object(item:id())
+			if se_item then
+				alife_release(se_item)
+				amt, removed = amt - 1, removed + 1
+			end
+		end
+		if removed > 0 then
+			news_manager.relocate_item(db.actor, "out", sec, removed)
+		end
+	end)
+	wrap(xr_effects, "relocate_item", function(original, actor, npc, p, ...)
+		local item = p and p[1]
+		local from_obj = p and get_story_object(p[2])
+		local to_obj = p and get_story_object(p[3])
+		if not (from_obj and from_obj:id() == AC_ID and to_obj and pins_of(item)) then
+			return original(actor, npc, p, ...)
+		end
+		local obj = actor_object(item)
+		if obj then
+			db.actor:transfer_item(obj, to_obj)
+		else -- as vanilla's when the actor has none
+			alife_create(item, to_obj:position(), to_obj:level_vertex_id(), to_obj:game_vertex_id(), to_obj:id())
+		end
+	end)
+	wrap(xr_conditions, "actor_has_item", function(original, actor, npc, p, ...)
+		if not pins_of(p and p[1]) then
+			return original(actor, npc, p, ...)
+		end
+		return actor_object(p[1]) ~= nil
+	end)
+	wrap(xr_conditions, "actor_has_item_amount", function(original, actor, npc, p, ...)
+		if not pins_of(p and p[1]) then
+			return original(actor, npc, p, ...)
+		end
+		local amt = p[2] and tonumber(p[2])
+		return amt and (actor_amount(p[1]) >= amt)
+	end)
+	wrap(xr_conditions, "actor_has_item_count", function(original, actor, npc, p, ...)
+		if not pins_of(p and p[1]) then
+			return original(actor, npc, p, ...)
+		end
+		return actor_amount(p[1], 0) >= (tonumber(p[2]) or 0)
+	end)
+	wrap(dialogs, "actor_has_item", function(original, first_speaker, second_speaker, section, ...)
+		if not pins_of(section) then
+			return original(first_speaker, second_speaker, section, ...)
+		end
+		return actor_object(section) ~= nil
+	end)
+end
+
+-- tasks_multifetch: its task data is local, its save_state hands it out
+local function multifetch(tid)
+	local t = {}
+	tasks_multifetch.save_state(t)
+	return t.multifetch_data and t.multifetch_data[tid]
+end
+
+local function have_all(list)
+	for _, v in pairs(list or {}) do
+		local mincd = v.cond or -1
+		local found = 0
+		db.actor:iterate_inventory(function(_, i)
+			if i:section() == v.sec and i:condition() > mincd and not is_pinned(i) then
+				found = found + 1
+			end
+		end, db.actor)
+		if found < v.num then
+			return false
+		end
+	end
+	return true
+end
+
+local function wrap_multifetch()
+	if not (tasks_multifetch and tasks_multifetch.save_state) then
+		return
+	end
+	local M = tasks_multifetch
+	wrap(M, "has_items", function(original, tid, ...)
+		local d = has_pins() and multifetch(tid)
+		if not d then
+			return original(tid, ...)
+		end
+		return have_all(d.required_items)
+	end)
+	wrap(M, "has_optional_items", function(original, tid, ...)
+		local d = has_pins() and multifetch(tid)
+		if not d then
+			return original(tid, ...)
+		end
+		return d.optional_items and have_all(d.optional_items) or false
+	end)
+	-- as vanilla's (its numbers and its quirks: the condition limit read as v.condition) without the pinned things
+	wrap(M, "remove_items_and_pay", function(original, tid, do_pay, ...)
+		local d = has_pins() and multifetch(tid)
+		if not d then
+			return original(tid, do_pay, ...)
+		end
+		local todel, todelnews, payout = {}, {}, 0
+		local function take(list, mult, optional)
+			for _, v0 in pairs(list or {}) do
+				local v = dup_table(v0)
+				local mincd = v.condition or -1
+				local news = { v.sec, optional and 0 or v.num }
+				todelnews[#todelnews + 1] = news
+				db.actor:iterate_inventory(function(_, i)
+					local cnd = i:condition()
+					if i:section() == v.sec and cnd > mincd and v.num > 0 and not is_pinned(i) then
+						todel[#todel + 1] = i:id()
+						local cost = v.cost * M.condmult(cnd) * mult
+						payout = payout + (optional and math.floor(cost) or cost)
+						if optional then
+							news[2] = news[2] + 1
+						end
+						v.num = v.num - 1
+					end
+				end, db.actor)
+			end
+		end
+		take(d.required_items, 1.1, false)
+		if M.has_optional_items(tid) then
+			take(d.optional_items, 1.3, true)
+		end
+		for _, v in ipairs(todelnews) do
+			news_manager.relocate_item(db.actor, "out", v[1], v[2])
+		end
+		for _, id in ipairs(todel) do
+			alife_release_id(id)
+		end
+		if do_pay then
+			payout = math.floor(payout)
+			db.actor:give_money(payout)
+			news_manager.relocate_money(db.actor, "in", payout)
+		end
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- the grids
+
+-- the shelter bar sells what lies in this box (shelter_trade.script): pinned things stay out (cached a second)
+local store_cache = { id = nil, t = 0, v = false }
+local function store_box(id)
+	if not (id and settings().shelter_store and shelter_trade and shelter_trade.sells_from) then
+		return false
+	end
+	if store_cache.id ~= id or time_global() > store_cache.t then
+		local ok, v = pcall(shelter_trade.sells_from, id)
+		store_cache.id, store_cache.t, store_cache.v = id, time_global() + 1000, ok and v or false
+	end
+	return store_cache.v
+end
+
+-- a full redraw of the open inventory: the stacks and the order anew (as its sort buttons do)
+local function redraw()
+	local gui = ui_inventory.GUI
+	if not (gui and gui:IsShown()) then
+		return
+	end
+	local sort = 1
+	for i = 1, #gui.sort_btn do
+		if gui.sort_btn[i]:GetCheck() then
+			sort = i
+		end
+	end
+	gui:On_Sort(sort)
+end
+
+local function wrap_grids()
+	local C, I = utils_ui.UICellContainer, utils_ui.UICellItem
+
+	-- a stack of things with the same marks only: the cells of others are out of the search while it runs
+	local find_similar = C.FindSimilar
+	C.FindSimilar = function(self, obj, sec, ...)
+		if not obj or self.showcase or self.disable_stack then
+			return find_similar(self, obj, sec, ...)
+		end
+		local s = obj:section()
+		local key = key_of(obj:id(), s)
+		local cells, kept, hidden = self.cell, {}, false
+		for idx, ci in pairs(cells) do
+			if ci.section == s then
+				if key_of(ci.ID, s) == key then
+					kept[idx] = ci
+				else
+					hidden = true
+				end
+			end
+		end
+		if not hidden then
+			return find_similar(self, obj, sec, ...)
+		end
+		local by_sec = self.indx_sec[s]
+		local kept_sec = {}
+		for id, idx in pairs(by_sec or {}) do
+			if kept[idx] then
+				kept_sec[id] = idx
+			end
+		end
+		self.cell, self.indx_sec[s] = kept, kept_sec
+		local res = { pcall(find_similar, self, obj, sec, ...) }
+		self.cell, self.indx_sec[s] = cells, by_sec
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end
+
+	-- favourites first; a kind's artefacts by grade, the best first (af_quality.sort_grade); the rest as it was
+	local get_sort = C.GetSortMethod
+	C.GetSortMethod = function(self, ...)
+		local base = get_sort(self, ...)
+		if self.showcase or not settings().enabled then
+			return base
+		end
+		local fav_first = settings().fav_first
+		local grade = af_quality and af_quality.sort_grade
+		return function(t, a, b)
+			local oa, ob = t[a], t[b]
+			if type(oa) ~= "userdata" or type(ob) ~= "userdata" then
+				return base(t, a, b)
+			end
+			if fav_first then
+				local fa, fb = is_fav(oa), is_fav(ob)
+				if fa ~= fb then
+					return fa
+				end
+			end
+			if grade and oa:section() == ob:section() then
+				local ga, gb = grade(oa), grade(ob)
+				if ga and gb and ga ~= gb then
+					return ga > gb
+				end
+			end
+			return base(t, a, b)
+		end
+	end
+
+	-- a pinned thing on the actor's side of a trade: red, not tradable, the tooltip says why; the same on the way to
+	-- a shelter store box
+	local check_trade = I.Check_TradeMode
+	I.Check_TradeMode = function(self, obj, sec, ...)
+		local res = check_trade(self, obj, sec, ...)
+		if res or self.showcase ~= 0 or not self.ID then
+			return res
+		end
+		local e = mark_of(self.ID, self.section)
+		if not (e and e.p) then
+			return res
+		end
+		local profile = self.container.trade_profile
+		local gui = ui_inventory.GUI
+		if profile and profile.mode == 1 then
+			self.flags.no_trade = true
+			self.flags.note_str = game.translate_string("st_item_marks_no_sell")
+		elseif self.container.ID == "actor_bag" and gui and gui.mode == "loot" and store_box(gui.npc_id) then
+			self.flags.no_trade = true
+			self.flags.note_str = game.translate_string("st_item_marks_no_store")
+		end
+		return res
+	end
+
+	-- onto the sell table: never a pinned thing (off the table back to the bag it may go)
+	local is_tradable = C.IsTradable
+	C.IsTradable = function(self, obj, ...)
+		if obj and self.ID ~= "actor_trade" and self.trade_profile and self.trade_profile.mode == 1 and is_pinned(obj) then
+			return false
+		end
+		return is_tradable(self, obj, ...)
+	end
+
+	-- the sale sells the whole table: a pinned thing there anyhow goes back first
+	local UI = ui_inventory.UIInventory
+	local sell = UI.TMode_Sell
+	UI.TMode_Sell = function(self, ...)
+		local cc, bag = self.CC["actor_trade"], self.CC["actor_trade_bag"]
+		if cc and bag then
+			local back = {}
+			for id in pairs(cc.indx_id) do
+				local obj = level.object_by_id(id)
+				if obj and is_pinned(obj) then
+					back[#back + 1] = obj
+				end
+			end
+			for _, obj in ipairs(back) do
+				cc:TransferItem(bag, obj)
+			end
+		end
+		return sell(self, ...)
+	end
+
+	-- a favourite's background shows on an unhighlight (rax_persistent_highlight): one as soon as its cell is laid out,
+	-- not only once the cursor has gone over some cell (in coop_trade.script's window never). The partner's grid
+	-- there has no marks (cells of sections)
+	local set = I.Set
+	I.Set = function(self, obj, area, ...)
+		local res = set(self, obj, area, ...)
+		if res and cell_mark(self) then
+			self:Highlight(false)
+		end
+		return res
+	end
+end
+
+local function register_looks()
+	rax_persistent_highlight.register("item_marks_fav", function(cell)
+		local e = settings().enabled and cell_mark(cell)
+		return e and e.f and settings().fav_color or nil
+	end)
+	rax_icon_layers.register("item_marks_pin", function(cell, obj, sec)
+		local e = settings().pin_icon and cell_mark(cell)
+		if not (e and e.p) then
+			return nil
+		end
+		local axis = utils_xml.get_item_axis(sec)
+		local size = settings().pin_icon_size
+		local x = axis.w - size - 2
+		if meat_spoiling and meat_spoiling.get_meat_is_frozen_cell and meat_spoiling.get_meat_is_frozen_cell(cell) then
+			x = x - size - 2 -- the frozen meat's snowflake has the corner
+		end
+		return { texture = "ui_item_marks_pin", x = x, y = 2, w = size, h = size }
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- the context menu
+
+local OWN_BAGS = { actor_bag = true, actor_equ = true, actor_belt = true, actor_trade_bag = true }
+
+local function menu_cond(obj, bag, mode)
+	return settings().enabled and obj and OWN_BAGS[bag] and true or false
+end
+
+-- the cell's things: a stack is marked as one
+local function toggle(obj, bag, kind)
+	local gui = ui_inventory.GUI
+	local cc = gui and gui.CC[bag]
+	local ci = cc and cc:GetCell_ID(obj:id())
+	local ids = { [obj:id()] = true }
+	if ci and ci.ID then
+		ids[ci.ID] = true
+		for id in pairs(ci.childs or {}) do
+			ids[id] = true
+		end
+	end
+	local e = mark_of(obj:id(), obj:section())
+	local on = not (e and e[kind])
+	for id in pairs(ids) do
+		local o = level.object_by_id(id)
+		if o then
+			set_mark(id, o:section(), kind, on)
+		end
+	end
+	dbg("%s %s: %s things of %s", kind == "p" and "pin" or "fav", on and "on" or "off", size_table(ids), obj:section())
+	redraw()
+end
+
+local function add_menu()
+	local add = custom_functor_autoinject.add_functor
+	add("item_marks_pin", menu_cond, function(obj)
+		return is_pinned(obj) and "st_item_marks_unpin" or "st_item_marks_pin"
+	end, nil, function(obj, bag)
+		toggle(obj, bag, "p")
+	end, true)
+	add("item_marks_fav", menu_cond, function(obj)
+		return is_fav(obj) and "st_item_marks_unfav" or "st_item_marks_fav"
+	end, nil, function(obj, bag)
+		toggle(obj, bag, "f")
+	end, true)
+end
+
+-------------------------------------------------------------------------------
+
+local ACTOR_BAGS = {}
+
+-- a pinned thing doesn't go into a box the shelter bar sells from
+local function before_move(flags, npc_id, obj, mode, bag_id)
+	if mode == "loot" and obj and ACTOR_BAGS[bag_id] and is_pinned(obj) and store_box(npc_id) then
+		flags.ret_value = false
+	end
+end
+
+local wrapped = false
+local function actor_on_first_update()
+	if not wrapped then -- after every on_game_start: around af_quality's stacks and the rest
+		wrapped = true
+		wrap_grids()
+	end
+	CreateTimeEvent("item_marks", "cleanup", settings().cleanup_delay, cleanup)
+end
+
+function on_game_start()
+	if not settings().enabled then
+		return
+	end
+	ACTOR_BAGS = { [EDDListType.iActorBag] = true, [EDDListType.iActorSlot] = true, [EDDListType.iActorBelt] = true }
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+	RegisterScriptCallback("server_entity_on_unregister", on_unregister)
+	RegisterScriptCallback("ActorMenu_on_item_before_move", before_move)
+	wrap_fetch()
+	wrap_generic()
+	wrap_multifetch()
+	register_looks()
+	add_menu()
+end

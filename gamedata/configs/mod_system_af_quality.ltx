@@ -38,6 +38,10 @@ skip                  = jup_b1_half_artifact, af_quest_b14_twisted, marker, af_v
 ; where a field after an emission is "north": field_north weights there, field_south elsewhere
 north_levels          = l10_radar, l10_red_forest, l10_limansk, l11_hospital, l11_pripyat, pripyat, jupiter, zaton, l12_stancia, l12_stancia_2, l13_generators
 wear_check_ms         = 500                  ; how often the belt's artefacts are looked at for the bad grades' extra wear
+; the inventory grids (inventory, stashes, trade, the item picker): none = every artefact in a cell of its own (two of
+; one grade still differ), grade = stacked with the ones of the grade it shows, section = as vanilla (all of a kind)
+stack_mode            = none
+sort_by_grade         = true                 ; a kind's artefacts in the grids: the best grade first
 
 ; A source's weights: unstable, dim, common, good, excellent, perfect
 [af_quality_source_field_south]
