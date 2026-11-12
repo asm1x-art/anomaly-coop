@@ -467,7 +467,7 @@ function UIQuickWheel:Build()
 	local n = math.min(#list, max_items())
 	self.body = self:box(0, 0, self.W, 768, self)
 	if n > 0 then
-		local disc = math.min(num("disc", 78), 2 * self.ring * math.sin(math.pi / n) * 0.92)
+		local disc = n > 1 and math.min(num("disc", 78), 2 * self.ring * math.sin(math.pi / n) * 0.92) or num("disc", 78)
 		local icon = disc * num("icon", 58) / num("disc", 78)
 		for i = 1, n do
 			local a = -math.pi / 2 + 2 * math.pi * (i - 1) / n
