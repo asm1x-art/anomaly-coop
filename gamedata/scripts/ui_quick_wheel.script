@@ -1,17 +1,16 @@
--- The quick item wheel: a key ([quick_wheel] key, per player in MCM) opens a wheel of the player's things in tabs.
--- A "set" tab is the player's own list (an item's menu in the backpack: «В быстрое колесо» adds it to the last set
--- opened; a right click on the wheel, or the item's «Убрать из быстрого колеса», takes it off); the other tabs fill
--- themselves from the backpack (meds, food, grenades, detectors, the ammo and addons of the gun in hands, the slots).
--- A click uses the thing: eats it, takes it in hands, puts it on, loads the ammo, attaches or takes off the addon.
--- The idea and the tab set are those of GRA's Quick Action Wheel (HarukaSai, its overhaul by Gwnf5066); the code is
--- ours, the look the game's own (ui_stalker_style: the ammo wheel under it, the co-op wheel's discs, the items' icons).
--- The sets live in an actor variable (save_var): they go with the save and, in co-op, with each player's own progress
--- (coop_progress keeps the actor's variables per player). Everything tunable: configs/mod_system_quick_wheel.ltx.
+-- The quick item wheel: a key ([quick_wheel] key, per player in MCM) opens one wheel of the player's own things.
+-- The player fills it from the backpack: an item's menu «В быстрое колесо» adds it, «Убрать из быстрого колеса» or a
+-- right click on the wheel takes it off. A click uses the thing: eats it, takes it in hands, puts it on, takes the
+-- grenade or the detector, loads the ammo, attaches or takes off the addon.
+-- The idea is GRA's Quick Action Wheel (HarukaSai, its overhaul by Gwnf5066); the code is ours, the look the game's
+-- own (ui_stalker_style: the ammo wheel under it, the co-op wheel's discs, the items' icons).
+-- The wheel's things live in an actor variable (save_var): they go with the save and, in co-op, with each player's own
+-- progress (coop_progress keeps the actor's variables per player). Everything tunable: configs/mod_system_quick_wheel.ltx.
 -- The game's ammo wheel (the weapon's next ammo key) stays as it is: this one has its own key.
 
 local C = ui_stalker_style.C
 local SEC = "quick_wheel"
-local VAR = "quick_wheel" -- the actor variable: { sets = { [tab name] = { { sec =, id = }, ... } }, tab =, set = }
+local VAR = "quick_wheel" -- the actor variable: { items = { { sec =, id = }, ... } }
 
 GUI = nil -- the wheel (DestroyAll_UI drops it by this name)
 local closed_at = 0
@@ -39,83 +38,38 @@ local function tr(id)
 	return game.translate_string(id)
 end
 
--------------------------------------------------------------------------------------------------------------------
--- the tabs ([quick_wheel] tabs, a section each)
-
-local TABS
-local function tabs()
-	if TABS then
-		return TABS
-	end
-	TABS = {}
-	for _, name in ipairs(parse_list(ini_sys, SEC, "tabs")) do
-		local s = SEC .. "_tab_" .. name
-		if ini_sys:section_exist(s) then
-			local t = {
-				name = name,
-				kind = ini_sys:r_string_ex(s, "kind") or "set",
-				title = ini_sys:r_string_ex(s, "title") or name,
-				icon = ini_sys:r_string_ex(s, "icon"),
-				kinds = {},
-				slots = {},
-			}
-			for _, k in ipairs(parse_list(ini_sys, s, "kinds")) do
-				t.kinds[k] = true
-			end
-			for _, v in ipairs(parse_list(ini_sys, s, "slots")) do
-				t.slots[#t.slots + 1] = tonumber(v)
-			end
-			if t.icon and not ini_sys:section_exist(t.icon) then
-				t.icon = nil
-			end
-			TABS[#TABS + 1] = t
-		else
-			printf("! [quick wheel] no section [%s]: tab %s left out", s, name)
-		end
-	end
-	return TABS
-end
-
-local function tab_index(name)
-	for i, t in ipairs(tabs()) do
-		if t.name == name then
-			return i
-		end
-	end
-end
-
-local function first_set()
-	for _, t in ipairs(tabs()) do
-		if t.kind == "set" then
-			return t
-		end
-	end
+local function max_items()
+	return num("max_items", 12)
 end
 
 -------------------------------------------------------------------------------------------------------------------
--- the player's sets
+-- the player's wheel
 
+-- the wheel's things; an older build kept two sets (sets.set1, sets.set2): they become the one list, the first set first
 local function data()
 	local d = load_var(db.actor, VAR)
 	if type(d) ~= "table" then
 		d = {}
 	end
-	d.sets = type(d.sets) == "table" and d.sets or {}
+	if type(d.items) ~= "table" then
+		d.items = {}
+		local seen = {}
+		for _, name in ipairs({ "set1", "set2" }) do
+			for _, e in ipairs(type(d.sets) == "table" and d.sets[name] or {}) do
+				local k = e.sec .. ":" .. tostring(e.id)
+				if not seen[k] and #d.items < max_items() then
+					seen[k] = true
+					d.items[#d.items + 1] = e
+				end
+			end
+		end
+		d.sets, d.tab, d.set = nil, nil, nil
+	end
 	return d
 end
 
 local function store(d)
 	save_var(db.actor, VAR, d)
-end
-
--- the set "add" puts things into: the last set opened, else the first
-local function target_set(d)
-	local i = d.set and tab_index(d.set)
-	local t = i and tabs()[i]
-	if t and t.kind == "set" then
-		return t
-	end
-	return first_set()
 end
 
 -------------------------------------------------------------------------------------------------------------------
@@ -428,8 +382,6 @@ local function use(e, st)
 	return true
 end
 
--------------------------------------------------------------------------------------------------------------------
--- what a tab shows: entries { sec =, id = }
 
 local function counts()
 	local n = {}
@@ -444,76 +396,6 @@ local function counts()
 		n[s] = (n[s] or 0) + c
 	end, db.actor)
 	return n
-end
-
-local function sorted_sections(set)
-	local list = {}
-	for s in pairs(set) do
-		list[#list + 1] = s
-	end
-	table.sort(list)
-	local out = {}
-	for i, s in ipairs(list) do
-		out[i] = { sec = s }
-	end
-	return out
-end
-
-local function entries_of(t, d)
-	if t.kind == "set" then
-		return d.sets[t.name] or {}
-	end
-	local found = {}
-	if t.kind == "items" or t.kind == "grenades" or t.kind == "devices" then
-		local want = t.kind == "grenades" and "grenade" or t.kind == "devices" and "device" or "eat"
-		db.actor:iterate_inventory(function(_, item)
-			local s = item:section()
-			if kind_of(s) == want and (t.kind ~= "items" or t.kinds[ini_sys:r_string_ex(s, "kind") or ""]) then
-				found[s] = true
-			end
-		end, db.actor)
-		return sorted_sections(found)
-	end
-	if t.kind == "slots" then
-		local out = {}
-		for _, slot in ipairs(t.slots) do
-			local item = db.actor:item_in_slot(slot)
-			if item and kind_of(item:section()) then
-				out[#out + 1] = { sec = item:section(), id = BY_ID[kind_of(item:section())] and item:id() or nil }
-			end
-		end
-		return out
-	end
-	local wpn = weapon_in_hands()
-	if not wpn then
-		return {}
-	end
-	if t.kind == "ammo" then
-		local out = {}
-		wpn:cast_Weapon():AmmoTypeForEach(function(i, s)
-			if db.actor:object(s) or i == wpn:get_ammo_type() and wpn:get_ammo_in_magazine() > 0 then
-				out[#out + 1] = { sec = s }
-			end
-		end)
-		return out
-	end
-	if t.kind == "attach" then
-		for _, k in ipairs({ "scope", "sil", "gl" }) do
-			local on = k == "sil" and utils_item.get_attached_silencer(wpn) or k == "gl" and utils_item.get_attached_gl(wpn)
-				or k == "scope" and utils_item.get_attached_scope(wpn)
-			if type(on) == "string" and ini_sys:section_exist(on) then
-				found[on] = true
-			end
-		end
-		db.actor:iterate_inventory(function(_, item)
-			local k = kind_of(item:section())
-			if (k == "scope" or k == "sil" or k == "gl") and can_attach(wpn, item, k) then
-				found[item:section()] = true
-			end
-		end, db.actor)
-		return sorted_sections(found)
-	end
-	return {}
 end
 
 -------------------------------------------------------------------------------------------------------------------
@@ -531,12 +413,12 @@ function UIQuickWheel:__init() super()
 	self.xml = CScriptXmlInit()
 	self.xml:ParseFile(ui_stalker_style.XML)
 
-	self.cx, self.cy = self.W / 2, num("center_y", 340)
+	self.cx, self.cy = self.W / 2, num("center_y", 384)
 	self.ring = num("ring", 152)
 	self.dead = num("dead_zone", 48)
 	self.col = {
 		name = color("color_name", C.head), text = color("color_text", C.text), hint = color("color_hint", C.dim),
-		bad = color("color_bad", C.bad), icon = color("color_icon", C.text), lit = color("color_lit", C.accent),
+		bad = color("color_bad", C.bad),
 	}
 	self.missing_alpha = num("missing_alpha", 70)
 
@@ -550,30 +432,6 @@ function UIQuickWheel:__init() super()
 	self.name = self:text(self.cx - tw / 2, self.cy - 52, tw, 46, "", self.col.name, self, CGameFont.alCenter, "l")
 	self.info = self:text(self.cx - tw / 2, self.cy - 4, tw, 20, "", self.col.text, self, CGameFont.alCenter, "m")
 	self.hint = self:text(self.cx - tw / 2, self.cy + 18, tw, 60, "", self.col.hint, self, CGameFont.alCenter, "s")
-
-	-- the tabs' row on the game's message box, the tab's name over it
-	local list = tabs()
-	local ts, gap = num("tab_size", 44), num("tab_gap", 8)
-	local total = #list * ts + math.max(0, #list - 1) * gap
-	local x0, y0 = self.cx - total / 2, num("tab_y", 604)
-	self:card(x0 - 14, y0 - 30, total + 28, ts + 42, self)
-	self.tab_title = self:text(x0 - 10, y0 - 28, total + 20, 26, "", self.col.name, self, CGameFont.alCenter, "m")
-	local ti = num("tab_icon", 30)
-	self.tabs = {}
-	for i, t in ipairs(list) do
-		local x = x0 + (i - 1) * (ts + gap)
-		local tab = { x = x, y = y0, w = ts, h = ts }
-		tab.disc = self:image(x, y0, ts, ts, "ui\\coop\\wheel_btn_e", self)
-		if t.icon then
-			tab.icon = self:item_icon(t.icon, x + (ts - ti) / 2, y0 + (ts - ti) / 2, ti, self)
-		else
-			local s = ti * 0.8
-			tab.icon = self:image(x + (ts - s) / 2, y0 + (ts - s) / 2, s, s, "ui\\coop\\qwheel_set", self, self.col.icon)
-			tab.tinted = true
-		end
-		self:text(x + 2, y0 + 1, 14, 14, tostring(i), self.col.text, self, CGameFont.alLeft, "s")
-		self.tabs[i] = tab
-	end
 	self.body = nil
 	self.items = {}
 end
@@ -597,11 +455,7 @@ function UIQuickWheel:item_icon(sec, x, y, box, parent)
 	return s
 end
 
-function UIQuickWheel:tab()
-	return tabs()[self.tab_i]
-end
-
--- the things of the tab, drawn again
+-- the things, drawn again
 function UIQuickWheel:Build()
 	if self.body then
 		self:DetachChild(self.body)
@@ -609,27 +463,21 @@ function UIQuickWheel:Build()
 	end
 	self.items = {}
 	self.hovered = nil
-	local t = self:tab()
-	local list = t and entries_of(t, self.d) or {}
-	local n = math.min(#list, num("show_max", 16))
-	self.keys = {}
-	for i = 1, #list do
-		self.keys[i] = list[i].sec .. ":" .. tostring(list[i].id)
-	end
+	local list = self.d.items
+	local n = math.min(#list, max_items())
 	self.body = self:box(0, 0, self.W, 768, self)
-	if n == 0 then
-		return
-	end
-	local disc = math.min(num("disc", 78), 2 * self.ring * math.sin(math.pi / n) * 0.92)
-	local icon = disc * num("icon", 58) / num("disc", 78)
-	for i = 1, n do
-		local a = -math.pi / 2 + 2 * math.pi * (i - 1) / n
-		local x, y = self.cx + self.ring * math.cos(a), self.cy + self.ring * math.sin(a)
-		local it = { e = list[i], angle = a }
-		it.disc = self:image(x - disc / 2, y - disc / 2, disc, disc, "ui\\coop\\wheel_btn_e", self.body)
-		it.icon = self:item_icon(list[i].sec, x - icon / 2, y - icon / 2, icon, self.body)
-		it.count = self:text(x - disc / 2, y + disc / 2 - 22, disc - 8, 16, "", self.col.text, self.body, CGameFont.alRight, "s")
-		self.items[i] = it
+	if n > 0 then
+		local disc = math.min(num("disc", 78), 2 * self.ring * math.sin(math.pi / n) * 0.92)
+		local icon = disc * num("icon", 58) / num("disc", 78)
+		for i = 1, n do
+			local a = -math.pi / 2 + 2 * math.pi * (i - 1) / n
+			local x, y = self.cx + self.ring * math.cos(a), self.cy + self.ring * math.sin(a)
+			local it = { e = list[i], angle = a }
+			it.disc = self:image(x - disc / 2, y - disc / 2, disc, disc, "ui\\coop\\wheel_btn_e", self.body)
+			it.icon = self:item_icon(list[i].sec, x - icon / 2, y - icon / 2, icon, self.body)
+			it.count = self:text(x - disc / 2, y + disc / 2 - 22, disc - 8, 16, "", self.col.text, self.body, CGameFont.alRight, "s")
+			self.items[i] = it
+		end
 	end
 	self:Refresh()
 end
@@ -667,24 +515,11 @@ function UIQuickWheel:Look()
 			it.look = look
 		end
 	end
-	for i, tab in ipairs(self.tabs) do
-		local look = i == self.tab_hovered and "h" or i == self.tab_i and "t" or "e"
-		if look ~= tab.look then
-			tab.disc:InitTexture("ui\\coop\\wheel_btn_" .. look)
-			tab.look = look
-			if tab.tinted then
-				local c = look == "e" and self.col.icon or self.col.lit
-				tab.icon:SetTextureColor(GetARGB(255, c[1], c[2], c[3]))
-			end
-		end
-	end
 	self:Texts()
 end
 
--- the middle's texts: the thing under the cursor, else the tab's
+-- the middle's texts: the thing under the cursor, else the wheel's own
 function UIQuickWheel:Texts()
-	local t = self:tab()
-	self.tab_title:SetText(t and tr(t.title) or "")
 	local it = self.hovered and self.items[self.hovered]
 	if it and it.st then
 		local st = it.st
@@ -697,59 +532,23 @@ function UIQuickWheel:Texts()
 			info = string.format(tr(st.kind == "ammo" and "st_qwheel_rounds" or IsItem("multiuse", it.e.sec) and "st_qwheel_uses" or "st_qwheel_count"), c)
 		end
 		self.info:SetText(info)
-		local hint = tr(action_hint(st))
-		if t and t.kind == "set" then
-			hint = hint .. "\\n" .. tr("st_qwheel_rmb_remove")
-		end
 		self.hint:SetTextColor(st.bad and ui_stalker_style.argb(self.col.bad) or ui_stalker_style.argb(self.col.hint))
-		self.hint:SetText(hint)
+		self.hint:SetText(tr(action_hint(st)) .. "\\n" .. tr("st_qwheel_rmb_remove"))
 		return
 	end
-	if self.tab_hovered then
-		local th = tabs()[self.tab_hovered]
-		self.name:SetText(tr(th.title))
-	else
-		self.name:SetText(t and tr(t.title) or "")
-	end
+	self.name:SetText(tr("st_qwheel_title"))
 	self.info:SetText("")
 	self.hint:SetTextColor(ui_stalker_style.argb(self.col.hint))
-	if #self.items == 0 then
-		self.hint:SetText(tr(t and t.kind == "set" and "st_qwheel_empty_set" or "st_qwheel_empty"))
-	else
-		self.hint:SetText(tr("st_qwheel_keys"))
-	end
+	self.hint:SetText(#self.items == 0 and tr("st_qwheel_empty") or "")
 end
 
 function UIQuickWheel:Open(d)
 	self.d = d
-	self.tab_i = d.tab and tab_index(d.tab) or 1
-	self.tab_hovered = nil
-	for _, tab in ipairs(self.tabs) do
-		tab.look = nil
-	end
 	self:Build()
 	self:ShowDialog(true)
 	self.opened_at = time_global() -- the press that opened it comes to the window too
 	Register_UI("UIQuickWheel", "ui_quick_wheel")
 	SetCursorPosition(vector2():set(self.cx * self.k, self.cy))
-end
-
-function UIQuickWheel:SetTab(i)
-	local list = tabs()
-	if #list == 0 then
-		return
-	end
-	i = (i - 1) % #list + 1
-	if i == self.tab_i then
-		return
-	end
-	self.tab_i = i
-	self.d.tab = list[i].name
-	if list[i].kind == "set" then
-		self.d.set = list[i].name
-	end
-	store(self.d)
-	self:Build()
 end
 
 function UIQuickWheel:cursor()
@@ -770,14 +569,9 @@ function UIQuickWheel:Update()
 		end
 		return
 	end
-	local x, y = self:cursor()
-	local hovered, tab_hovered
-	for i, tab in ipairs(self.tabs) do
-		if x >= tab.x and x < tab.x + tab.w and y >= tab.y and y < tab.y + tab.h then
-			tab_hovered = i
-		end
-	end
-	if not tab_hovered and #self.items > 0 then
+	local hovered
+	if #self.items > 0 then
+		local x, y = self:cursor()
 		local dx, dy = x - self.cx, y - self.cy
 		if dx * dx + dy * dy >= self.dead * self.dead then
 			local a = math.atan2(dy, dx)
@@ -791,23 +585,10 @@ function UIQuickWheel:Update()
 		end
 	end
 	if time_global() >= (self.next_refresh or 0) then
-		local t = self:tab()
-		if t and t.kind ~= "set" then -- a tab that fills itself: its things may have changed
-			local list = entries_of(t, self.d)
-			local same = #list == #self.keys
-			for i = 1, #list do
-				same = same and self.keys[i] == list[i].sec .. ":" .. tostring(list[i].id)
-			end
-			if not same then
-				self:Build()
-			end
-		end
 		self.hovered = hovered
-		self.tab_hovered = tab_hovered
 		self:Refresh()
-	elseif hovered ~= self.hovered or tab_hovered ~= self.tab_hovered then
+	elseif hovered ~= self.hovered then
 		self.hovered = hovered
-		self.tab_hovered = tab_hovered
 		self:Look()
 	end
 end
@@ -829,16 +610,12 @@ function UIQuickWheel:Use(it)
 end
 
 function UIQuickWheel:Remove(i)
-	local t = self:tab()
-	if not (t and t.kind == "set") then
-		return
-	end
-	local set = self.d.sets[t.name]
+	local list = self.d.items
 	local it = self.items[i]
-	if set and it then
-		for j = #set, 1, -1 do
-			if set[j] == it.e then
-				table.remove(set, j)
+	if it then
+		for j = #list, 1, -1 do
+			if list[j] == it.e then
+				table.remove(list, j)
 			end
 		end
 		store(self.d)
@@ -852,9 +629,7 @@ function UIQuickWheel:OnKeyboard(dik, keyboard_action)
 		return res
 	end
 	if dik == DIK_keys.MOUSE_1 then
-		if self.tab_hovered then
-			self:SetTab(self.tab_hovered)
-		elseif self.hovered then
+		if self.hovered then
 			local it = self.items[self.hovered]
 			self:Close()
 			self:Use(it)
@@ -867,11 +642,6 @@ function UIQuickWheel:OnKeyboard(dik, keyboard_action)
 		return true
 	elseif dik == DIK_keys.DIK_ESCAPE or dik == self.key and not self.hold and time_global() > self.opened_at + 150 then
 		self:Close()
-		return true
-	end
-	local n = dik - DIK_keys.DIK_1 + 1 -- 1..9 on the row above the letters
-	if n >= 1 and n <= 9 and n <= #tabs() then
-		self:SetTab(n)
 		return true
 	end
 	return res
@@ -908,9 +678,6 @@ function open()
 	if not (db.actor and db.actor:alive()) or not actor_menu.is_hud_free() or time_global() < closed_at + 200 then
 		return
 	end
-	if #tabs() == 0 then
-		return
-	end
 	if not GUI or math.abs(GUI.k - utils_xml.screen_ratio()) > 0.001 then -- none yet, or made for another screen shape
 		GUI = UIQuickWheel()
 	end
@@ -921,71 +688,48 @@ function open()
 	GUI:Open(data())
 end
 
--- the entry for obj in a set (by id or by section, as its kind keeps it)
-local function entry_index(set, obj)
+-- the wheel's entry for obj (by id or by section, as its kind keeps it)
+local function entry_index(list, obj)
 	local by_id = BY_ID[kind_of(obj:section())]
-	for i, e in ipairs(set or {}) do
+	for i, e in ipairs(list) do
 		if by_id and e.id == obj:id() or not by_id and not e.id and e.sec == obj:section() then
 			return i
 		end
 	end
 end
 
-local function sets_holding(d, obj)
-	local out = {}
-	for _, t in ipairs(tabs()) do
-		if t.kind == "set" and entry_index(d.sets[t.name], obj) then
-			out[#out + 1] = t
-		end
-	end
-	return out
-end
-
 local function can_add(obj)
-	if not (obj and ours(obj) and kind_of(obj:section())) then
-		return false
-	end
-	local d = data()
-	local t = target_set(d)
-	return t and not entry_index(d.sets[t.name], obj) and true or false
-end
-
-local function add_name(obj)
-	local t = target_set(data())
-	return tr("st_qwheel_add") .. ": " .. tr(t.title)
+	return obj and ours(obj) and kind_of(obj:section()) and not entry_index(data().items, obj) and true or false
 end
 
 local function add(obj)
 	local d = data()
-	local t = target_set(d)
-	if not t or entry_index(d.sets[t.name], obj) then
+	if entry_index(d.items, obj) then
 		return
 	end
-	d.sets[t.name] = d.sets[t.name] or {}
-	local set = d.sets[t.name]
-	if #set >= num("set_max", 12) then
-		actor_menu.set_msg(1, string.format(tr("st_qwheel_full"), tr(t.title)), 4)
+	if #d.items >= max_items() then
+		actor_menu.set_msg(1, tr("st_qwheel_full"), 4)
 		return
 	end
 	local sec = obj:section()
-	set[#set + 1] = { sec = sec, id = BY_ID[kind_of(sec)] and obj:id() or nil }
-	d.set = t.name
+	d.items[#d.items + 1] = { sec = sec, id = BY_ID[kind_of(sec)] and obj:id() or nil }
 	store(d)
-	actor_menu.set_msg(1, string.format(tr("st_qwheel_added"), ui_item.get_sec_name(sec), tr(t.title)), 4)
-	debug("%s added to %s", sec, t.name)
+	actor_menu.set_msg(1, string.format(tr("st_qwheel_added"), ui_item.get_sec_name(sec)), 4)
+	debug("%s added", sec)
 end
 
 local function can_remove(obj)
-	return obj and ours(obj) and #sets_holding(data(), obj) > 0 or false
+	return obj and ours(obj) and entry_index(data().items, obj) and true or false
 end
 
 local function remove(obj)
 	local d = data()
-	for _, t in ipairs(sets_holding(d, obj)) do
-		table.remove(d.sets[t.name], entry_index(d.sets[t.name], obj))
+	local i = entry_index(d.items, obj)
+	if i then
+		table.remove(d.items, i)
+		store(d)
+		actor_menu.set_msg(1, string.format(tr("st_qwheel_removed"), ui_item.get_sec_name(obj:section())), 4)
 	end
-	store(d)
-	actor_menu.set_msg(1, string.format(tr("st_qwheel_removed"), ui_item.get_sec_name(obj:section())), 4)
 end
 
 function on_game_start()
@@ -994,19 +738,15 @@ function on_game_start()
 			open()
 		end
 	end)
-	RegisterScriptCallback("on_mouse_wheel", function(dir, flags)
-		if GUI and GUI:IsShown() then
-			GUI:SetTab(GUI.tab_i + (dir == 1 and -1 or 1))
-			flags.ret_value = false -- not the weapon switch / zoom behind it
-		end
-	end)
 	RegisterScriptCallback("actor_on_net_destroy", function()
 		if GUI and GUI:IsShown() then
 			GUI:Close()
 		end
 		GUI = nil
 	end)
-	custom_functor_autoinject.add_functor("quick_wheel_add", can_add, add_name, nil, add)
+	custom_functor_autoinject.add_functor("quick_wheel_add", can_add, function()
+		return "st_qwheel_add"
+	end, nil, add)
 	custom_functor_autoinject.add_functor("quick_wheel_remove", can_remove, function()
 		return "st_qwheel_remove"
 	end, nil, remove)

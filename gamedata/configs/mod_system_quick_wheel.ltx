@@ -1,83 +1,26 @@
-; The quick item wheel (scripts/ui_quick_wheel.script): a key opens a wheel of the player's things, in tabs. A "set"
-; tab is the player's own (an item's menu in the backpack: «В быстрое колесо» adds it, a right click on the wheel
-; takes it off); the other tabs fill themselves from the backpack. Each player's sets are his (an actor variable,
-; personal in co-op). The key and press/hold are per player in MCM («Быстрое колесо»); these are their defaults.
+; The quick item wheel (scripts/ui_quick_wheel.script): a key opens one wheel of the player's own things. The player
+; fills it from the backpack (an item's menu: «В быстрое колесо» adds it, «Убрать из быстрого колеса» or a right click
+; on the wheel takes it off). Each player's wheel is his (an actor variable, personal in co-op). The key and press/hold
+; are per player in MCM («Быстрое колесо»); these are their defaults.
 
 [quick_wheel]
 key            = DIK_C    ; opens the wheel (V is the game's weapon function: grenade launcher, second sight, BaS laser)
 hold           = false    ; false: a press opens it and the next closes it; true: open while held, letting go uses the thing under the cursor
-tabs           = set1, set2, meds, food, grenades, devices, ammo, attach, slots ; left to right, keys 1..9; leave one out to hide it
-set_max        = 12       ; things in one set at most
-show_max       = 16       ; things on the wheel at most (a tab that fills itself shows the first ones)
+max_items      = 12       ; things on the wheel at most
 refresh_ms     = 300      ; how often the open wheel looks at the backpack again (counts, what is worn, what is loaded)
 
 ; the layout, in square units of a 1024x768 screen (narrowed for a wider one, so circles stay round)
-center_y       = 340      ; the wheel's middle, from the screen's top
+center_y       = 384      ; the wheel's middle, from the screen's top
 back_size      = 460      ; the game's ammo wheel under it, across
 back_alpha     = 242      ; its see-through (of 255)
 ring           = 152      ; the ring the things sit on: its radius
 disc           = 78       ; a thing's disc (smaller when many)
 icon           = 58       ; a thing's icon in its disc
 dead_zone      = 48       ; the cursor nearer the middle than this picks nothing
-tab_size       = 44       ; a tab's disc in the row under the wheel
-tab_icon       = 30       ; the icon in it
-tab_gap        = 8
-tab_y          = 604      ; the tab row's top, from the screen's top
 
 ; colours: r, g, b
 color_name     = 240, 217, 182  ; the name in the middle
 color_text     = 200, 200, 200  ; the count, the condition
 color_hint     = 140, 140, 140  ; what a click does
 color_bad      = 240, 86, 74    ; can't be used now (ammo for another gun, an addon that doesn't fit)
-color_icon     = 200, 200, 200  ; a tab's own icon (a set's star)
-color_lit      = 238, 155, 23   ; the same, picked or under the cursor
-missing_alpha  = 70             ; a set's thing that is not in the backpack: its icon this see-through (of 255)
-
-; the tabs: kind = set (the player's own) | items (things of these ltx kinds) | grenades | devices (detectors) |
-; ammo (the gun in hands: its ammo in the backpack) | attach (the gun in hands: its addons) | slots (what is in these slots)
-; title: its name (text id); icon: an item whose icon stands for it (none: the set's star)
-[quick_wheel_tab_set1]
-kind           = set
-title          = st_qwheel_tab_set1
-
-[quick_wheel_tab_set2]
-kind           = set
-title          = st_qwheel_tab_set2
-
-[quick_wheel_tab_meds]
-kind           = items
-kinds          = i_medical
-title          = st_qwheel_tab_meds
-icon           = medkit
-
-[quick_wheel_tab_food]
-kind           = items
-kinds          = i_food, i_drink, i_mutant_cooked
-title          = st_qwheel_tab_food
-icon           = bread
-
-[quick_wheel_tab_grenades]
-kind           = grenades
-title          = st_qwheel_tab_grenades
-icon           = grenade_f1
-
-[quick_wheel_tab_devices]
-kind           = devices
-title          = st_qwheel_tab_devices
-icon           = detector_advanced
-
-[quick_wheel_tab_ammo]
-kind           = ammo
-title          = st_qwheel_tab_ammo
-icon           = ammo_5.45x39_fmj
-
-[quick_wheel_tab_attach]
-kind           = attach
-title          = st_qwheel_tab_attach
-icon           = wpn_addon_scope
-
-[quick_wheel_tab_slots]
-kind           = slots
-slots          = 1, 2, 3, 4, 5, 9 ; knife, pistol, rifle, grenade, binoculars, detector
-title          = st_qwheel_tab_slots
-icon           = wpn_ak74
+missing_alpha  = 70             ; a thing that is not in the backpack: its icon this see-through (of 255)

@@ -11,7 +11,7 @@
 		<text>Удерживать клавишу (отпустить - применить)</text>
 	</string>
 	<string id="ui_mcm_quick_wheel_desc">
-		<text>Свои наборы: в рюкзаке ПКМ по предмету, пункт «В быстрое колесо»; на колесе ПКМ - убрать. Вкладки: колесо мыши или 1-9.</text>
+		<text>Колесо своих предметов: в рюкзаке ПКМ по предмету, пункт «В быстрое колесо»; на колесе ПКМ - убрать.</text>
 	</string>
 	<string id="st_qwheel_add">
 		<text>В быстрое колесо</text>
@@ -20,40 +20,16 @@
 		<text>Убрать из быстрого колеса</text>
 	</string>
 	<string id="st_qwheel_added">
-		<text>«%s» добавлен в набор «%s»</text>
+		<text>«%s» добавлен в быстрое колесо</text>
+	</string>
+	<string id="st_qwheel_title">
+		<text>Быстрое колесо</text>
 	</string>
 	<string id="st_qwheel_removed">
 		<text>«%s» убран из быстрого колеса</text>
 	</string>
 	<string id="st_qwheel_full">
-		<text>Набор «%s» полон</text>
-	</string>
-	<string id="st_qwheel_tab_set1">
-		<text>Набор 1</text>
-	</string>
-	<string id="st_qwheel_tab_set2">
-		<text>Набор 2</text>
-	</string>
-	<string id="st_qwheel_tab_meds">
-		<text>Медицина</text>
-	</string>
-	<string id="st_qwheel_tab_food">
-		<text>Еда и питьё</text>
-	</string>
-	<string id="st_qwheel_tab_grenades">
-		<text>Гранаты</text>
-	</string>
-	<string id="st_qwheel_tab_devices">
-		<text>Детекторы</text>
-	</string>
-	<string id="st_qwheel_tab_ammo">
-		<text>Патроны</text>
-	</string>
-	<string id="st_qwheel_tab_attach">
-		<text>Обвес</text>
-	</string>
-	<string id="st_qwheel_tab_slots">
-		<text>Слоты</text>
+		<text>Быстрое колесо заполнено</text>
 	</string>
 	<string id="st_qwheel_missing">
 		<text>Нет в рюкзаке</text>
@@ -101,16 +77,10 @@
 		<text>ЛКМ - снять</text>
 	</string>
 	<string id="st_qwheel_rmb_remove">
-		<text>ПКМ - убрать из набора</text>
-	</string>
-	<string id="st_qwheel_empty_set">
-		<text>Набор пуст. В рюкзаке: ПКМ по предмету, пункт «В быстрое колесо»</text>
+		<text>ПКМ - убрать из колеса</text>
 	</string>
 	<string id="st_qwheel_empty">
-		<text>Нет подходящих предметов</text>
-	</string>
-	<string id="st_qwheel_keys">
-		<text>Вкладки: колесо мыши, 1-9</text>
+		<text>Колесо пусто. В рюкзаке: ПКМ по предмету, пункт «В быстрое колесо»</text>
 	</string>
 	<string id="st_qwheel_count">
 		<text>%d шт.</text>
