@@ -26,7 +26,7 @@ function settings()
 	local c = str_explode(ini_sys:r_string_ex(S, "fav_color") or "", ",")
 	cfg = {
 		enabled = b("enabled", true),
-		fav_color = GetARGB(tonumber(c[1]) or 70, tonumber(c[2]) or 255, tonumber(c[3]) or 190, tonumber(c[4]) or 60),
+		fav_color = GetARGB(tonumber(c[1]) or 70, tonumber(c[2]) or 60, tonumber(c[3]) or 190, tonumber(c[4]) or 255),
 		fav_first = b("fav_first", true),
 		pin_icon = b("pin_icon", true),
 		pin_icon_size = f("pin_icon_size", 13),
@@ -608,22 +608,16 @@ local function wrap_grids()
 		return sell(self, ...)
 	end
 
-	-- the co-op trade window: our own grids get their favourites' backgrounds at once (a cell shows it after an
-	-- unhighlight); the partner's grid has no marks (cells of sections)
-	if coop_trade and coop_trade.UICoopTrade and coop_trade.UICoopTrade.Fill then
-		local fill = coop_trade.UICoopTrade.Fill
-		coop_trade.UICoopTrade.Fill = function(self, ...)
-			local res = fill(self, ...)
-			for _, name in ipairs({ "mine", "offer" }) do
-				local cc = self.CC and self.CC[name]
-				for _, ci in pairs(cc and cc.cell or {}) do
-					if ci:IsShown() then
-						ci:Highlight(false)
-					end
-				end
-			end
-			return res
+	-- a favourite's background shows on an unhighlight (rax_persistent_highlight): one as soon as its cell is laid out,
+	-- not only once the cursor has gone over some cell (in coop_trade.script's window never). The partner's grid
+	-- there has no marks (cells of sections)
+	local set = I.Set
+	I.Set = function(self, obj, area, ...)
+		local res = set(self, obj, area, ...)
+		if res and cell_mark(self) then
+			self:Highlight(false)
 		end
+		return res
 	end
 end
 

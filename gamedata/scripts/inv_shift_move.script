@@ -67,7 +67,8 @@ local function move(cc, idx)
 	return true
 end
 
-local armed_cc, armed_idx -- the cell last moved out of: not again until the cursor leaves it
+local armed_cc, armed_idx -- the cell last moved out of: not again until the cursor leaves it (rawequal: luabind
+-- class instances have no ==)
 local n = 0
 
 function on_game_start()
@@ -78,10 +79,10 @@ function on_game_start()
 
 	local on_hover = C.On_Hover
 	C.On_Hover = function(self, idx, ...)
-		if armed_cc == self and idx ~= armed_idx then
+		if rawequal(armed_cc, self) and idx ~= armed_idx then
 			armed_cc = nil
 		end
-		if idx and armed_cc ~= self and settings().hover and shift_held() and movable(self) then
+		if idx and not rawequal(armed_cc, self) and settings().hover and shift_held() and movable(self) then
 			local ci = self.cell[idx]
 			if ci and ci:IsShown() then
 				armed_cc, armed_idx = self, idx
@@ -97,7 +98,7 @@ function on_game_start()
 		if idx and settings().click and shift_held() and movable(self) then
 			local ci = self.cell[idx]
 			if ci and ci:IsShown() then
-				if not (armed_cc == self and armed_idx == idx) then -- else the hover has just moved it
+				if not (rawequal(armed_cc, self) and armed_idx == idx) then -- else the hover has just moved it
 					armed_cc, armed_idx = self, idx
 					move(self, idx)
 				end
