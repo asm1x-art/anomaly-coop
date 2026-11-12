@@ -1,0 +1,12 @@
+#include "ash_ground.h"
+
+// rt_Color rgb (blend src alpha, inv src alpha): the albedo toward the ash's
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float k = ash_load(tc).w;
+	clip(k - 1.0 / 255.0);
+	float3 P, N;
+	float hemi;
+	ash_gbuffer(tc, pos2d, P, N, hemi);
+	return float4(ash_color(P), k);
+}

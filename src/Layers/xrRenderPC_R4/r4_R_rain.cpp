@@ -4,6 +4,7 @@
 #include "../xrRender/FBasicVisual.h"
 
 #include "r4_R_sun_support.h"
+#include "../../xrEngine/shader_bus.h"
 
 const float tweak_rain_COP_initial_offs = 1200.f;
 const float tweak_rain_ortho_xform_initial_offs = 1000.f; //. ?
@@ -27,16 +28,31 @@ static int facetable[6][4] = {
 };
 
 //////////////////////////////////////////////////////////////////////////
+// Co-op: the Ash front's cover of the ground, x of the lane ash_cover a script sets (coop_zone_ash.script; the shader
+// side in ash_ground.h), 0 while nobody set it. The lane exists once ash_apply_* declares it or a script registers it
+float ash_ground_cover()
+{
+	static const ShaderBus::lane* lane = nullptr;
+	if (!lane)
+		lane = ShaderBus::find("ash_cover");
+	return lane ? lane->bound.x : 0.f;
+}
+
 void CRender::render_rain()
 {
 	//return;
 	float fRainFactor = 0;
-	if (ps_ssfx_gloss_method == 0)
-		fRainFactor = g_pGamePersistent->Environment().CurrentEnv->rain_density;
-	else
-		fRainFactor = g_pGamePersistent->Environment().wetness_factor;
+	if (ps_r2_ls_flags.test(R3FLAG_DYN_WET_SURF))
+	{
+		if (ps_ssfx_gloss_method == 0)
+			fRainFactor = g_pGamePersistent->Environment().CurrentEnv->rain_density;
+		else
+			fRainFactor = g_pGamePersistent->Environment().wetness_factor;
+	}
+	// the ash shares the rain's view from above (its shadow map); not with MSAA
+	const float fAsh = RImplementation.o.dx10_msaa ? 0.f : ash_ground_cover();
 
-	if (fRainFactor < EPS_L) return;
+	if (fRainFactor < EPS_L && fAsh < EPS_L) return;
 
 	PIX_EVENT(render_rain);
 
@@ -274,5 +290,8 @@ void CRender::render_rain()
 
 	// Accumulate
 	Target->phase_rain();
-	Target->draw_rain(RainLight);
+	if (fRainFactor >= EPS_L)
+		Target->draw_rain(RainLight);
+	if (fAsh >= EPS_L)
+		Target->draw_ash(RainLight);
 }

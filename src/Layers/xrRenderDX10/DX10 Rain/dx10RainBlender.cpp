@@ -255,3 +255,44 @@ void CBlender_rain_msaa::Compile(CBlender_Compile& C)
 	}
 	::Render->m_MSAASample = -1;
 }
+
+// Co-op: ash settling on the ground during the Ash front (gamedata/shaders/r3/ash_ground.h, CRenderTarget::draw_ash)
+void CBlender_ash::Compile(CBlender_Compile& C)
+{
+	IBlender::Compile(C);
+
+	switch (C.iElement)
+	{
+	case 0: // rt_Accumulator = the turned normal and how much ash
+		C.r_Pass("stub_notransform_2uv", "ash_amount", false, FALSE, FALSE, FALSE);
+		break;
+	case 1: // rt_Color rgb toward the ash's albedo
+		C.r_Pass("stub_notransform_2uv", "ash_apply_albedo", false, FALSE, FALSE, TRUE, D3DBLEND_SRCALPHA,
+		         D3DBLEND_INVSRCALPHA);
+		C.r_ColorWriteEnable(true, true, true, false);
+		break;
+	case 2: // rt_Color alpha (gloss) down
+		C.r_Pass("stub_notransform_2uv", "ash_apply_gloss", false, FALSE, FALSE, TRUE, D3DBLEND_ZERO,
+		         D3DBLEND_SRCALPHA);
+		C.r_ColorWriteEnable(false, false, false, true);
+		break;
+	case 3: // rt_Position xy = the turned normal
+		C.r_Pass("stub_notransform_2uv", "ash_apply_normal", false, FALSE, FALSE, FALSE);
+		C.r_ColorWriteEnable(true, true, false, false);
+		break;
+	default:
+		return;
+	}
+
+	C.r_dx10Texture("s_position", r2_RT_P);
+	C.r_dx10Texture("s_smap", r2_RT_smap_depth);
+	C.r_dx10Texture("s_heat", r2_RT_heat);
+	C.r_dx10Texture("s_ash", r2_RT_accum);
+
+	C.r_dx10Sampler("smp_nofilter");
+	C.r_dx10Sampler("smp_linear");
+	jitter(C);
+	C.r_dx10Sampler("smp_smap");
+
+	C.r_End();
+}

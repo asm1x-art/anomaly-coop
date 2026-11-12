@@ -1,0 +1,10 @@
+#include "ash_ground.h"
+
+// rt_Color alpha (blend zero, src alpha): the gloss down to bus_ash_cover.z of it under full ash
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float k = ash_load(tc).w;
+	clip(k - 1.0 / 255.0);
+	float keep = bus_ash_cover.z > 0 ? bus_ash_cover.z : 0.15;
+	return float4(0, 0, 0, 1.0 - k * (1.0 - keep));
+}

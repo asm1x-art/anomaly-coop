@@ -883,6 +883,8 @@ CRenderTarget::CRenderTarget()
 	{
 		CBlender_rain TempBlender;
 		s_rain.create(&TempBlender, "null");
+		CBlender_ash AshBlender; // Co-op: the Ash front's ash on the ground (draw_ash)
+		s_ash.create(&AshBlender, "null");
 
 		if (RImplementation.o.dx10_msaa)
 		{

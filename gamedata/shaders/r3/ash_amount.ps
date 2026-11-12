@@ -1,0 +1,13 @@
+#include "ash_ground.h"
+
+// rt_Accumulator: the normal turned up by the ash (view space, xyz) and how much ash (w)
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float3 P, N;
+	float hemi;
+	ash_gbuffer(tc, pos2d, P, N, hemi);
+	float k = ash_amount(tc, pos2d, P, N, hemi);
+	float flatten = bus_ash_shape.x > 0 ? bus_ash_shape.x : 0.6;
+	float3 up = mul(m_V, float4(0, 1, 0, 0));
+	return float4(normalize(lerp(N, up, k * flatten)), k);
+}

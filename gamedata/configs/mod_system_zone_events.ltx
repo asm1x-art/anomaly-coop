@@ -128,3 +128,19 @@ leave_zaton                 = jupiter
 leave_k02_trucks_cemetery   = l04_darkvalley, l05_bar, l07_military
 return_real_hours   = 2         ; real hours after the end the squads may take to get back to their smarts
 albino_squads       =           ; albino mutant squads put on the level for the front (none yet: assets later)
+; the ash settling on the ground (each game its own picture: the engine's ash pass, shaders/r3/ash_ground.h; DX11, not
+; with MSAA). Its cover grows from 0 to 1 over ground_ramp_up_min real minutes of the front and goes in
+; ground_ramp_down_min after its end. Under a roof it stays clean: near the camera (r3_dynamic_wet_surfaces_far) by the
+; rain's view from above, farther by the surface's open sky (hemi)
+ground_levels        = l10_red_forest, l08_yantar, jupiter, zaton ; not the Truck Cemetery (its front is machinery, no fire)
+ground_ramp_up_min   = 20          ; real minutes from no ash to full
+ground_ramp_down_min = 10          ; real minutes it takes to go after the front
+ground_opacity       = 0.85        ; the most the ash hides of a surface, 0..1
+ground_gloss_keep    = 0.15        ; the surface's gloss left under full ash, 0..1
+ground_patchiness    = 1           ; 0: everywhere at once; 1: in patches first (ground_patch_m), the rest later
+ground_patch_m       = 6           ; the patches' size, metres
+ground_color         = 0.42, 0.41, 0.40 ; the ash's albedo, r, g, b
+ground_up            = 0.35, 0.8   ; how much a surface faces up (world normal.y): no ash at the first, full at the second
+ground_sky           = 0.2, 0.55   ; open sky over a surface (its hemi): no ash at the first, full at the second
+ground_flatten       = 0.6         ; how far full ash smooths a surface (turns its normal up), 0..1
+ground_grain         = 0.36        ; how much the ash's albedo varies (fine grain), 0..1

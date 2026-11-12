@@ -302,6 +302,7 @@ private:
 
 	//	DX10 Rain
 	ref_shader s_rain;
+	ref_shader s_ash; // Co-op: the Ash front's ash on the ground (draw_ash)
 
 	ref_shader s_rain_msaa[8]; // up to 8 shaders for DX10.0 support
 	ref_shader s_accum_direct_volumetric_msaa[8];
@@ -505,6 +506,8 @@ public:
 
 	void phase_rain();
 	void draw_rain(light& RainSetup);
+	// Co-op: the Ash front's ash on the ground (ash_ground.h), over rt_Color after the rain
+	void draw_ash(light& RainSetup);
 
 	void mark_msaa_edges();
 

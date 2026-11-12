@@ -177,6 +177,79 @@ local function update_weather(on)
 end
 
 -------------------------------------------------------------------------------
+-- the ash on the ground (each game its own picture; the engine's ash pass, shaders/r3/ash_ground.h): the shader bus
+-- lanes ash_cover (cover 0..1, opacity, gloss kept, patchiness), ash_look (albedo, patch size), ash_mask (normal.y
+-- and open sky from no ash to full) and ash_shape (how far it smooths the surface, grain). The cover grows from 0 to 1 over ground_ramp_up_min real minutes of the front on
+-- one of ground_levels and goes in ground_ramp_down_min after its end; the event's from/till (the shared fact) decide,
+-- so every game on the level shows the same. 0 anywhere else, in the headless host and on an exe without the bus
+
+local ground_tokens -- { cover, look, mask, shape }, nil: no bus
+local ground_ev     -- the slot's ash event as update() last saw it (on or over), nil: none
+local ground_last = -1
+local next_ground = 0
+
+local function nums(key, default)
+	local t = {}
+	for item in string.gmatch(ini_sys:r_string_ex(S, key) or "", "[^,]+") do
+		t[#t + 1] = tonumber(item)
+	end
+	for i = 1, #default do
+		t[i] = t[i] or default[i]
+	end
+	return t
+end
+
+local function ground_register()
+	if not shader_bus or ghost() then
+		return
+	end
+	local owner = "Anomaly co-op"
+	local cover = shader_bus.register("ash_cover", owner, "Ash front: ash on the ground, x cover 0..1, y opacity, z gloss kept, w patchiness")
+	local look = shader_bus.register("ash_look", owner, "Ash front: ash on the ground, xyz albedo, w patch size in metres")
+	local mask = shader_bus.register("ash_mask", owner, "Ash front: ash on the ground, normal.y from..to, open sky from..to")
+	local shape = shader_bus.register("ash_shape", owner, "Ash front: ash on the ground, x normal turned up, y grain")
+	if not (cover and look and mask and shape) then
+		return
+	end
+	ground_tokens = { cover = cover, look = look, mask = mask, shape = shape }
+	local c = nums("ground_color", { 0.42, 0.41, 0.40 })
+	shader_bus.set(look, c[1], c[2], c[3], num("ground_patch_m", 6))
+	local up, sky = nums("ground_up", { 0.35, 0.8 }), nums("ground_sky", { 0.2, 0.55 })
+	shader_bus.set(mask, up[1], up[2], sky[1], sky[2])
+	shader_bus.set(shape, num("ground_flatten", 0.6), num("ground_grain", 0.36), 0, 0)
+	ground_last = -1
+end
+
+local function ground_cover()
+	local ev = ground_ev
+	if not ev or ev.level ~= level.name() or not listed(ev.level, "ground_levels") then
+		return 0
+	end
+	local up = math.max(1, num("ground_ramp_up_min", 20) * 60)
+	local down = math.max(1, num("ground_ramp_down_min", 10) * 60)
+	local t = ZE.now()
+	if ev.stage == "on" then
+		return math.min(1, math.max(0, (t - ev.from) / up))
+	end
+	local at_end = math.min(1, math.max(0, (ev.till - ev.from) / up))
+	return at_end * math.min(1, math.max(0, 1 - (t - ev.till) / down))
+end
+
+local function ground_update()
+	if not ground_tokens then
+		return
+	end
+	local cover = ground_cover()
+	if math.abs(cover - ground_last) < 0.0005 then
+		return
+	end
+	ground_last = cover
+	shader_bus.set(ground_tokens.cover, cover, num("ground_opacity", 0.85), num("ground_gloss_keep", 0.15),
+		num("ground_patchiness", 1))
+	ZE.dbg("ash on the ground %.3f", cover)
+end
+
+-------------------------------------------------------------------------------
 -- the radiation (each game its own player)
 
 local last_dose, last_health, warned, next_dbg = nil, nil, false, 0
@@ -775,6 +848,7 @@ end
 -- each look
 
 local function update(ev)
+	ground_ev = ev
 	local on = ev and ev.stage == "on"
 	local on_here = on and ev.level == level.name()
 	update_weather(on_here)
@@ -832,8 +906,13 @@ function on_game_start()
 		end
 		return pre
 	end
+	ground_register()
 	RegisterScriptCallback("actor_on_update", function()
 		local now = time_global()
+		if now >= next_ground then
+			next_ground = now + 250
+			ground_update()
+		end
 		if now < next_dose then
 			return
 		end
