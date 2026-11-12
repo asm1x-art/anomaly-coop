@@ -129,7 +129,8 @@ void CBlender_Detail_Still::Compile(CBlender_Compile& C)
 		}
 
 
-		uber_deffer(C, false, "detail_w", "base", true, 0, true);
+		// Co-op: ASH_GRASS marks grass in the G-buffer for the Ash front's ash (ash_ground.h)
+		uber_deffer(C, false, "detail_w", "base", true, 0, true, false, "ASH_GRASS");
 		C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 		C.r_StencilRef(0x01);
 		C.r_CullMode(D3DCULL_NONE);
@@ -150,7 +151,7 @@ void CBlender_Detail_Still::Compile(CBlender_Compile& C)
 			C.r_End();
 		}
 
-		uber_deffer(C, false, "detail_s", "base", true, 0, true);
+		uber_deffer(C, false, "detail_s", "base", true, 0, true, false, "ASH_GRASS");
 		C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 		C.r_StencilRef(0x01);
 		C.r_CullMode(D3DCULL_NONE);

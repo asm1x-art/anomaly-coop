@@ -1000,6 +1000,8 @@ void CRender::add_leafs_Static(dxRender_Visual* pVisual)
 	case MT_TREE_PM:
 	case MT_TREE_ST:
 		{
+			if (smap_skip_trees) // only while render_rain fills its map
+				return;
 			// General type of visual
 			r_dsgraph_insert_static(pVisual);
 		}
@@ -1272,6 +1274,8 @@ void CRender::add_Static(dxRender_Visual* pVisual, u32 planes)
 	case MT_TREE_ST:
 	case MT_TREE_PM:
 		{
+			if (smap_skip_trees) // only while render_rain fills its map
+				return;
 			// General type of visual
 			r_dsgraph_insert_static(pVisual);
 		}

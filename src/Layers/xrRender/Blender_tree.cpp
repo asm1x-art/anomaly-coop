@@ -240,7 +240,9 @@ void CBlender_Tree::Compile(CBlender_Compile& C)
 			C.r_End();
 		}
 
-		uber_deffer(C, true, tvs, tps, oBlend.value, 0, true);
+		// Co-op: ASH_FOLIAGE (leaves) and ASH_BARK (trunks) mark trees and bushes in the G-buffer for the Ash front's
+		// ash (ash_ground.h)
+		uber_deffer(C, true, tvs, tps, oBlend.value, 0, true, false, oBlend.value ? "ASH_FOLIAGE" : "ASH_BARK");
 		C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 		C.r_StencilRef(0x01);
 
@@ -266,7 +268,7 @@ void CBlender_Tree::Compile(CBlender_Compile& C)
 			C.r_End();
 		}
 
-		uber_deffer(C, false, tvs, "base", oBlend.value, 0, true);
+		uber_deffer(C, false, tvs, "base", oBlend.value, 0, true, false, oBlend.value ? "ASH_FOLIAGE" : "ASH_BARK");
 		C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 		C.r_StencilRef(0x01);
 

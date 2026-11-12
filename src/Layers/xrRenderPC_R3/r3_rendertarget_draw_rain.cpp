@@ -394,3 +394,69 @@ void CRenderTarget::draw_rain(light& RainSetup)
 		//		u_DBT_disable	();
 	}
 }
+
+// Co-op: the Ash front's ash on the ground (gamedata/shaders/r3/ash_ground.h, s_ash), after the rain's passes, at any
+// distance (no depth clip, unlike the rain): ash_amount works out the ash and the turned normal into rt_Accumulator
+// (scratch until the lights, as for the rain), then cheap passes put it into rt_Color (albedo, gloss) and rt_Position
+// (normal). The rain's shadow map (the view from above, rendered by render_rain) keeps what is under a roof clean near
+// the camera; beyond its reach the shader only has the hemi. With MSAA the passes run once a pixel on its sample 0.
+void CRenderTarget::draw_ash(light& RainSetup)
+{
+	u32 Offset;
+	u32 C = color_rgba(255, 255, 255, 255);
+	float d_Z = EPS_S, d_W = 1.f;
+
+	// the rain shadow map's texel adjustment and xform, as in draw_rain
+	float smapsize = float(RImplementation.o.smapsize);
+	float fTexelOffs = (.5f / smapsize);
+	float view_dimX = float(RainSetup.X.D.maxX - RainSetup.X.D.minX) / smapsize;
+	float view_dimY = float(RainSetup.X.D.maxX - RainSetup.X.D.minX) / smapsize;
+	float view_sx = float(RainSetup.X.D.minX) / smapsize;
+	float view_sy = float(RainSetup.X.D.minY) / smapsize;
+	Fmatrix m_TexelAdjust =
+	{
+		view_dimX / 2.f, 0.0f, 0.0f, 0.0f,
+		0.0f, -view_dimY / 2.f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.f, 0.0f,
+		view_dimX / 2.f + view_sx + fTexelOffs, view_dimY / 2.f + view_sy + fTexelOffs, -0.0001f, 1.0f
+	};
+	Fmatrix m_shadow;
+	{
+		FPU::m64r();
+		Fmatrix xf_project;
+		xf_project.mul(m_TexelAdjust, RainSetup.X.D.combine);
+		m_shadow.mul(xf_project, Device.mInvView);
+		FPU::m24r();
+	}
+
+	// the map covers the view up to r3_dynamic_wet_surfaces_far: fade it out before its edge
+	const float fFar = ps_r3_dyn_wet_surf_far;
+
+	// jitter coordinates, as in draw_rain
+	float scale_X = float(Device.dwWidth) / float(TEX_jitter);
+
+	FVF::TL2uv* pv = (FVF::TL2uv*)RCache.Vertex.Lock(4, g_combine_2UV->vb_stride, Offset);
+	pv->set(-1, -1, d_Z, d_W, C, 0, 1, 0, scale_X);
+	pv++;
+	pv->set(-1, 1, d_Z, d_W, C, 0, 0, 0, 0);
+	pv++;
+	pv->set(1, -1, d_Z, d_W, C, 1, 1, scale_X, scale_X);
+	pv++;
+	pv->set(1, 1, d_Z, d_W, C, 1, 0, scale_X, 0);
+	pv++;
+	RCache.Vertex.Unlock(4, g_combine_2UV->vb_stride);
+	RCache.set_Geometry(g_combine_2UV);
+
+	ref_rt* targets[4] = { &rt_Accumulator, &rt_Color, &rt_Color, &rt_Position };
+	for (u32 element = 0; element < 4; ++element)
+	{
+		if (element != 2) // the gloss goes into the same target as the albedo
+			u_setrt(*targets[element], NULL, NULL, RImplementation.o.dx10_msaa ? rt_MSAADepth->pZRT : HW.pBaseZB);
+		RCache.set_Element(s_ash->E[element]);
+		RCache.set_c("m_shadow", m_shadow);
+		RCache.set_c("ash_smap", 1.f, fFar * 0.6f, fFar * 0.9f, 0.f);
+		// lit geometry only (not the sky)
+		RCache.set_Stencil(TRUE, D3DCMP_EQUAL, 0x01, 0x01, 0);
+		RCache.Render(D3DPT_TRIANGLELIST, Offset, 0, 4, 0, 2);
+	}
+}

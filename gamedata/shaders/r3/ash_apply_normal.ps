@@ -1,0 +1,10 @@
+#include "ash_ground.h"
+
+// rt_Position xy: the normal ash_amount turned up, where there is ash
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float4 a = ash_load(tc, pos2d);
+	clip(a.w - 1.0 / 255.0);
+	clip(bus_ash_shape.w > 0 ? -1 : 1); // not in the debug views
+	return float4(gbuf_pack_normal(normalize(a.xyz)), 0, 0);
+}

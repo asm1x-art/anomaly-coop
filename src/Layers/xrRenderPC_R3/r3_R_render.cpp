@@ -219,6 +219,7 @@ void CRender::render_menu()
 }
 
 extern u32 g_r;
+float ash_ground_cover(); // r3_R_rain.cpp
 
 void CRender::Render()
 {
@@ -485,7 +486,8 @@ void CRender::Render()
 	}
 
 	//	TODO: DX10: Implement DX10 rain.
-	if (ps_r2_ls_flags.test(R3FLAG_DYN_WET_SURF))
+	// Co-op: the Ash front's ash on the ground goes with it (r3_R_rain.cpp)
+	if (ps_r2_ls_flags.test(R3FLAG_DYN_WET_SURF) || ash_ground_cover() >= EPS_L)
 	{
 		PIX_EVENT(DEFER_RAIN);
 		render_rain();

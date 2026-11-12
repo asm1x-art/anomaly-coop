@@ -1,0 +1,28 @@
+#include "ash_ground.h"
+
+// rt_Color rgb (blend src alpha, inv src alpha): the albedo toward the ash's
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float k = ash_load(tc, pos2d).w;
+	clip(k - 1.0 / 255.0);
+	float3 P, N;
+	float hemi;
+	uint mtl;
+	ash_gbuffer(tc, pos2d, P, N, hemi, mtl);
+	if (bus_ash_shape.w > 3.5) // debug view 4: red facing, green open sky, blue alive
+		return float4(ash_load(tc, pos2d).xyz, 1);
+	if (bus_ash_shape.w > 2.5) // debug view 3: how much ash
+		return float4(k.xxx, 1);
+	if (bus_ash_shape.w > 1.5) // debug view 2: the hemi (grey)
+		return float4(hemi.xxx, 1);
+	if (bus_ash_shape.w > 0) // debug view 1: yellow leaves, orange bark, magenta alpha tested, cyan grass, red flora material, blue tree LODs, green the rest
+	{
+		uint kind = ash_kind_at(tc, pos2d, mtl);
+		float hw = ASH_TEX(s_heat, tc, pos2d).w;
+		float3 c = kind == ASH_KIND_BARK ? float3(1, 0.4, 0) : abs(hw - 0.5) < 0.06 ? float3(1, 1, 0) :
+			kind == ASH_KIND_AREF ? float3(1, 0, 1) : kind == ASH_KIND_GRASS ? float3(0, 1, 1) :
+			mtl == ASH_MTL_FLORA ? float3(1, 0, 0) : mtl == ASH_MTL_LOD ? float3(0, 0, 1) : float3(0, 1, 0);
+		return float4(c, 0.6);
+	}
+	return float4(ash_color(P), k);
+}

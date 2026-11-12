@@ -33,6 +33,8 @@ public:
 	u32 marker;
 	bool pmask [2];
 	bool pmask_wmark;
+	// Co-op: the rain's shadow map without trees while it only serves the Ash front's ash (r4_R_rain.cpp)
+	bool smap_skip_trees;
 public:
 	// Dynamic scene graph
 	//R_dsgraph::mapNormal_T										mapNormal	[2]		;	// 2==(priority/2)
@@ -140,6 +142,7 @@ public:
 		val_feedback_breakp = 0;
 		val_recorder = 0;
 		marker = 0;
+		smap_skip_trees = false;
 		r_pmask(true, true);
 		b_loaded = FALSE;
 	};

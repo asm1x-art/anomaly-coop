@@ -1,0 +1,22 @@
+#include "ash_ground.h"
+
+// rt_Accumulator: the normal turned up by the ash (view space, xyz) and how much ash (w)
+float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR, float4 pos2d : SV_Position) : SV_Target
+{
+	float3 P, N;
+	float hemi;
+	uint mtl;
+	ash_gbuffer(tc, pos2d, P, N, hemi, mtl);
+	float k = ash_amount(tc, pos2d, P, N, hemi, mtl);
+	if (bus_ash_shape.w > 3.5)
+		return float4(ash_dbg, 1);
+	if (bus_ash_shape.w > 0)
+		return float4(N, bus_ash_shape.w > 2.5 ? max(k, 0.005) : 1); // debug views: every pixel
+	float flatten = bus_ash_shape.x > 0 ? bus_ash_shape.x : 0.6;
+	if (ash_kind_at(tc, pos2d, mtl) == ASH_KIND_FLORA)
+		flatten *= 0.5; // leaves stay leaves
+	float3 up = mul(m_V, float4(0, 1, 0, 0));
+	// a leaf seen from its back side keeps a normal pointing down: turning it up would pass through nothing
+	float3 n = lerp(N, up, k * flatten);
+	return float4(dot(n, n) > 0.01 ? normalize(n) : N, k);
+}

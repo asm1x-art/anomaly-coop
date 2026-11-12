@@ -31,4 +31,15 @@ public:
 	LPCSTR Definition;
 };
 
+// Co-op: ash settling on the ground during the Ash front (ash_ground.h): elements 0-3, the passes of draw_ash
+class CBlender_ash : public IBlender
+{
+public:
+	virtual LPCSTR getComment() { return "INTERNAL: ash on the ground"; }
+	virtual BOOL canBeDetailed() { return FALSE; }
+	virtual BOOL canBeLMAPped() { return FALSE; }
+
+	virtual void Compile(CBlender_Compile& C);
+};
+
 #endif	//	dx10RainBlender_included

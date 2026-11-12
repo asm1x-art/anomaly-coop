@@ -105,7 +105,8 @@ void CBlender_deffer_aref::Compile(CBlender_Compile& C)
 			}
 
 
-			uber_deffer(C, true, "base", "base", true, 0, true);
+			// Co-op: ASH_AREF marks alpha tested surfaces (willows, hanging foliage, nets) for the Ash front's ash
+			uber_deffer(C, true, "base", "base", true, 0, true, false, "ASH_AREF");
 			C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 			C.r_StencilRef(0x01);
 			if (bUseATOC) C.RS.SetRS(D3DRS_ZFUNC, D3DCMP_EQUAL);
@@ -128,7 +129,7 @@ void CBlender_deffer_aref::Compile(CBlender_Compile& C)
 			}
 
 
-			uber_deffer(C, false, "base", "base", true, 0, true);
+			uber_deffer(C, false, "base", "base", true, 0, true, false, "ASH_AREF");
 			C.r_Stencil(TRUE, D3DCMP_ALWAYS, 0xff, 0x7f, D3DSTENCILOP_KEEP, D3DSTENCILOP_REPLACE, D3DSTENCILOP_KEEP);
 			C.r_StencilRef(0x01);
 			if (bUseATOC) C.RS.SetRS(D3DRS_ZFUNC, D3DCMP_EQUAL);

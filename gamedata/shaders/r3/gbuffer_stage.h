@@ -113,6 +113,24 @@ f_deffer pack_gbuffer( float4 norm, float4 pos, float4 col, uint imask )
         res.H = float4(L_hotness.x, 0.0, 0.0, 1.0);
     else
         res.H = float4(0.0, 0.0, 0.0, 0.0);
+    // Co-op: trees and bushes (CBlender_Tree compiles their pixel shaders with one of these) for the Ash front's ash on
+    // them: ash_ground.h reads the alpha, heat vision only the colour
+#ifdef ASH_FOLIAGE
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.5;
+#endif
+#ifdef ASH_BARK
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.75;
+#endif
+#ifdef ASH_AREF
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.375;
+#endif
+#ifdef ASH_GRASS
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.25;
+#endif
 #ifdef DLSS_MV
 	res.Velocity = 0; // a shader with motion of its own sets it after (DLSS_MV_WRITE)
 #endif
