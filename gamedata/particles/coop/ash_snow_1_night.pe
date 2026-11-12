@@ -1,0 +1,105 @@
+; Co-op: the ash front's falling ash (coop_zone_ash_fx.script moves it with the camera): Anomaly's snow
+; rezy\environment\effects\snow\snow_test_00 copied, night tone. Changed from the snow: colour (Source Color), alpha (Source
+; Color\Alpha), fewer flakes (max_particles, Source Rate a second), slower (Source Velocity), bigger (Source Size),
+; shorter lives (Age Limit: without collisions they fall on under the ground), no collisions (flags). A plain text
+; file: change these numbers here; the game reads it at start.
+[_effect]
+version = 1
+max_particles = 350
+flags = 37889
+action_count = 5
+
+[sprite]
+shader = particles\blend
+texture = pfx\snowo
+
+[frame]
+tex_size = 0.5, 0.5
+reserved = 0, 0
+dim_x = 2
+frame_count = 4
+speed = 24
+
+[align_to_path]
+default_rotation = -1.570796, 0, 0
+
+; KillOld
+[action_0000]
+action_type = 10
+version = 1
+action_name = killold
+flags = 1
+flt_0000 = 9 ; Age Limit
+bool_0000 = off ; Kill Less Than
+
+; Gravity
+[action_0001]
+action_type = 8
+version = 1
+action_name = gravity
+flags = 0
+vec_0000 = 0, -9.8, 0 ; Direction
+bool_0000 = on ; Allow Rotate
+
+; Move
+[action_0002]
+action_type = 12
+version = 1
+action_name = move
+flags = 1
+
+; Source
+[action_0003]
+action_type = 21
+version = 1
+action_name = source
+flags = 1
+flt_0000 = 0 ; Age Sigma
+flt_0001 = 0.525 ; Color\Alpha
+flt_0002 = 0 ; Parent Motion
+flt_0003 = 40.8 ; Rate
+flt_0004 = 0 ; Starting Age
+bool_0000 = off ; Allow Rotate
+bool_0001 = off ; Single Size
+
+[domain_action_0003_0000] ; Color Point
+type = 0
+v0 = 0.05, 0.048, 0.045
+v1 = 1, 1, 1
+v2 = 1, 1, 1
+
+[domain_action_0003_0001] ; Domain Disc
+type = 9
+v0 = 0, 10, 0
+v1 = 0, 0.5, 0
+v2 = 5, 10, 0
+
+[domain_action_0003_0002] ; Rotation Point
+type = 0
+v0 = 3.141593, 0, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0003_0003] ; Size Point
+type = 0
+v0 = 0.14, 0.14, 0.14
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0003_0004] ; Velocity Point
+type = 0
+v0 = 0, -2.2, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+; Turbulence
+[action_0004]
+action_type = 30
+version = 1
+action_name = turbulence
+flags = 1
+flt_0000 = 0.01 ; Delta
+flt_0001 = 0.6 ; Frequency
+flt_0002 = 3 ; Magnitude
+vec_0000 = 1, 1, 1 ; Movement
+int_0000 = 1 ; Octaves

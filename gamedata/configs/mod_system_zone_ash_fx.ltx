@@ -1,0 +1,33 @@
+; Co-op: the looks of the Zone's event "Ash front" (coop_zone_ash_fx.script; the event itself: [zone_event_ash] in
+; mod_system_zone_events.ltx). Each game with a player makes them for its own player while the front is on its level;
+; the headless host none. The weather (fog, view distance, the wind's gusts) is environment\weathers\w_zev_ash.ltx with
+; its ambients zev_ash / zev_ash_night (environment\mod_ambients_coop_ash.ltx, mod_effects_coop_ash.ltx).
+[zone_event_ash_fx]
+; the front's strength on its level, 0..1 (coop_zone_ash_fx.intensity()): rises from 0 over ramp_in_min real minutes
+; after its start, falls to 0 over ramp_out_min real minutes before its planned end (an admin's stop ends it at once)
+ramp_in_min         = 10
+ramp_out_min        = 10
+
+; falling ash, like snow all around the player: Anomaly's snow (rezy\environment\snow: five rings of flakes up to 30 m
+; round the emitter, 10 m up) copied and made grey - gamedata\particles\coop\ash_snow_<tone>.pg and its
+; ash_snow_<ring>_<tone>.pe (colour, alpha, how many, how fast there: plain text files) - moved with the camera
+fall_levels         = l10_red_forest, l08_yantar, jupiter, zaton    ; the front's levels with falling ash (not the Truck Cemetery: its radiation is the machinery's)
+fall_particle       = coop\ash_snow    ; + _day, _dusk, _night by the hour (the flakes' shader is unlit)
+; how much ash: the player's option (Options > Co-op > "Ash": off, low, medium, high, max; fall_default till he sets
+; it): that many copies of the snow at once (2000 flakes each). While the front gathers or fades (its strength under
+; 1) the ash is that much thinner: strength x the player's choice, at least low
+fall_copies         = 1, 2, 3, 4    ; copies for low, medium, high, max
+fall_default        = 2             ; 0 off, 1 low, 2 medium, 3 high, 4 max
+fall_tone_hours     = 5, 7, 19, 21  ; game hours: dusk tone from, day from, dusk from, night from
+fall_move_ms        = 100       ; real ms between moves of the snow to the camera
+fall_lead_s         = 3         ; the snow goes this many seconds ahead of a moving player (where the flakes born now land)
+; under a roof (a ray straight up from the camera hits the level's buildings within fall_roof_m metres; trees don't
+; count) the ash stops falling and the flakes in the air go after fall_fade_s seconds
+fall_roof_m         = 25
+fall_fade_s         = 1.5
+
+; fire hotspots (fire_particle: gamedata\particles\coop\ash_fire.pg - a wide flame, Anomaly's big campfire, a smoke
+; column ash_smoke.pe) at the points fire_<level> ("x:y:z", comma separated), while the front is on that level. The Red
+; Forest's: in the forest, on the ground and the AI grid, 55+ m from its smarts, story objects and level changers
+fire_particle       = coop\ash_fire
+fire_l10_red_forest = -20.3:2.6:-107.8, 100.1:0.6:-336.0, -188.3:6.7:-216.3, 147.7:1.2:-84.0, -32.2:-0.5:-275.8

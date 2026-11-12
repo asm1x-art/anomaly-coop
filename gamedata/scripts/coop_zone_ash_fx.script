@@ -1,0 +1,223 @@
+-- Co-op: the looks of the Zone's event "Ash front" (coop_zone_ash.script; settings [zone_event_ash_fx] in
+-- mod_system_zone_ash_fx.ltx). Particles are each game's own, so every game with a player makes them for its player
+-- from the shared event fact (coop_zone_events.on_level); the headless host makes none.
+--   falling ash  on fall_levels: Anomaly's snow made grey (fall_particle, rings of flakes round the emitter) moved
+--                with the camera, a little ahead of a moving player. How much: the player's option "Ash" (Options >
+--                Co-op, ash_level()) - copies of it (fall_copies) - times the front's strength, in the hour's tone
+--                (day, dusk, night). Under a roof they stop and their flakes go after fall_fade_s
+--   fires        fire_particle at the points fire_<level> for as long as the front is on that level
+--   intensity()  the front's strength on this level now, 0..1 (0: none here): rises over ramp_in_min real minutes
+--                after its start, falls over ramp_out_min before its planned end. For other looks (the ground's ash)
+-- The weather (fog, the wind's gusts) is the event's w_zev_ash (coop_zone_ash.weather()).
+
+local S = "zone_event_ash_fx"
+local OPTION = "coop/general/ash_fall"
+
+local function num(key, default)
+	return ini_sys:r_float_ex(S, key) or default
+end
+
+local function str(key, default)
+	return ini_sys:r_string_ex(S, key) or default
+end
+
+local function ghost()
+	return coop and coop.connected and coop.connected() and coop.is_host() -- the headless host has no player
+end
+
+local function listed(key, value)
+	for _, v in ipairs(coop_zone_events.ini_list(S, key)) do
+		if v == value then
+			return true
+		end
+	end
+	return false
+end
+
+-------------------------------------------------------------------------------
+-- the strength
+
+-- the front's strength on this level now, 0..1 (0: no front here)
+function intensity()
+	local ev = level.present() and coop_zone_events.on_level("ash", level.name())
+	if not ev then
+		return 0
+	end
+	local t = coop_zone_events.now()
+	local ramp_in, ramp_out = num("ramp_in_min", 10) * 60, num("ramp_out_min", 10) * 60
+	local k = 1
+	if ramp_in > 0 then
+		k = math.min(k, (t - ev.from) / ramp_in)
+	end
+	if ramp_out > 0 then
+		k = math.min(k, (ev.till - t) / ramp_out)
+	end
+	return math.max(0, math.min(1, k))
+end
+
+-- the player's choice of how much ash: 0 off .. #fall_copies (the Co-op options page; fall_default till he sets it)
+function ash_level()
+	local v = ui_options and ui_options.get(OPTION)
+	return math.floor(tonumber(v) or num("fall_default", 2))
+end
+
+-- the falling ash's tone by the hour (its shader is unlit): day, dusk or night (fall_tone_hours: dusk from, day from,
+-- dusk from, night from)
+local function tone()
+	local t = coop_zone_events.ini_list(S, "fall_tone_hours")
+	local h = level.get_time_hours() + level.get_time_minutes() / 60
+	local dawn, day, dusk, night = tonumber(t[1]) or 5, tonumber(t[2]) or 7, tonumber(t[3]) or 19, tonumber(t[4]) or 21
+	if h >= day and h < dusk then
+		return "day"
+	elseif (h >= dawn and h < day) or (h >= dusk and h < night) then
+		return "dusk"
+	end
+	return "night"
+end
+
+-------------------------------------------------------------------------------
+-- falling ash: copies of the ash snow (Anomaly's snow: rings round the emitter) moved with the camera
+
+local falls = {} -- the emitters (copies of fall_effect)
+local fall_effect = nil -- the effect falling now (nil: none)
+local emitting = false -- the emitters make flakes (false: stopped, their flakes in the air go at faded_at + fall_fade_s)
+local faded_at = 0
+local last_pos, last_move = nil, 0
+
+-- under a roof: a ray straight up hits the level's buildings (trees aren't in it)
+local function under_roof(pos)
+	local rp = ray_pick(pos, vector():set(0, 1, 0), num("fall_roof_m", 25), rq_target.rqtStatic, nil)
+	return rp:query()
+end
+
+local function clear_falls()
+	for _, p in ipairs(falls) do
+		p:stop()
+	end
+	falls, emitting = {}, false
+end
+
+-- effect: the group to fall, count: its copies (nil, 0: none)
+local function update_falls(now, effect, count)
+	local cam = device().cam_pos
+	local vel = vector():set(0, 0, 0)
+	if last_pos and now > last_move then
+		vel:sub(cam, last_pos):mul(1000 / (now - last_move))
+		if vel:magnitude() > 15 then
+			vel:set(0, 0, 0) -- a teleport or a level's start: no lead
+		end
+	end
+	last_pos, last_move = vector():set(cam), now
+	if effect ~= fall_effect then
+		clear_falls() -- another strength or tone: over again
+		fall_effect = effect
+	end
+	if not effect or under_roof(cam) then
+		if emitting then
+			for _, p in ipairs(falls) do
+				p:stop_deffered() -- no more flakes; those in the air fall on a little
+			end
+			emitting, faded_at = false, now
+		elseif #falls > 0 and now - faded_at >= num("fall_fade_s", 1.5) * 1000 then
+			clear_falls()
+		end
+		return
+	end
+	-- the flakes are born 10 m up and fall a few seconds: the emitters go where a moving player will be by then
+	local pos = vector():set(cam):mad(vel, num("fall_lead_s", 3))
+	for i = #falls, count + 1, -1 do
+		falls[i]:stop_deffered()
+		table.remove(falls, i)
+	end
+	for i = 1, count do
+		local p = falls[i]
+		if not p then
+			p = particles_object(effect)
+			p:play_at_pos(pos)
+			falls[i] = p
+		elseif not emitting then
+			p:play_at_pos(pos)
+		end
+		p:move_to(pos, vel)
+	end
+	emitting = true
+end
+
+-------------------------------------------------------------------------------
+-- fires
+
+local fires = nil -- the level's fire particles while the front is on it
+
+local function fire_points(lvl)
+	local t = {}
+	for entry in string.gmatch(ini_sys:r_string_ex(S, "fire_" .. lvl) or "", "[^,]+") do
+		local x, y, z = string.match(entry, "([%-%d%.]+)%s*:%s*([%-%d%.]+)%s*:%s*([%-%d%.]+)") -- the ltx drops spaces
+		if z then
+			t[#t + 1] = vector():set(tonumber(x), tonumber(y), tonumber(z))
+		end
+	end
+	return t
+end
+
+local function update_fires(on)
+	if on and not fires then
+		fires = {}
+		for _, pos in ipairs(fire_points(level.name())) do
+			local p = particles_object(str("fire_particle", "coop\\ash_fire"))
+			p:play_at_pos(pos)
+			fires[#fires + 1] = p
+		end
+		coop_zone_events.dbg("ash fx: %s fire(s) on %s", #fires, level.name())
+	elseif not on and fires then
+		for _, p in ipairs(fires) do
+			p:stop_deffered()
+		end
+		fires = nil
+		coop_zone_events.dbg("ash fx: the fires are out")
+	end
+end
+
+-------------------------------------------------------------------------------
+
+local next_look = 0
+local want, want_count = nil, 0 -- the falling ash's effect now (nil: none) and its copies
+
+local function actor_on_update()
+	local now = time_global()
+	if now >= next_look then
+		next_look = now + 1000
+		local k = ghost() and 0 or intensity()
+		update_fires(k > 0)
+		local copies = coop_zone_events.ini_list(S, "fall_copies")
+		local choice = math.min(ash_level(), #copies)
+		local n = (k > 0 and choice > 0 and listed("fall_levels", level.name())) and math.max(1, math.ceil(k * choice)) or 0
+		local effect = n > 0 and (str("fall_particle", "coop\\ash_snow") .. "_" .. tone()) or nil
+		want_count = n > 0 and math.max(1, math.floor(tonumber(copies[n]) or 1)) or 0
+		if effect ~= want then
+			coop_zone_events.dbg("%s", string.format("ash fx: falling ash %s x%s (strength %.2f, the player's choice %s)",
+				tostring(effect), want_count, k, choice))
+			want = effect
+		end
+	end
+	if now >= last_move + num("fall_move_ms", 100) and (want or #falls > 0) then
+		update_falls(now, want, want_count)
+	end
+end
+
+-- the level goes: its particles with it
+local function actor_on_net_destroy()
+	clear_falls()
+	fall_effect, want = nil, nil
+	if fires then
+		for _, p in ipairs(fires) do
+			p:stop()
+		end
+		fires = nil
+	end
+	next_look, last_move, last_pos = 0, 0, nil
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
+end

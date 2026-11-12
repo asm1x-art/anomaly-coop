@@ -571,6 +571,27 @@
 	<string id="ui_mm_coop_general_raid_timer_desc">
 		<text>Time left till the Cooling window closes, in a corner of the screen during a raid (real minutes).</text>
 	</string>
+	<string id="ui_mm_coop_general_ash_fall">
+		<text>Ash (Ash front)</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_desc">
+		<text>How much ash falls around you during the Ash front. Lower it if FPS drops; applies at once.</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_0">
+		<text>Off</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_1">
+		<text>Low</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_2">
+		<text>Medium</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_3">
+		<text>High</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_4">
+		<text>Max</text>
+	</string>
 	<!-- co-op messages in the game (coop_sync.script, coop_fps.script) -->
 	<string id="st_coop_share_stash">
 		<text>Share with the group</text>

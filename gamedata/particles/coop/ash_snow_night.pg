@@ -1,0 +1,53 @@
+; Co-op: the ash front's falling ash, night tone: Anomaly's snow group rezy\environment\snow (five rings round
+; the emitter) made of our ash copies ash_snow_<ring>_night.pe.
+[_group]
+version = 3
+flags = 0
+effects_count = 5
+timelimit = 0
+
+[effect_0000]
+effect_name = coop\ash_snow_0_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0001]
+effect_name = coop\ash_snow_1_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0002]
+effect_name = coop\ash_snow_2_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0003]
+effect_name = coop\ash_snow_3_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0004]
+effect_name = coop\ash_snow_4_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+

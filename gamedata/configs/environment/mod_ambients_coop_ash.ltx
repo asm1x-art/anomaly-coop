@@ -1,0 +1,14 @@
+; Co-op: the ambients of the ash front's weather (weathers\w_zev_ash.ltx): Anomaly's tuman / tuman_night (their wind
+; and night sounds) with gusts of dusty wind, the effects of mod_effects_coop_ash.ltx. A gust comes every
+; min_effect_period..max_effect_period seconds (in the open only).
+[zev_ash]
+effects                          = zev_ash_gust_1, zev_ash_gust_2, zev_ash_gust_3, zev_ash_gust_4
+max_effect_period                = 40
+min_effect_period                = 15
+sound_channels                   = default_ambient_wind
+
+[zev_ash_night]
+effects                          = zev_ash_gust_1, zev_ash_gust_2, zev_ash_gust_3
+max_effect_period                = 60
+min_effect_period                = 25
+sound_channels                   = default_ambient_night
