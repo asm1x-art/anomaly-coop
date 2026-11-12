@@ -49,8 +49,8 @@ void CRender::render_rain()
 		else
 			fRainFactor = g_pGamePersistent->Environment().wetness_factor;
 	}
-	// the ash shares the rain's view from above (its shadow map); not with MSAA
-	const float fAsh = RImplementation.o.dx10_msaa ? 0.f : ash_ground_cover();
+	// the ash shares the rain's view from above (its shadow map)
+	const float fAsh = ash_ground_cover();
 
 	if (fRainFactor < EPS_L && fAsh < EPS_L) return;
 

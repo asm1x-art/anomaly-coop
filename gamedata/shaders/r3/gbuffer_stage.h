@@ -123,6 +123,14 @@ f_deffer pack_gbuffer( float4 norm, float4 pos, float4 col, uint imask )
     if (L_hotness.x <= 0.0)
         res.H.w = 0.75;
 #endif
+#ifdef ASH_AREF
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.375;
+#endif
+#ifdef ASH_GRASS
+    if (L_hotness.x <= 0.0)
+        res.H.w = 0.25;
+#endif
 #ifdef DLSS_MV
 	res.Velocity = 0; // a shader with motion of its own sets it after (DLSS_MV_WRITE)
 #endif

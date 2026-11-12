@@ -137,6 +137,8 @@ ground_levels        = l10_red_forest, l08_yantar, jupiter, zaton ; not the Truc
 ground_ramp_up_min   = 20          ; real minutes from no ash to full
 ground_linger_game_h = 60          ; game hours the ash lies on after the front (2.5 game days)
 ground_linger_curve  = 1.5         ; how it fades: 1 evenly, above 1 quicker at first and a thin layer longer
+ground_rain_wash     = 4           ; rain washes it off: a game second of rain (density 1) counts as this many of lying
+ground_rain_sample_s = 30          ; real seconds between the master's looks at the rain (it adds it to the shared fact)
 ground_opacity       = 0.85        ; the most the ash hides of a surface, 0..1
 ground_gloss_keep    = 0.15        ; the surface's gloss left under full ash, 0..1
 ground_patchiness    = 1           ; 0: everywhere at once; 1: in patches first (ground_patch_m), the rest later
@@ -153,3 +155,5 @@ ground_flora_open     = 0.8        ; how much of the crown's own shade from abov
 ; tree trunks and branches (the trees' solid parts): their upper sides
 ground_bark_up        = 0.0, 0.7   ; world normal.y of the bark: no ash at the first, full at the second
 ground_bark_strength  = 0.8        ; the most ash on bark (x ground_opacity), 0..1
+ground_grass_strength = 0.5        ; the most ash on grass (x the ground's), 0..1
+ground_aref_strength  = 0.8        ; the most on alpha tested surfaces: willows' hanging foliage, nets, fences, 0..1

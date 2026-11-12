@@ -14,13 +14,15 @@
 //   bus_ash_look   xyz the ash's albedo, w the size of its patches in metres
 //   bus_ash_mask   x..y world normal.y from no ash to full, z..w hemi (open sky) from no ash to full
 //   bus_ash_shape  x how far full ash turns the normal up (smooths the surface's bumps), y grain (albedo variation),
-//                  w debug views: 1 yellow leaves, orange bark, red flora material, blue tree LODs, green the rest;
+//                  w debug views: 1 yellow leaves, orange bark, magenta alpha tested, cyan grass, red flora material,
+//                  blue tree LODs, green the rest;
 //                  2 the hemi; 3 how much ash (white); 4 red facing, green open sky, blue alive
 //   bus_ash_flora  foliage (leaves, bushes, grass: Anomaly's flora material 6) and far tree LODs (material 0): their
 //                  normals point every way and a crown hides itself from above, so x..y world normal.y from no ash to
 //                  full, z the most of it (x opacity), w how much the view from above and the hemi are ignored
 //   bus_ash_bark   tree trunks and branches (ASH_BARK): x..y world normal.y from no ash to full, z the most of it;
 //                  the view from above and the hemi ignored as for foliage
+//   bus_ash_kinds  x the most ash on grass (ASH_GRASS), y on alpha tested surfaces (ASH_AREF: willows, nets, fences)
 // ash_smap (engine): x 1 while the rain's shadow map (the view from above) is valid, y..z view distance where it fades
 // out (beyond it only the hemi tells a roof). m_shadow (the map's xform) comes from shadow.h.
 
@@ -33,10 +35,20 @@ uniform float4 bus_ash_mask;
 uniform float4 bus_ash_shape;
 uniform float4 bus_ash_flora;
 uniform float4 bus_ash_bark;
+uniform float4 bus_ash_kinds;
 uniform float4 ash_smap;
 
-Texture2D s_heat;         // HeatVision's target: x > 0 on living things
+// with MSAA the G-buffer is multisampled: every pass here runs once a pixel and reads its sample 0 (and writes all the
+// pixel's samples): the ash at an outline may show a pixel off, nothing else
+#ifdef USE_MSAA
+Texture2DMS<float4, MSAA_SAMPLES> s_heat; // HeatVision's target: x > 0 on living things, alpha the kind (gbuffer_stage.h)
+Texture2DMS<float4, MSAA_SAMPLES> s_ash;  // ash_amount's result (rt_Accumulator): xyz normal, w amount
+#define ASH_TEX(tex, tc, pos2d) tex.Load(int2(pos2d.xy), 0)
+#else
+Texture2D s_heat;         // HeatVision's target: x > 0 on living things, alpha the kind (gbuffer_stage.h)
 Texture2D s_ash;          // ash_amount's result (rt_Accumulator): xyz normal, w amount
+#define ASH_TEX(tex, tc, pos2d) tex.Sample(smp_nofilter, tc)
+#endif
 static float3 ash_dbg;    // debug view 4: ash_amount's facing, open sky and alive
 
 float ash_hash(float2 p)
@@ -66,32 +78,39 @@ float ash_vnoise(float2 p)
 // view space position and normal of the pixel, hemi, the material's 5 bit id
 void ash_gbuffer(float2 tc, float4 pos2d, out float3 P, out float3 N, out float hemi, out uint mtl)
 {
-	float4 G = s_position.Sample(smp_nofilter, tc);
+	float4 G = ASH_TEX(s_position, tc, pos2d);
 	P = float3(G.z * (pos2d.xy * pos_decompression_params.zw - pos_decompression_params.xy), G.z);
 	N = gbuf_unpack_normal(G.xy);
 	hemi = gbuf_unpack_hemi(G.w);
 	mtl = uint(round(gbuf_unpack_mtl(G.w) * 31.0 / 1.333333333));
 }
 
-// trees and bushes: their pixel shaders are compiled with ASH_FOLIAGE (leaves) or ASH_BARK (trunks), which put 0.5 or
-// 0.75 into the heat target's alpha (gbuffer_stage.h); foliage textures with Anomaly's flora material and the far tree
-// LODs by the material
+// what a surface is, from the heat target's alpha its pixel shader wrote (gbuffer_stage.h, the defines the blenders
+// compile them with): 0.25 grass (ASH_GRASS, details), 0.375 alpha tested level and model surfaces (ASH_AREF: hanging
+// foliage, willows, nets, fences), 0.5 tree leaves (ASH_FOLIAGE), 0.75 tree trunks (ASH_BARK); foliage textures with
+// Anomaly's flora material and the far tree LODs by the material
 #define ASH_KIND_GROUND 0
 #define ASH_KIND_FLORA 1
 #define ASH_KIND_BARK 2
+#define ASH_KIND_GRASS 3
+#define ASH_KIND_AREF 4
 
 uint ash_kind(float heat_w, uint mtl)
 {
-	if (abs(heat_w - 0.75) < 0.1)
+	if (abs(heat_w - 0.75) < 0.06)
 		return ASH_KIND_BARK;
-	if (abs(heat_w - 0.5) < 0.1 || mtl == ASH_MTL_FLORA || mtl == ASH_MTL_LOD)
+	if (abs(heat_w - 0.5) < 0.06 || mtl == ASH_MTL_FLORA || mtl == ASH_MTL_LOD)
 		return ASH_KIND_FLORA;
+	if (abs(heat_w - 0.375) < 0.06)
+		return ASH_KIND_AREF;
+	if (abs(heat_w - 0.25) < 0.06)
+		return ASH_KIND_GRASS;
 	return ASH_KIND_GROUND;
 }
 
-uint ash_kind_at(float2 tc, uint mtl)
+uint ash_kind_at(float2 tc, float4 pos2d, uint mtl)
 {
-	return ash_kind(s_heat.Sample(smp_nofilter, tc).w, mtl);
+	return ash_kind(ASH_TEX(s_heat, tc, pos2d).w, mtl);
 }
 
 float ash_patch_noise(float3 Pw)
@@ -134,7 +153,7 @@ float ash_amount(float2 tc, float4 pos2d, float3 P, float3 N, float hemi, uint m
 	}
 
 	// not the HUD, not living things
-	float4 H = s_heat.Sample(smp_nofilter, tc);
+	float4 H = ASH_TEX(s_heat, tc, pos2d);
 	float hud = smoothstep(1.0, 1.3, length(P));
 	float alive = saturate(H.x * 4.0);
 
@@ -155,6 +174,15 @@ float ash_amount(float2 tc, float4 pos2d, float3 P, float3 N, float hemi, uint m
 		up = smoothstep(bark.x, bark.y, outline ? 0 : Ng.y) * bark.z;
 		open = lerp(open, 1.0, flora.w);
 	}
+	else if (kind == ASH_KIND_AREF)
+	{
+		// hanging foliage, nets, fences: as leaves, but a roof over them still counts (only the view from above of
+		// their own crown is ignored, not the hemi)
+		up = smoothstep(flora.x, flora.y, Nw.y) * flora.z * (bus_ash_kinds.y > 0 ? bus_ash_kinds.y : 0.8);
+		open = sky * lerp(above, 1.0, flora.w);
+	}
+	else if (kind == ASH_KIND_GRASS)
+		up *= bus_ash_kinds.x > 0 ? bus_ash_kinds.x : 0.5;
 
 	// patches first: the noise decides where a cover below 1 has settled
 	float grow = saturate(cover * (1.0 + spread) - ash_patch_noise(Pw) * spread);
@@ -174,9 +202,9 @@ float3 ash_color(float3 P)
 	return look * (1.0 + amp * (grain - 0.5)) * (0.9 + 0.2 * ash_patch_noise(Pw));
 }
 
-float4 ash_load(float2 tc)
+float4 ash_load(float2 tc, float4 pos2d)
 {
-	return s_ash.Sample(smp_nofilter, tc);
+	return ASH_TEX(s_ash, tc, pos2d);
 }
 
 #endif

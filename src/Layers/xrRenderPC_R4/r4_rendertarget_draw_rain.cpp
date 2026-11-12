@@ -404,7 +404,7 @@ void CRenderTarget::draw_rain(light& RainSetup)
 // distance (no depth clip, unlike the rain): ash_amount works out the ash and the turned normal into rt_Accumulator
 // (scratch until the lights, as for the rain), then cheap passes put it into rt_Color (albedo, gloss) and rt_Position
 // (normal). The rain's shadow map (the view from above, rendered by render_rain) keeps what is under a roof clean near
-// the camera; beyond its reach the shader only has the hemi. Not with MSAA (render_rain does not call it then).
+// the camera; beyond its reach the shader only has the hemi. With MSAA the passes run once a pixel on its sample 0.
 void CRenderTarget::draw_ash(light& RainSetup)
 {
 	u32 Offset;
@@ -456,7 +456,7 @@ void CRenderTarget::draw_ash(light& RainSetup)
 	for (u32 element = 0; element < 4; ++element)
 	{
 		if (element != 2) // the gloss goes into the same target as the albedo
-			u_setrt(*targets[element], NULL, NULL, HW.pBaseZB);
+			u_setrt(*targets[element], NULL, NULL, RImplementation.o.dx10_msaa ? rt_MSAADepth->pZRT : HW.pBaseZB);
 		RCache.set_Element(s_ash->E[element]);
 		RCache.set_c("m_shadow", m_shadow);
 		RCache.set_c("ash_smap", 1.f, fFar * 0.6f, fFar * 0.9f, 0.f);
