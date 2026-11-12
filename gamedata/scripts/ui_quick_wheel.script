@@ -1,0 +1,753 @@
+-- The quick item wheel: a key ([quick_wheel] key, per player in MCM) opens one wheel of the player's own things.
+-- The player fills it from the backpack: an item's menu «В быстрое колесо» adds it, «Убрать из быстрого колеса» or a
+-- right click on the wheel takes it off. A click uses the thing: eats it, takes it in hands, puts it on, takes the
+-- grenade or the detector, loads the ammo, attaches or takes off the addon.
+-- The idea is GRA's Quick Action Wheel (HarukaSai, its overhaul by Gwnf5066); the code is ours, the look the game's
+-- own (ui_stalker_style: the ammo wheel under it, the co-op wheel's discs, the items' icons).
+-- The wheel's things live in an actor variable (save_var): they go with the save and, in co-op, with each player's own
+-- progress (coop_progress keeps the actor's variables per player). Everything tunable: configs/mod_system_quick_wheel.ltx.
+-- The game's ammo wheel (the weapon's next ammo key) stays as it is: this one has its own key.
+
+local C = ui_stalker_style.C
+local SEC = "quick_wheel"
+local VAR = "quick_wheel" -- the actor variable: { items = { { sec =, id = }, ... } }
+
+GUI = nil -- the wheel (DestroyAll_UI drops it by this name)
+local closed_at = 0
+
+local function debug(fmt, ...)
+	if coop and get_console():get_integer("coop_debug") == 1 then
+		printf("[quick wheel] " .. fmt, ...)
+	end
+end
+
+local function num(key, def)
+	return ini_sys:r_float_ex(SEC, key) or def
+end
+
+local function color(key, def)
+	local s = ini_sys:r_string_ex(SEC, key)
+	local t = {}
+	for v in string.gmatch(s or "", "%d+") do
+		t[#t + 1] = tonumber(v)
+	end
+	return #t >= 3 and t or def
+end
+
+local function tr(id)
+	return game.translate_string(id)
+end
+
+local function max_items()
+	return num("max_items", 12)
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- the player's wheel
+
+-- the wheel's things; an older build kept two sets (sets.set1, sets.set2): they become the one list, the first set first
+local function data()
+	local d = load_var(db.actor, VAR)
+	if type(d) ~= "table" then
+		d = {}
+	end
+	if type(d.items) ~= "table" then
+		d.items = {}
+		local seen = {}
+		for _, name in ipairs({ "set1", "set2" }) do
+			for _, e in ipairs(type(d.sets) == "table" and d.sets[name] or {}) do
+				local k = e.sec .. ":" .. tostring(e.id)
+				if not seen[k] and #d.items < max_items() then
+					seen[k] = true
+					d.items[#d.items + 1] = e
+				end
+			end
+		end
+		d.sets, d.tab, d.set = nil, nil, nil
+	end
+	return d
+end
+
+local function store(d)
+	save_var(db.actor, VAR, d)
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- what a thing is and does
+
+local function slot_of(sec) -- the engine's slot (the ltx one plus one)
+	local s = ini_sys:r_float_ex(sec, "slot")
+	return s and s >= 0 and s + 1 or nil
+end
+
+-- "ammo" | "scope" | "sil" | "gl" | "eat" | "grenade" | "device" | "wear" | "weapon" | nil (not for the wheel)
+local function kind_of(sec)
+	if not sec or not ini_sys:section_exist(sec) then
+		return nil
+	end
+	if IsItem("ammo", sec) or IsItem("grenade_ammo", sec) then
+		return not IsItem("fake_ammo", sec) and "ammo" or nil
+	end
+	if IsItem("scope", sec) then
+		return "scope"
+	end
+	if IsItem("sil", sec) then
+		return "sil"
+	end
+	if IsItem("gl", sec) then
+		return "gl"
+	end
+	if IsItem("consumable", sec) then
+		return "eat"
+	end
+	local slot = slot_of(sec)
+	if slot == 4 then
+		return "grenade"
+	elseif slot == 9 then
+		return "device"
+	elseif slot == 7 or slot == 12 or slot == 13 then
+		return "wear"
+	elseif slot == 1 or slot == 2 or slot == 3 or slot == 5 or slot == 6 then
+		return "weapon"
+	end
+	return nil
+end
+
+-- kept by id (this very gun, this very suit); the rest by section
+local BY_ID = { weapon = true, wear = true }
+
+local function ours(obj)
+	local p = obj and obj:parent()
+	return p and p:id() == AC_ID or false
+end
+
+local function family(sec)
+	return ini_sys:r_string_ex(sec, "parent_section") or sec
+end
+
+-- the thing an entry stands for, in our backpack (nil: not on us). A gun given or taken a scope is another object of
+-- another section of the same family: the entry follows it.
+local function find(e)
+	if not e.id then
+		return db.actor:object(e.sec)
+	end
+	local obj = level.object_by_id(e.id)
+	if obj and ours(obj) and family(obj:section()) == family(e.sec) then
+		e.sec = obj:section()
+		return obj
+	end
+	local same, kin
+	db.actor:iterate_inventory(function(_, item)
+		local s = item:section()
+		if not same and s == e.sec then
+			same = item
+		elseif not kin and family(s) == family(e.sec) then
+			kin = item
+		end
+	end, db.actor)
+	obj = same or kin
+	if obj then
+		e.id, e.sec = obj:id(), obj:section()
+	end
+	return obj
+end
+
+local function slot_holding(obj)
+	for slot = 1, 13 do
+		local item = db.actor:item_in_slot(slot)
+		if item and item:id() == obj:id() then
+			return slot
+		end
+	end
+end
+
+local function weapon_in_hands()
+	local wpn = db.actor:active_item()
+	if wpn and IsWeapon(wpn) and not IsItem("fake_ammo_wpn", wpn:section()) then
+		return wpn
+	end
+end
+
+local function ammo_index(wpn, sec)
+	local idx
+	local cwpn = wpn:cast_Weapon()
+	if cwpn then
+		cwpn:AmmoTypeForEach(function(i, s)
+			if s == sec then
+				idx = i
+			end
+		end)
+	end
+	return idx
+end
+
+-- a scope on a gun made of two sections (the gun's section + "_" + the scope's), as the backpack's attach does
+local function child_scope(wpn, sec)
+	local parent = ini_sys:r_string_ex(wpn:section(), "parent_section")
+	if not parent or parent ~= wpn:section() or not ini_sys:section_exist(parent .. "_" .. sec) then
+		return false
+	end
+	for _, s in ipairs(parse_list(ini_sys, wpn:section(), "scopes")) do
+		if s == sec then
+			return true
+		end
+	end
+	return false
+end
+
+local function attached(wpn, sec, k)
+	if k == "sil" then
+		return utils_item.get_attached_silencer(wpn) == sec
+	elseif k == "gl" then
+		return utils_item.get_attached_gl(wpn) == sec
+	end
+	return utils_item.get_attached_scope(wpn) == sec
+end
+
+local function can_attach(wpn, obj, k)
+	if k == "sil" then
+		return utils_item.can_attach_silencer(wpn, obj)
+	elseif k == "gl" then
+		return utils_item.can_attach_gl(wpn, obj)
+	end
+	return utils_item.can_attach_scope(wpn, obj) or child_scope(wpn, obj:section())
+end
+
+local snd_attach = sound_object([[interface\inv_attach_addon]])
+local snd_detach = sound_object([[interface\inv_detach_addon]])
+
+-- the state of an entry now: obj (on us or nil), active (worn, in hands, loaded, attached), bad (can't be used now)
+local function state_of(e)
+	local k = kind_of(e.sec)
+	local obj = find(e)
+	local st = { obj = obj, kind = k }
+	if k == "weapon" then
+		local item = db.actor:active_item()
+		st.active = obj and item and item:id() == obj:id()
+	elseif k == "wear" then
+		st.active = obj and slot_holding(obj) ~= nil
+	elseif k == "device" then
+		local worn = db.actor:item_in_slot(9)
+		st.active = obj and worn and worn:section() == e.sec and db.actor:active_detector() ~= nil
+	elseif k == "grenade" then
+		local item = db.actor:active_item()
+		st.active = item and item:section() == e.sec
+	elseif k == "ammo" then
+		local wpn = weapon_in_hands()
+		local idx = wpn and ammo_index(wpn, e.sec)
+		st.active = idx and idx == wpn:get_ammo_type() and wpn:get_ammo_in_magazine() > 0
+		st.bad = not idx
+		st.why = not wpn and "st_qwheel_no_weapon" or not idx and "st_qwheel_no_fit" or nil
+	elseif k == "scope" or k == "sil" or k == "gl" then
+		local wpn = weapon_in_hands()
+		st.active = wpn and attached(wpn, e.sec, k)
+		st.bad = not st.active and not (wpn and obj and can_attach(wpn, obj, k))
+		st.why = not wpn and "st_qwheel_no_weapon" or st.bad and "st_qwheel_no_fit" or nil
+	end
+	st.active = st.active and true or false
+	return st
+end
+
+-- what a click on it does (a hint's text id)
+local function action_hint(st)
+	if not st.obj and not st.active then
+		return "st_qwheel_missing"
+	end
+	if st.bad then
+		return st.why or "st_qwheel_no_fit"
+	end
+	local k = st.kind
+	if k == "eat" then
+		return "st_qwheel_do_eat"
+	elseif k == "weapon" then
+		return st.active and "st_qwheel_do_holster" or "st_qwheel_do_weapon"
+	elseif k == "wear" then
+		return st.active and "st_qwheel_worn" or "st_qwheel_do_wear"
+	elseif k == "device" then
+		return st.active and "st_qwheel_do_device_hide" or "st_qwheel_do_device"
+	elseif k == "grenade" then
+		return "st_qwheel_do_grenade"
+	elseif k == "ammo" then
+		return st.active and "st_qwheel_loaded" or "st_qwheel_do_ammo"
+	end
+	return st.active and "st_qwheel_do_detach" or "st_qwheel_do_attach"
+end
+
+local function later(name, delay, f)
+	CreateTimeEvent("ui_quick_wheel", name, delay, function()
+		f()
+		return true
+	end)
+end
+
+local function use_device(obj)
+	local worn = db.actor:item_in_slot(9)
+	if worn and worn:id() == obj:id() then
+		if db.actor:active_detector() then
+			db.actor:hide_detector(false)
+		else
+			db.actor:show_detector(false)
+		end
+		return
+	end
+	local function put_on()
+		local o = level.object_by_id(obj:id())
+		if o and ours(o) then
+			db.actor:move_to_slot(o, 9)
+			later("device_show", 0.1, function()
+				db.actor:show_detector(false)
+			end)
+		end
+	end
+	if worn and db.actor:active_detector() then
+		db.actor:hide_detector(false)
+		local tries = 0
+		RemoveTimeEvent("ui_quick_wheel", "device_swap")
+		CreateTimeEvent("ui_quick_wheel", "device_swap", 0, function()
+			tries = tries + 1
+			if not db.actor:active_detector() or tries > 200 then
+				put_on()
+				return true
+			end
+			return false
+		end)
+		return
+	end
+	put_on()
+end
+
+-- use an entry (its state from state_of); true when done
+local function use(e, st)
+	local obj, k = st.obj, st.kind
+	if st.bad or not (obj or st.active) then
+		return false
+	end
+	debug("use %s (%s)", e.sec, k)
+	if k == "eat" then
+		if CInventory__eat(obj) == false then
+			return true
+		end
+		db.actor:eat(obj)
+	elseif k == "weapon" then
+		if st.active then
+			db.actor:activate_slot(0)
+			return true
+		end
+		local slot = slot_holding(obj)
+		if not slot then
+			slot = slot_of(obj:section())
+			db.actor:move_to_slot(obj, slot)
+		end
+		later("activate", 0.1, function()
+			db.actor:activate_slot(slot)
+		end)
+	elseif k == "wear" then
+		if not st.active then
+			db.actor:move_to_slot(obj, slot_of(obj:section()))
+		end
+	elseif k == "grenade" then
+		local worn = db.actor:item_in_slot(4)
+		if not (worn and worn:section() == obj:section()) then
+			db.actor:move_to_slot(obj, 4)
+		end
+		later("activate", 0.1, function()
+			db.actor:activate_slot(4)
+		end)
+	elseif k == "device" then
+		use_device(obj)
+	elseif k == "ammo" then
+		local wpn = weapon_in_hands()
+		local idx = wpn and ammo_index(wpn, e.sec)
+		if idx and not st.active then
+			wpn:unload_magazine(true)
+			wpn:set_ammo_type(idx)
+			db.actor:reload_weapon()
+		end
+	else -- an addon on the gun in hands
+		local wpn = weapon_in_hands()
+		if not wpn or wpn:get_state() ~= 0 then
+			return false -- busy (shooting, reloading): not now
+		end
+		if st.active then
+			snd_detach:play(db.actor, 0, sound_object.s2d)
+			utils_item.detach_addon(wpn, nil, k)
+		elseif k == "scope" and child_scope(wpn, obj:section()) then
+			snd_attach:play(db.actor, 0, sound_object.s2d)
+			item_weapon.attach_scope(obj, wpn)
+		else
+			snd_attach:play(db.actor, 0, sound_object.s2d)
+			utils_item.attach_addon(wpn, obj, k)
+		end
+	end
+	return true
+end
+
+
+local function counts()
+	local n = {}
+	db.actor:iterate_inventory(function(_, item)
+		local s = item:section()
+		local c = 1
+		if IsItem("ammo", s) or IsItem("grenade_ammo", s) then
+			c = item:ammo_get_count()
+		elseif IsItem("multiuse", s) then
+			c = item:get_remaining_uses()
+		end
+		n[s] = (n[s] or 0) + c
+	end, db.actor)
+	return n
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- the window
+
+class "UIQuickWheel" (CUIScriptWnd)
+ui_stalker_style.apply(UIQuickWheel)
+
+function UIQuickWheel:__init() super()
+	self.k = utils_xml.screen_ratio()
+	self.W = 1024 / self.k
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self:AllowMovement(true) -- walk with it open, as with the game's ammo wheel
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile(ui_stalker_style.XML)
+
+	self.cx, self.cy = self.W / 2, num("center_y", 384)
+	self.ring = num("ring", 152)
+	self.dead = num("dead_zone", 48)
+	self.col = {
+		name = color("color_name", C.head), text = color("color_text", C.text), hint = color("color_hint", C.dim),
+		bad = color("color_bad", C.bad),
+	}
+	self.missing_alpha = num("missing_alpha", 70)
+
+	-- the game's ammo wheel under it
+	local bw = num("back_size", 460)
+	local bh = bw * 420 / 440
+	self:image(self.cx - bw / 2, self.cy - bh / 2, bw, bh, "ui_hud2_wheel_ammo", self, nil, num("back_alpha", 242))
+
+	-- the middle: the name, its count or condition, what a click does
+	local tw = 2 * (self.ring - num("disc", 78) / 2) - 16
+	self.name = self:text(self.cx - tw / 2, self.cy - 52, tw, 46, "", self.col.name, self, CGameFont.alCenter, "l")
+	self.info = self:text(self.cx - tw / 2, self.cy - 4, tw, 20, "", self.col.text, self, CGameFont.alCenter, "m")
+	self.hint = self:text(self.cx - tw / 2, self.cy + 18, tw, 60, "", self.col.hint, self, CGameFont.alCenter, "s")
+	self.body = nil
+	self.items = {}
+end
+
+function UIQuickWheel:__finalize()
+end
+
+-- an item's icon fitted into a box, its shape kept (ui_stalker_style's icon, returned to be tinted)
+function UIQuickWheel:item_icon(sec, x, y, box, parent)
+	local ico = utils_xml.get_item_axis(sec)
+	if ico.w <= 0 or ico.h <= 0 then
+		return nil
+	end
+	local s = self.xml:InitStatic("image", parent)
+	s:InitTexture(utils_xml.get_icons_texture(sec))
+	s:SetTextureRect(Frect():set(ico.x1, ico.y1, ico.x2, ico.y2))
+	s:SetStretchTexture(true)
+	local scale = math.min(box / ico.w, box / ico.h)
+	local w, h = ico.w * scale, ico.h * scale
+	self:place(s, x + (box - w) / 2, y + (box - h) / 2, w, h)
+	return s
+end
+
+-- the things, drawn again
+function UIQuickWheel:Build()
+	if self.body then
+		self:DetachChild(self.body)
+		self.body = nil
+	end
+	self.items = {}
+	self.hovered = nil
+	local list = self.d.items
+	local n = math.min(#list, max_items())
+	self.body = self:box(0, 0, self.W, 768, self)
+	if n > 0 then
+		local disc = math.min(num("disc", 78), 2 * self.ring * math.sin(math.pi / n) * 0.92)
+		local icon = disc * num("icon", 58) / num("disc", 78)
+		for i = 1, n do
+			local a = -math.pi / 2 + 2 * math.pi * (i - 1) / n
+			local x, y = self.cx + self.ring * math.cos(a), self.cy + self.ring * math.sin(a)
+			local it = { e = list[i], angle = a }
+			it.disc = self:image(x - disc / 2, y - disc / 2, disc, disc, "ui\\coop\\wheel_btn_e", self.body)
+			it.icon = self:item_icon(list[i].sec, x - icon / 2, y - icon / 2, icon, self.body)
+			it.count = self:text(x - disc / 2, y + disc / 2 - 22, disc - 8, 16, "", self.col.text, self.body, CGameFont.alRight, "s")
+			self.items[i] = it
+		end
+	end
+	self:Refresh()
+end
+
+-- the things' states (on us, worn, loaded...), counts and looks
+function UIQuickWheel:Refresh()
+	self.next_refresh = time_global() + num("refresh_ms", 300)
+	local n = counts()
+	for _, it in ipairs(self.items) do
+		local st = state_of(it.e)
+		it.st = st
+		if it.icon then
+			local a = st.obj and 255 or self.missing_alpha
+			it.icon:SetTextureColor(st.bad and GetARGB(a, self.col.bad[1], self.col.bad[2], self.col.bad[3]) or GetARGB(a, 255, 255, 255))
+		end
+		local txt = ""
+		if st.obj and BY_ID[st.kind] then
+			txt = string.format("%d%%", math.floor(st.obj:condition() * 100 + 0.5))
+		elseif (n[it.e.sec] or 0) > 1 then
+			txt = tostring(n[it.e.sec])
+		end
+		it.count:SetText(txt)
+		it.look = nil -- the disc again
+	end
+	self.counts = n
+	self:Look()
+end
+
+-- the discs: under the cursor, active, missing or plain
+function UIQuickWheel:Look()
+	for i, it in ipairs(self.items) do
+		local look = i == self.hovered and "h" or it.st and it.st.active and "t" or it.st and not it.st.obj and "d" or "e"
+		if look ~= it.look then
+			it.disc:InitTexture("ui\\coop\\wheel_btn_" .. look)
+			it.look = look
+		end
+	end
+	self:Texts()
+end
+
+-- the middle's texts: the thing under the cursor, else the wheel's own
+function UIQuickWheel:Texts()
+	local it = self.hovered and self.items[self.hovered]
+	if it and it.st then
+		local st = it.st
+		self.name:SetText(ui_item.get_sec_name(it.e.sec))
+		local info = ""
+		local c = self.counts and self.counts[it.e.sec] or 0
+		if st.obj and BY_ID[st.kind] then
+			info = string.format(tr("st_qwheel_condition"), math.floor(st.obj:condition() * 100 + 0.5))
+		elseif c > 0 then
+			info = string.format(tr(st.kind == "ammo" and "st_qwheel_rounds" or IsItem("multiuse", it.e.sec) and "st_qwheel_uses" or "st_qwheel_count"), c)
+		end
+		self.info:SetText(info)
+		self.hint:SetTextColor(st.bad and ui_stalker_style.argb(self.col.bad) or ui_stalker_style.argb(self.col.hint))
+		self.hint:SetText(tr(action_hint(st)) .. "\\n" .. tr("st_qwheel_rmb_remove"))
+		return
+	end
+	self.name:SetText(tr("st_qwheel_title"))
+	self.info:SetText("")
+	self.hint:SetTextColor(ui_stalker_style.argb(self.col.hint))
+	self.hint:SetText(#self.items == 0 and tr("st_qwheel_empty") or "")
+end
+
+function UIQuickWheel:Open(d)
+	self.d = d
+	self:Build()
+	self:ShowDialog(true)
+	self.opened_at = time_global() -- the press that opened it comes to the window too
+	Register_UI("UIQuickWheel", "ui_quick_wheel")
+	SetCursorPosition(vector2():set(self.cx * self.k, self.cy))
+end
+
+function UIQuickWheel:cursor()
+	local p = GetCursorPosition()
+	return p.x / self.k, p.y
+end
+
+function UIQuickWheel:Update()
+	CUIScriptWnd.Update(self)
+	if not self:IsShown() then
+		return
+	end
+	if self.hold and key_state(self.key) == 0 then -- held, let go: what is under the cursor
+		local it = self.hovered and self.items[self.hovered]
+		self:Close()
+		if it then
+			self:Use(it)
+		end
+		return
+	end
+	local hovered
+	if #self.items > 0 then
+		local x, y = self:cursor()
+		local dx, dy = x - self.cx, y - self.cy
+		if dx * dx + dy * dy >= self.dead * self.dead then
+			local a = math.atan2(dy, dx)
+			local best
+			for i, it in ipairs(self.items) do
+				local diff = math.abs(math.fmod(a - it.angle + 3 * math.pi, 2 * math.pi) - math.pi)
+				if not best or diff < best then
+					best, hovered = diff, i
+				end
+			end
+		end
+	end
+	if time_global() >= (self.next_refresh or 0) then
+		self.hovered = hovered
+		self:Refresh()
+	elseif hovered ~= self.hovered then
+		self.hovered = hovered
+		self:Look()
+	end
+end
+
+function UIQuickWheel:Use(it)
+	local st = state_of(it.e) -- now, not as last drawn
+	if use(it.e, st) then
+		if it.e.id then
+			store(self.d) -- the entry may have followed its gun to a new id
+		end
+		return true
+	end
+	if not st.obj and not st.active then
+		actor_menu.set_msg(1, tr("st_qwheel_missing"), 3)
+	elseif st.bad then
+		actor_menu.set_msg(1, tr(st.why or "st_qwheel_no_fit"), 3)
+	end
+	return false
+end
+
+function UIQuickWheel:Remove(i)
+	local list = self.d.items
+	local it = self.items[i]
+	if it then
+		for j = #list, 1, -1 do
+			if list[j] == it.e then
+				table.remove(list, j)
+			end
+		end
+		store(self.d)
+		self:Build()
+	end
+end
+
+function UIQuickWheel:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if keyboard_action ~= ui_events.WINDOW_KEY_PRESSED then
+		return res
+	end
+	if dik == DIK_keys.MOUSE_1 then
+		if self.hovered then
+			local it = self.items[self.hovered]
+			self:Close()
+			self:Use(it)
+		end
+		return true
+	elseif dik == DIK_keys.MOUSE_2 then
+		if self.hovered then
+			self:Remove(self.hovered)
+		end
+		return true
+	elseif dik == DIK_keys.DIK_ESCAPE or dik == self.key and not self.hold and time_global() > self.opened_at + 150 then
+		self:Close()
+		return true
+	end
+	return res
+end
+
+function UIQuickWheel:Close()
+	if self:IsShown() then
+		self:HideDialog()
+	end
+	Unregister_UI("UIQuickWheel")
+	closed_at = time_global()
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- opening, the backpack's menu
+
+local function key()
+	local k = ui_mcm and ui_mcm.get("quick_wheel/key") -- -1: unbound in MCM, no key
+	if not k then
+		k = DIK_keys[ini_sys:r_string_ex(SEC, "key") or "DIK_C"]
+	end
+	return k
+end
+
+local function hold()
+	local h = ui_mcm and ui_mcm.get("quick_wheel/hold")
+	if h == nil then
+		h = ini_sys:r_bool_ex(SEC, "hold", false)
+	end
+	return h
+end
+
+function open()
+	if not (db.actor and db.actor:alive()) or not actor_menu.is_hud_free() or time_global() < closed_at + 200 then
+		return
+	end
+	if not GUI or math.abs(GUI.k - utils_xml.screen_ratio()) > 0.001 then -- none yet, or made for another screen shape
+		GUI = UIQuickWheel()
+	end
+	if GUI:IsShown() then
+		return
+	end
+	GUI.key, GUI.hold = key(), hold()
+	GUI:Open(data())
+end
+
+-- the wheel's entry for obj (by id or by section, as its kind keeps it)
+local function entry_index(list, obj)
+	local by_id = BY_ID[kind_of(obj:section())]
+	for i, e in ipairs(list) do
+		if by_id and e.id == obj:id() or not by_id and not e.id and e.sec == obj:section() then
+			return i
+		end
+	end
+end
+
+local function can_add(obj)
+	return obj and ours(obj) and kind_of(obj:section()) and not entry_index(data().items, obj) and true or false
+end
+
+local function add(obj)
+	local d = data()
+	if entry_index(d.items, obj) then
+		return
+	end
+	if #d.items >= max_items() then
+		actor_menu.set_msg(1, tr("st_qwheel_full"), 4)
+		return
+	end
+	local sec = obj:section()
+	d.items[#d.items + 1] = { sec = sec, id = BY_ID[kind_of(sec)] and obj:id() or nil }
+	store(d)
+	actor_menu.set_msg(1, string.format(tr("st_qwheel_added"), ui_item.get_sec_name(sec)), 4)
+	debug("%s added", sec)
+end
+
+local function can_remove(obj)
+	return obj and ours(obj) and entry_index(data().items, obj) and true or false
+end
+
+local function remove(obj)
+	local d = data()
+	local i = entry_index(d.items, obj)
+	if i then
+		table.remove(d.items, i)
+		store(d)
+		actor_menu.set_msg(1, string.format(tr("st_qwheel_removed"), ui_item.get_sec_name(obj:section())), 4)
+	end
+end
+
+function on_game_start()
+	RegisterScriptCallback("on_key_press", function(dik)
+		if dik == key() then
+			open()
+		end
+	end)
+	RegisterScriptCallback("actor_on_net_destroy", function()
+		if GUI and GUI:IsShown() then
+			GUI:Close()
+		end
+		GUI = nil
+	end)
+	custom_functor_autoinject.add_functor("quick_wheel_add", can_add, function()
+		return "st_qwheel_add"
+	end, nil, add)
+	custom_functor_autoinject.add_functor("quick_wheel_remove", can_remove, function()
+		return "st_qwheel_remove"
+	end, nil, remove)
+end

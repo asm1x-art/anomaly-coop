@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the quick item wheel (scripts/ui_quick_wheel.script) -->
+<string_table>
+	<string id="ui_mcm_menu_quick_wheel">
+		<text>Quick wheel</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_key">
+		<text>Quick wheel key</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_hold">
+		<text>Hold the key (release to use)</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_desc">
+		<text>A wheel of your own items: in the backpack right-click an item, "To quick wheel"; right-click on the wheel removes it.</text>
+	</string>
+	<string id="st_qwheel_add">
+		<text>To quick wheel</text>
+	</string>
+	<string id="st_qwheel_remove">
+		<text>Remove from quick wheel</text>
+	</string>
+	<string id="st_qwheel_added">
+		<text>"%s" added to the quick wheel</text>
+	</string>
+	<string id="st_qwheel_title">
+		<text>Quick wheel</text>
+	</string>
+	<string id="st_qwheel_removed">
+		<text>"%s" removed from the quick wheel</text>
+	</string>
+	<string id="st_qwheel_full">
+		<text>The quick wheel is full</text>
+	</string>
+	<string id="st_qwheel_missing">
+		<text>Not in the backpack</text>
+	</string>
+	<string id="st_qwheel_no_fit">
+		<text>Doesn't fit the weapon in hands</text>
+	</string>
+	<string id="st_qwheel_no_weapon">
+		<text>No weapon in hands</text>
+	</string>
+	<string id="st_qwheel_do_eat">
+		<text>LMB - use</text>
+	</string>
+	<string id="st_qwheel_do_weapon">
+		<text>LMB - take in hands</text>
+	</string>
+	<string id="st_qwheel_do_holster">
+		<text>LMB - put away</text>
+	</string>
+	<string id="st_qwheel_do_wear">
+		<text>LMB - put on</text>
+	</string>
+	<string id="st_qwheel_worn">
+		<text>Worn</text>
+	</string>
+	<string id="st_qwheel_do_device">
+		<text>LMB - take out</text>
+	</string>
+	<string id="st_qwheel_do_device_hide">
+		<text>LMB - put away</text>
+	</string>
+	<string id="st_qwheel_do_grenade">
+		<text>LMB - take the grenade</text>
+	</string>
+	<string id="st_qwheel_do_ammo">
+		<text>LMB - load</text>
+	</string>
+	<string id="st_qwheel_loaded">
+		<text>Loaded</text>
+	</string>
+	<string id="st_qwheel_do_attach">
+		<text>LMB - attach</text>
+	</string>
+	<string id="st_qwheel_do_detach">
+		<text>LMB - detach</text>
+	</string>
+	<string id="st_qwheel_rmb_remove">
+		<text>RMB - remove from the wheel</text>
+	</string>
+	<string id="st_qwheel_empty">
+		<text>The wheel is empty. In the backpack: right-click an item, "To quick wheel"</text>
+	</string>
+	<string id="st_qwheel_count">
+		<text>%d pcs.</text>
+	</string>
+	<string id="st_qwheel_uses">
+		<text>Uses left: %d</text>
+	</string>
+	<string id="st_qwheel_rounds">
+		<text>%d rounds</text>
+	</string>
+	<string id="st_qwheel_condition">
+		<text>Condition: %d%%</text>
+	</string>
+</string_table>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- the quick item wheel (scripts/ui_quick_wheel.script) -->
+<string_table>
+	<string id="ui_mcm_menu_quick_wheel">
+		<text>Быстрое колесо</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_key">
+		<text>Клавиша быстрого колеса</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_hold">
+		<text>Удерживать клавишу (отпустить - применить)</text>
+	</string>
+	<string id="ui_mcm_quick_wheel_desc">
+		<text>Колесо своих предметов: в рюкзаке ПКМ по предмету, пункт «В быстрое колесо»; на колесе ПКМ - убрать.</text>
+	</string>
+	<string id="st_qwheel_add">
+		<text>В быстрое колесо</text>
+	</string>
+	<string id="st_qwheel_remove">
+		<text>Убрать из быстрого колеса</text>
+	</string>
+	<string id="st_qwheel_added">
+		<text>«%s» добавлен в быстрое колесо</text>
+	</string>
+	<string id="st_qwheel_title">
+		<text>Быстрое колесо</text>
+	</string>
+	<string id="st_qwheel_removed">
+		<text>«%s» убран из быстрого колеса</text>
+	</string>
+	<string id="st_qwheel_full">
+		<text>Быстрое колесо заполнено</text>
+	</string>
+	<string id="st_qwheel_missing">
+		<text>Нет в рюкзаке</text>
+	</string>
+	<string id="st_qwheel_no_fit">
+		<text>Не подходит к оружию в руках</text>
+	</string>
+	<string id="st_qwheel_no_weapon">
+		<text>Нет оружия в руках</text>
+	</string>
+	<string id="st_qwheel_do_eat">
+		<text>ЛКМ - использовать</text>
+	</string>
+	<string id="st_qwheel_do_weapon">
+		<text>ЛКМ - взять в руки</text>
+	</string>
+	<string id="st_qwheel_do_holster">
+		<text>ЛКМ - убрать</text>
+	</string>
+	<string id="st_qwheel_do_wear">
+		<text>ЛКМ - надеть</text>
+	</string>
+	<string id="st_qwheel_worn">
+		<text>Надето</text>
+	</string>
+	<string id="st_qwheel_do_device">
+		<text>ЛКМ - достать</text>
+	</string>
+	<string id="st_qwheel_do_device_hide">
+		<text>ЛКМ - убрать</text>
+	</string>
+	<string id="st_qwheel_do_grenade">
+		<text>ЛКМ - взять гранату</text>
+	</string>
+	<string id="st_qwheel_do_ammo">
+		<text>ЛКМ - зарядить</text>
+	</string>
+	<string id="st_qwheel_loaded">
+		<text>Заряжено</text>
+	</string>
+	<string id="st_qwheel_do_attach">
+		<text>ЛКМ - установить</text>
+	</string>
+	<string id="st_qwheel_do_detach">
+		<text>ЛКМ - снять</text>
+	</string>
+	<string id="st_qwheel_rmb_remove">
+		<text>ПКМ - убрать из колеса</text>
+	</string>
+	<string id="st_qwheel_empty">
+		<text>Колесо пусто. В рюкзаке: ПКМ по предмету, пункт «В быстрое колесо»</text>
+	</string>
+	<string id="st_qwheel_count">
+		<text>%d шт.</text>
+	</string>
+	<string id="st_qwheel_uses">
+		<text>Осталось: %d</text>
+	</string>
+	<string id="st_qwheel_rounds">
+		<text>%d патр.</text>
+	</string>
+	<string id="st_qwheel_condition">
+		<text>Состояние: %d%%</text>
+	</string>
+</string_table>

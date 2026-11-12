@@ -1,0 +1,15 @@
+-- The quick item wheel's options in MCM (ui_quick_wheel.script): its key and press or hold, per player (MCM keeps
+-- them in the player's own axr_options). The defaults are [quick_wheel] key and hold (mod_system_quick_wheel.ltx).
+
+function on_mcm_load()
+	local key = DIK_keys[ini_sys:r_string_ex("quick_wheel", "key") or "DIK_C"] or DIK_keys.DIK_C
+	return {
+		id = "quick_wheel", sh = true,
+		gr = {
+			{ id = "title", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_menu_quick_wheel", size = { 512, 50 }, spacing = 20 },
+			{ id = "key", type = "key_bind", val = 2, def = key },
+			{ id = "hold", type = "check", val = 1, def = ini_sys:r_bool_ex("quick_wheel", "hold", false) },
+			{ id = "desc", type = "desc", text = "ui_mcm_quick_wheel_desc" },
+		},
+	}
+end
