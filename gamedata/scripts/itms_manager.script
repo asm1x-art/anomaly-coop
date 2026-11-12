@@ -1051,7 +1051,7 @@ function relocate_item_from_actor(actor, npc, section, amount)
 	local keep_itr = true
 	local function itr(temp, obj)
 		--printf("~relocate_item_from_actor | checked [%s]", obj:section())
-		if keep_itr and (obj and obj:section() == section) then
+		if keep_itr and (obj and obj:section() == section) and not (item_marks and item_marks.is_pinned(obj)) then -- a pinned thing stays (item_marks.script)
 			--printf("-relocate_item_from_actor | found needed section [%s]", section)
 			local uses = max_uses and obj:get_remaining_uses() or 1
 			cnt = cnt - uses

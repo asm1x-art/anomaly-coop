@@ -1,0 +1,5 @@
+<w>
+    <file name="ui\coop\item_pin.dds">
+        <texture id="ui_item_marks_pin"		x="0" y="0" width="32" height="32" />
+    </file>
+</w>

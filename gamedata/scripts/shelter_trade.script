@@ -368,6 +368,21 @@ function stock()
 	end, true)
 end
 
+-- does the bar sell from this box (one in the store's room, or the orders' box)? item_marks.script keeps pinned
+-- things out of them
+function sells_from(id)
+	if id == shelter.state("orders_box", nil) then
+		return true
+	end
+	local box = role_box("store")
+	local se = box and alife_object(id)
+	if not (se and IsInvbox(nil, se:clsid()) and on_level(se)) then
+		return false
+	end
+	local p = se.position
+	return p.x >= box[1] and p.x <= box[2] and p.z >= box[3] and p.z <= box[4]
+end
+
 -- the shelter's boxes for picking, the working ones left out: { id, section, position, count }
 function boxes()
 	local sim, out, held, skip = alife(), {}, {}, settings().not_boxes
