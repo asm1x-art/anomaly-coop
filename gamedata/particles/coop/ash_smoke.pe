@@ -1,0 +1,125 @@
+; Co-op: the ash front's smoke column over a fire in the Red Forest (part of ash_fire.pg). A plain text file:
+; colour (Source Color, TargetColor Color), how high (TargetVelocity Velocity: metres a second up and with the wind,
+; Age Limit: seconds), width (Source Size, TargetSize Size) can be changed here; the game reads it at start.
+[_effect]
+version = 1
+max_particles = 220
+flags = 1
+action_count = 8
+
+[sprite]
+shader = particles\blend
+texture = pfx\pfx_smoke_b
+
+; KillOld
+[action_0000]
+action_type = 10
+version = 1
+action_name = killold
+flags = 1
+flt_0000 = 28 ; Age Limit
+bool_0000 = off ; Kill Less Than
+
+; Source
+[action_0001]
+action_type = 21
+version = 1
+action_name = source
+flags = 1
+flt_0000 = 0 ; Age Sigma
+flt_0001 = 0 ; Color\Alpha
+flt_0002 = 0 ; Parent Motion
+flt_0003 = 7.5 ; Rate
+flt_0004 = 0 ; Starting Age
+bool_0000 = off ; Allow Rotate
+bool_0001 = on ; Single Size
+
+[domain_action_0001_0000] ; Color: line
+type = 1
+v0 = 0.06, 0.055, 0.05
+v1 = 0.12, 0.11, 0.1
+v2 = 0, 0, 0
+
+[domain_action_0001_0001] ; Domain: sphere
+type = 5
+v0 = 0, 2, 0
+v1 = 3, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0002] ; Rotation: line
+type = 1
+v0 = -3.14, 0, 0
+v1 = 3.14, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0003] ; Size: line
+type = 1
+v0 = 4, 4, 4
+v1 = 6, 6, 6
+v2 = 0, 0, 0
+
+[domain_action_0001_0004] ; Velocity: box
+type = 4
+v0 = -0.3, 2, -0.3
+v1 = 0.3, 3.5, 0.3
+v2 = 0, 0, 0
+
+; TargetVelocity
+[action_0002]
+action_type = 27
+version = 1
+action_name = targetvelocity
+flags = 1
+flt_0000 = 0.25 ; Scale
+vec_0000 = 1.1, 2.2, 0.5 ; Velocity
+bool_0000 = off ; Allow Rotate
+
+; TargetSize
+[action_0003]
+action_type = 24
+version = 1
+action_name = targetsize
+flags = 1
+vec_0000 = 0.09, 0.09, 0.09 ; Scale
+vec_0001 = 22, 22, 22 ; Size
+
+; TargetColor
+[action_0004]
+action_type = 23
+version = 1
+action_name = targetcolor
+flags = 1
+flt_0000 = 1 ; Alpha
+flt_0001 = 2 ; Scale
+flt_0002 = 0 ; TimeFrom
+flt_0003 = 0.12 ; TimeTo
+vec_0000 = 0.2, 0.19, 0.17 ; Color
+
+; TargetColor
+[action_0005]
+action_type = 23
+version = 1
+action_name = targetcolor
+flags = 1
+flt_0000 = 0 ; Alpha
+flt_0001 = 0.3 ; Scale
+flt_0002 = 0.55 ; TimeFrom
+flt_0003 = 1 ; TimeTo
+vec_0000 = 0.24, 0.23, 0.21 ; Color
+
+; TargetRotate
+[action_0006]
+action_type = 25
+version = 1
+action_name = targetrotate
+flags = 1
+flt_0000 = 0.03 ; Scale
+vec_0000 = 8, 0, 0 ; Rotation
+
+; Move
+[action_0007]
+action_type = 12
+version = 1
+action_name = move
+flags = 1
+

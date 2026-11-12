@@ -1,0 +1,95 @@
+; Co-op: the ash front's wide ground fire in the Red Forest (part of ash_fire.pg): Anomaly's campfire_big_flame (its
+; animated flame texture) made wider - three flames on a 3 m disc, each bigger. A plain text file: how many
+; (max_particles), the disc (Source Domain: centre, normal, radii) and the flames' size (Source Size: width, height)
+; can be changed here; the game reads it at start.
+[_effect]
+version = 1
+max_particles = 3
+flags = 39937
+action_count = 4
+
+[sprite]
+shader = particles\add
+texture = pfx\pfx_ani-fire01.bmp
+
+[frame]
+tex_size = 0.09082, 0.142578
+reserved = 93, 146
+dim_x = 11
+frame_count = 77
+speed = 30
+
+[align_to_path]
+default_rotation = -1.570796, 0, 0
+
+; KillOld
+[action_0000]
+action_type = 10
+version = 1
+action_name = killold
+flags = 3
+flt_0000 = 1000 ; Age Limit
+bool_0000 = off ; Kill Less Than
+
+; Source
+[action_0001]
+action_type = 21
+version = 1
+action_name = source
+flags = 1
+flt_0000 = 0 ; Age Sigma
+flt_0001 = 1 ; Color\Alpha
+flt_0002 = 0 ; Parent Motion
+flt_0003 = 100 ; Rate
+flt_0004 = 0 ; Starting Age
+bool_0000 = on ; Allow Rotate
+bool_0001 = off ; Single Size
+
+[domain_action_0001_0000] ; Color: point
+type = 0
+v0 = 0, 0, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0001] ; Domain: disc (centre, normal, outer and inner radius)
+type = 9
+v0 = 0, 2.6, 0
+v1 = 0, 2, 0
+v2 = 1.5, 0.4, 0
+
+[domain_action_0001_0002] ; Rotation: point
+type = 0
+v0 = 0, 0, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0003] ; Size: point (width, height)
+type = 0
+v0 = 4.5, 6, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0004] ; Velocity: point
+type = 0
+v0 = 0, 0, 0
+v1 = 0, 0, 0
+v2 = 0, 0, 0
+
+; TargetColor
+[action_0002]
+action_type = 23
+version = 1
+action_name = targetcolor
+flags = 1
+flt_0000 = 1 ; Alpha
+flt_0001 = 2 ; Scale
+flt_0002 = 0 ; TimeFrom
+flt_0003 = 1 ; TimeTo
+vec_0000 = 0.65, 0.65, 0.65 ; Color
+
+; Move
+[action_0003]
+action_type = 12
+version = 1
+action_name = move
+flags = 1

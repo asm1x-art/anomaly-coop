@@ -27,6 +27,10 @@ local GROUP = {
 				{ id = "autosave_interval", type = "track", val = 2, cmd = "coop_autosave_interval", min = 0, max = 120, step = 1 },
 				{ id = "fps", type = "check", val = 1, def = true, functor = { function() coop_fps.refresh() end } },
 				{ id = "raid_timer", type = "check", val = 1, def = true, functor = { function() ui_raid_hud.refresh_timer() end } },
+				-- the ash front's falling ash (coop_zone_ash_fx.script reads it each second: no reload)
+				{ id = "ash_fall", type = "list", val = 2, def = ini_sys:r_float_ex("zone_event_ash_fx", "fall_default") or 2, no_str = true,
+					content = { { 0, "ui_mm_coop_general_ash_fall_0" }, { 1, "ui_mm_coop_general_ash_fall_1" },
+						{ 2, "ui_mm_coop_general_ash_fall_2" }, { 3, "ui_mm_coop_general_ash_fall_3" }, { 4, "ui_mm_coop_general_ash_fall_4" } } },
 				{ id = "line_1", type = "line" },
 				{ id = "title_color", type = "title", text = "ui_mm_coop_general_title_color", align = "l" },
 				color_track("color_r", 90),

@@ -571,6 +571,27 @@
 	<string id="ui_mm_coop_general_raid_timer_desc">
 		<text>Сколько осталось до закрытия окна «Охлаждения», в углу экрана во время рейда (реальные минуты).</text>
 	</string>
+	<string id="ui_mm_coop_general_ash_fall">
+		<text>Пепел (Пепельный фронт)</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_desc">
+		<text>Сколько пепла падает вокруг во время Пепельного фронта. Меньше - если проседает FPS; применяется сразу.</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_0">
+		<text>Выкл</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_1">
+		<text>Мало</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_2">
+		<text>Средне</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_3">
+		<text>Много</text>
+	</string>
+	<string id="ui_mm_coop_general_ash_fall_4">
+		<text>Максимум</text>
+	</string>
 	<!-- co-op messages in the game (coop_sync.script, coop_fps.script) -->
 	<string id="st_coop_share_stash">
 		<text>Поделиться с отрядом</text>

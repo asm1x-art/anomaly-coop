@@ -1,0 +1,63 @@
+; Co-op: the ash front's fire hotspot in the Red Forest (coop_zone_ash_fx.script, points in
+; mod_system_zone_ash_fx.ltx): a wide flame (ash_flame.pe, Anomaly's campfire_big_flame
+; bigger), Anomaly's big campfire and the smoke column ash_smoke.pe over it.
+[_group]
+version = 3
+flags = 0
+effects_count = 6
+timelimit = 0
+
+[effect_0000]
+effect_name = coop\ash_flame
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0001]
+effect_name = explosions\effects\campfire_big_flame
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0002]
+effect_name = explosions\effects\campfire_big_sparks
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0.7
+time1 = 0
+flags = 4
+
+[effect_0003]
+effect_name = explosions\effects\campfire_glow_04
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0004]
+effect_name = explosions\effects\campfire_big_smoke
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0005]
+effect_name = coop\ash_smoke
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
