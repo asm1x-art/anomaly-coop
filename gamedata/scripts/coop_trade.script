@@ -208,6 +208,19 @@ function UICoopTrade:Move(from, idx)
 	end
 end
 
+-- a cell's whole stack from mine to what I give, or back (Shift: inv_shift_move.script)
+function UICoopTrade:MoveAll(from, idx)
+	local ci = (from == "mine" or from == "offer") and self.CC[from].cell[idx]
+	if not (ci and ci:IsShown() and ci.ID) then
+		return
+	end
+	session.mine[ci.ID] = from == "mine" or nil
+	for id in pairs(ci.childs or {}) do
+		session.mine[id] = from == "mine" or nil
+	end
+	changed()
+end
+
 function UICoopTrade:On_CC_Mouse1_DB(bag, idx)
 	self:Move(bag, idx)
 end

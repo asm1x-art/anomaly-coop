@@ -1,0 +1,109 @@
+-- Shift moves whole stacks between the grids: Shift + left click on a cell, or the cursor over cells while Shift is
+-- held (the cell under it moves once; again only after the cursor has left it). Where a double click would move a
+-- thing: inventory <-> stash, box, body, companion (loot), bag <-> sell or buy table (trade), and mine <-> what I give
+-- in the co-op trade window (coop_trade.script). Nothing ever goes on the ground. Settings: mod_system_inv_ui.ltx
+-- [inv_shift_move].
+
+local cfg
+local function settings()
+	if not cfg then
+		local S = "inv_shift_move"
+		cfg = {
+			enabled = ini_sys:r_bool_ex(S, "enabled", true),
+			hover = ini_sys:r_bool_ex(S, "hover", true),
+			click = ini_sys:r_bool_ex(S, "click", true),
+		}
+	end
+	return cfg
+end
+
+-- the inventory window's grids a stack moves out of (not the slots, the belt or the item picker)
+local BAGS = { actor_bag = true, npc_bag = true, actor_trade = true, actor_trade_bag = true, npc_trade = true,
+	npc_trade_bag = true }
+
+local function down(key)
+	local v = key_state(key)
+	return v == true or (type(v) == "number" and v ~= 0)
+end
+
+local function shift_held()
+	return down(DIK_keys.DIK_LSHIFT) or down(DIK_keys.DIK_RSHIFT)
+end
+
+-- can a stack move out of this grid at all
+local function movable(cc)
+	local owner = cc.owner
+	if not owner or owner.item_in_hold then
+		return false
+	end
+	if owner.MoveAll then -- coop_trade.UICoopTrade
+		return cc.ID == "mine" or cc.ID == "offer"
+	end
+	return owner.Action_Move_All and BAGS[cc.ID] and true or false
+end
+
+local function move(cc, idx)
+	local owner = cc.owner
+	if not (owner and owner:IsShown()) then
+		return true
+	end
+	local ci = cc.cell[idx]
+	if not (ci and ci:IsShown() and ci.ID) then
+		return true
+	end
+	if owner.MoveAll then
+		owner:MoveAll(cc.ID, idx)
+		return true
+	end
+	local obj = level.object_by_id(ci.ID)
+	local bag = cc.ID
+	if obj and owner:Item_On_Mode("move", bag) and owner:Cond_Move(obj, bag) then
+		if owner:Cond_Childs(obj, bag) then
+			owner:Action_Move_All(obj, bag)
+		else
+			owner:Action_Move(obj, bag)
+		end
+	end
+	return true
+end
+
+local armed_cc, armed_idx -- the cell last moved out of: not again until the cursor leaves it
+local n = 0
+
+function on_game_start()
+	if not settings().enabled then
+		return
+	end
+	local C = utils_ui.UICellContainer
+
+	local on_hover = C.On_Hover
+	C.On_Hover = function(self, idx, ...)
+		if armed_cc == self and idx ~= armed_idx then
+			armed_cc = nil
+		end
+		if idx and armed_cc ~= self and settings().hover and shift_held() and movable(self) then
+			local ci = self.cell[idx]
+			if ci and ci:IsShown() then
+				armed_cc, armed_idx = self, idx
+				n = n + 1 -- next frame: not while the window walks its grids
+				CreateTimeEvent("inv_shift_move", "move_" .. n, 0, move, self, idx)
+			end
+		end
+		return on_hover(self, idx, ...)
+	end
+
+	local on_mouse1 = C.On_Mouse1
+	C.On_Mouse1 = function(self, idx, ...)
+		if idx and settings().click and shift_held() and movable(self) then
+			local ci = self.cell[idx]
+			if ci and ci:IsShown() then
+				if not (armed_cc == self and armed_idx == idx) then -- else the hover has just moved it
+					armed_cc, armed_idx = self, idx
+					move(self, idx)
+				end
+				return
+			end
+		end
+		return on_mouse1(self, idx, ...)
+	end
+end
