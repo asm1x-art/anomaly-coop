@@ -5,9 +5,16 @@ float4 main(float2 tc : TEXCOORD0, float2 tcJ : TEXCOORD1, float4 Color : COLOR,
 {
 	float3 P, N;
 	float hemi;
-	ash_gbuffer(tc, pos2d, P, N, hemi);
-	float k = ash_amount(tc, pos2d, P, N, hemi);
+	uint mtl;
+	ash_gbuffer(tc, pos2d, P, N, hemi, mtl);
+	float k = ash_amount(tc, pos2d, P, N, hemi, mtl);
+	if (bus_ash_shape.w > 3.5)
+		return float4(ash_dbg, 1);
+	if (bus_ash_shape.w > 0)
+		return float4(N, bus_ash_shape.w > 2.5 ? max(k, 0.005) : 1); // debug views: every pixel
 	float flatten = bus_ash_shape.x > 0 ? bus_ash_shape.x : 0.6;
+	if (ash_kind_at(tc, mtl) == ASH_KIND_FLORA)
+		flatten *= 0.5; // leaves stay leaves
 	float3 up = mul(m_V, float4(0, 1, 0, 0));
 	return float4(normalize(lerp(N, up, k * flatten)), k);
 }

@@ -179,11 +179,17 @@ end
 -------------------------------------------------------------------------------
 -- the ash on the ground (each game its own picture; the engine's ash pass, shaders/r3/ash_ground.h): the shader bus
 -- lanes ash_cover (cover 0..1, opacity, gloss kept, patchiness), ash_look (albedo, patch size), ash_mask (normal.y
--- and open sky from no ash to full) and ash_shape (how far it smooths the surface, grain). The cover grows from 0 to 1 over ground_ramp_up_min real minutes of the front on
--- one of ground_levels and goes in ground_ramp_down_min after its end; the event's from/till (the shared fact) decide,
--- so every game on the level shows the same. 0 anywhere else, in the headless host and on an exe without the bus
+-- and open sky from no ash to full), ash_shape (how far it smooths the surface, grain) and ash_flora (foliage and far
+-- tree LODs: their facing, strength, how much a crown's own shade is ignored) and ash_bark (tree trunks: facing,
+-- strength). On ground_levels only, 0 anywhere else,
+-- in the headless host and on an exe without the bus. Every game works it out from shared facts, so all show the same:
+--   falling  while the front is on: 0 to 1 over ground_ramp_up_min real minutes from its start (the event's from)
+--   lying    after it: what had settled fades over ground_linger_game_h GAME hours, (1 - t) ^ ground_linger_curve; the
+--            master writes the fact "zone_event:ash_ground_<level>" = "<game second of the end>|<cover then>" when the
+--            front ends (the event's slot can go to another event, this stays), so it outlives saves, rejoins, level
+--            changes and host restarts. A new front on a level with ash still lying: the larger of the two
 
-local ground_tokens -- { cover, look, mask, shape }, nil: no bus
+local ground_tokens -- { cover, look, mask, shape, flora, bark }, nil: no bus
 local ground_ev     -- the slot's ash event as update() last saw it (on or over), nil: none
 local ground_last = -1
 local next_ground = 0
@@ -208,31 +214,68 @@ local function ground_register()
 	local look = shader_bus.register("ash_look", owner, "Ash front: ash on the ground, xyz albedo, w patch size in metres")
 	local mask = shader_bus.register("ash_mask", owner, "Ash front: ash on the ground, normal.y from..to, open sky from..to")
 	local shape = shader_bus.register("ash_shape", owner, "Ash front: ash on the ground, x normal turned up, y grain")
-	if not (cover and look and mask and shape) then
+	local flora = shader_bus.register("ash_flora", owner, "Ash front: ash on foliage and tree LODs, normal.y from..to, strength, crown shade ignored")
+	local bark = shader_bus.register("ash_bark", owner, "Ash front: ash on tree trunks, normal.y from..to, strength")
+	if not (cover and look and mask and shape and flora and bark) then
 		return
 	end
-	ground_tokens = { cover = cover, look = look, mask = mask, shape = shape }
+	ground_tokens = { cover = cover, look = look, mask = mask, shape = shape, flora = flora, bark = bark }
 	local c = nums("ground_color", { 0.42, 0.41, 0.40 })
 	shader_bus.set(look, c[1], c[2], c[3], num("ground_patch_m", 6))
-	local up, sky = nums("ground_up", { 0.35, 0.8 }), nums("ground_sky", { 0.2, 0.55 })
+	local up, sky = nums("ground_up", { 0.35, 0.8 }), nums("ground_sky", { 0.03, 0.2 })
 	shader_bus.set(mask, up[1], up[2], sky[1], sky[2])
 	shader_bus.set(shape, num("ground_flatten", 0.6), num("ground_grain", 0.36), 0, 0)
+	local fup = nums("ground_flora_up", { -0.6, 0.5 })
+	shader_bus.set(flora, fup[1], fup[2], num("ground_flora_strength", 0.9), num("ground_flora_open", 0.8))
+	local bup = nums("ground_bark_up", { 0.0, 0.7 })
+	shader_bus.set(bark, bup[1], bup[2], num("ground_bark_strength", 0.8), 0)
 	ground_last = -1
 end
 
-local function ground_cover()
-	local ev = ground_ev
-	if not ev or ev.level ~= level.name() or not listed(ev.level, "ground_levels") then
+-- game seconds since the world began: the world's clock is shared, so the same in every game
+local function game_seconds()
+	return math.floor(game.get_game_time():diffSec(level.get_start_time()))
+end
+
+-- the falling ash's cover at real second t of the front ev
+local function ground_falling(ev, t)
+	local up = math.max(1, num("ground_ramp_up_min", 20) * 60)
+	return math.min(1, math.max(0, (t - ev.from) / up))
+end
+
+-- the ash still lying on lvl from a front that ended there
+local function ground_lying(lvl)
+	local at, cover = string.match(ZE.mark_of("ash_ground_" .. lvl) or "", "^(%d+)|([%d%.]+)$")
+	if not at then
 		return 0
 	end
-	local up = math.max(1, num("ground_ramp_up_min", 20) * 60)
-	local down = math.max(1, num("ground_ramp_down_min", 10) * 60)
-	local t = ZE.now()
-	if ev.stage == "on" then
-		return math.min(1, math.max(0, (t - ev.from) / up))
+	local x = (game_seconds() - tonumber(at)) / math.max(1, num("ground_linger_game_h", 60) * 3600)
+	if x >= 1 then
+		return 0
 	end
-	local at_end = math.min(1, math.max(0, (ev.till - ev.from) / up))
-	return at_end * math.min(1, math.max(0, 1 - (t - ev.till) / down))
+	return tonumber(cover) * (1 - math.max(0, x)) ^ num("ground_linger_curve", 1.5)
+end
+
+local function ground_cover()
+	local lvl = level.name()
+	if not listed(lvl, "ground_levels") then
+		return 0
+	end
+	local cover = ground_lying(lvl)
+	local ev = ground_ev
+	if ev and ev.stage == "on" and ev.level == lvl then
+		cover = math.max(cover, ground_falling(ev, ZE.now()))
+	end
+	return cover
+end
+
+-- master, as the front ends (ev.till: now): what lies on the ground from now on
+local function ground_settle(ev)
+	if listed(ev.level, "ground_levels") then
+		local cover = math.max(ground_lying(ev.level), ground_falling(ev, ev.till))
+		ZE.mark("ash_ground_" .. ev.level, string.format("%d|%.3f", game_seconds(), cover))
+		ZE.dbg("%s", string.format("ash lies on %s: %.3f", ev.level, cover))
+	end
 end
 
 local function ground_update()
@@ -246,7 +289,7 @@ local function ground_update()
 	ground_last = cover
 	shader_bus.set(ground_tokens.cover, cover, num("ground_opacity", 0.85), num("ground_gloss_keep", 0.15),
 		num("ground_patchiness", 1))
-	ZE.dbg("ash on the ground %.3f", cover)
+	ZE.dbg("%s", string.format("ash on the ground %.3f", cover))
 end
 
 -------------------------------------------------------------------------------
@@ -830,6 +873,7 @@ local function start(ev)
 end
 
 local function finish(ev, how)
+	ground_settle(ev)
 	-- the squads home from now on (relocate, in every game)
 	local lvl, _, rel = read_rel()
 	if lvl == ev.level then

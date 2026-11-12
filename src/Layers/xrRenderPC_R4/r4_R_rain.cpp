@@ -255,7 +255,10 @@ void CRender::render_rain()
 
 	// Fill the database
 	//r_dsgraph_render_subspace				(cull_sector, &cull_frustum, cull_xform, cull_COP, TRUE);
+	// the ash alone: no trees in the view from above, the ash gets through their crowns to the ground (and onto them)
+	smap_skip_trees = fRainFactor < EPS_L;
 	r_dsgraph_render_subspace(cull_sector, &cull_frustum, cull_xform, cull_COP, FALSE);
+	smap_skip_trees = false;
 
 	// Finalize & Cleanup
 	RainLight.X.D.combine = cull_xform; //*((Fmatrix*)&m_LightViewProj);

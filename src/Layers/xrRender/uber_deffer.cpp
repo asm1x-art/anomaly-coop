@@ -5,7 +5,7 @@ void fix_texture_name(LPSTR fn);
 #include "dxRenderDeviceRender.h"
 
 void uber_deffer(CBlender_Compile& C, bool hq, LPCSTR _vspec, LPCSTR _pspec, BOOL _aref, LPCSTR _detail_replace,
-                 bool DO_NOT_FINISH, bool DO_NOT_WRITE)
+                 bool DO_NOT_FINISH, bool DO_NOT_WRITE, LPCSTR _ps_define)
 {
 	// Uber-parse
 	string256 fname, fnameA, fnameB;
@@ -97,6 +97,16 @@ void uber_deffer(CBlender_Compile& C, bool hq, LPCSTR _vspec, LPCSTR _pspec, BOO
 	// Uber-construct
 #if defined(USE_DX10) || defined(USE_DX11)
 #	ifdef USE_DX11
+	// Co-op: the trees' pixel shaders with a define of their own (ASH_FOLIAGE: ash_ground.h)
+	if (_ps_define)
+	{
+		xr_strcat(ps, "(");
+		xr_strcat(ps, _ps_define);
+		xr_strcat(ps, ")");
+		RImplementation.addShaderOption(_ps_define, "1");
+	}
+#	endif
+#	ifdef USE_DX11
 	if (bump && hq && RImplementation.o.dx11_enable_tessellation && C.TessMethod != 0)
 	{
 		char hs[256], ds[256]; // = "DX11\\tess", ds[256] = "DX11\\tess";
@@ -162,6 +172,10 @@ void uber_deffer(CBlender_Compile& C, bool hq, LPCSTR _vspec, LPCSTR _pspec, BOO
 #	endif
 	if (DO_NOT_WRITE) C.r_Pass(vs, ps, FALSE, TRUE, FALSE);
 	else C.r_Pass(vs, ps, FALSE);
+#	ifdef USE_DX11
+	if (_ps_define)
+		RImplementation.clearAllShaderOptions();
+#	endif
 	//C.r_Sampler		("s_base",		C.L_textures[0],	false,	D3DTADDRESS_WRAP,	D3DTEXF_ANISOTROPIC,D3DTEXF_LINEAR,	D3DTEXF_ANISOTROPIC);
 	//C.r_Sampler		("s_bumpX",		fnameB,				false,	D3DTADDRESS_WRAP,	D3DTEXF_ANISOTROPIC,D3DTEXF_LINEAR,	D3DTEXF_ANISOTROPIC);	// should be before base bump
 	//C.r_Sampler		("s_bump",		fnameA,				false,	D3DTADDRESS_WRAP,	D3DTEXF_ANISOTROPIC,D3DTEXF_LINEAR,	D3DTEXF_ANISOTROPIC);
