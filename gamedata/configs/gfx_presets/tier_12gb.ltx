@@ -1,0 +1,88 @@
+; Co-op: a graphics preset (gfx_presets.script, docs/coop/graphics.md).
+; [mcm]: settings of Screen Space Shaders' pages (Esc - Mod Configuration Menu - Screen Space Shaders), by their keys in
+; axr_options.ltx. A key not listed keeps the page's default: Atmospherics' values, the ones GRA plays with.
+; [console]: console commands.
+
+[preset]
+title    = 10-12 GB
+vram     = 10
+version  = 1
+; GRA as it is: every page at Atmospherics' default (GRA's own values are the same), GRA's render distances
+
+[mcm]
+; ambient occlusion: samples 2 / 4 / 8, resolution 0.25..1
+ssfx_module/ao/quality_mcm                              = 4
+ssfx_module/ao/res_mcm                                  = 1
+ssfx_module/ao/global_int_mcm                           = 1
+; indirect light: samples 16..64, resolution 0.15..1; global_int 0 turns the pass off
+ssfx_module/il/quality_mcm                              = 32
+ssfx_module/il/res_mcm                                  = 0.15
+ssfx_module/il/global_int_mcm                           = 0.8
+; screen space shadows: samples for the sun 6..24, for lamps 2..8
+ssfx_module/sss/quality_dir_mcm                         = 12
+ssfx_module/sss/quality_point_mcm                       = 4
+ssfx_module/sss/enable_dir_mcm                          = true
+ssfx_module/sss/enable_point_mcm                        = true
+; lamps' shadow maps: the smallest 0..4 = 128/256/512/768/1536, the biggest 0..4 = 1536/2048/2560/3072/4096
+ssfx_module/shadows/lod_quality_mcm                     = 1
+ssfx_module/shadows/lod_min_mcm                         = 1
+ssfx_module/shadows/lod_max_mcm                         = 0
+; light shafts of every lamp: quality 1..5
+ssfx_module/shadows/volumetric_force_mcm                = true
+ssfx_module/shadows/volumetric_quality_mcm              = 4
+; grass shadows: 0 off .. 3, how far
+ssfx_module/shw_cascades/grass_shw_quality_mcm          = 1
+ssfx_module/shw_cascades/grass_shw_distance_mcm         = 35
+; reflections: quality 0..5, resolution 0.5..1
+ssfx_module/ssr/quality_mcm                             = 0
+ssfx_module/ssr/render_scale_mcm                        = 1
+; water: reflections 0..4, waves 0..3
+ssfx_module/water/ssr_quality_mcm                       = 2
+ssfx_module/water/parallax_quality_mcm                  = 2
+; relief of surfaces: samples 16/24/36, how far; terrain: samples 12/24/36, how far the detailed terrain reaches (x10 m)
+ssfx_module/parallax/quality_mcm                        = 16
+ssfx_module/parallax/range_mcm                          = 12
+ssfx_module/terrain/pom_quality_mcm                     = 12
+ssfx_module/terrain/pom_range_mcm                       = 20
+ssfx_module/terrain/distance_mcm                        = 8
+; rain: drops' quality 0..2, how many; wet surfaces: the roof map 0..5, how far
+ssfx_module/ssfx_rain_module/ssfx_rain_main/quality_mcm = 1
+ssfx_module/ssfx_rain_module/ssfx_rain_main/max_drops_mcm = 2500
+ssfx_module/ssfx_wetness/ssfx_wet_surf/cover_res_mcm    = 1
+ssfx_module/ssfx_wetness/ssfx_wet_surf/cover_distance_mcm = 30
+; grass bent by people, mutants and anomalies: how many at once
+ssfx_module/inter_grass/max_entities_mcm                = 8
+; fog scattering 0..1 (0: the pass is off)
+ssfx_module/fog/scattering_mcm                          = 1
+
+[console]
+; --- the look, the same in every preset: GRA's GRA-v.ltx
+r__color_grading         = (0.5, 0.5, 0.5)
+r__saturation            = 1.1
+r__gamma                 = 1
+r__exposure              = 1
+r2_sun_lumscale          = 2.7
+r2_sun_lumscale_hemi     = 1.3
+r2_sun_lumscale_amb      = 1.10
+r2_tonemap               = on
+r2_tonemap_lowlum        = 0.15
+r2_tonemap_adaptation    = 5.5
+r2_tonemap_amount        = 1
+r2_tonemap_middlegray    = 0.7
+r2_gloss_factor          = 0.001
+r2_gloss_min             = 0.56
+r2_sun_depth_near_scale  = 0.9998
+r2_sun_depth_far_scale   = 0.99988
+ssfx_hud_hemi            = 0.3
+ssfx_blood_decals        = (0.5, 0.9, 0, 0)
+; --- GRA's user.ltx: the engine's own ambient occlusion and light shafts off, Screen Space Shaders has its own
+r2_ssao                  = st_opt_off
+r2_ssao_mode             = disabled
+r2_sunshafts_mode        = screen_space
+r2_volumetric_lights     = off
+; --- this preset's own: grass (density: less = thicker), detail of far objects, view distance, sun shadows
+r__detail_density        = 0.46
+r__detail_radius         = 140
+r__geometry_lod          = 1.5
+rs_vis_distance          = 1.5
+r2_sun_quality           = st_opt_medium
