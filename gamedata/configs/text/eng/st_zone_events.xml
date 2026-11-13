@@ -7,12 +7,6 @@
 	<string id="st_coop_ev_t_calm">
 		<text>Dead calm</text>
 	</string>
-	<string id="st_zev_calm_start">
-		<text>The anomalies are down %s! Electros don't strike, burners don't burn, vortexes have collapsed. And the artefacts there are gone, as if swept away.</text>
-	</string>
-	<string id="st_zev_calm_end">
-		<text>The calm %s is over: the anomalies are active again, and artefacts will soon be born there.</text>
-	</string>
 	<string id="st_zev_r_unknown">
 		<text>No such event: %s.</text>
 	</string>
@@ -61,27 +55,6 @@
 	<string id="st_coop_ev_t_ash">
 		<text>Ash front</text>
 	</string>
-	<string id="st_zev_ash_start">
-		<text>Ash %s! The background radiation is dozens of times the usual: nobody lives there without a sealed scientific suit.</text>
-	</string>
-	<string id="st_zev_ash_start_l10_red_forest">
-		<text>The Red Forest is burning! Fires all over the forest, smoke and ash, the background radiation dozens of times the usual. Don't go there without a SEVA or an SSP, an exoskeleton won't save you. The Sin have gone into the cave.</text>
-	</string>
-	<string id="st_zev_ash_start_l08_yantar">
-		<text>The Red Forest is burning, and the wind carries the ash to Yantar! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. The scientists have let everyone into the bunker.</text>
-	</string>
-	<string id="st_zev_ash_start_jupiter">
-		<text>The Red Forest is burning, and the wind carries the ash to Jupiter! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Yanov is sealed: nobody gets in until it settles.</text>
-	</string>
-	<string id="st_zev_ash_start_zaton">
-		<text>The Red Forest is burning, and the wind carries the ash to Zaton! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Skadovsk and the barges are sealed: nobody gets in until it settles.</text>
-	</string>
-	<string id="st_zev_ash_start_k02_trucks_cemetery">
-		<text>The surge has shaken up the old machinery of the Truck Cemetery: the vehicles are hotter than ever, and the wind drives radioactive dust and ash around. Without a SEVA or an SSP it is certain death. The bandits are holed up in the building.</text>
-	</string>
-	<string id="st_zev_ash_end">
-		<text>The ash %s has settled: the background is falling, people come out of the shelters.</text>
-	</string>
 	<string id="st_zev_ash_exposed">
 		<text>Ash! Without a sealed suit you won't last long here: take anti-rad and get out.</text>
 	</string>
@@ -93,6 +66,144 @@
 	</string>
 	<string id="st_zev_ash_sealed">
 		<text>The shelter is sealed until the ash front is over: nobody gets in.</text>
+	</string>
+	<string id="st_zev_calm_start_1">
+		<text>The anomalies are down %s! Electros don't strike, burners don't burn, vortexes have collapsed. And the artefacts there are gone, as if swept away.</text>
+	</string>
+	<string id="st_zev_calm_start_2">
+		<text>Guys, it's quiet as a grave %s: not one anomaly works. I threw bolts, they fly as over tarmac. But there are no artefacts either, not one: don't go there for loot now.</text>
+	</string>
+	<string id="st_zev_calm_start_3">
+		<text>Whoever is %s, confirm: have all the anomalies gone out, every last one? The detector is silent, the fields are empty, you could play football there. The artefacts went with them. You can walk straight through until it comes round.</text>
+	</string>
+	<string id="st_zev_calm_start_4">
+		<text>Dead calm %s, brothers. No anomalies at all, neither fields nor single ones. No artefacts either, I checked, don't waste your time. But the way is clear of anomalies: whoever needed to slip through, now is the time.</text>
+	</string>
+	<string id="st_zev_calm_start_5">
+		<text>This bodes no good: %s the anomalies all died at once, and the loot in them is gone without a trace. The old hands call it a dead calm: the Zone has breathed out. You can walk freely, but nobody can tell when it breathes back in.</text>
+	</string>
+	<string id="st_zev_calm_end_1">
+		<text>The calm %s is over: the anomalies are active again, and artefacts will soon be born there.</text>
+	</string>
+	<string id="st_zev_calm_end_2">
+		<text>That's it, the free ride %s is over: the anomalies woke up all at once. Whoever was walking straight through, get your bolts out. But artefacts will soon be born there, as after an emission.</text>
+	</string>
+	<string id="st_zev_calm_end_3">
+		<text>Attention: the anomalies work again %s! A vortex nearly pulled me in on level ground. The paths are by the old maps again. The loot will turn up a little later.</text>
+	</string>
+	<string id="st_zev_calm_end_4">
+		<text>The Zone has breathed back in: the calm %s is over, the fields are alive. Careful out there. And yes, artefacts will soon be born: first come, first served.</text>
+	</string>
+	<string id="st_zev_calm_end_5">
+		<text>Well, it crackles and glows again %s: the anomalies are back in their places. The party is over, watch your step. There will be artefacts, give them time.</text>
+	</string>
+	<string id="st_zev_ash_start_1">
+		<text>Ash %s! The background radiation is dozens of times the usual: nobody lives there without a sealed scientific suit.</text>
+	</string>
+	<string id="st_zev_ash_start_2">
+		<text>Attention everyone: ash %s. The background radiation is dozens of times the usual. Nobody lives there without a sealed scientific suit, an exoskeleton won't save you.</text>
+	</string>
+	<string id="st_zev_ash_start_3">
+		<text>Ash %s, guys, and it is hot: dozens of times the norm. Don't go in without a sealed scientific suit: a SEVA or an SSP, nothing else will save you.</text>
+	</string>
+	<string id="st_zev_ash_start_4">
+		<text>Whoever was about to go, call it off: radioactive ash is falling %s, the background is dozens of times the usual. Only in a SEVA or an SSP, otherwise it is certain death.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest_1">
+		<text>The Red Forest is burning! Fires all over the forest, smoke and ash, the background radiation dozens of times the usual. Don't go there without a SEVA or an SSP, an exoskeleton won't save you. The Sin have gone into the cave.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest_2">
+		<text>The Red Forest is ablaze, guys. Fires everywhere, ash comes down in flakes, the dosimeter is off the scale: the background is dozens of times the norm. Only a SEVA or an SSP, in anything else you are a dead man, an exoskeleton won't do either. The Sin have hidden in the cave.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest_3">
+		<text>Everyone who was heading for the Red Forest: turn back. The forest is burning, the ash is radioactive, the background is dozens of times the usual. Without a sealed scientific suit (a SEVA, an SSP) you won't last long there. Even the Sin have gone underground, into the cave.</text>
+	</string>
+	<string id="st_zev_ash_start_l10_red_forest_4">
+		<text>Seen the glow over the Red Forest? That is no sunset. It burns all over the forest, and the ash is so hot the counter howls: dozens of times the usual. Don't go in an exoskeleton, it won't save you: you need a SEVA or an SSP. The Sin sit in the cave.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar_1">
+		<text>The Red Forest is burning, and the wind carries the ash to Yantar! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. The scientists have let everyone into the bunker.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar_2">
+		<text>The ash from the Red Forest has reached Yantar. It falls like snow, only this snow is dozens of times hotter than the norm. Outside without a SEVA or an SSP you are a corpse. The scientists have opened the bunker and let everyone in.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar_3">
+		<text>Yantar is covered: the wind drives the ash from the burning Red Forest. The background is dozens of times the usual, an exoskeleton won't help: only a SEVA or an SSP. The scientists, bless them, have let people into the bunker. I don't envy those who were late.</text>
+	</string>
+	<string id="st_zev_ash_start_l08_yantar_4">
+		<text>Whoever is on Yantar, run to the scientists' bunker, they let everyone in! The Red Forest is burning, the ash is carried right onto the lake, the background is dozens of times the usual. Outside only one in a SEVA or an SSP will live.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter_1">
+		<text>The Red Forest is burning, and the wind carries the ash to Jupiter! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Yanov is sealed: nobody gets in until it settles.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter_2">
+		<text>Jupiter is in ash: it drifts from the burning Red Forest. The background is dozens of times the usual. Yanov is sealed tight and lets nobody in until it settles: knocking is no use. Without a SEVA or an SSP there is no way there now.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter_3">
+		<text>Word from Yanov: the station is closed, the doors are locked until the ash settles, nobody will be let in. The wind carries the ash from the Red Forest, the background is dozens of times the norm. Outside one lives only in a SEVA or an SSP, an exoskeleton won't save you.</text>
+	</string>
+	<string id="st_zev_ash_start_jupiter_4">
+		<text>Don't go to Jupiter, brothers. The Red Forest is burning, its ash falls all over the area, the counter crackles without a stop: the background is dozens of times the usual. Yanov is closed and lets nobody in. Without a SEVA or an SSP it is certain death.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton_1">
+		<text>The Red Forest is burning, and the wind carries the ash to Zaton! The background radiation is dozens of times the usual: without a SEVA or an SSP it is certain death. Skadovsk and the barges are sealed: nobody gets in until it settles.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton_2">
+		<text>Zaton is being buried in ash: the wind carries it from the burning Red Forest. The background is dozens of times the usual. Skadovsk and the barges are sealed, the hatches stay shut until it settles. Don't go there without a SEVA or an SSP.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton_3">
+		<text>Word from Skadovsk: we are closing, nobody gets in until the ash settles. The barges are sealed too. The ash is from the Red Forest, dozens of times hotter than the norm; outside only one in a SEVA or an SSP will live. An exoskeleton won't save you.</text>
+	</string>
+	<string id="st_zev_ash_start_zaton_4">
+		<text>Whoever was heading for Zaton, call it off. The ash from the Red Forest stands there like a wall, the background is dozens of times the usual. Beard has sealed Skadovsk, the same on the barges: nobody gets in. Only a SEVA or an SSP, otherwise it is certain death.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery_1">
+		<text>The surge has shaken up the old machinery of the Truck Cemetery: the vehicles are hotter than ever, and the wind drives radioactive dust and ash around. Without a SEVA or an SSP it is certain death. The bandits are holed up in the building.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery_2">
+		<text>The Truck Cemetery is a mess after the emission: the old iron got shaken up, it is hotter than ever, the wind carries radioactive dust and ash. Don't go in without a SEVA or an SSP, an exoskeleton won't save you. The bandits have crammed into the building and don't show their noses.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery_3">
+		<text>Guys, keep clear of the Truck Cemetery. The emission shook the machinery, and its dust and ash are so hot the dosimeter chokes. One lives there only in a SEVA or an SSP. Even the bandits have hidden in the building.</text>
+	</string>
+	<string id="st_zev_ash_start_k02_trucks_cemetery_4">
+		<text>I meant to go to the Truck Cemetery for spare parts and thought better of it. After the emission the vehicles are hotter than ever, dust and ash sweep all over the cemetery: without a sealed scientific suit (a SEVA, an SSP) it is certain death. The bandits sit it out in the building.</text>
+	</string>
+	<string id="st_zev_ash_end_1">
+		<text>The ash %s has settled: the background is falling, people come out of the shelters.</text>
+	</string>
+	<string id="st_zev_ash_end_2">
+		<text>That's it, all clear: the ash %s has settled. The background is falling, people crawl out of the shelters: alive, angry and hungry.</text>
+	</string>
+	<string id="st_zev_ash_end_3">
+		<text>The ash %s has laid down. The dosimeter calms down, the doors are being opened, people come out of the shelters. One can breathe.</text>
+	</string>
+	<string id="st_zev_ash_end_4">
+		<text>Good news: the ash has settled %s, the background is falling back to the usual. Those who sat in the shelters are coming out. You can come back.</text>
+	</string>
+	<string id="st_zev_ash_end_5">
+		<text>It has passed: no more ash falling %s. The background is falling, people make their way out of the shelters. Whoever waited at the border, the way is free.</text>
+	</string>
+	<string id="st_evnews_who_1">
+		<text>Nail, loner</text>
+	</string>
+	<string id="st_evnews_who_2">
+		<text>Quiet, loner</text>
+	</string>
+	<string id="st_evnews_who_3">
+		<text>Badger, loner</text>
+	</string>
+	<string id="st_evnews_who_4">
+		<text>Leshy, Clear Sky</text>
+	</string>
+	<string id="st_evnews_who_5">
+		<text>Pin, Freedom</text>
+	</string>
+	<string id="st_evnews_who_6">
+		<text>Owl, Duty</text>
+	</string>
+	<string id="st_evnews_who_7">
+		<text>Smoked, loner</text>
 	</string>
 	<!-- a level as the news say it: "the anomalies are down <here>" -->
 	<string id="st_zev_on_l01_escape">

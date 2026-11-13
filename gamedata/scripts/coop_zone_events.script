@@ -16,6 +16,8 @@
 -- An event's length: real_hours_min..real_hours_max real hours.
 -- mark(key, value) / marked(key): an event's own facts of the world ("zone_event:<key>"). Each game tells its player the start once and, if he
 -- heard it, the end once; the master also tells the server's journal (coop_news: zone_event, zone_event_end).
+-- The news are a stalker's post: one of the text's variants (st_zev_<id>_start_1, _2, ...) from one of the event's
+-- senders, the same in every game: both counted from the event's start second (coop_event_news.script).
 -- Without co-op the facts are the actor's variables and this game is the master.
 --
 -- An event is a module that calls register(id, def) at its on_game_start. def (all optional; texts st_zev_t_<id>, st_zev_<id>_start, st_zev_<id>_end):
@@ -184,12 +186,20 @@ end
 
 local function news_start(ev)
 	local def = defs[ev.id]
-	return def and def.news_start and def.news_start(ev) or tr("st_zev_" .. ev.id .. "_start", where(ev.level))
+	return def and def.news_start and def.news_start(ev)
+		or tr(coop_event_news.text_id("st_zev_" .. ev.id .. "_start", ev.from, 0), where(ev.level))
 end
 
 local function news_end(ev)
 	local def = defs[ev.id]
-	return def and def.news_end and def.news_end(ev) or tr("st_zev_" .. ev.id .. "_end", where(ev.level))
+	return def and def.news_end and def.news_end(ev)
+		or tr(coop_event_news.text_id("st_zev_" .. ev.id .. "_end", ev.from, 1), where(ev.level))
+end
+
+-- who writes the event's news (its start, its end): the caption and the icon; none listed: the event's title
+local function news_sender(ev)
+	local who, icon = coop_event_news.sender(ev.id, ev.from, ev.stage == "on" and 2 or 3)
+	return who or title(ev.id), icon or "ui_inGame2_Radiopomehi"
 end
 
 -------------------------------------------------------------------------------
@@ -249,7 +259,7 @@ function start(id, lvl, by)
 	end
 	put(ev)
 	printf("[coop] zone event %s on %s for %s real h (%s), #%s", id, lvl, string.format("%.2f", hours), tostring(by), ev.seq)
-	coop_news.publish("zone_event", title(id) .. ". " .. news_start(ev))
+	coop_news.publish("zone_event", title(id) .. ". " .. news_sender(ev) .. ": " .. news_start(ev))
 	return ev
 end
 
@@ -271,7 +281,7 @@ function finish(slot, how)
 	set_fact("last_" .. ev.id, tostring(math.floor(ev.till)))
 	set_fact("last_slot_" .. ev.slot, tostring(math.floor(ev.till)))
 	printf("[coop] zone event %s on %s over (%s), #%s", ev.id, ev.level, how, ev.seq)
-	coop_news.publish("zone_event_end", title(ev.id) .. ". " .. news_end(ev))
+	coop_news.publish("zone_event_end", title(ev.id) .. ". " .. news_sender(ev) .. ": " .. news_end(ev))
 	return ev
 end
 
@@ -489,7 +499,8 @@ local function hear(ev)
 		end
 	end
 	if text and not (in_coop() and coop.is_host()) then -- the headless host has no player
-		db.actor:give_game_news(title(ev.id), text, "ui_inGame2_Radiopomehi", 0, 20000)
+		local who, icon = news_sender(ev)
+		db.actor:give_game_news(who, text, icon, 0, 20000)
 		xr_sound.set_sound_play(AC_ID, "pda_tips")
 	end
 end

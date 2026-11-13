@@ -1,0 +1,55 @@
+-- Co-op: the events' news as stalkers write them in their network: several variants of a text and several senders,
+-- one of each for an event. The texts are the string table's: <key>_1, <key>_2, ... (as many as there are; none:
+-- <key> itself); the senders are mod_system_zone_events.ltx's [coop_event_news].
+-- Every game writes an event's news itself (in its language), so nothing is rolled here: the variant and the sender
+-- are counted from a number every game has the same for that event - a Zone's event's start second (the server's
+-- fact), the Cooling's number (the shelter's state) - and so are the same for every player and in the journal.
+
+local S = "coop_event_news"
+
+local counts = {} -- key -> how many variants the string table has
+
+local function count(key)
+	local n = counts[key]
+	if not n then
+		n = 0
+		while game.translate_string(key .. "_" .. (n + 1)) ~= key .. "_" .. (n + 1) do
+			n = n + 1
+		end
+		counts[key] = n
+	end
+	return n
+end
+
+-- 1..n by the event's number; salt: another choice by the same number (the text, the sender, the end's)
+function index(n, seed, salt)
+	if n < 2 then
+		return 1
+	end
+	seed = math.floor(tonumber(seed) or 0)
+	local h = ((seed % 65536) * 1103515245 + math.floor(seed / 65536) * 7919 + (salt or 0) * 40503 + 12345) % 2147483648
+	return math.floor(h / 256) % n + 1
+end
+
+-- the string id of the text's variant for that event
+function text_id(key, seed, salt)
+	local n = count(key)
+	if n == 0 then
+		return key
+	end
+	return key .. "_" .. index(n, seed, salt)
+end
+
+-- the event's sender: its caption ("√воздь, одиночка") and its icon, or nil with no senders listed.
+-- <kind>_senders = <string id>:<community, for the icon as the stalkers' news have it>, ...
+function sender(kind, seed, salt)
+	local list = {}
+	for item in string.gmatch(ini_sys:r_string_ex(S, kind .. "_senders") or "", "[^,%s]+") do
+		list[#list + 1] = item
+	end
+	if #list == 0 then
+		return nil
+	end
+	local id, community = string.match(list[index(#list, seed, salt)], "^([^:]+):?(.*)$")
+	return game.translate_string(id), news_manager.tips_icons[community]
+end

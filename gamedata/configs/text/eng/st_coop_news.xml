@@ -4,19 +4,64 @@
 	<string id="st_coop_news_cooling_window">
 		<text>The raid window is %s h.</text>
 	</string>
-	<string id="st_coop_news_cooling_end">
-		<text>The Cooling is over: the Brain Scorcher works again, the raid window is closed.</text>
+	<string id="st_coop_news_cooling_end_1">
+		<text>The Scorcher fries at full power again: the Radar antennas have spun up, the window to Limansk is closed. Whoever was late, wait for the next Cooling.</text>
 	</string>
-	<string id="st_coop_news_surge">
-		<text>An emission is coming - find cover!</text>
+	<string id="st_coop_news_cooling_end_2">
+		<text>That's it, guys, the shop is shut: the Radar hums again, the psi background is back. The Cooling is over, there is no way to Limansk now.</text>
 	</string>
-	<string id="st_coop_news_surge_end">
-		<text>The emission is over.</text>
+	<string id="st_coop_news_cooling_end_3">
+		<text>The Cooling is over. The Brain Scorcher works as before, the raid window is closed: stay out, it will bake your brains.</text>
 	</string>
-	<string id="st_coop_news_psi">
-		<text>A psi storm is coming - find cover!</text>
+	<string id="st_coop_news_cooling_end_4">
+		<text>The Radar antennas are at full speed again. The raid window is closed until the next Cooling.</text>
 	</string>
-	<string id="st_coop_news_psi_end">
-		<text>The psi storm is over.</text>
+	<string id="st_coop_news_surge_1">
+		<text>Guys, an emission is coming! The sky turns red, the ground hums: everyone into cover, quick!</text>
+	</string>
+	<string id="st_coop_news_surge_2">
+		<text>Attention everyone: an emission is coming! Drop the loot and find a roof over your head, there is little time.</text>
+	</string>
+	<string id="st_coop_news_surge_3">
+		<text>An emission is coming! Whoever is out in the open, run under concrete, into a cellar, anywhere. We will talk later.</text>
+	</string>
+	<string id="st_coop_news_surge_4">
+		<text>The Zone is about to blow: an emission is coming. Find cover; whoever is out in the open, don't play the hero.</text>
+	</string>
+	<string id="st_coop_news_surge_end_1">
+		<text>The emission is over. We crawl out and count the living.</text>
+	</string>
+	<string id="st_coop_news_surge_end_2">
+		<text>It has thundered out: the emission has passed. You can come out of cover.</text>
+	</string>
+	<string id="st_coop_news_surge_end_3">
+		<text>That's it, the emission is over. Whoever is alive, answer. High time to walk the anomalies for fresh loot.</text>
+	</string>
+	<string id="st_coop_news_surge_end_4">
+		<text>The emission has passed, the sky is clear. Come out of cover.</text>
+	</string>
+	<string id="st_coop_news_psi_1">
+		<text>A psi storm is beginning! My head is splitting already: everyone into cover, under a roof!</text>
+	</string>
+	<string id="st_coop_news_psi_2">
+		<text>Attention: a psi storm is coming! Whoever is out in the open, hide, or it will burn your brains out.</text>
+	</string>
+	<string id="st_coop_news_psi_3">
+		<text>Guys, the sky is flashing: a psi storm. Into cover, quick, and don't stick your heads out until it dies down.</text>
+	</string>
+	<string id="st_coop_news_psi_4">
+		<text>A psi storm is beginning, find cover! There is nothing to do outside now but go mad.</text>
+	</string>
+	<string id="st_coop_news_psi_end_1">
+		<text>The psi storm is over. My head is still on: good enough.</text>
+	</string>
+	<string id="st_coop_news_psi_end_2">
+		<text>It has died down: the psi storm has passed. You can come out of cover.</text>
+	</string>
+	<string id="st_coop_news_psi_end_3">
+		<text>That's it, the psi storm is over. Whoever heard voices, it will pass. Probably.</text>
+	</string>
+	<string id="st_coop_news_psi_end_4">
+		<text>The psi storm has thundered out, the sky has calmed. We come out.</text>
 	</string>
 </string_table>
