@@ -556,6 +556,11 @@ end
 
 local function actor_on_first_update()
 	normal_fov = device().fov * 0.7
+	-- Co-op: a game ended with the goggles on leaves r__nightvision set in user.ltx: the night vision pass would run
+	-- with the goggles off (a blurred picture) until they are switched on and off once
+	if not item_device.nv_state then
+		get_console():execute("r__nightvision 0")
+	end
 end
 
 function on_game_start()
