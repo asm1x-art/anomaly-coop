@@ -1,10 +1,10 @@
 -- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
 -- https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
--- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
--- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
--- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
--- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
--- slot.
+-- occupants were gone before. While an outfit is worn (any one, or the Nosorog only: [shelter_brigadier_vision]
+-- all_outfits) the helmet module sits in the headlamp slot: L the light, N the Oracle's night vision, N held the
+-- thermal vision (z_heatvision), J the anomaly visor (after the Grim Raid Addon's raid_special_items_visor). The
+-- module's charge is the outfit's accumulator; a battery dragged onto the outfit charges it. An electric artefact on
+-- the belt powers it all and charges the accumulator and the PDA in its slot.
 
 local OUTFIT = "shelter_brigadier_outfit"
 local MODULE = "shelter_brigadier_module"
@@ -20,9 +20,15 @@ local GEAR = {
 		addons = { "eot", "wpn_sil_45" }, -- an EOTech, the .45 silencer
 		items = { "detector_scientific", "ammo_11.43x23_hydro", "ammo_11.43x23_hydro" } }, -- the Svarog, expansive rounds
 }
-local HOLD = 500 -- ms N is held for the thermal vision
-local CHARGE = 1 / 3600 -- of a full charge per game second from an electric artefact: an hour for a full one
-local VISOR = { radius = 35, step = 500, drain = 0.75 } -- the anomaly visor's reach, and its power loss each step (ms)
+-- the numbers of [shelter_brigadier_vision]
+local VISION = "shelter_brigadier_vision"
+local ALL_OUTFITS = ini_sys:r_bool_ex(VISION, "all_outfits", false) -- the module in any outfit worn
+local HOLD = ini_sys:r_float_ex(VISION, "hold_ms") -- ms N is held for the thermal vision
+local CHARGE = 1 / ini_sys:r_float_ex(VISION, "charge_seconds") -- of a full charge per game second from an electric
+-- artefact
+-- the anomaly visor's reach, and its power loss each step (ms)
+local VISOR = { radius = ini_sys:r_float_ex(VISION, "visor_radius"), step = 500,
+	drain = ini_sys:r_float_ex(VISION, "visor_drain") }
 
 -- the anomaly visor's marks: a part of an anomaly's section -> its detector icon
 local ANOMALY_KINDS = {
@@ -51,7 +57,7 @@ end
 
 local function worn()
 	local outfit = db.actor:item_in_slot(7)
-	return outfit and outfit:section() == OUTFIT and outfit or nil
+	return outfit and (ALL_OUTFITS or outfit:section() == OUTFIT) and outfit or nil
 end
 
 local power, power_at = false, 0
@@ -87,25 +93,37 @@ end
 -------------------------------------------------------------------------------
 -- the visions
 
+-- With Beef's NVGs a vision goes on at the end of the goggles' animation (only the move keys work till then), so
+-- "is on" is known later: thermal is what was asked for, and it's taken back once the animation is over with nothing on.
 local thermal = false
 
+-- a vision is being switched on: its animation plays
+local function switching()
+	return game.only_movekeys_allowed()
+end
+
+-- item_device.set_nightvision is z_heatvision's: a section with a heat_effect is the thermal vision
 local function thermal_off()
 	if not thermal then
 		return
 	end
 	thermal = false
 	if item_device.is_nv_active() then
-		z_heatvision.set_heatvision_simple(HEAT, false)
+		item_device.set_nightvision(HEAT, false)
 	else -- the night vision under it went off (no power): its shader with it
 		get_console():execute("r__heatvision 0")
 		z_heatvision.set_nightvision_HUD(false)
 	end
 end
 
--- N: the Oracle on and off; the thermal vision off
+-- N: the Oracle on and off (from the thermal vision: over to the Oracle)
 local function night_vision()
+	if switching() then
+		return
+	end
 	if thermal then
 		thermal_off()
+		item_device.set_nightvision(MODULE, true)
 	elseif item_device.is_nv_active() then
 		item_device.set_nightvision(MODULE, false)
 	elseif charged(module()) then
@@ -113,17 +131,19 @@ local function night_vision()
 	end
 end
 
--- N held: the thermal vision on, or back to the Oracle
+-- N held: the thermal vision on and off (from the Oracle: over to the thermal vision)
 local function thermal_vision()
+	if switching() then
+		return
+	end
 	if thermal then
 		thermal_off()
-		item_device.set_nightvision(MODULE, true)
 	elseif charged(module()) then
 		if item_device.is_nv_active() then
 			item_device.set_nightvision(MODULE, false)
 		end
-		z_heatvision.set_heatvision_simple(HEAT, true)
-		thermal = item_device.is_nv_active()
+		item_device.set_nightvision(HEAT, true)
+		thermal = item_device.is_nv_active() or switching()
 	end
 end
 
@@ -256,7 +276,7 @@ local function actor_on_update()
 		wearing = nil
 	end
 	local m = module()
-	if thermal and not item_device.is_nv_active() then
+	if thermal and not item_device.is_nv_active() and not switching() then
 		thermal_off()
 	end
 	if visor and now >= visor_at then
@@ -291,7 +311,8 @@ end
 
 -- a battery dragged onto the outfit charges its accumulator (as item_device does a device's)
 local function on_item_drag_dropped(obj_b, obj_d, slot_from, slot_to)
-	if not (obj_b:section() == item_device.device_battery and obj_d:section() == OUTFIT) then
+	if not (obj_b:section() == item_device.device_battery
+		and (obj_d:section() == OUTFIT or ALL_OUTFITS and IsOutfit(obj_d))) then
 		return
 	end
 	local m = obj_d:id() == wearing and module()

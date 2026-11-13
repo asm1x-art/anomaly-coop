@@ -229,16 +229,19 @@ end
 
 	local nv_change_state = false
 
+	-- Co-op: a short press switches the night vision, the key held (hold_ms of [shelter_brigadier_vision]) the thermal
+	-- vision of a device that has one (heat_effect); the mod had the hold for both and the short press for brightness
 	local function on_key_press(key)
 		local bind = dik_to_bind(key)
 
 		if (bind == key_bindings.kNIGHT_VISION) then
-			printf("beef - key on-press")
 			local torch = db.actor:item_in_slot(10)
-			CreateTimeEvent("nvg_keypress", "nvg_keypress_long", 0.5, function()
+			local sec = torch and torch:section()
+			CreateTimeEvent("nvg_keypress", "nvg_keypress_long", ini_sys:r_float_ex("shelter_brigadier_vision", "hold_ms") / 1000, function()
 				nv_change_state = true
-				set_nightvision(torch and torch:section(), not nv_state)
-				printf("beef - time event fired for nvg turn-on")
+				if sec and ini_sys:r_string_ex(sec, "heat_effect") then
+					set_nightvision(sec, not nv_state)
+				end
 				return true 
 			end)
 		end
@@ -255,12 +258,14 @@ end
 		
 		-- Night-Vision
 		if (bind == key_bindings.kNIGHT_VISION) then
-			printf("beef - key on-release")
 			RemoveTimeEvent("nvg_keypress", "nvg_keypress_long")
 		
 			if not nv_change_state then
-				printf("beef - brightness adjust")
-				z_beefs_nvgs.brightness_adjust()
+				local torch = db.actor:item_in_slot(10)
+				local sec = torch and torch:section()
+				if sec and ini_sys:r_string_ex(sec, "nv_effect") then
+					set_nightvision(sec, not nv_state)
+				end
 			end
 			
 			nv_change_state = false

@@ -316,10 +316,10 @@
 		<text>The Nosorog exoskeleton of a mercenary everyone called the Brigadier. A professional who looked after his gear: the suit is upgraded to the limit, all five artefact containers are open and shielded, so no artefact radiation gets through and no applied modules are needed. Lightened to 18 kg. Its patches are torn off: in it you pass for a loner.\n\nA module built into the helmet: a light (L), Oracle night vision (N), thermal vision (hold N) and an anomaly visor (J). It runs on the suit's accumulator: drag a battery onto the suit. With an electric artefact on the belt it runs on that, which also charges the accumulator and the PDA in its slot.</text>
 	</string>
 	<string id="st_shelter_brigadier_module_name">
-		<text>Nosorog helmet module</text>
+		<text>Helmet module</text>
 	</string>
 	<string id="st_shelter_brigadier_module_descr">
-		<text>Built into the Brigadier's Nosorog helmet: a light, Oracle night vision, thermal vision and an anomaly visor. It can't be taken out; its charge is the suit's accumulator.</text>
+		<text>Built into the suit's helmet: a light (L), Oracle night vision (N), thermal vision (hold N) and an anomaly visor (J). It can't be taken out; its charge is the suit's accumulator: drag a battery onto the suit.</text>
 	</string>
 	<string id="st_shelter_brigadier_m4_name">
 		<text>The Brigadier's M4 Tactical</text>
