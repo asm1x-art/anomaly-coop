@@ -12,7 +12,8 @@
 --   "zone_event:last_slot_<slot>" = when the slot's last one ended (the director's gap between world-state events)
 -- Every game applies an event's effects itself from the fact, the way it takes the weather: the event's update()
 -- each look (the calm: its level's anomalies out; the ash: its weather, its shelter), prices (on_get_item_cost), smarts
--- of its level closed to some squads (se_smart_terrain.target_precondition: closed_to_squads, only_squads).
+-- of its level closed to some squads (se_smart_terrain.target_precondition: closed_to_squads, only_squads, the event's
+-- own open_to(squad)).
 -- An event's length: real_hours_min..real_hours_max real hours.
 -- mark(key, value) / marked(key): an event's own facts of the world ("zone_event:<key>"). Each game tells its player the start once and, if he
 -- heard it, the end once; the master also tells the server's journal (coop_news: zone_event, zone_event_end).
@@ -408,10 +409,10 @@ end
 
 -------------------------------------------------------------------------------
 -- smarts of an event's level closed to some squads: "closed_to_squads" those whose section has one of these parts,
--- "only_squads" all but those whose section has one of these parts
+-- "only_squads" all but those whose section has one of these parts; an event's open_to(squad) (its def): all it says no to
 
 local smart_level = {} -- smart id -> its level
-local rules, rules_at = {}, 0 -- the running events' { level, parts, only }, read again each check_s (the host asks per squad)
+local rules, rules_at = {}, 0 -- the running events' { level, parts, only, open }, read again each check_s (the host asks per squad)
 
 local function level_of(se_obj)
 	local lvl = smart_level[se_obj.id]
@@ -433,8 +434,9 @@ local function closed(smart, squad)
 				local section_of = "zone_event_" .. ev.id
 				local parts = ini_list(section_of, "closed_to_squads")
 				local only = ini_list(section_of, "only_squads")
-				if #parts > 0 or #only > 0 then
-					rules[#rules + 1] = { level = ev.level, parts = parts, only = only }
+				local open = defs[ev.id] and defs[ev.id].open_to
+				if #parts > 0 or #only > 0 or open then
+					rules[#rules + 1] = { level = ev.level, parts = parts, only = only, open = open }
 				end
 			end
 		end
@@ -460,6 +462,9 @@ local function closed(smart, squad)
 				if not allowed then
 					return true
 				end
+			end
+			if r.open and squad and not r.open(squad) then
+				return true
 			end
 		end
 	end
