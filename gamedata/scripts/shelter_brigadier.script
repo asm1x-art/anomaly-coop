@@ -1,10 +1,10 @@
 -- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
 -- https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
--- occupants were gone before. While an outfit is worn (any one, or the Nosorog only: [shelter_brigadier_vision]
--- all_outfits) the helmet module sits in the headlamp slot: L the light, N the Oracle's night vision, N held the
--- thermal vision (z_heatvision), J the anomaly visor (after the Grim Raid Addon's raid_special_items_visor). The
--- module's charge is the outfit's accumulator; a battery dragged onto the outfit charges it. An electric artefact on
--- the belt powers it all and charges the accumulator and the PDA in its slot.
+-- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
+-- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
+-- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
+-- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
+-- slot.
 
 local OUTFIT = "shelter_brigadier_outfit"
 local MODULE = "shelter_brigadier_module"
@@ -22,7 +22,6 @@ local GEAR = {
 }
 -- the numbers of [shelter_brigadier_vision]
 local VISION = "shelter_brigadier_vision"
-local ALL_OUTFITS = ini_sys:r_bool_ex(VISION, "all_outfits", false) -- the module in any outfit worn
 local HOLD = ini_sys:r_float_ex(VISION, "hold_ms") -- ms N is held for the thermal vision
 local CHARGE = 1 / ini_sys:r_float_ex(VISION, "charge_seconds") -- of a full charge per game second from an electric
 -- artefact
@@ -57,7 +56,7 @@ end
 
 local function worn()
 	local outfit = db.actor:item_in_slot(7)
-	return outfit and (ALL_OUTFITS or outfit:section() == OUTFIT) and outfit or nil
+	return outfit and outfit:section() == OUTFIT and outfit or nil
 end
 
 local power, power_at = false, 0
@@ -311,8 +310,7 @@ end
 
 -- a battery dragged onto the outfit charges its accumulator (as item_device does a device's)
 local function on_item_drag_dropped(obj_b, obj_d, slot_from, slot_to)
-	if not (obj_b:section() == item_device.device_battery
-		and (obj_d:section() == OUTFIT or ALL_OUTFITS and IsOutfit(obj_d))) then
+	if not (obj_b:section() == item_device.device_battery and obj_d:section() == OUTFIT) then
 		return
 	end
 	local m = obj_d:id() == wearing and module()
