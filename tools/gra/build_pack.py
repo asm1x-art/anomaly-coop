@@ -102,6 +102,7 @@ GFX_MODS = [
     "[ПНВ] Beefs_NVGs",  # Beef's shader based night vision
     "[Шейдеры] ScreenSpaceShaders 23.5",  # SSS update 23.5 (the archive of 2025-12-20)
     "[Погода] Atmospherics 2.68.93_h3",  # weathers, skies, suns; its settings of SSS. No scripts that drive the weather
+    "[Эффект_в4] Emergent Zone 2 Flare",  # the colour table (LUT) GRA has on, of the Emergent Zone 2 pack's five
 ]
 # left out of the look's mods
 GFX_SKIP_PREFIX = ("scripts/orig/",)  # Beef's NVG: the mod's untouched copies
