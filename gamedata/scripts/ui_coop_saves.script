@@ -257,11 +257,32 @@ function UICoopSaveChoice:OnKeyboard(dik, keyboard_action)
 	return res
 end
 
+-- Test stands: -coop_pick_save exit|personal|newest on the command line chooses without the window (nobody clicks
+-- there). exit: the exit save, personal: the newest of the others, newest: the newest of all; a kind that is not
+-- there (or any other word) gives the newest.
+local function auto_pick(list)
+	local kind = string.match(command_line() or "", "%-coop_pick_save%s+(%a+)")
+	if not kind then
+		return nil
+	end
+	for _, s in ipairs(list) do
+		if kind == "exit" and s.reason == "exit" or kind == "personal" and s.reason ~= "exit" then
+			return s, kind
+		end
+	end
+	return list[1], kind
+end
+
 -- from the engine (coop_save.cpp on_world_info): the saves as on_saves has them, newest first
 function on_save_choice(text)
 	on_saves(text)
 	if #saves == 0 then
 		return coop.choose_save(0)
+	end
+	local s, kind = auto_pick(saves)
+	if s then
+		printf("[coop] -coop_pick_save %s: going on from save %s (%s) without the window", kind, s.id, s.reason)
+		return coop.choose_save(s.id)
 	end
 	UICoopSaveChoice(saves):ShowDialog(true)
 end

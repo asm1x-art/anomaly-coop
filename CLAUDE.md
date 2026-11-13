@@ -49,6 +49,7 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 ## Testing
 - Lua syntax without the game: compile each `.script` with `lupa.luajit21` `loadstring` (decode cp1251).
 - Engine self-test: `tools/coop_selftest.script`, copied into the game and run with `-coop_selftest`.
+- Automated runs: always start players with `-coop_pick_save exit|personal|newest` (`ui_coop_saves.script`), otherwise a character with an exit save and one of its own waits on the "which save" window for a click.
 - Two instances on one PC need two exe folders (`bin`, `bin2` + `fsgame2.ltx` with its own appdata): the single-instance mutex is per exe folder.
 - Test user.ltx: `g_always_active on`, `keypress_on_start off`, otherwise the games wait for a key and actor updates never run.
 - Logs are buffered: run `flush` in the console, or close the game with CloseMainWindow, not by killing it.
