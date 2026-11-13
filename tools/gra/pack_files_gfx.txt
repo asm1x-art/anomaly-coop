@@ -152,7 +152,6 @@ scripts/ssfx_wind.script
 scripts/ssfx_wind_mcm.script
 scripts/ssfx_wind_settings.script
 scripts/ui_debug_weather.script
-scripts/z_beefs_nvgs.script
 scripts/z_beefs_nvgs_mcm.script
 shaders/r3/accum_base.ps
 shaders/r3/accum_emissive.ps
