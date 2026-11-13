@@ -50,6 +50,10 @@ O.N = lerp(orig, mul((float3x3)m_WV,  v.pos), 0.25);
 
 	O.position	= float4	(Pe, 		c0.w		);
 
+	// Co-op: motion vectors as Screen Space Shaders' other G-buffer shaders give them (the camera's motion; dlss_mv.h)
+	O.vel_curr = Pp;
+	O.vel_prev = mul(m_vp_prev, pos);
+
 	return O;
 }
 FXVS;

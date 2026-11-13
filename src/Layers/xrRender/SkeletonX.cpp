@@ -77,7 +77,8 @@ void CSkeletonX::_Render(ref_geom& hGeom, u32 vCount, u32 iOffset, u32 pCount)
 			// the parkour climb takes the weapon away, the legs after it) has no last frame: its saved matrices are from
 			// long ago and somewhere else, and DLSS would drag old pixels across the screen (a ghost). It takes no motion
 			// of its own this frame: a world model goes with the camera, a HUD model stays where it is on the screen.
-			const bool fresh = g_taa.mv && !RImplementation.o.ssfx_motionvectors &&
+			// (with Screen Space Shaders' vectors too: DLSS reads those then)
+			const bool fresh = g_taa.mv &&
 				(Parent->MV_MainFrame == u32(-1) || Parent->MV_MainFrame + 1 != g_taa.frame);
 			if (g_taa.mv)
 				Parent->MV_MainFrame = g_taa.frame;

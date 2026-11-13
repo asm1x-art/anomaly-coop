@@ -13,9 +13,14 @@
 	uniform float4x4 m_wvp_prev;
 	uniform float4x4 m_vp_prev;
 	uniform float4 ssfx_jitter;
+	uniform float4 m_dlss_jitter; // Co-op: xy = this frame's camera jitter in clip space while DLSS runs (r4_taa.h), else 0
 
 	float4 ssfx_mv_calc(float4 current, float4 previous, float IsHUD, float TAAMask)
 	{
+		// Co-op: DLSS's jitter sits in the projection, so the current position has it and the last frame's has not:
+		// taken back out, or every pixel would report the jitter as motion (dlss_mv.h)
+		current.xy -= m_dlss_jitter.xy * current.w;
+
 		// Motion vectors
 		float2 motion_vectors = (current.xy / current.w) - (previous.xy / previous.w);
 		
