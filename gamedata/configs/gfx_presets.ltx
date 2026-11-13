@@ -1,0 +1,51 @@
+; Co-op: graphics presets by video memory (gfx_presets.script, docs/coop/graphics.md).
+; A preset = gfx_presets\<name>.ltx. All the numbers are there; nothing of it is in code.
+
+[settings]
+; applied on the first start, when no preset was ever applied on this PC
+default       = tier_8gb
+; a file in appdata with "[apply]" and "preset = <name>": the preset is applied at the next start, the file emptied
+request_file  = gfx_preset.ltx
+
+[presets]
+tier_4gb
+tier_8gb
+tier_12gb
+
+; console commands gfx_presets.dump_user_ltx writes out besides every ssfx_* one (the lines of user.ltx a preset comes to)
+[user_ltx_commands]
+r__color_grading
+r__saturation
+r__gamma
+r__exposure
+r2_sun_lumscale
+r2_sun_lumscale_hemi
+r2_sun_lumscale_amb
+r2_tonemap
+r2_tonemap_lowlum
+r2_tonemap_adaptation
+r2_tonemap_amount
+r2_tonemap_middlegray
+r2_gloss_factor
+r2_gloss_min
+r2_sun_depth_near_scale
+r2_sun_depth_far_scale
+r2_ssao
+r2_ssao_mode
+r2_sunshafts_mode
+r2_volumetric_lights
+r2_ls_squality
+r2_ls_depth_bias
+r3_dynamic_wet_surfaces_sm_res
+r3_dynamic_wet_surfaces_far
+r__detail_density
+r__detail_radius
+r__geometry_lod
+rs_vis_distance
+r2_sun_quality
+r__fakescope
+r2_smaa
+r3_msaa
+r3_msaa_alphatest
+r2_aa
+texture_lod

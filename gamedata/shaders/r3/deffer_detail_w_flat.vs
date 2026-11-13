@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include "screenspace_mvectors.h"
+
 uniform float4 		consts; // {1/quant,1/quant,diffusescale,ambient}
 uniform float4 		wave; 	// cx,cy,cz,tm
 uniform float4 		dir2D; 
@@ -58,7 +60,11 @@ v2p_flat 	main (v_detail v)
 # endif
 	O.position	= float4	(Pe, 		c0.w		);
 
-	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
+	// Co-op: motion vectors as Screen Space Shaders' G-buffer shaders give them (the camera's motion; dlss_mv.h), its jitter
+	O.vel_curr = O.hpos;
+	O.vel_prev = mul(m_vp_prev, pos);
+	O.hpos.xy = ssfx_taa_jitter(O.hpos);
+
 	return O;
 }
 FXVS;

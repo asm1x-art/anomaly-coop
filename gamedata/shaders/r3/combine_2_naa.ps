@@ -1,6 +1,29 @@
 #include "common.h"
 #include "anomaly_shaders.h"
-#include "hdr10.h"
+
+// Check Screen Space Shaders modules
+#include "check_screenspace.h"
+
+#ifdef SSFX_BEEFS_NVG
+	#include "night_vision.h"
+#endif
+
+#ifdef SSFX_DEBAND
+	#include "screenspace_debanding.h"
+#endif
+
+// Used by FOG and IL. Keep it here for the moment...
+uniform float4 fakescope_params3;
+
+uniform float4 vignette_control; // Co-op: the engine's console command of the same name
+
+#ifdef SSFX_LUT_INUSE
+	#include "screenspace_lut.h"
+#endif
+
+#ifdef SSFX_BLOOM
+	Texture2D s_ssfx_bloom;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #ifndef USE_MSAA
@@ -19,8 +42,6 @@ float4 e_barrier;	// x=norm(.8f), y=depth(.1f), z=clr
 float4 e_weights;	// x=norm, y=depth, z=clr
 float4 e_kernel;	// x=norm, y=depth, z=clr
 
-float4 vignette_control;
-
 //////////////////////////////////////////////////////////////////////////////////////////
 #include "mblur.h"
 #include "img_corrections.h"
@@ -34,7 +55,7 @@ struct c2_out
 #ifdef USE_MSAA
 	float	Depth : SV_Depth;
 #endif
-};
+};	
 
 c2_out main( v2p_aa_AA I )
 {
@@ -63,34 +84,56 @@ c2_out main( v2p_aa_AA I )
 	float2	center 	= I.Tex0;
 #endif
 
-    float3 img = s_image.Load(int3(center.xy * screen_res.xy, 0),0);
-	
-    float4 bloom = s_bloom.Sample(smp_rtlinear,center);
+	float3 img = s_image.Load(int3(center.xy * screen_res.xy, 0),0);
+
+#ifdef SSFX_BLOOM
+	float4 bloom = s_ssfx_bloom.Sample(smp_rtlinear, center);
+#else
+	float4 bloom = s_bloom.Sample(smp_rtlinear, center);
+#endif
 
 	img = mblur( center, ( gbd ).P, img.rgb);
 
-	img = blend_soft(img, bloom.xyz*bloom.w);
-		
-	if (!HDR10_IS_ENABLED) {
-		if (tnmp_onoff == 1.0)
-		{		
-			img = Uncharted2ToneMapping(img);
-		}
+#ifdef SSFX_DEBAND
+	// Debanding  - SCREEN SPACE SHADERS - UPDATE 12.5
+	img = lerp(img, ssfx_debanding(img, I.Tex0.xy), depth <= SKY_EPS);
+#endif
 
-		img = img_corrections(img);
-	}
-		
+#ifdef SSFX_BEEFS_NVG
+	// NVG CHANGE TO PREVENT WEIRD COLORS, ONLY APPLY BLOOM WHEN WE'RE NOT IN NVG MASK
+	float lua_param_nvg_generation = floor(shader_param_8.x);			// 1, 2, or 3
+	float lua_param_nvg_num_tubes = frac(shader_param_8.x) * 10.0f;		// 1, 2, 4, 1.1, or 1.2
+	if (lua_param_nvg_generation < 0.01f && compute_lens_mask(aspect_ratio_correction(I.Tex0), lua_param_nvg_num_tubes) == 0.0f)
 	{
-		/*
-		Vignette.
-		vignette_control.x 0->1: Darken the corners of the screen.
-		vignette_control.y 0->1: Darken the center of the screen.
-		vignette_control.z 0->1: Expand the dark edges toward the center.
-		*/
+		img = blend_soft(img, bloom.xyz*bloom.w);
+	}
+#else
+	img = blend_soft(img, bloom.xyz*bloom.w);
+#endif
+
+
+// Color grading --------------------------------
+#ifndef SSFX_ENHANCED_SHADERS
+	if (tnmp_onoff == 1.0)
+	{
+		img = Uncharted2ToneMapping(img);
+	}
+#endif
+
+	// Vanilla color grading ( Exposure, saturation and gamma )
+	img = img_corrections(img);
+
+#ifdef SSFX_LUT_INUSE
+	img = ssfx_lut_pp(img);
+#endif
+// ----------------------------------------------
+
+	// Co-op: the engine's vignette_control (x darkens the corners, y the centre, z brings the dark edge inward), as in
+	// the shader Screen Space Shaders' one replaced
+	{
 		float2 mid_tc = I.Tex0.xy - 0.5;
-		float num = sqrt(dot(mid_tc, mid_tc)) * 2; /* [0.0:sqrt(2.0)] */
+		float num = sqrt(dot(mid_tc, mid_tc)) * 2;
 		float edge_radius = sqrt(2.0) * (1.0 - saturate(vignette_control.z));
-		/* Make sure to avoid division by zero. */
 		if (num > edge_radius)
 			num = 1.0;
 		else if (edge_radius == 0)
@@ -99,7 +142,7 @@ c2_out main( v2p_aa_AA I )
 			num = num / edge_radius;
 		img *= lerp(1.0 - vignette_control.y, 1.0 - vignette_control.x, saturate(num));
 	}
-
+		
 #ifdef 	USE_DISTORT
  	float3	blurred	= bloom*def_hdr	;
 			img		= lerp	(img,blurred,distort.z);

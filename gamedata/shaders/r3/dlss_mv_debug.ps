@@ -1,7 +1,7 @@
 #include "common.h"
 
 // r__dlss_mv_debug: DLSS's motion vectors over the frame (engine: CRenderTarget::phase_dlss_mv).
-// Grey: still. Red/green: the motion left-right / up-down, a pixel of motion = a tenth of the scale. Blue: a model's own.
+// Grey: still. Red/green: the motion left-right / up-down, a pixel of motion = a tenth of the scale. Blue: the HUD.
 Texture2D s_dlss_mv;
 Texture2D s_dlss_obj;
 
@@ -9,6 +9,6 @@ float4 main(float2 tc : TEXCOORD0, float4 col : COLOR, float4 pos2d : SV_Positio
 {
 	int3 px = int3(pos2d.xy, 0);
 	float2 mv = s_dlss_mv.Load(px).xy;
-	float own = s_dlss_obj.Load(px).w;
+	float own = s_dlss_obj.Load(px).z;
 	return float4(saturate(0.5f + mv * 0.1f), own > 0.5f ? 0.8f : 0.2f, 1.f);
 }

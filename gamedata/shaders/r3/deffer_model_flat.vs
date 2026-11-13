@@ -1,6 +1,8 @@
 #include "common.h"
 #include "skin.h"
 
+#include "screenspace_mvectors.h"
+
 v2p_flat _main( v_model I )
 {
 	// world-space  N
@@ -12,33 +14,39 @@ v2p_flat _main( v_model I )
 	O.hpos 		= mul( m_WVP, I.P );
 	O.N 		= mul( (float3x3)m_WV, (float3)I.N );
 
-	O.tcdh 		= float4( I.tc.xyyy	);
+	// Values to calc motion vectors
+	O.vel_curr = O.hpos;
+	O.vel_prev = mul(m_wvp_prev, I.P_prev);
+
+	// Test TAA
+	O.hpos.xy = ssfx_taa_jitter(O.hpos);
+
+	O.tcdh = float4( I.tc.xyyy );
 	
 	//  Hemi cube lighting
-	float3	Nw	= mul		((float3x3)m_W, (float3)I.N);
-	float3  hc_pos	= (float3)hemi_cube_pos_faces;
-	float3	hc_neg	= (float3)hemi_cube_neg_faces;
-	float3  hc_mixed= (Nw < 0) ? hc_neg : hc_pos;
-	float	hemi_val= dot( hc_mixed, abs(Nw) );
-	hemi_val	= saturate(hemi_val);
+	float3	Nw = mul((float3x3)m_W, (float3)I.N);
+	float3  hc_pos = (float3)hemi_cube_pos_faces;
+	float3	hc_neg = (float3)hemi_cube_neg_faces;
+	float3  hc_mixed = (Nw < 0) ? hc_neg : hc_pos;
+	float	hemi_val = dot( hc_mixed, abs(Nw) );
+	hemi_val = saturate(hemi_val);
 
-	O.position	= float4(Pe, 	hemi_val);		//Use L_material.x for old behaviour;
+	O.position	= float4(Pe, hemi_val); //Use L_material.x for old behaviour;
 
 #if defined(USE_R2_STATIC_SUN) && !defined(USE_LM_HEMI)
-	O.tcdh.w	= L_material.y;							// (,,,dir-occlusion)
+	O.tcdh.w	= L_material.y; // (,,,dir-occlusion)
 #endif
 
 #ifdef USE_TDETAIL
-	O.tcdbump	= O.tcdh*dt_params;					// dt tc
+	O.tcdbump	= O.tcdh*dt_params; // dt tc
 #endif
 
-	DLSS_MV_SET(O, skin_P_prev); // dlss_mv.h: where the vertex was a frame ago (skin.h)
 	return	O;
 }
 
 /////////////////////////////////////////////////////////////////////////
 #ifdef 	SKIN_NONE
-v2p_flat	main(v_model v) 		{ SKIN_PREV_NONE(v.P); return _main(v); 		}
+v2p_flat	main(v_model v) 		{ return _main(v); }
 #endif
 
 #ifdef 	SKIN_0

@@ -1,10 +1,10 @@
 -- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
 -- https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
 -- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
--- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
--- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
--- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
--- slot.
+-- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), N with the wheel the night vision's
+-- brightness, J the anomaly visor (after the Grim Raid Addon's raid_special_items_visor). The module's charge is the
+-- outfit's accumulator; a battery dragged onto the outfit charges it. An electric artefact on the belt powers it all
+-- and charges the accumulator and the PDA in its slot.
 
 local OUTFIT = "shelter_brigadier_outfit"
 local MODULE = "shelter_brigadier_module"
@@ -20,9 +20,14 @@ local GEAR = {
 		addons = { "eot", "wpn_sil_45" }, -- an EOTech, the .45 silencer
 		items = { "detector_scientific", "ammo_11.43x23_hydro", "ammo_11.43x23_hydro" } }, -- the Svarog, expansive rounds
 }
-local HOLD = 500 -- ms N is held for the thermal vision
-local CHARGE = 1 / 3600 -- of a full charge per game second from an electric artefact: an hour for a full one
-local VISOR = { radius = 35, step = 500, drain = 0.75 } -- the anomaly visor's reach, and its power loss each step (ms)
+-- the numbers of [shelter_brigadier_vision]
+local VISION = "shelter_brigadier_vision"
+local HOLD = ini_sys:r_float_ex(VISION, "hold_ms") -- ms N is held for the thermal vision
+local CHARGE = 1 / ini_sys:r_float_ex(VISION, "charge_seconds") -- of a full charge per game second from an electric
+-- artefact
+-- the anomaly visor's reach, and its power loss each step (ms)
+local VISOR = { radius = ini_sys:r_float_ex(VISION, "visor_radius"), step = 500,
+	drain = ini_sys:r_float_ex(VISION, "visor_drain") }
 
 -- the anomaly visor's marks: a part of an anomaly's section -> its detector icon
 local ANOMALY_KINDS = {
@@ -87,25 +92,37 @@ end
 -------------------------------------------------------------------------------
 -- the visions
 
+-- With Beef's NVGs a vision goes on at the end of the goggles' animation (only the move keys work till then), so
+-- "is on" is known later: thermal is what was asked for, and it's taken back once the animation is over with nothing on.
 local thermal = false
 
+-- a vision is being switched on: its animation plays
+local function switching()
+	return game.only_movekeys_allowed()
+end
+
+-- item_device.set_nightvision is z_heatvision's: a section with a heat_effect is the thermal vision
 local function thermal_off()
 	if not thermal then
 		return
 	end
 	thermal = false
 	if item_device.is_nv_active() then
-		z_heatvision.set_heatvision_simple(HEAT, false)
+		item_device.set_nightvision(HEAT, false)
 	else -- the night vision under it went off (no power): its shader with it
 		get_console():execute("r__heatvision 0")
 		z_heatvision.set_nightvision_HUD(false)
 	end
 end
 
--- N: the Oracle on and off; the thermal vision off
+-- N: the Oracle on and off (from the thermal vision: over to the Oracle)
 local function night_vision()
+	if switching() then
+		return
+	end
 	if thermal then
 		thermal_off()
+		item_device.set_nightvision(MODULE, true)
 	elseif item_device.is_nv_active() then
 		item_device.set_nightvision(MODULE, false)
 	elseif charged(module()) then
@@ -113,17 +130,19 @@ local function night_vision()
 	end
 end
 
--- N held: the thermal vision on, or back to the Oracle
+-- N held: the thermal vision on and off (from the Oracle: over to the thermal vision)
 local function thermal_vision()
+	if switching() then
+		return
+	end
 	if thermal then
 		thermal_off()
-		item_device.set_nightvision(MODULE, true)
 	elseif charged(module()) then
 		if item_device.is_nv_active() then
 			item_device.set_nightvision(MODULE, false)
 		end
-		z_heatvision.set_heatvision_simple(HEAT, true)
-		thermal = item_device.is_nv_active()
+		item_device.set_nightvision(HEAT, true)
+		thermal = item_device.is_nv_active() or switching()
 	end
 end
 
@@ -256,7 +275,7 @@ local function actor_on_update()
 		wearing = nil
 	end
 	local m = module()
-	if thermal and not item_device.is_nv_active() then
+	if thermal and not item_device.is_nv_active() and not switching() then
 		thermal_off()
 	end
 	if visor and now >= visor_at then
@@ -317,32 +336,52 @@ end
 -------------------------------------------------------------------------------
 -- the keys while the outfit is worn
 
-local pressed, held -- when N went down; its hold used
+-- decided as N is let go: sooner than HOLD the night vision, held longer the thermal vision; the wheel turned with N
+-- down changed the night vision's brightness and nothing else is done
+local pressed, wheel -- when N went down; the wheel was turned with it down
+local seen = 0 -- when N was last seen down
 
 local function on_before_key_press(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and worn() and not Check_UI() then
 		flags.ret_value = false
-		pressed, held = time_global(), false
+		pressed, wheel = time_global(), false
+		seen = pressed
 	end
 end
 
 local function on_before_key_hold(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and pressed then
 		flags.ret_value = false
-		if not held and time_global() - pressed >= HOLD then
-			held = true
-			thermal_vision()
-		end
+		seen = time_global()
 	end
 end
 
 local function on_before_key_release(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and pressed then
 		flags.ret_value = false
-		if not held then
+		if wheel then
+			-- the brightness was it
+		elseif time_global() - pressed >= HOLD then
+			thermal_vision()
+		else
 			night_vision()
 		end
 		pressed = nil
+	end
+end
+
+local function on_mouse_wheel(dir, flags)
+	if not pressed then
+		return
+	end
+	if time_global() - seen > 500 then -- let go where no release came (a window was open)
+		pressed = nil
+		return
+	end
+	flags.ret_value = false -- no weapon switching, no zoom
+	wheel = true
+	if not thermal then
+		z_beefs_nvgs.brightness_step(dir == 1)
 	end
 end
 
@@ -535,6 +574,7 @@ function on_game_start()
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)
 	RegisterScriptCallback("on_before_key_hold", on_before_key_hold)
 	RegisterScriptCallback("on_before_key_release", on_before_key_release)
+	RegisterScriptCallback("on_mouse_wheel", on_mouse_wheel)
 	RegisterScriptCallback("on_key_release", on_key_release)
 	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
 	RegisterScriptCallback("actor_on_before_death", actor_on_net_destroy)

@@ -1,5 +1,7 @@
 #include 	"common.h"
 
+#include "screenspace_mvectors.h"
+
 struct 		vv
 {
 	float4	P		: POSITION;
@@ -29,7 +31,9 @@ v2p_particle main( vv I )
 	O.tcdbump	= O.tcdh * dt_params;			// dt tc
 #endif
 
-	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
+	// Co-op: motion vectors as Screen Space Shaders' G-buffer shaders give them (the camera's motion; dlss_mv.h)
+	O.vel_curr = O.hpos;
+	O.vel_prev = mul(m_vp_prev, float4(mul(m_W, w_pos), 1));
 
 	v2p_particle	pp;
 	pp.color = I.c;

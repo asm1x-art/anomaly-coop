@@ -1,46 +1,52 @@
+// NOTE: Used by a specific vehicle. ( Car with yellow roof )
+
 #include "common.h"
 
-uniform float3x4	m_xform;
-uniform float3x4	m_xform_v;
-uniform float4 		consts; 	// {1/quant,1/quant,???,???}
-uniform float4 		c_scale,c_bias,wind,wave;
-uniform float2 		c_sun;		// x=*, y=+
+#include "screenspace_mvectors.h"
+
+uniform float3x4 m_xform;
+uniform float3x4 m_xform_v;
+uniform float4 consts;
+uniform float4 c_scale,c_bias;
+uniform float2 c_sun;
 
 v2p_flat main (v_tree I)
 {
-	I.Nh	=	unpack_D3DCOLOR(I.Nh);
-	I.T		=	unpack_D3DCOLOR(I.T);
-	I.B		=	unpack_D3DCOLOR(I.B);
+	I.Nh = unpack_D3DCOLOR(I.Nh);
+	I.T = unpack_D3DCOLOR(I.T);
+	I.B = unpack_D3DCOLOR(I.B);
 
-	v2p_flat 		o;
+	v2p_flat O;
 
 	// Transform to world coords
-	float3 	pos		= mul		(m_xform, I.P);
+	float3 pos = mul(m_xform, I.P);
+	float4 wpos = float4(pos, 1);
 
-	//
-	float2 	result	= 0;
-	float4 	f_pos 	= float4(pos.x+result.x, pos.y, pos.z+result.y, 1);
-
-	// Final xform(s)
 	// Final xform
-	float3	Pe		= mul		(m_V,  f_pos				);
-	float 	hemi 	= I.Nh.w*c_scale.w + c_bias.w;
-    //float 	hemi 	= I.Nh.w;
-	o.hpos			= mul		(m_VP, f_pos				);
-	o.N 			= mul		((float3x3)m_xform_v, unpack_bx2(I.Nh)	);
-	o.tcdh 			= float4	((I.tc * consts).xyyy		);
-	o.position		= float4	(Pe, hemi					);
+	float3 Pe = mul(m_V,  wpos );
+	float hemi = I.Nh.w * c_scale.w + c_bias.w;
+
+	O.hpos = mul(m_VP, wpos );
+	O.N = mul((float3x3)m_xform_v, unpack_bx2(I.Nh));
+	O.tcdh = float4((I.tc * consts).xyyy );
+	O.position = float4(Pe, hemi );
+
+	// Values to calc motion vectors
+	O.vel_curr = O.hpos;
+	O.vel_prev = mul(m_vp_prev, wpos);
+
+	// TAA Jitter
+	O.hpos.xy = ssfx_taa_jitter(O.hpos);
 
 #if defined(USE_R2_STATIC_SUN) && !defined(USE_LM_HEMI)
-	float 	suno 	= I.Nh.w * c_sun.x + c_sun.y	;
-	o.tcdh.w		= suno;					// (,,,dir-occlusion)
+	float suno = I.Nh.w * c_sun.x + c_sun.y;
+	O.tcdh.w = suno;
 #endif
 
-	#ifdef USE_TDETAIL
-	o.tcdbump	= o.tcdh*dt_params;					// dt tc
-	#endif
+#ifdef USE_TDETAIL
+	O.tcdbump = O.tcdh*dt_params;
+#endif
 
-	DLSS_MV_NONE(o); // dlss_mv.h: the camera's motion only
-	return o;
+	return O;
 }
 FXVS;

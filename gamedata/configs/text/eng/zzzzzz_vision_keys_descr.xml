@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!--
+	Co-op: the keys in the descriptions of the night vision devices and the thermal visor one buys.
+	The texts are st_items_devices.xml's (vanilla) and heatvision.xml's (the pack's) with the keys added.
+	The string table reads the files in the order of their names and the last one wins:
+	this file must stay after both by name.
+-->
+
+<string_table>
+	<string id="st_device_torch_nv_1_descr">
+		<text>A standard head-mounted flashlight in fully working order. Useful for stalkers who find themselves out and about after dark, but may attract trouble if used unwisely. This head lamp comes with a standard-issue 1PN93-1 Russian Military Forces night-vision device. Offers generation 2+ image intensification, especially useful for operations at night or in low-light conditions.\n \n
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_blue] • %c[ui_gray_2] technological item\n
+		%c[d_purple] • %c[ui_gray_2] nightvision: %c[ui_gray_1]1PN93-1.\n
+		%c[d_blue] • %c[ui_gray_2] moderate electric power consumption\n
+		 \n
+		%c[ui_gray_3]CONTROLS:\n
+		%c[d_blue] • %c[ui_gray_2] night vision: a short press of the night vision key (N)\n
+		%c[d_blue] • %c[ui_gray_2] brightness: hold N and turn the mouse wheel\n
+		</text>
+	</string>
+	<string id="st_device_torch_nv_2_descr">
+		<text>A standard head-mounted flashlight in fully working order. Useful for stalkers who find themselves out and about after dark, but may attract trouble if used unwisely. This head lamp comes with an IIT generation 2+ image intensification, intended for operation at night under natural illumination and in the complete darkness with the switched on infrared illuminator.\n \n
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_blue] • %c[ui_gray_2] technological item\n
+		%c[d_purple] • %c[ui_gray_2] nightvision: %c[ui_gray_1]PN21KL.\n
+		%c[d_blue] • %c[ui_gray_2] moderate electric power consumption\n
+		 \n
+		%c[ui_gray_3]CONTROLS:\n
+		%c[d_blue] • %c[ui_gray_2] night vision: a short press of the night vision key (N)\n
+		%c[d_blue] • %c[ui_gray_2] brightness: hold N and turn the mouse wheel\n
+		</text>
+	</string>
+	<string id="st_device_torch_nv_3_descr">
+		<text>A standard head-mounted flashlight in fully working order. Useful for stalkers who find themselves out and about after dark, but may attract trouble if used unwisely. This head lamp has an electric powerate of lenses and image-processing software that removes video noise and enhances image-intensifying capabilities of PN21K unit, thus making it a full-fledged IIT generation 3+ night vision device.\n \n
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_blue] • %c[ui_gray_2] technological item\n
+		%c[d_purple] • %c[ui_gray_2] nightvision: %c[ui_gray_1]Oracle.\n
+		%c[d_blue] • %c[ui_gray_2] moderate electric power consumption\n
+		 \n
+		%c[ui_gray_3]CONTROLS:\n
+		%c[d_blue] • %c[ui_gray_2] night vision: a short press of the night vision key (N)\n
+		%c[d_blue] • %c[ui_gray_2] brightness: hold N and turn the mouse wheel\n
+		</text>
+	</string>
+	<string id="st_device_torch_nv_4_descr">
+		<text>Thermal background recognition device (thermal visor) equipped with a built-in flashlight. Allows to distinguish thermal signatures of warm objects, including people, animals, fire, anomalous fields, and more. \n \n
+		%c[ui_gray_3]PROPERTIES:\n
+		%c[d_blue] • %c[ui_gray_2] technological item\n
+		%c[d_blue] • %c[ui_gray_2] high electric power consumption\n
+		 \n
+		%c[ui_gray_3]CONTROLS:\n
+		%c[d_blue] • %c[ui_gray_2] thermal vision: hold the night vision key (N) for about half a second and let go\n
+		</text>
+	</string>
+
+</string_table>

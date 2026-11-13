@@ -1,5 +1,6 @@
-//night_vision.h - to define functions and variables for all 3 generations
 #include "common.h"
+uniform float4  shader_param_8;
+uniform float4  shader_param_7;
 
 ///////////////////////////////////////////////////////
 //      BEEF'S SHADER BASED NIGHT VISION EFFECT      //
@@ -17,122 +18,145 @@
 // their original authors where applicable.	- BEEF   //
 ///////////////////////////////////////////////////////
 
+
 ///////////////////////////////////////////////////////
-// STEP 0 - GLOBAL DEFINITIONS AND INCLUDES
+// USER SETTINGS HERE
 ///////////////////////////////////////////////////////
 
-//////// GLOBAL SETTINGS(ALL GENERATIONS)//////// 
-
-// NVG POSITIONING OPTIONS: in (X, Y) format. If X is 0, it's L edge of screen, if 1, it's right edge of screen. Note that it's not linear across the screen.
-		#define nvg_gen_1_centered float2(0.5f,0.5f)		// Gen 1 monocular without offset
-		#define nvg_gen_2_offset_1 float2(0.25f,0.5f)		// Offset for Gen 2 left eye
-		#define nvg_gen_2_offset_2 float2(0.75f,0.5f)		// Offset for Gen 2 right eye
-		#define nvg_gen_3_offset_1 float2(0.05f,0.5f)		// Offset for Gen 3 outer left tube
-		#define nvg_gen_3_offset_2 float2(0.3f,0.5f)		// Offset for Gen 3 inner left tube
-		#define nvg_gen_3_offset_3 float2(0.7f,0.5f)		// Offset for Gen 3 inner right tube
-		#define nvg_gen_3_offset_4 float2(0.95f,0.5f)		// Offset for Gen 3 outer right tube
-		#define nvg_gen_1_offset float2(0.75f,0.5f)			// Offset for Gen 1 monocular
-		#define nvg_gen_1_offset_flipped float2 (1-nvg_gen_1_offset.x, 1-nvg_gen_1_offset.y) // inverse of nvg_gen_1_offset (To allow switching L/R side of screen)
-		#define circle_radius float (0.5f)
-// NVG BLUR OPTIONS: (DEPTH INFLUENCED, CLOSE OBJECTS ARE AT MAX BLUR, FAR OBJECTS ARE AT MIN BLUR)
-		#define gen_1_min_blur_factor float (0.25) 			// Gen 1 - minimum blur applied to image (at far distance), 1 is no blur, higher is more
-		#define gen_1_max_blur_factor float (0.95) 					// maximum blur applied to image (at camera)
-		#define gen_2_min_blur_factor float (0.2) 			// Gen 1 - minimum blur applied to image (at far distance), 1 is no blur, higher is more
-		#define gen_2_max_blur_factor float (0.8) 					// maximum blur applied to image (at camera)
-		#define gen_3_min_blur_factor float (0.1) 			// Gen 1 - minimum blur applied to image (at far distance), 1 is no blur, higher is more
-		#define gen_3_max_blur_factor float (0.6) 					// maximum blur applied to image (at camera)
-
-// NVG VISION DISTANCE (LIGHT ATTENTUATION - FEWER PHOTONS FROM FAR OBJECTS HIT THE INTENSIFIER TUBE AND THEREFORE APPEAR DARKER)
-		#define gen_1_max_vision_distance float (250)			// How far away do objects appear completely dark for Gen 1 NVG
-		#define gen_1_min_vision_distance float(30.0)				// How close does light attenutation begin to take effect (default 0.0)
-		#define gen_1_dim_threshold float (0.7)					// Pixels brighter than this aren't dimmed, since they're likely light sources
-		#define gen_2_max_vision_distance float (400)			// How far away do objects appear completely dark for Gen 1 NVG
-		#define gen_2_min_vision_distance float(30.0)				// How close does light attenutation begin to take effect (default 0.0)
-		#define gen_2_dim_threshold float (0.7)					// Pixels brighter than this aren't dimmed, since they're likely light sources
-		#define gen_3_max_vision_distance float (600)			// How far away do objects appear completely dark for Gen 1 NVG
-		#define gen_3_min_vision_distance float(30.0)				// How close does light attenutation begin to take effect (default 0.0)
-		#define gen_3_dim_threshold float (0.7)					// Pixels brighter than this aren't dimmed, since they're likely light sources
-
-// LIGHT AMPLIFICATION VALUES
-	//	#define nvg_light_amplificiation float (8)			// How much brigher does the image get before NVG processing 
-
-// LUMA SHARPEN VALUES
+	//////// GLOBAL SETTINGS(ALL GENERATIONS)////////
+		#define sky_brightness_factor float (1.0f)			// Sky brightness factor. If your sky is too bright, decrease this slightly, if too dim, increase this slightly.
+		
+	// NVG CRT & NOISE VALUES 
+	//(BE AWARE THAT NOISE AND SCINTILLATION SCALE WITH NVG GAIN)
+		
+		#define gen_1_crt_effect_factor float(0.05)				// Default 0.05 - How much CRT effect to add to NVG image (0 = none, 1 = max).
+		#define gen_1_nvg_noise_factor float (0.15)				// Default 0.15 - How much noise to add to NVG image. (0 = none, 0.5 = insane)
+		#define gen_1_scintillation_constant float (0.999f) 	// Default 0.999 - The closer the number is to 1.00000, the less scintillation effect.
+		#define gen_1_luma_sharpen_factor float(0.0f)			// Default 0.0 - How much luma sharpen is added in. (0 = none, 1 = max)
+		
+		#define gen_2_crt_effect_factor float(0.07)				// Default 0.07 - How much CRT effect to add to NVG image (0 = none, 1 = max).
+		#define gen_2_nvg_noise_factor float (0.1)				// Default 0.15 - How much noise to add to NVG image. (0 = none, 0.5 = insane)
+		#define gen_2_scintillation_constant float (0.9991f) 	// Default 0.9991 - The closer the number is to 1.00000, the less scintillation effect.
+		#define gen_2_luma_sharpen_factor float(0.25f)			// Default 0.25f - How much luma sharpen is added in. (0 = none, 1 = max)
 	
-// NVG BLOOM OPTIONS (AKA WASHOUT EFFECT):
-		#define gen_1_bloom_threshold (0.11)						// Threshold from 0 to 1 of how bright the pixel should be for bloom (0 is black, 0.5 is middle gray, 1.0 is bright white - default about 0.9 looks good)
-		#define gen_1_bloom_multiplier float (2.5)				// How much transparency to apply to bloom effect (0.0 = full bloom, 0.5 = 50%, 1.0 = no bloom)
-		#define gen_2_bloom_threshold (0.18)						// Threshold from 0 to 1 of how bright the pixel should be for bloom (0 is black, 0.5 is middle gray, 1.0 is bright white - default about 0.9 looks good)
-		#define gen_2_bloom_multiplier float (2)				// How much transparency to apply to bloom effect (0.0 = full bloom, 0.5 = 50%, 1.0 = no bloom)
-		#define gen_3_bloom_threshold (0.29)						// Threshold from 0 to 1 of how bright the pixel should be for bloom (0 is black, 0.5 is middle gray, 1.0 is bright white - default about 0.9 looks good)
-		#define gen_3_bloom_multiplier float (2)				// How much transparency to apply to bloom effect (0.0 = full bloom, 0.5 = 50%, 1.0 = no bloom)
-// NVG CRT / NOISE VALUES
+		#define gen_3_crt_effect_factor float(0.1)				// Default 0.1 - How much CRT effect to add to NVG image (0 = none, 1 = max).
+		#define gen_3_nvg_noise_factor float (0.08)				// Default 0.15 - How much noise to add to NVG image. (0 = none, 0.5 = insane)
+		#define gen_3_scintillation_constant float (0.9992f) 	// Default 0.9992 - The closer the number is to 1.00000, the less scintillation effect.
+		#define gen_3_luma_sharpen_factor float(0.5f)			// Default 0.5 - How much luma sharpen is added in. (0 = none, 1 = max)
 		
-		#define gen_1_crt_effect_factor float(0.05)				// How much CRT effect to add to NVG image (0 = none, 1 = max) (CRT effect makes it look like an old school Cathode Ray Tube television)
-		#define gen_1_nvg_noise_factor float (0.15)				// How much noise to add to NVG image (0.04 is default, anything greater than 0.15 is insane)
-		#define gen_1_scintillation_constant float (0.999f) 		// The closer the number is to 1.00000, the less scintillation effect. 0.9995f is a good default value. 0.9990 is stronger.
+	// NVG COLOR OPTIONS:
+
+		#define gen_1_saturation_color float3 (0.7,1,0.6)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
+		#define gen_2_saturation_color float3 (0.5,1,0.4)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
+		#define gen_3_saturation_color float3 (0.2,1,0.9)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
+
+		// EXAMPLE COLOR SCHEMES:
+		//  (0.7,1,0.6) - gen 1 soft green
+		//	(0.5,1,0.4) - gen 2 hard green
+		//  (0.2,1,0.9) - gen 3 blueish
+		//	(1.0,1.0,1.0) - black and white
+		// 	(1.0,0.7,0.1) - yellow or amber color
 		
-		#define gen_2_crt_effect_factor float(0.2)				// How much CRT effect to add to NVG image (0 = none, 1 = max) (CRT effect makes it look like an old school Cathode Ray Tube television)
-		#define gen_2_nvg_noise_factor float (0.15)				// How much noise to add to NVG image (0.04 is default, anything greater than 0.15 is insane)
-		#define gen_2_scintillation_constant float (0.9993f) 		// The closer the number is to 1.00000, the less scintillation effect. 0.9995f is a good default value. 0.9990 is stronger.
+///////////////////////////////////////////////////////
+// PROBABLY DON'T CHANGE STUFF BELOW HERE UNLESS YOU KNOW WHAT YOU'RE DOING
+///////////////////////////////////////////////////////
+										
+	// Constants
+		#define tube_radius float (frac(shader_param_7.y))
+		
+		#define single_tube_centered float2(0.5f, -0.5f + (floor(shader_param_7.x) / 100))
+		#define single_tube_offset_left float2(0.25f, -0.5f + (floor(shader_param_7.x) / 100))		// Single tube screen position (0.5, 0.5 is centered)
+		#define single_tube_offset_right float2(0.75f, -0.5f + (floor(shader_param_7.x) / 100))	// Single tube screen position (0.5, 0.5 is centered)
+		
+		#define dual_tube_offset_1 float2(0.25f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for dual tube left eye
+		#define dual_tube_offset_2 float2(0.75f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for dual tube right eye
+		
+		#define quad_tube_offset_1 float2(0.05f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for quad tube left outer tube
+		#define quad_tube_offset_2 float2(0.3f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for quad tube left inner tube
+		#define quad_tube_offset_3 float2(0.7f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for quad tube right inner tube
+		#define quad_tube_offset_4 float2(0.95f, -0.5f + (floor(shader_param_7.x) / 100))			// Offset for quad tube right outer tube
 	
-		#define gen_3_crt_effect_factor float(0.4)				// How much CRT effect to add to NVG image (0 = none, 1 = max) (CRT effect makes it look like an old school Cathode Ray Tube television)
-		#define gen_3_nvg_noise_factor float (0.15)				// How much noise to add to NVG image (0.04 is default, anything greater than 0.15 is insane)
-		#define gen_3_scintillation_constant float (0.9995f) 		// The closer the number is to 1.00000, the less scintillation effect. 0.9995f is a good default value. 0.9990 is stronger.
-		
-// NVG COLOR OPTIONS:
-		#define gen_1_saturation_color float3 (0.4,1,0.1)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
-		#define gen_2_saturation_color float3 (0.3,1,0.3)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
-		#define gen_3_saturation_color float3 (0.1,1,0.8)	// Gen1 NVG color - it defines the max amount of color from 0 to 1 using (Red,Green,Blue)
+	#define luma_conversion_coeff float3 (0.299, 0.587, 0.114)// When we convert to YUV, these are the coefficients for Y (since we discard UV)
+	#define farthest_depth float (25.0f) 						// The farthest far place that we can reach in regards to DOF effects
+	
+	
+	// LUA PACKING
+		//	local x_1 = tostring(nvg_generation)                           -- Generation (1,2,3) - outputs 1.x to 3.x
+		//	local x_2 = tostring(nvg_num_tubes)                            -- Num Tubes (1,2,4,11,12) outputs x.1, x.2, x.4, x.11, or x.12
+		//	local y_1 = tostring(math.floor(nvg_gain_current * 10))        -- Gain Adjust (0.1 to 3) -- outputs 1.y to 30.y in 1. increment
+		//	local y_2 = tostring(math.floor(nvg_washout_thresh * 10))      -- Washout Thresh (0.0 - 0.9) - outputs y.0 to y.9 in .1 increment
+		//	local z_1 = tostring(math.floor(vignette_current * 100))       -- Vignette Amount (0.0 to 1.0) outputs 0.z to 100.z in 1. increment
+		//	local z_2 = tostring(math.floor(glitch_power * 10))            -- Glitch Power (0.0 - 0.9) - outputs z.0 to z.9 in .1 increment
+		//	local w_1 = tostring((math.floor(nvg_gain_offset * 10)) )      -- Gain Offset (0.5 to 3.0) - outputs 5.w to 30.w in 1. increment
+		//	local w_2 = tostring(nvg_mode)                  		         -- Mode (0,1) - outputs w.0 or w.1 depending on mode
 
-// LUMA Sharpen
-
-// NVG VIGNETTE AMOUNT
-		#define gen_1_vignette_amount float (0.1f)
-		#define gen_2_vignette_amount float (0.08f)
-		#define gen_3_vignette_amount float	(0.05f)
+	// SHADER UNPACKING
+		// float lua_param_nvg_generation = floor(shader_param_8.x);           	  // 1, 2, or 3
+		// float lua_param_nvg_num_tubes = frac(shader_param_8.x) * 10.0f;   	  // 1, 2, 4, 1.1, or 1.2
+		// float lua_param_nvg_gain_current = floor(shader_param_8.y) / 10.0f;	  // 0.0 to 3.0
+		// float lua_param_nvg_washout_thresh = frac(shader_param_8.y);    		  // 0.0 to 0.9
+		// float lua_param_vignette_current = floor(shader_param_8.z) / 100.0f;   // 0.0 to 1.0
+		// float lua_param_glitch_power = frac(shader_param_8.z);        		  // 0.0 to 0.9
+		// float lua_param_nvg_gain_offset = floor(shader_param_8.w) / 10.0f;	  // 0.5 to 3.0
+		// float lua_param_nvg_mode = frac(shader_param_8.w) * 10;                // 0 to 9 in 1.0 increment 
+			// mode 0: blurred background (default)
+			// mode 1: black background
+			// mode 2: image overlay
+			// mode 3: no changes (clear vision)
+			
+			
+		// float lua_param_flip_down = floor(shader_param_7.x);
 		
+		
+		// float lua_param_nvg_radius = frac(shader_param_7.y);
+
+	
 ///////////////////////////////////////////////////////
 // DEFINE NVG MASK (Credit to LVutner for huge assistance in designing the functions)
 ///////////////////////////////////////////////////////
-float compute_lens_mask(float2 masktc, float nvg_gen)
+float compute_lens_mask(float2 masktc, float num_tubes)
 {
-	if (nvg_gen == 1) // for Gen 1 NVG
+	float lua_param_flip_down = floor(shader_param_7.x);
+	lua_param_flip_down = clamp(5 - (lua_param_flip_down / 20.0f),1.0f,5.0f);
+	masktc.y = masktc.y * lua_param_flip_down;
+	
+	if (num_tubes > 0.99f && num_tubes < 1.01f) // One tube centered
 		{
-			return step(distance(masktc,nvg_gen_1_offset), circle_radius);
+			return step(distance(masktc,single_tube_centered), tube_radius);
 		}
-	else if (nvg_gen == 10) // for Gen 1 NVG, but flipped (Left side vs right side) aka Gen 10 NVG
+	else if (num_tubes > 1.09f && num_tubes < 1.11f) // One tube left offset
 		{
-			return step(distance(masktc,nvg_gen_1_offset_flipped), circle_radius);
+			return step(distance(masktc,single_tube_offset_left), tube_radius);
 		}
-	else if (nvg_gen == 11) // for Gen 1 NVG, but centered
+	else if (num_tubes > 1.19f && num_tubes < 1.21f) // One tube right offset
 		{
-			return step(distance(masktc,nvg_gen_1_centered), circle_radius);
+			return step(distance(masktc,single_tube_offset_right), tube_radius);
 		}
-	else if (nvg_gen == 2) // for Gen 2 NVGs
+	else if (num_tubes > 1.99f && num_tubes < 2.01f) // Two tubes
 		{
-			if ( (step(distance(masktc,nvg_gen_2_offset_1), circle_radius) == 1) || (step(distance(masktc,nvg_gen_2_offset_2), circle_radius) == 1))
+			if ( (step(distance(masktc,dual_tube_offset_1), tube_radius) == 1) || (step(distance(masktc,dual_tube_offset_2), tube_radius) == 1))
 				{
-				return 1;
+				return 1.0f;
 				}
 			else
 				{
-				return 0;
+				return 0.0f;
 				}
 		}
-	else if (nvg_gen == 3) // for Gen 3 NVGs
+	else if (num_tubes > 3.99f && num_tubes < 4.01f) // Four Tubes
 		{
-		if  (((step(distance(masktc,nvg_gen_3_offset_1), circle_radius) == 1) || (step(distance(masktc,nvg_gen_3_offset_2), circle_radius) == 1)) || ((step(distance(masktc,nvg_gen_3_offset_3), circle_radius) == 1) || (step(distance(masktc,nvg_gen_3_offset_4), circle_radius) == 1)))
+		if  (((step(distance(masktc,quad_tube_offset_1), tube_radius) == 1) || (step(distance(masktc,quad_tube_offset_2), tube_radius) == 1)) || ((step(distance(masktc,quad_tube_offset_3), tube_radius) == 1) || (step(distance(masktc,quad_tube_offset_4), tube_radius) == 1)))
 				{
-				return 1;
+				return 1.0f;
 				}
 			else
 				{
-				return 0;
+				return 0.0f;
 				}
 		}
 	else
 	{
-		return 0;
+		return 0.0f;
 	}
 }
 
@@ -147,8 +171,9 @@ float2 aspect_ratio_correction (float2 tc)
 	return tc;
 	}
 
+
 ///////////////////////////////////////////////////////
-// CURVED TEXTURE COORDINATES FOR CRT EFFECT (adapted from "MattiasCRT" on ShaderToy, credit Mattias)
+// CRT EFFECT (adapted from MattiasCRT on ShaderToy, credit Mattias)
 ///////////////////////////////////////////////////////
 float2 curve_texturecoords(float2 curved_tc)
 {
@@ -161,21 +186,6 @@ float2 curve_texturecoords(float2 curved_tc)
 	return curved_tc;
 }
 
-
-///////////////////////////////////////////////////////
-// Exposure Increaser
-///////////////////////////////////////////////////////
-float3 exposer_increaser( float3 image, float gray, float exposure)
-{
-     float b=4*(exposure-1);
-	 float a=1-b;
-	 float f= gray*(a*gray+b);
-	 return f*image;
-}
-
-///////////////////////////////////////////////////////
-// CRT EFFECT (adapted from MattiasCRT on ShaderToy, credit Mattias)
-///////////////////////////////////////////////////////
 float3 make_crt_ified(float3 fragColor, float2 tc )
 {
 	//float2 screen_res = screen_res.xy; // define screen res variable
@@ -219,6 +229,71 @@ float3 make_crt_ified(float3 fragColor, float2 tc )
 }
 
 ///////////////////////////////////////////////////////
+// VIGNETTE CALCULATOR (USED IN NVG AS WELL AS BLOOM PHASES TO DARKEN EDGES OF SHIT)
+///////////////////////////////////////////////////////
+float calc_vignette (float num_tubes, float2 tc, float vignette_amount)
+{
+	float vignette;
+	float2 corrected_texturecoords = aspect_ratio_correction(tc);
+	
+	float lua_param_flip_down = floor(shader_param_7.x);
+	lua_param_flip_down = clamp(5 - (lua_param_flip_down / 20.0f),1.0f,5.0f);
+	
+	corrected_texturecoords.y = corrected_texturecoords.y * lua_param_flip_down;
+	
+	if (num_tubes > 0.99f && num_tubes < 1.01f)
+	{
+		float gen1_vignette = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,single_tube_centered)),3);
+		vignette = 1.0 - (1.0 - gen1_vignette); // apply vignette
+	}
+	else if (num_tubes > 1.09f && num_tubes < 1.11f)
+	{
+		float gen1_vignette = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,single_tube_offset_left)),3);
+		vignette = 1.0 - (1.0 - gen1_vignette); // apply vignette
+	}
+	
+	else if (num_tubes > 1.19f && num_tubes < 1.21f)
+	{
+		float gen1_vignette = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,single_tube_offset_right)),3);
+		vignette = 1.0 - (1.0 - gen1_vignette); // apply vignette
+	}
+	else if (num_tubes > 1.99f && num_tubes < 2.01f)
+	{
+		float gen2_vignette_1 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,dual_tube_offset_1)),3);
+		float gen2_vignette_2 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,dual_tube_offset_2)),3);
+		vignette = 1.0 - ((1.0 - gen2_vignette_1) * (1.0 - gen2_vignette_2)); // apply vignette
+	}
+	else if (num_tubes > 3.99f && num_tubes < 4.01f)
+	{
+		float gen3_vignette_1 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,quad_tube_offset_1)),3);
+		float gen3_vignette_2 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,quad_tube_offset_2)),3);
+		float gen3_vignette_3 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,quad_tube_offset_3)),3);
+		float gen3_vignette_4 = pow(smoothstep(tube_radius,tube_radius-vignette_amount, distance(corrected_texturecoords,quad_tube_offset_4)),3);
+		vignette = 1.0 - ((1.0 - gen3_vignette_1) * (1.0 - gen3_vignette_2) * (1.0 - gen3_vignette_3) * (1.0 - gen3_vignette_4)); // apply vignette
+	}
+	return vignette;
+}			
+
+
+
+///// blur functions
+float IGN_calc(float2 uv)
+{
+    uv = frac(uv);
+    float f = 0.06711056 * uv.x + 0.00583715 * uv.y;
+    return 6.28*(frac(52.9829189 * frac(f)));
+}
+
+float2x2 rot(float a)
+{
+    float c;
+    float s;
+	sincos(a,s,c);
+    return float2x2 (c, s, -s, c);
+}
+
+
+///////////////////////////////////////////////////////
 // LUMA SHARPEN	(adapted from  Simple Luma Sharpen on ShaderToy, credit xwize)
 ///////////////////////////////////////////////////////
 
@@ -252,7 +327,7 @@ float3 luma_sharpen(float3 image, float2 uv)
         for(int j = -1; j <= 1; ++j) {
             float2 offset = float2(i,j) / imgSize;
             
-            float s = extractLuma(s_image.SampleLevel(smp_rtlinear,uv + offset,0).rgb);
+            float s = extractLuma(s_blur_2.SampleLevel(smp_rtlinear,uv + offset,0).rrr);
             float notCentre = min(float(i*i + j*j),1.0);
             accumY += s * (9.0 - notCentre*10.0);
         }
@@ -267,56 +342,18 @@ float3 luma_sharpen(float3 image, float2 uv)
 		return image;   
 }
 
-///////////////////////////////////////////////////////
-// VIGNETTE CALCULATOR (USED IN NVG AS WELL AS BLOOM PHASES TO DARKEN EDGES OF SHIT)
-///////////////////////////////////////////////////////
-float calc_vignette (float night_vision_generation, float2 tc)
-{
-	float vignette;
-	float2 corrected_texturecoords = aspect_ratio_correction(tc);
-	
-	if (night_vision_generation == 1)
-	{
-		float gen1_vignette_right = pow(smoothstep(circle_radius,circle_radius-gen_1_vignette_amount, distance(corrected_texturecoords,nvg_gen_1_offset)),3);
-		vignette = 1.0 - (1.0 - gen1_vignette_right); // apply vignette
-	}
-	else if (night_vision_generation == 10)
-	{
-		float gen1_vignette_left = pow(smoothstep(circle_radius,circle_radius-gen_1_vignette_amount, distance(corrected_texturecoords,nvg_gen_1_offset_flipped)),3);
-		vignette = 1.0 - (1.0 - gen1_vignette_left); // apply vignette
-	}
-	else if (night_vision_generation == 11)
-	{
-		float gen1_vignette_center = pow(smoothstep(circle_radius,circle_radius-gen_1_vignette_amount, distance(corrected_texturecoords,nvg_gen_1_centered)),3);
-		vignette = 1.0 - (1.0 - gen1_vignette_center); // apply vignette
-	}
-	else if (night_vision_generation == 2)
-	{
-		float gen2_vignette_1 = pow(smoothstep(circle_radius,circle_radius-gen_2_vignette_amount, distance(corrected_texturecoords,nvg_gen_2_offset_1)),3);
-		float gen2_vignette_2 = pow(smoothstep(circle_radius,circle_radius-gen_2_vignette_amount, distance(corrected_texturecoords,nvg_gen_2_offset_2)),3);
-		vignette = 1.0 - ((1.0 - gen2_vignette_1) * (1.0 - gen2_vignette_2)); // apply vignette
-	}
-	else if (night_vision_generation == 3)
-	{
-		float gen3_vignette_1 = pow(smoothstep(circle_radius,circle_radius-gen_3_vignette_amount, distance(corrected_texturecoords,nvg_gen_3_offset_1)),3);
-		float gen3_vignette_2 = pow(smoothstep(circle_radius,circle_radius-gen_3_vignette_amount, distance(corrected_texturecoords,nvg_gen_3_offset_2)),3);
-		float gen3_vignette_3 = pow(smoothstep(circle_radius,circle_radius-gen_3_vignette_amount, distance(corrected_texturecoords,nvg_gen_3_offset_3)),3);
-		float gen3_vignette_4 = pow(smoothstep(circle_radius,circle_radius-gen_3_vignette_amount, distance(corrected_texturecoords,nvg_gen_3_offset_4)),3);
-		vignette = 1.0 - ((1.0 - gen3_vignette_1) * (1.0 - gen3_vignette_2) * (1.0 - gen3_vignette_3) * (1.0 - gen3_vignette_4)); // apply vignette
-	}
-	return vignette;
-}			
+
 
 ///////////////////////////////////////////////////////
 // DEPTH BLUR - LITERALLY BLURS THE DEPTH VALUE IN S_POSITION
 ///////////////////////////////////////////////////////
-float blurred_depth (float2 tc, float fp_start, float fp_end)
+float blurred_depth (float2 tc)
 {
     float Pi = 6.28318530718; // Pi*2
     
     float Directions = 12.0; // BLUR DIRECTIONS (Default 16.0 - More is better but slower)
     float Quality = 4.0; // BLUR QUALITY (Default 4.0 - More is better but slower)
-	float Size = 4;
+	float Size = 6;
 	float2 Radius = Size/screen_res.xy;
 
 	// how far away is the center of our COC
@@ -345,7 +382,7 @@ float blurred_depth (float2 tc, float fp_start, float fp_end)
 			if (depth_sample == 0) {depth_sample = 10000.0f; }
 			
 			// if the point we hit is closer than our (center? average), then that point should add blurring to our centerpoint
-			if (depth_sample < center_depth) 
+			if (depth_sample <= center_depth ) 
 			{
 				weight = Quality - pow((i - 1),0.5);
 				depth_average += depth_sample * weight;
@@ -357,4 +394,60 @@ float blurred_depth (float2 tc, float fp_start, float fp_end)
     }
 	depth_average /= total_weight;
     return depth_average;
+}
+
+
+////////////////////////////////////////////////////////////////////
+//////// GLITCH EFFECT /////////////////
+
+float3 glitchEffect( float3 image, float2 tc, float power)
+{
+    //tc.y = 1.0 - tc.y;
+	
+	float time = fmod(timers.x, 32.0); // + modelmat[0].x + modelmat[0].z;
+
+	float GLITCH = saturate(power);
+
+	float rnd0 = rand(timers.x);
+	float r0 = saturate((1.0-GLITCH)*0.7 + rnd0);
+	float rnd1 = rand(floor(tc.x*10.0f * r0) / (10.0f * r0) * time);
+	float r1 = 0.5 - (0.5 * GLITCH) + rnd1;
+	r1 = 1.0 - max( 0.0, r1);
+	float rnd2 = rand(floor(tc.y*40.0f * r1) / (40.0f * r1) * time);
+	float r2 = saturate(rnd2);
+	float rnd3 = rand(floor(tc.y*10.0f * r0) / (10.0f * r0) * time);
+	float r3 = (1.0 - saturate(rnd3 + 0.8)) - 0.1f;
+
+	float pxrnd = rand( dot(tc.x,tc.y) + time );
+
+	float test_result;
+	if (rnd0 > 0.5f)
+	{ test_result = 1.0f; }
+	else
+	{test_result = -1.0f; }
+	
+	float ofs = 0.05 * r2 * GLITCH * test_result;
+	ofs += 0.5 * pxrnd * ofs;
+
+	tc.y += 0.1 * r3 * GLITCH;
+
+    int NUM_SAMPLES = 10;
+    float RCP_NUM_SAMPLES_F = 1.0 / (float)NUM_SAMPLES;
+    
+	float3 sum = 0.0f;
+	float3 wsum = 0.0f;
+	float t0 = 0.0f;
+	
+	for( int i=0; i<NUM_SAMPLES; ++i )
+	{
+		float t = (float)i * RCP_NUM_SAMPLES_F;
+		tc.x = saturate(tc.x + ofs * t);
+		float3 samplecol = s_blur_2.SampleLevel(smp_rtlinear, tc, 0).rgb;
+//		float3 s = spectrum_offset( t );
+//		samplecol *= s;
+		sum += samplecol;
+		wsum += 1.0f;
+	}
+return 	sum.rgb /= wsum;
+
 }

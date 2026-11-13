@@ -6,6 +6,7 @@
 #define	v_in	v_static
 #endif
 
+#include "screenspace_mvectors.h"
 
 v2p_bumped main( v_in I )
 {
@@ -21,6 +22,13 @@ v2p_bumped main( v_in I )
 	O.tcdh 		= float4	(tc.xyyy			);
 	O.position	= float4	(Pe, hemi			);
 //	O.position	= float4	(O.hpos.xyz, hemi	);
+	
+	// Values to calc motion vectors
+	O.vel_curr = O.hpos;
+	O.vel_prev = mul(m_wvp_prev, w_pos);
+
+	// TAA Jitter
+	O.hpos.xy = ssfx_taa_jitter(O.hpos);
 
 #if defined(USE_R2_STATIC_SUN) && !defined(USE_LM_HEMI)
 	O.tcdh.w	= I.color.w;					// (r,g,b,dir-occlusion)
@@ -61,7 +69,6 @@ v2p_bumped main( v_in I )
 #ifdef	USE_LM_HEMI
 	O.lmh 			= unpack_tc_lmap	(I.lmh);
 #endif
-	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return	O;
 }
 

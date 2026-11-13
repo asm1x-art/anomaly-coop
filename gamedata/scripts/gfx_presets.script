@@ -1,0 +1,202 @@
+--[[
+	Co-op: graphics presets by video memory (docs/coop/graphics.md).
+
+	A preset is a file gamedata\configs\gfx_presets\<name>.ltx:
+		[preset]   title, vram: for people and the launcher
+		[mcm]      values of the mods' settings pages (Screen Space Shaders: ssfx_module/...), as axr_options.ltx keeps them.
+		           The mods' own scripts turn them into console commands, so the settings pages show what is in force
+		[console]  console commands (the render's own: light, tonemapping, grass radius...), key = the command, value = its
+		           arguments
+	The list of presets, the default one and the request file's name are in gamedata\configs\gfx_presets.ltx.
+
+	A preset is applied:
+	  - on the first start with this script, the default one (nobody chose yet);
+	  - when the request file is found in appdata (the launcher or a person writes it):
+	        [apply]
+	        preset = tier_8gb
+	    The file is emptied once the preset is applied (an empty file is no request).
+	  - by gfx_presets.apply("tier_8gb") from another script.
+	Nothing is forced after that: a player's own changes in the settings pages stay until the next request.
+
+	Shader quality levels are compiled into the shaders, so part of a preset shows only after the game is started again;
+	the launcher can avoid that by putting the preset's lines of gfx_presets\<name>_user.ltx into user.ltx beforehand
+	(the same values, written out by gfx_presets.dump_user_ltx in a running game).
+
+	This script's name sorts before the ssfx_* scripts: its on_game_start runs first, and they read the values it stored.
+]]
+
+local SETTINGS = "gfx_presets.ltx"
+local STORE = "gfx_presets" -- the section of axr_options.ltx with what was applied
+
+local settings -- ini_file of SETTINGS
+local take_request_done = false -- a request file was applied at this start
+
+local function log(fmt, ...)
+	printf("[gfx_presets] " .. fmt, ...)
+end
+
+local function cfg()
+	if not settings then
+		settings = ini_file(SETTINGS)
+	end
+	return settings
+end
+
+local function typed(text)
+	if text == "true" then
+		return true
+	elseif text == "false" then
+		return false
+	end
+	return tonumber(text) or text
+end
+
+-- {key = value} of a section, in the file's order as a second result
+local function read_section(ini, section)
+	local values, order = {}, {}
+	if not ini:section_exist(section) then
+		return values, order
+	end
+	for i = 0, ini:line_count(section) - 1 do
+		local _, key, value = ini:r_line_ex(section, i, "", "")
+		if key and key ~= "" then
+			values[key] = value or ""
+			order[#order + 1] = key
+		end
+	end
+	return values, order
+end
+
+function preset_names()
+	local _, order = read_section(cfg(), "presets")
+	return order
+end
+
+function current()
+	return axr_main.config:r_value(STORE, "current", 0, "")
+end
+
+local function preset_file(name)
+	local ini = cfg()
+	if not (ini:section_exist("presets") and ini:line_exist("presets", name)) then
+		return nil
+	end
+	return ini_file("gfx_presets\\" .. name .. ".ltx")
+end
+
+-- puts a preset in force; returns true, or false and why not.
+-- starting: called from on_game_start, before the mods' scripts read their settings (they will on their own; the
+-- other scripts are not ready for an "options changed" yet)
+function apply(name, starting)
+	local ini = preset_file(name)
+	if not ini then
+		log("no preset \"%s\" in %s", tostring(name), SETTINGS)
+		return false, "unknown preset"
+	end
+
+	local mcm, mcm_order = read_section(ini, "mcm")
+	for _, key in ipairs(mcm_order) do
+		axr_main.config:w_value("mcm", key, typed(mcm[key]))
+	end
+	axr_main.config:w_value(STORE, "current", name)
+	axr_main.config:w_value(STORE, "version", ini:r_float_ex("preset", "version") or 0)
+	axr_main.config:save()
+
+	local console = get_console()
+	local commands, order = read_section(ini, "console")
+	for _, key in ipairs(order) do
+		console:execute(key .. " " .. commands[key])
+	end
+
+	-- the mods' scripts read their settings again and send them to the console
+	if not starting then
+		SendScriptCallback("on_option_change")
+		console:execute("cfg_save")
+	end
+	log("preset \"%s\" applied: %d settings of the mods' pages, %d console commands", name, #mcm_order, #order)
+	return true
+end
+
+-- the request file in appdata: applied and removed. Returns true when a preset was applied
+local function take_request()
+	local name = cfg():r_string_ex("settings", "request_file")
+	if not name or name == "" then
+		return false
+	end
+	local path = getFS():update_path("$app_data_root$", name)
+	local f = io.open(path, "r")
+	if not f then
+		return false
+	end
+	local text = f:read("*all") or ""
+	f:close()
+	local preset = text:match("preset%s*=%s*([%w_%-]+)")
+	if text:match("^%s*$") then
+		return false -- emptied by an earlier start (the game's Lua cannot delete files)
+	end
+	f = io.open(path, "w") -- taken: emptied
+	if f then
+		f:close()
+	end
+	if not preset then
+		log("request file %s has no \"preset = <name>\" line", name)
+		return false
+	end
+	take_request_done = true
+	return (apply(preset, true))
+end
+
+local function startup()
+	if take_request() then
+		return
+	end
+	if current() == "" then
+		local default = cfg():r_string_ex("settings", "default")
+		if default and default ~= "" then
+			apply(default, true)
+		end
+	end
+end
+
+-- the lines of user.ltx a preset comes to, for the launcher (see the top): written to appdata\<name>_user.ltx.
+-- Run in a game where the preset is applied; the commands are those listed in [user_ltx_commands] of gfx_presets.ltx
+-- and every ssfx_* command
+function dump_user_ltx(name)
+	local console = get_console()
+	console:execute("cfg_save")
+	local keep = read_section(cfg(), "user_ltx_commands")
+	local src = io.open(getFS():update_path("$app_data_root$", "user.ltx"), "r")
+	if not src then
+		return false
+	end
+	local out = {}
+	for line in src:lines() do
+		local cmd = line:match("^(%S+)%s")
+		if cmd and (cmd:find("^ssfx_") or keep[cmd] ~= nil) and cmd ~= "ssfx_is_underground" then
+			out[#out + 1] = line
+		end
+	end
+	src:close()
+	local path = getFS():update_path("$app_data_root$", name .. "_user.ltx")
+	local dst = io.open(path, "w")
+	dst:write(table.concat(out, "\n"), "\n")
+	dst:close()
+	log("%d lines of user.ltx written to %s", #out, path)
+	return true
+end
+
+-- the mods' scripts have sent their settings to the console by now: user.ltx keeps them even if the game is ended hard
+local function save_once()
+	get_console():execute("cfg_save")
+	UnregisterScriptCallback("main_menu_on_init", save_once)
+	UnregisterScriptCallback("actor_on_first_update", save_once)
+end
+
+function on_game_start()
+	local before = current()
+	startup()
+	if current() ~= before or take_request_done then
+		RegisterScriptCallback("main_menu_on_init", save_once)
+		RegisterScriptCallback("actor_on_first_update", save_once)
+	end
+end

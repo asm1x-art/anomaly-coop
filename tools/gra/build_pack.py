@@ -95,6 +95,29 @@ MANTLING_SOUNDS = {f"sounds/ledge_grabbing/vaulting/{kind_}/{kind_}{n}.ogg": "[�
                    for n in range(1, count + 1)}
 
 
+# GRA's look: its shader block, in Mod Organizer's priority (the same in the profiles 12 GB, 6 GB and 4 GB "Средние"),
+# lowest first. A mod is added here only together with its files (one commit a mod)
+GFX_MODS = [
+    "[Частицы_в2 и 12] Enh_Shaders_Color_G 1.10",  # Enhanced Shaders and Color Grading: light, tonemapping, bloom
+    "[ПНВ] Beefs_NVGs",  # Beef's shader based night vision
+    "[Шейдеры] ScreenSpaceShaders 23.5",  # SSS update 23.5 (the archive of 2025-12-20)
+    "[Погода] Atmospherics 2.68.93_h3",  # weathers, skies, suns; its settings of SSS. No scripts that drive the weather
+    "[Эффект_в4] Emergent Zone 2 Flare",  # the colour table (LUT) GRA has on, of the Emergent Zone 2 pack's five
+]
+# left out of the look's mods
+GFX_SKIP_PREFIX = ("scripts/orig/",)  # Beef's NVG: the mod's untouched copies
+GFX_SKIP = {
+    "scripts/item_device.script.bak",
+    "scripts/raid_lamp_color_change.script",  # GRA's own, lying in its ScreenSpaceShaders folder: raid gameplay
+}
+GFX_EXTRA = {
+    # Beef's own script: GRA's copy of it plays the goggles' animation through FDDA Redone (lam2), a mod not taken
+    "scripts/z_beefs_nvgs.script": ("[ПНВ] Beefs_NVGs", "gamedata/scripts/orig/z_beefs_nvgs.script"),
+}
+# archives the mods bring ready made: copied next to the pack's own (the sounds of steps in the rain)
+GFX_ARCHIVES = [("[Шейдеры] ScreenSpaceShaders 23.5", "db/mods/ssfx_rain_footsteps.db0")]
+
+
 # the packs: each puts its code into gamedata, listed in its own file list (another pack's files count as the repo's:
 # a file two packs have goes to tools\gra\merge), and its assets into <prefix>_*.db
 PACKS = {
@@ -108,6 +131,10 @@ PACKS = {
                  "skip": {"scripts/demonized_geometry_ray.script", "scripts/demonized_randomizing_functions.script",
                           "scripts/demonized_ledge_grabbing_animation_data_blender_script.py",  # Blender's, not the game's
                           "anims/camera_effects/climbing_in.anm"}},  # unused: a script moves the camera
+    # GRA's look (docs/coop/graphics.md): shaders, weathers and their scripts into gamedata, skies and the other textures
+    # and sounds into gra_gfx_*.db. The repo's own files the mods replace are merged by hand (tools/gra/merge)
+    "gfx": {"mods": GFX_MODS, "extra": GFX_EXTRA, "files": "pack_files_gfx.txt", "prefix": "gra_gfx", "skip": GFX_SKIP,
+            "skip_prefix": GFX_SKIP_PREFIX, "archives": GFX_ARCHIVES},
 }
 PACK = PACKS["weapons"]  # the one at work, --pack
 
@@ -115,12 +142,14 @@ PACK = PACKS["weapons"]  # the one at work, --pack
 def skipped(rel):
     """files of the taken mods left out"""
     return (rel in PACK.get("skip", ())
+            or rel.startswith(PACK.get("skip_prefix", ("//",)))
             or rel.startswith("scripts/это что такое/")  # a stray copy of MRAA's scripts; the engine doesn't read subfolders
             or rel == "scripts/raid_auto_cmd_graphics_parametrs.script"  # GRA's: forces graphics settings every start
             or rel == "particles.xr"  # BaS's is the same as vanilla's
             or os.path.basename(rel).startswith("не нужно")  # GRA's way of turning a file off ("not needed")
-            or rel in INSPECT_DOF  # Inspect Weapons' depth of field is ScreenSpaceShaders' (not here); inspecting works
-            or rel in IWP_FDDA)  # I.W.P.'s add-on to FDDA (not here): its exo hands stay
+            # the weapons pack only (the look's pack brings ScreenSpaceShaders' own depth_of_field.ps):
+            or (PACK["prefix"] == "gra" and rel in INSPECT_DOF)  # Inspect Weapons' depth of field is ScreenSpaceShaders'; inspecting works
+            or (PACK["prefix"] == "gra" and rel in IWP_FDDA))  # I.W.P.'s add-on to FDDA (not here): its exo hands stay
 
 
 # Inspect Weapons' blur behind the weapon: built on ScreenSpaceShaders' headers, which this project hasn't
@@ -157,7 +186,11 @@ def manifest():
                 if not skipped(rel):
                     files[rel] = (mod, full)
     for rel, mod in PACK["extra"].items():
-        full = os.path.join(MO2, mod, "gamedata", *rel.split("/"))
+        if isinstance(mod, tuple):  # (mod, the file's path inside the mod): taken from another place than its own
+            mod, source = mod
+            full = os.path.join(MO2, mod, *source.split("/"))
+        else:
+            full = os.path.join(MO2, mod, "gamedata", *rel.split("/"))
         assert os.path.isfile(full), full
         files[rel] = (mod, full)
     return files
@@ -290,6 +323,9 @@ def cmd_assets(stage, out):
         subprocess.run([CONVERTER, "-pack", folder, "-out", db, "-xdb", "-xdb_ud", header], check=True,
                        stdout=subprocess.DEVNULL)
         shutil.rmtree(folder)
+    for mod, source in PACK.get("archives", ()):
+        shutil.copyfile(os.path.join(MO2, mod, *source.split("/")), os.path.join(out, os.path.basename(source)))
+        print("as it is:", os.path.basename(source), flush=True)
 
 
 if __name__ == "__main__":

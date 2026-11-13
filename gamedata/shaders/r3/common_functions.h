@@ -1,38 +1,41 @@
 #ifndef	common_functions_h_included
 #define	common_functions_h_included
 
-#include "hdr10.h"
+#include "srgb.h"
 
 //	contrast function
 float Contrast(float Input, float ContrastPower)
 {
-     //piecewise contrast function
-     bool IsAboveHalf = Input > 0.5 ;
-     float ToRaise = saturate(2*(IsAboveHalf ? 1-Input : Input));
-     float Output = 0.5*pow(ToRaise, ContrastPower); 
-     Output = IsAboveHalf ? 1-Output : Output;
-     return Output;
+    //piecewise contrast function
+    bool IsAboveHalf = Input > 0.5 ;
+    float ToRaise = saturate(2*(IsAboveHalf ? 1-Input : Input));
+    float Output = 0.5*pow(ToRaise, ContrastPower); 
+    Output = IsAboveHalf ? 1-Output : Output;
+    return Output;
 }
 
-float3 vibrance( float3 img, half val )
+float3 vibrance(float3 img, float val )
 {
-    float luminance = dot( float3( img.rgb ), LUMINANCE_VECTOR );
-    return float3( lerp( luminance, float3( img.rgb ), val ));
+    float luminance = dot(float3(img.rgb ), LUMINANCE_VECTOR );
+    return float3(lerp(luminance, float3(img.rgb ), val ));
 }
 
-void        tonemap              (out half4 low, out half4 high, half3 rgb, half scale)
+void        tonemap (out float4 low, out float4 high, float3 rgb, float scale)
 {
-        rgb     =      	rgb*scale       ;
+	rgb =    	SRGBToLinear(rgb);
+	scale =    	SRGBToLinear(scale);
+	rgb =    	rgb*scale;
+	rgb =    	LinearTosRGB(rgb);
 
-		if (HDR10_IS_ENABLED) {
-			low = half4(rgb, 0);
-			high = half4(rgb/def_hdr, 0);
-		} else {
-			const float fWhiteIntensity = 1.7;
-			const float fWhiteIntensitySQR = fWhiteIntensity*fWhiteIntensity;
-			low		=   half4( ( (rgb*(1+rgb/fWhiteIntensitySQR)) / (rgb+1) ),           0 )	;
-			high	= 	half4(rgb/def_hdr, 0);
-		}
+	const float fWhiteIntensity = 11.2;
+
+	low =   float4(tonemap_sRGB(rgb, fWhiteIntensity ), 0);
+	high = 	float4(rgb/def_hdr, 0);
+}
+
+void		tonemap_hipri (out float4 low, out float4 high, float3 rgb, float scale)
+{
+	tonemap (low, high, rgb, scale);
 }
 
 float3 compute_colored_ao(float ao, float3 albedo)
@@ -43,60 +46,80 @@ float3 compute_colored_ao(float ao, float3 albedo)
 
     return max(ao, ((ao * a + b) * ao + c) * ao);
 }
+//CUSTOM
+float3 blend_soft(float3 a, float3 b)
+{
+	//return 1.0 - (1.0 - a) * (1.0 - b);
+	
+	//gamma correct and inverse tonemap to add bloom
+	a = SRGBToLinear(a); //post tonemap render
+	a = a / max(0.004, 1-a); //inverse tonemap
+	//a = a / max(0.001, 1-a); //inverse tonemap
+	b = SRGBToLinear(b); //bloom
+
+	a += b; //bloom add
+	
+	a = a / (1+a) ; //tonemap
+	
+	a = LinearTosRGB(a);
+	return a;
+}
 
 float4 combine_bloom(float3 low, float4 high)    
 {
-        return        float4(low + high*high.a, 1.0);
+	//return	float4(low + high*high.a, 1); //add
+	high.rgb  *= high.a;
+	return	float4(blend_soft(low.rgb, high.rgb),1); //screen
 }	
 
-float calc_fogging( float4 w_pos )      
+float calc_fogging(float4 w_pos )      
 {
 	return dot(w_pos,fog_plane);         
 }
 
-float2 unpack_tc_base( float2 tc, float du, float dv )
+float2 unpack_tc_base(float2 tc, float du, float dv )
 {
-		return (tc.xy + float2	(du,dv))*(32.0/32768.0); //!Increase from 32bit to 64bit floating point
+		return (tc.xy + float2(du,dv))*(32.0/32768.0); //!Increase from 32bit to 64bit floating point
 }
 
-float3 calc_sun_r1( float3 norm_w )    
+float3 calc_sun_r1(float3 norm_w )    
 {
 	return L_sun_color*saturate(dot((norm_w),-L_sun_dir_w));                 
 }
 
-float3 calc_model_hemi_r1( float3 norm_w )    
+float3 calc_model_hemi_r1(float3 norm_w )    
 {
  return max(0,norm_w.y)*L_hemi_color;
 }
 
-float3 calc_model_lq_lighting( float3 norm_w )    
+float3 calc_model_lq_lighting(float3 norm_w )    
 {
 	return L_material.x*calc_model_hemi_r1(norm_w) + L_ambient + L_material.y*calc_sun_r1(norm_w);
 }
 
-float3 	unpack_normal( float3 v )	{ return 2.0*v-1.0; }
-float3 	unpack_bx2( float3 v )	{ return 2.0*v-1.0; }
-float3 	unpack_bx4( float3 v )	{ return 4.0*v-2.0; } //!reduce the amount of stretching from 4*v-2 and increase precision
-float2 	unpack_tc_lmap( float2 tc )	{ return tc*(1.0/32768.0);	} // [-1  .. +1 ] 
-float4	unpack_color( float4 c ) { return c.bgra; }
-float4	unpack_D3DCOLOR( float4 c ) { return c.bgra; }
-float3	unpack_D3DCOLOR( float3 c ) { return c.bgr; }
+float3 unpack_normal(float3 v )	{ return 2.0*v-1.0; }
+float3 unpack_bx2(float3 v )	{ return 2.0*v-1.0; }
+float3 unpack_bx4(float3 v )	{ return 4.0*v-2.0; } //!reduce the amount of stretching from 4*v-2 and increase precision
+float2 	unpack_tc_lmap(float2 tc )	{ return tc*(1.0/32768.0);	} // [-1  .. +1 ] 
+float4	unpack_color(float4 c ) { return c.bgra; }
+float4	unpack_D3DCOLOR(float4 c ) { return c.bgra; }
+float3	unpack_D3DCOLOR(float3 c ) { return c.bgr; }
 
-float3   p_hemi( float2 tc )
+float3 p_hemi(float2 tc )
 {
 //	float3	t_lmh = tex2D (s_hemi, tc);
-//	float3	t_lmh = s_hemi.Sample( smp_rtlinear, tc);
+//	float3	t_lmh = s_hemi.Sample(smp_rtlinear, tc);
 //	return	dot(t_lmh,1.h/4.h);
-	float4	t_lmh = s_hemi.Sample( smp_rtlinear, tc);
+	float4	t_lmh = s_hemi.Sample(smp_rtlinear, tc);
 	return	t_lmh.a;
 }
 
-float   get_hemi( float4 lmh)
+float get_hemi(float4 lmh)
 {
 	return lmh.a;
 }
 
-float   get_sun( float4 lmh)
+float get_sun(float4 lmh)
 {
 	return lmh.g;
 }
@@ -106,19 +129,14 @@ float3	v_hemi(float3 n)
 	return L_hemi_color*(.5f + .5f*n.y);                   
 }
 
-float3	v_sun(float3 n)                        	
+float3	v_sun(float3 n)                      	
 {
 	return L_sun_color*dot(n,-L_sun_dir_w);                
 }
 
-float3	calc_reflection( float3 pos_w, float3 norm_w )
+float3	calc_reflection(float3 pos_w, float3 norm_w )
 {
     return reflect(normalize(pos_w-eye_position), norm_w);
-}
-//CUSTOM
-float3 blend_soft(float3 a, float3 b)
-{
-	return 1.0 - (1.0 - a) * (1.0 - b);
 }
 
 float4 screen_to_proj(float2 screen, float z)
@@ -188,7 +206,7 @@ return hash(float2(hash(intro.xy),intro.z));
 
 float hash12(float2 p)
 {
-	float3 p3  = frac(float3(p.xyx) * .1031);
+	float3 p3 = frac(float3(p.xyx) * .1031);
     p3 += dot(p3, p3.yzx + 19.19);
     return frac((p3.x + p3.y) * p3.z);
 }
@@ -213,17 +231,17 @@ float noise(float2 tc)
 
 //////////////////////////////////////////////////////////////////////////
 //	Aplha to coverage code
-#if ( defined( MSAA_ALPHATEST_DX10_1_ATOC ) || defined( MSAA_ALPHATEST_DX10_1 ) )
+#if (defined(MSAA_ALPHATEST_DX10_1_ATOC ) || defined(MSAA_ALPHATEST_DX10_1 ) )
 
 #if MSAA_SAMPLES == 2
-uint alpha_to_coverage ( float alpha, float2 pos2d )
+uint alpha_to_coverage (float alpha, float2 pos2d )
 {
 	uint mask;
-	uint pos = uint(pos2d.x) | uint( pos2d.y);
-	if( alpha < 0.3333 )
+	uint pos = uint(pos2d.x) | uint(pos2d.y);
+	if(alpha < 0.3333 )
 		mask = 0;
-	else if( alpha < 0.6666 )
-		mask = 1 << ( pos & 1 );
+	else if(alpha < 0.6666 )
+		mask = 1 << (pos & 1 );
 	else 
 		mask = 3;
 
@@ -232,26 +250,26 @@ uint alpha_to_coverage ( float alpha, float2 pos2d )
 #endif
 
 #if MSAA_SAMPLES == 4
-uint alpha_to_coverage ( float alpha, float2 pos2d )
+uint alpha_to_coverage (float alpha, float2 pos2d )
 {
 	uint mask;
 
-	float off = float( ( uint(pos2d.x) | uint( pos2d.y) ) & 3 );
-	alpha = saturate( alpha - off * ( ( 0.2 / 4.0 ) / 3.0 ) );
-	if( alpha < 0.40 )
+	float off = float((uint(pos2d.x) | uint(pos2d.y) ) & 3 );
+	alpha = saturate(alpha - off * ((0.2 / 4.0 ) / 3.0 ) );
+	if(alpha < 0.40 )
 	{
-		if( alpha < 0.20 )
+		if(alpha < 0.20 )
 			mask = 0;	
-		else if( alpha < 0.40 ) // only one bit set
+		else if(alpha < 0.40 ) // only one bit set
 			mask = 1;
 	}
   else
   {
-	if( alpha < 0.60 ) // 2 bits set => 1100 0110 0011 1001 1010 0101
+	if(alpha < 0.60 ) // 2 bits set => 1100 0110 0011 1001 1010 0101
 	{
 		mask = 3;
 	}
-	else if( alpha < 0.8 ) // 3 bits set => 1110 0111 1011 1101 
+	else if(alpha < 0.8 ) // 3 bits set => 1110 0111 1011 1101 
 	  mask = 7;
 	else
 	  mask = 0xf;
@@ -262,25 +280,25 @@ uint alpha_to_coverage ( float alpha, float2 pos2d )
 #endif
 
 #if MSAA_SAMPLES == 8
-uint alpha_to_coverage ( float alpha, float2 pos2d )
+uint alpha_to_coverage (float alpha, float2 pos2d )
 {
 	uint mask;
 
-	float off = float( ( uint(pos2d.x) | uint( pos2d.y) ) & 3 );
-	alpha = saturate( alpha - off * ( ( 0.1111 / 8.0 ) / 3.0 ) );
-  if( alpha < 0.4444 )
+	float off = float((uint(pos2d.x) | uint(pos2d.y) ) & 3 );
+	alpha = saturate(alpha - off * ((0.1111 / 8.0 ) / 3.0 ) );
+  if(alpha < 0.4444 )
   {
-	if( alpha < 0.2222 )
+	if(alpha < 0.2222 )
 	{
-		if( alpha < 0.1111 )
+		if(alpha < 0.1111 )
 			mask = 0;	
 		else // only one bit set 0.2222
 			mask = 1;
 	}
 	else 
 	{
-		if( alpha < 0.3333 ) // 2 bits set0=> 10000001 + 11000000 .. 00000011 : 8 // 0.2222
-		  				   //        set1=> 10100000 .. 00000101 + 10000010 + 01000001 : 8
+		if(alpha < 0.3333 ) // 2 bits set0=> 10000001 + 11000000 .. 00000011 : 8 // 0.2222
+						   //        set1=> 10100000 .. 00000101 + 10000010 + 01000001 : 8
 						   //		set2=> 10010000 .. 00001001 + 10000100 + 01000010 + 00100001 : 8
 						   //		set3=> 10001000 .. 00010001 + 10001000 + 01000100 + 00100010 + 00010001 : 8
 		{  
@@ -298,9 +316,9 @@ uint alpha_to_coverage ( float alpha, float2 pos2d )
   }
   else
   {
-	  if( alpha < 0.6666 )
+	  if(alpha < 0.6666 )
 	  {
-		if( alpha < 0.5555 ) // 4 bits set0 => 11110000 .. 00001111 + 10000111 + 11000011 + 11100001 : 8 // 0.5555
+		if(alpha < 0.5555 ) // 4 bits set0 => 11110000 .. 00001111 + 10000111 + 11000011 + 11100001 : 8 // 0.5555
 		 				   //        set1 => 11011000 .. 00011011 + 10001101 + 11000110 + 01100011 + 10110001 : 8
 						   //        set2 => 11001100 .. 00110011 + 10011001 : 4 make 8
 						   //        set3 => 11000110 + 01100011 + 10110001 + 11011000 + 01101100 + 00110110 + 00011011 + 10001101 : 8
@@ -325,13 +343,13 @@ uint alpha_to_coverage ( float alpha, float2 pos2d )
 	  }
 	  else
 	  {
-		if( alpha < 0.7777 ) // 6 bits set0 => 11111100 01111110 00111111 10011111 11001111 11100111 11110011 11111001 : 8
+		if(alpha < 0.7777 ) // 6 bits set0 => 11111100 01111110 00111111 10011111 11001111 11100111 11110011 11111001 : 8
 						  //        set1 => 10111110 : 8
 						  //        set2 => 11011110 : 8
 		{
 			mask = 0x3F;
 		}
-		else if( alpha < 0.8888 ) // 7 bits set0 => 11111110 :8
+		else if(alpha < 0.8888 ) // 7 bits set0 => 11111110 :8
 		{
 			mask = 0x7F;
 		}

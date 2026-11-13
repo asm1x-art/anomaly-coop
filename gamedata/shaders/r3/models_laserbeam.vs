@@ -1,6 +1,8 @@
 #include "common.h"
 #include "skin.h"
 
+#include "screenspace_mvectors.h"
+
 struct vf
 {
 	float2 tc0	: TEXCOORD0;		// base
@@ -8,7 +10,7 @@ struct vf
 	float4 hpos	: SV_Position;
 };
 
-vf 	_main (v_model v)
+vf 	_main (v_model v, float4 psp)
 {
 	vf 		o;
 
@@ -16,9 +18,9 @@ vf 	_main (v_model v)
 	o.tc0		= v.tc.xy;					// copy tc
 
 	// calculate fade
-	float3  dir_v 	= normalize		(mul(m_WV,v.P));
-	float3 	norm_v 	= normalize 		(mul(m_WV,v.N));
-	float 	fade 	= abs			(dot(dir_v,norm_v));
+	float3  dir_v 	= normalize(mul(m_WV,v.P));
+	float3 	norm_v 	= normalize(mul(m_WV,v.N));
+	float 	fade 	= abs(dot(dir_v,norm_v));
 	o.c0		= fade;
 
 	return o;
@@ -26,25 +28,25 @@ vf 	_main (v_model v)
 
 /////////////////////////////////////////////////////////////////////////
 #ifdef 	SKIN_NONE
-vf	main(v_model v) 		{ return _main(v); 		}
+vf	main(v_model v) 		{ return _main(v, 0); 		}
 #endif
 
 #ifdef 	SKIN_0
-vf	main(v_model_skinned_0 v) 	{ return _main(skinning_0(v)); }
+vf	main(v_model_skinned_0 v) 	{ return _main(skinning_0(v), v.P); }
 #endif
 
 #ifdef	SKIN_1
-vf	main(v_model_skinned_1 v) 	{ return _main(skinning_1(v)); }
+vf	main(v_model_skinned_1 v) 	{ return _main(skinning_1(v), v.P); }
 #endif
 
 #ifdef	SKIN_2
-vf	main(v_model_skinned_2 v) 	{ return _main(skinning_2(v)); }
+vf	main(v_model_skinned_2 v) 	{ return _main(skinning_2(v), v.P); }
 #endif
 
 #ifdef	SKIN_3
-vf	main(v_model_skinned_3 v) 	{ return _main(skinning_3(v)); }
+vf	main(v_model_skinned_3 v) 	{ return _main(skinning_3(v), v.P); }
 #endif
 
 #ifdef	SKIN_4
-vf	main(v_model_skinned_4 v) 	{ return _main(skinning_4(v)); }
+vf	main(v_model_skinned_4 v) 	{ return _main(skinning_4(v), v.P); }
 #endif
