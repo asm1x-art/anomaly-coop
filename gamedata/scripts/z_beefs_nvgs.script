@@ -372,6 +372,19 @@ function brightness_adjust()
 end
 
 
+-- Co-op: one step brighter or darker (the wheel with the night vision key held: item_device.script,
+-- shelter_brigadier.script), between the same limits; brightness_steps of [shelter_brigadier_vision] steps from one
+-- limit to the other
+function brightness_step(up)
+	if item_device.nv_state then
+		local step_size = (nvg_gain_max - nvg_gain_min) / ini_sys:r_float_ex("shelter_brigadier_vision", "brightness_steps")
+		nvg_gain_current = clamp(nvg_gain_current + (up and step_size or -step_size), nvg_gain_min, nvg_gain_max)
+		local snd_adjust = sound_object('interface\\inv_nvg')
+		snd_adjust:play(db.actor,0,sound_object.s2d)
+		update_nvgs()
+	end
+end
+
 -----------------------------------------------------------------------------
 --		NVG STATE CHANGE EFFECT, MANIPULATES VIGNETTE AND LOCATION TO
 --			SIMUALATE FLIPPING DOWN AND TURNING ON NVGS

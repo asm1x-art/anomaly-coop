@@ -1,10 +1,10 @@
 -- The Brigadier's Nosorog and M4, the Chemist's SEVA, Vector and Svarog (configs\mod_system_shelter_brigadier.ltx,
 -- https://app.notion.com/p/40ed89dbf39d818cb08efde54df35db5): their bodies in the bunker drop them in good repair, or the stash has them in a game whose
 -- occupants were gone before. While the Nosorog is worn its helmet module sits in the headlamp slot: L the
--- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), J the anomaly visor (after the Grim
--- Raid Addon's raid_special_items_visor). The module's charge is the outfit's accumulator; a battery dragged onto the
--- outfit charges it. An electric artefact on the belt powers it all and charges the accumulator and the PDA in its
--- slot.
+-- light, N the Oracle's night vision, N held the thermal vision (z_heatvision), N with the wheel the night vision's
+-- brightness, J the anomaly visor (after the Grim Raid Addon's raid_special_items_visor). The module's charge is the
+-- outfit's accumulator; a battery dragged onto the outfit charges it. An electric artefact on the belt powers it all
+-- and charges the accumulator and the PDA in its slot.
 
 local OUTFIT = "shelter_brigadier_outfit"
 local MODULE = "shelter_brigadier_module"
@@ -336,32 +336,52 @@ end
 -------------------------------------------------------------------------------
 -- the keys while the outfit is worn
 
-local pressed, held -- when N went down; its hold used
+-- decided as N is let go: sooner than HOLD the night vision, held longer the thermal vision; the wheel turned with N
+-- down changed the night vision's brightness and nothing else is done
+local pressed, wheel -- when N went down; the wheel was turned with it down
+local seen = 0 -- when N was last seen down
 
 local function on_before_key_press(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and worn() and not Check_UI() then
 		flags.ret_value = false
-		pressed, held = time_global(), false
+		pressed, wheel = time_global(), false
+		seen = pressed
 	end
 end
 
 local function on_before_key_hold(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and pressed then
 		flags.ret_value = false
-		if not held and time_global() - pressed >= HOLD then
-			held = true
-			thermal_vision()
-		end
+		seen = time_global()
 	end
 end
 
 local function on_before_key_release(dik, bind, dis, flags)
 	if bind == key_bindings.kNIGHT_VISION and pressed then
 		flags.ret_value = false
-		if not held then
+		if wheel then
+			-- the brightness was it
+		elseif time_global() - pressed >= HOLD then
+			thermal_vision()
+		else
 			night_vision()
 		end
 		pressed = nil
+	end
+end
+
+local function on_mouse_wheel(dir, flags)
+	if not pressed then
+		return
+	end
+	if time_global() - seen > 500 then -- let go where no release came (a window was open)
+		pressed = nil
+		return
+	end
+	flags.ret_value = false -- no weapon switching, no zoom
+	wheel = true
+	if not thermal then
+		z_beefs_nvgs.brightness_step(dir == 1)
 	end
 end
 
@@ -554,6 +574,7 @@ function on_game_start()
 	RegisterScriptCallback("on_before_key_press", on_before_key_press)
 	RegisterScriptCallback("on_before_key_hold", on_before_key_hold)
 	RegisterScriptCallback("on_before_key_release", on_before_key_release)
+	RegisterScriptCallback("on_mouse_wheel", on_mouse_wheel)
 	RegisterScriptCallback("on_key_release", on_key_release)
 	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
 	RegisterScriptCallback("actor_on_before_death", actor_on_net_destroy)

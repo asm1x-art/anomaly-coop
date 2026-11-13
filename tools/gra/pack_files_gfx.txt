@@ -86,7 +86,6 @@ configs/text/rus/ssfx_ui_wet_surfaces.xml
 configs/text/rus/ssfx_ui_wind.xml
 configs/text/rus/ssfx_ui_wpn_dof_mcm.xml
 scripts/bind_anomaly_field.script
-scripts/item_device.script
 scripts/ssfx_001_mcm.script
 scripts/ssfx_001_settings.script
 scripts/ssfx_ao.script

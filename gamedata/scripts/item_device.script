@@ -221,29 +221,48 @@ local function on_item_drag_dropped(obj_b, obj_d, slot_from, slot_to)
 	end
 end
 
+local nv_key_seen = 0 -- when the night vision key was last seen down
+
 local function on_key_hold(key)
 	if (key == DIK_keys["DIK_LSHIFT"]) then
 		holding_shift = true
+	elseif (dik_to_bind(key) == key_bindings.kNIGHT_VISION) then
+		nv_key_seen = time_global()
 	end
 end
 
-	local nv_change_state = false
+	local nv_key_down -- when the night vision key went down
+	local nv_key_wheel = false -- the wheel was turned with it down
 
-	-- Co-op: a short press switches the night vision, the key held (hold_ms of [shelter_brigadier_vision]) the thermal
-	-- vision of a device that has one (heat_effect); the mod had the hold for both and the short press for brightness
+	-- Co-op: the keys of a device of one's own, the same as the Brigadier's helmet module's (shelter_brigadier.script).
+	-- Decided as the night vision key is let go: sooner than hold_ms of [shelter_brigadier_vision] the night vision
+	-- on and off; held longer the thermal vision of a device that has one (heat_effect); the wheel turned with the key
+	-- down changed the night vision's brightness, and nothing else is done. The mod had the hold for both and the short
+	-- press for brightness
 	local function on_key_press(key)
 		local bind = dik_to_bind(key)
 
 		if (bind == key_bindings.kNIGHT_VISION) then
-			local torch = db.actor:item_in_slot(10)
-			local sec = torch and torch:section()
-			CreateTimeEvent("nvg_keypress", "nvg_keypress_long", ini_sys:r_float_ex("shelter_brigadier_vision", "hold_ms") / 1000, function()
-				nv_change_state = true
-				if sec and ini_sys:r_string_ex(sec, "heat_effect") then
-					set_nightvision(sec, not nv_state)
-				end
-				return true 
-			end)
+			nv_key_down = time_global()
+			nv_key_seen = nv_key_down
+			nv_key_wheel = false
+		end
+	end
+
+	local function on_mouse_wheel(dir, flags)
+		if not nv_key_down then
+			return
+		end
+		if time_global() - nv_key_seen > 500 then -- let go where no release came (a window was open)
+			nv_key_down = nil
+			return
+		end
+		flags.ret_value = false -- no weapon switching, no zoom
+		nv_key_wheel = true
+		local torch = db.actor:item_in_slot(10)
+		local sec = torch and torch:section()
+		if sec and ini_sys:r_string_ex(sec, "nv_effect") then
+			z_beefs_nvgs.brightness_step(dir == 1)
 		end
 	end
 
@@ -258,17 +277,16 @@ end
 		
 		-- Night-Vision
 		if (bind == key_bindings.kNIGHT_VISION) then
-			RemoveTimeEvent("nvg_keypress", "nvg_keypress_long")
-		
-			if not nv_change_state then
+			if nv_key_down and not nv_key_wheel then
+				local held = time_global() - nv_key_down >= ini_sys:r_float_ex("shelter_brigadier_vision", "hold_ms")
 				local torch = db.actor:item_in_slot(10)
 				local sec = torch and torch:section()
-				if sec and ini_sys:r_string_ex(sec, "nv_effect") then
+				if sec and ini_sys:r_string_ex(sec, held and "heat_effect" or "nv_effect") then
 					set_nightvision(sec, not nv_state)
 				end
 			end
-			
-			nv_change_state = false
+
+			nv_key_down = nil
 		
 		-- Dosimeter keybind
 		elseif (bind == key_bindings.kCUSTOM14) then
@@ -441,6 +459,7 @@ function on_game_start()
 	RegisterScriptCallback("on_key_press",on_key_press)
 	RegisterScriptCallback("on_key_release",on_key_release)
 	RegisterScriptCallback("on_key_hold",on_key_hold)
+	RegisterScriptCallback("on_mouse_wheel",on_mouse_wheel)
 	
 	RegisterScriptCallback("ActorMenu_on_item_drag_drop",on_item_drag_dropped)
 	RegisterScriptCallback("actor_on_info_callback",process_pda_info)
