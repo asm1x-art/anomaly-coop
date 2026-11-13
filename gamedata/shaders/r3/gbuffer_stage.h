@@ -1,20 +1,21 @@
 #ifndef	GBUFFER_STAGE_H
 #define	GBUFFER_STAGE_H
 
+#include "screenspace_mvectors.h"
+
 //GBuffer targets struct
-struct f_deffer        		
+struct f_deffer
 {
 	float4 position : SV_Target0; //XY - Normal, Z - Depth, W - Hemi/M_ID
 	float4 C : SV_Target1; //XYZ - Albedo, W - Specular
-    float4 H : SV_Target2;
-#ifdef DLSS_MV
-	float4 Velocity : SV_Target3; // dlss_mv.h: the screen motion (models only; 0 = the camera's)
-#endif
+	float4 H : SV_Target2; // HeatVision
+	float4 velocity : SV_Target3; // Motion vectors
 #ifdef EXTEND_F_DEFFER
 	uint mask : SV_COVERAGE;
 #endif
 };
 
+// HeatVision
 uniform float4 L_hotness;
 
 //Unpacked data struct
@@ -109,31 +110,12 @@ f_deffer pack_gbuffer( float4 norm, float4 pos, float4 col, uint imask )
 
 	res.position = float4( gbuf_pack_normal( norm.xyz ), pos.z, gbuf_pack_hemi_mtl( norm.w, pos.w ) );
 	res.C = col;
+
+	// HeatVision
     if (L_hotness.x > 0.0)
         res.H = float4(L_hotness.x, 0.0, 0.0, 1.0);
     else
         res.H = float4(0.0, 0.0, 0.0, 0.0);
-    // Co-op: trees and bushes (CBlender_Tree compiles their pixel shaders with one of these) for the Ash front's ash on
-    // them: ash_ground.h reads the alpha, heat vision only the colour
-#ifdef ASH_FOLIAGE
-    if (L_hotness.x <= 0.0)
-        res.H.w = 0.5;
-#endif
-#ifdef ASH_BARK
-    if (L_hotness.x <= 0.0)
-        res.H.w = 0.75;
-#endif
-#ifdef ASH_AREF
-    if (L_hotness.x <= 0.0)
-        res.H.w = 0.375;
-#endif
-#ifdef ASH_GRASS
-    if (L_hotness.x <= 0.0)
-        res.H.w = 0.25;
-#endif
-#ifdef DLSS_MV
-	res.Velocity = 0; // a shader with motion of its own sets it after (DLSS_MV_WRITE)
-#endif
 
 #ifdef EXTEND_F_DEFFER
    res.mask = imask;
@@ -155,6 +137,9 @@ gbuffer_data gbuffer_load_data( float2 tc : TEXCOORD, float2 pos2d, uint iSample
 	float4 C = s_diffuse.Load( int3( pos2d, 0 ), iSample );
 #endif
 
+	// Unjitter position buffer to avoid shadow flickering and more related issues
+    pos2d -= ssfx_jitter.xy * (float2(screen_res.x, -screen_res.y) * 0.5f);
+
 	// 3d view space pos reconstruction math
 	gbd.P = float3( P.z * ( pos2d * pos_decompression_params.zw - pos_decompression_params.xy ), P.z );
 
@@ -168,7 +153,7 @@ gbuffer_data gbuffer_load_data( float2 tc : TEXCOORD, float2 pos2d, uint iSample
 	gbd.hemi = gbuf_unpack_hemi( P.w );
 
 	gbd.C = C.xyz;
-    gbd.gloss = C.w;
+	gbd.gloss = C.w;
 
 	return gbd;
 }

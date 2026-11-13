@@ -1,34 +1,77 @@
 #include "common.h"
+#include "screenspace_mvectors.h"
+
+#include "check_screenspace.h"
+
+#ifdef SSFX_FOG
+	#include "screenspace_fog.h"
+#endif
 
 struct 	v2p
 {
- 	float2 	tc0: TEXCOORD0;	// base
-  	float4	c0: COLOR0;		// sun
-};
-
-struct p_laser_out
-{
-    float4 main         : SV_Target0;
-    float4 additional   : SV_Target1;
+ 	float2 tc0	: TEXCOORD0;	// base
+  	float4 c0	: COLOR0;		// sun
+	float4 hpos	: SV_Position;
 };
 
 float4 shader_param_5;
 
+struct _out
+{
+	float4 render		: SV_Target;
+	float4 heatvision	: SV_Target1;
+	float4 velocity 	: SV_Target2;
+};
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // Pixel
-p_laser_out main( v2p I ) : SV_Target
+_out main( v2p I )
 {
+	float2 tc_screen = I.hpos.xy / screen_res.xy;
+
+	// Position
+#ifndef USE_MSAA
+	float4 P = s_position.Sample( smp_nofilter, tc_screen );
+#else
+	float4 P = s_position.Load( int3( I.hpos.xy, 0 ), 0 );
+#endif
+
+	P = float4( P.z * ( I.hpos.xy * pos_decompression_params.zw - pos_decompression_params.xy ), P.z, 1.0f );
+
+	// Fix Sky depth
+	float Depth = P.z <= SKY_EPS ? 10000 : P.z;
+
 	float4 t_base = s_base.Sample(smp_base, I.tc0);
 
 	t_base *= shader_param_5.x; //Only first component is used
 
-    p_laser_out O;
-    
-    O.main = float4(t_base.xyz, t_base.w * I.c0.w);
-    if (O.main.a > 0.2)
-        O.additional = float4(0.0, 0.0, 1.0, 1.0);
-    else
-        O.additional = float4(0.0, 0.0, 0.0, 0.0);
+	// Use depth to adjust the laser dot alpha
+	float Alpha = I.hpos.w > 5 ? saturate(1.0f - smoothstep(10, 300, Depth)) : 1.0f;
+	
+	// Fogging
+	float3 w_s = mul(m_inv_V, P);
 
-    return O;
+	float fog = saturate(calc_fogging(float4(w_s, 1.0f))); // Vanilla Fog
+
+#ifdef SSFX_FOG
+	fog	= SSFX_FOGGING(1.0 - fog, w_s.y); // Height Fog
+#endif
+
+	// Apply fog
+	Alpha *= fog * fog;
+
+	_out O;
+
+	float a = t_base.w * I.c0.w * Alpha;
+	
+	O.render = float4(t_base.rgb, a);
+	
+	// Apply TAA Mask O.velocity.w
+	O.velocity = float4(0, 0, 0, 2 * (a > 0.1f));
+
+	// Heatvision
+    O.heatvision = (a > 0.2) ? float4(0.0, 0.0, 1.0, 1.0) : float4(0.0, 0.0, 0.0, 0.0);
+		
+	return O;
+
 }

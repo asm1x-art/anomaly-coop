@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include "screenspace_mvectors.h"
+
 uniform float4 		consts; // {1/quant,1/quant,diffusescale,ambient}
 //uniform float4 		array	[200] : register(c12);
 //tbuffer DetailsData
@@ -35,6 +37,9 @@ v2p_flat 	main (v_detail v)
 	O.hpos 		= Pp;
 	float3 orig		= mul		(m_WV,  normalize(norm)	);
 
+	// TAA Jitter
+	O.hpos.xy = ssfx_taa_jitter(O.hpos); 
+
 O.N = lerp(orig, mul((float3x3)m_WV,  v.pos), 0.25);
 	float3	Pe	= mul		(m_WV,  pos				);
 	O.tcdh 		= float4	((v.misc * consts).xyyy	);
@@ -45,7 +50,6 @@ O.N = lerp(orig, mul((float3x3)m_WV,  v.pos), 0.25);
 
 	O.position	= float4	(Pe, 		c0.w		);
 
-	DLSS_MV_NONE(O); // dlss_mv.h: the camera's motion only
 	return O;
 }
 FXVS;

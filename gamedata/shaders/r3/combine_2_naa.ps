@@ -1,6 +1,27 @@
 #include "common.h"
 #include "anomaly_shaders.h"
-#include "night_vision.h"
+
+// Check Screen Space Shaders modules
+#include "check_screenspace.h"
+
+#ifdef SSFX_BEEFS_NVG
+	#include "night_vision.h"
+#endif
+
+#ifdef SSFX_DEBAND
+	#include "screenspace_debanding.h"
+#endif
+
+// Used by FOG and IL. Keep it here for the moment...
+uniform float4 fakescope_params3;
+
+#ifdef SSFX_LUT_INUSE
+	#include "screenspace_lut.h"
+#endif
+
+#ifdef SSFX_BLOOM
+	Texture2D s_ssfx_bloom;
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #ifndef USE_MSAA
@@ -32,7 +53,7 @@ struct c2_out
 #ifdef USE_MSAA
 	float	Depth : SV_Depth;
 #endif
-};
+};	
 
 c2_out main( v2p_aa_AA I )
 {
@@ -61,25 +82,49 @@ c2_out main( v2p_aa_AA I )
 	float2	center 	= I.Tex0;
 #endif
 
-    float3 img = s_image.Load(int3(center.xy * screen_res.xy, 0),0);
-    float4 bloom = s_bloom.Sample(smp_rtlinear,center);
+	float3 img = s_image.Load(int3(center.xy * screen_res.xy, 0),0);
+
+#ifdef SSFX_BLOOM
+	float4 bloom = s_ssfx_bloom.Sample(smp_rtlinear, center);
+#else
+	float4 bloom = s_bloom.Sample(smp_rtlinear, center);
+#endif
 
 	img = mblur( center, ( gbd ).P, img.rgb);
 
-	float lua_param_nvg_generation = floor(shader_param_8.x);             		// 1, 2, or 3
-	float lua_param_nvg_num_tubes = frac(shader_param_8.x) * 10.0f;            // 1, 2, 4, 1.1, or 1.2
+#ifdef SSFX_DEBAND
+	// Debanding  - SCREEN SPACE SHADERS - UPDATE 12.5
+	img = lerp(img, ssfx_debanding(img, I.Tex0.xy), depth <= SKY_EPS);
+#endif
+
+#ifdef SSFX_BEEFS_NVG
 	// NVG CHANGE TO PREVENT WEIRD COLORS, ONLY APPLY BLOOM WHEN WE'RE NOT IN NVG MASK
+	float lua_param_nvg_generation = floor(shader_param_8.x);			// 1, 2, or 3
+	float lua_param_nvg_num_tubes = frac(shader_param_8.x) * 10.0f;		// 1, 2, 4, 1.1, or 1.2
 	if (lua_param_nvg_generation < 0.01f && compute_lens_mask(aspect_ratio_correction(I.Tex0), lua_param_nvg_num_tubes) == 0.0f)
 	{
-	img = blend_soft(img, bloom.xyz*bloom.w);
+		img = blend_soft(img, bloom.xyz*bloom.w);
 	}
-	
+#else
+	img = blend_soft(img, bloom.xyz*bloom.w);
+#endif
+
+
+// Color grading --------------------------------
+#ifndef SSFX_ENHANCED_SHADERS
 	if (tnmp_onoff == 1.0)
-	{		
+	{
 		img = Uncharted2ToneMapping(img);
 	}
+#endif
 
+	// Vanilla color grading ( Exposure, saturation and gamma )
 	img = img_corrections(img);
+
+#ifdef SSFX_LUT_INUSE
+	img = ssfx_lut_pp(img);
+#endif
+// ----------------------------------------------
 		
 #ifdef 	USE_DISTORT
  	float3	blurred	= bloom*def_hdr	;

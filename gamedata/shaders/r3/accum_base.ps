@@ -2,6 +2,14 @@
 #include "lmodel.h"
 #include "shadow.h"
 
+// Check Screen Space Shaders modules & addons
+#include "check_screenspace.h"
+
+#ifdef SSFX_SSS
+	int sss_id;
+	Texture2D s_ssfx_sss;
+#endif
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // This is the basic primitive used by convex, volumetric lights
 // for example spot-lights, one face of the omni lights, etc.
@@ -29,33 +37,65 @@ float4 main(p_volume I, float4 pos2d : SV_Position ) : SV_Target
 	
 	float m = xmaterial	;
 #ifndef USE_R2_STATIC_SUN
-			m = _P.w		;
+			m = _P.w;
 #endif
-        // ----- light-model
-    	float rsqr;
-        float4      		light = plight_local(m, _P, _N, _C, Ldynamic_pos, Ldynamic_pos.w, rsqr );
 
-        // ----- shadow
-		float4        		P4 = float4(_P.x, _P.y, _P.z, 1);
-        float4       		PS = mul(m_shadow, P4 );
-        float s = 1.h;
-        #ifdef  USE_SHADOW
-							s = shadow(PS );
-        #endif
+	// FLORA FIXES & IMPROVEMENTS - SSS Update 14.2
+	// Fix Flora ilumination ( Align normal to light )
+#ifdef SSFX_FLORAFIX
+	if(abs(m - MAT_FLORA) <= 0.05)
+	{
+		_N.rgb = lerp( _N.rgb, -normalize(_P - Ldynamic_pos.xyz), 0.5f);
+		_C.w *= 0.5f;
+	}
+#endif
 
-        // ----- lightmap
-        float4         lightmap= 1.h;
-        #ifdef        USE_LMAP
-                #ifdef         USE_LMAPXFORM
-							PS.x = dot(P4, m_lmap[0] );
-							PS.y = dot(P4, m_lmap[1] );
-                #endif
+	// ----- light-model
+	float rsqr;
+	float4 light = plight_local(m, _P, _N, _C, Ldynamic_pos, Ldynamic_pos.w, rsqr );
 
-				//	Can use linear with mip point
-				lightmap = s_lmap.Sample(smp_rtlinear, PS.xy / PS.w );        //
-        #endif
-	
-        float3 result = SRGBToLinear(lightmap.rgb) * SRGBToLinear(s);
-        result *=  light * SRGBToLinear(Ldynamic_color.rgb);
-		return float4(result.rgb, 0);
+	// ----- shadow
+
+	float3 Offset = 0;
+#ifdef SSFX_SHADOWS
+	// Biasing ( Use the nDotL from plight_local... )
+	float bias_int = (1.0 - saturate(dot(_N, -normalize(_P - Ldynamic_pos.xyz)))) * rsqr * Ldynamic_pos.w;
+	Offset = _N * (0.025f + bias_int * ssfx_shadow_bias.x);
+#endif
+
+	float4 P4 = float4(_P.xyz + Offset, 1);
+	float4 PS = mul(m_shadow, P4 );
+
+	float s = 1.h;
+	#ifdef  USE_SHADOW
+		s = shadow( PS );
+	#endif
+
+	// ----- lightmap
+	float4 lightmap= 1.h;
+	#ifdef USE_LMAP
+		#ifdef USE_LMAPXFORM
+			PS.x = dot(P4, m_lmap[0] );
+			PS.y = dot(P4, m_lmap[1] );
+		#endif
+
+		//	Can use linear with mip point
+		lightmap = s_lmap.SampleLevel(smp_rtlinear, PS.xy / PS.w, 0 );
+	#endif
+
+#ifdef SSFX_SSS
+	if (sss_id > -1)
+	{
+		float2 offset = (sss_id < 4 ? float2(0,0) : float2(0.5f,0));
+
+		float4 SSS_Sample = s_ssfx_sss.Sample( smp_rtlinear, tcProj * float2(0.5f, 1.0f) + offset ); // (sss_id < 3 ? float2(0,0) : float2(0.5f,0))
+		s *= SSS_Sample[sss_id % 4];
+	}
+#endif
+
+#ifdef SSFX_ENHANCED_SHADERS
+		return  float4(SRGBToLinear(Ldynamic_color.rgb * lightmap.rgb * s.xxx),1) * light;
+#else
+		return  float4( Ldynamic_color * light * s * lightmap);
+#endif
 }

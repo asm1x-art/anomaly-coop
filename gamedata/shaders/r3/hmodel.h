@@ -1,3 +1,9 @@
+/**
+ * @ Description: Enhanced Shaders and Color Grading 1.10
+ * @ Author: https://www.moddb.com/members/kennshade
+ * @ Mod: https://www.moddb.com/mods/stalker-anomaly/addons/screen-space-shaders
+ */
+ 
 #ifndef        HMODEL_H
 #define HMODEL_H
 #define CUBE_MIPS 6 //mipmaps for ambient shading and specular
@@ -17,12 +23,18 @@ void hmodel
 	float m, float h, float4 alb_gloss, float3 Pnt, float3 normal
 )
 {
+	// [ SSS Test ]. Overwrite terrain material
+	bool m_terrain = abs(m - 0.95) <= 0.04f;
+	bool m_flora = abs(m - 0.15) <= 0.04f;
+	if (m_terrain)
+		m = 0;
+	
 	//PBR style
 	float3 albedo = calc_albedo(alb_gloss, m);
 	float3 specular = calc_specular(alb_gloss, m);
 	float rough = calc_rough(alb_gloss, m);
-	calc_rain(albedo, specular, rough, alb_gloss, m, h);
-	calc_foliage(albedo, specular, rough, alb_gloss, m);
+	//calc_rain(albedo, specular, rough, alb_gloss, m, h);
+	//calc_foliage(albedo, specular, rough, float4(0.05,0.05,0.05,0.05), m);
 	
 	float roughCube = rough;
 	//float roughCube = sqrt(rough); //cubemap mipmaps (brdf too?)
@@ -116,10 +128,12 @@ void hmodel
 	float3 amb_col = L_ambient.rgb;	
 	env_d += amb_col; 			
 	env_s += amb_col; //*(env_s/env_d);
-	
+		
 	env_d = SRGBToLinear(env_d); 
 	env_s = SRGBToLinear(env_s);	//gamma correct
 	
+	env_s *= 1.0f - m_flora * 0.75f;
+
 	hdiffuse = Amb_BRDF(rough, albedo, specular, env_d, env_s, -v2Pnt, nw ).rgb;
 	hspecular = 0; //do not use hspec at all
 }

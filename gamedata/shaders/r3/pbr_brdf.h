@@ -1,3 +1,9 @@
+/**
+ * @ Description: Enhanced Shaders and Color Grading 1.10
+ * @ Author: https://www.moddb.com/members/kennshade
+ * @ Mod: https://www.moddb.com/mods/stalker-anomaly/addons/screen-space-shaders
+ */
+ 
 //=================================================================================================
 //Pseudo PBR shading for STALKER Anomaly 
 //Roughness is controlled with r2_gloss_min
@@ -5,8 +11,9 @@
 #include "pbr_settings.h" //load settings files
 #define PI 3.14159265359
 //=================================================================================================
+uniform float4 ssfx_lightsetup_1; // Spec intensity
+
 //Metalness
-//
 float calc_metalness(float4 alb_gloss, float material_ID)
 {
 	//material ID experiment
@@ -133,8 +140,15 @@ void calc_rain(inout float3 albedo, inout float3 specular, inout float rough, in
 void calc_foliage(inout float3 albedo, inout float3 specular, inout float rough, in float4 alb_gloss, in float mat_id)
 {
 	//specular = (abs(mat_id-MAT_FLORA) <= MAT_FLORA_ELIPSON) ? calc_specular(alb_gloss, 0.0) : specular;
-	specular = (abs(mat_id-MAT_FLORA) <= MAT_FLORA_ELIPSON) ? alb_gloss.g * 0.02 : specular;
+//	specular = (abs(mat_id-MAT_FLORA) <= MAT_FLORA_ELIPSON) ? alb_gloss.g * 0.02 : specular;
 	//specular = (abs(mat_id-MAT_FLORA) <= MAT_FLORA_ELIPSON) ? pow(alb_gloss.g * 0.1414, 2) : specular;
+	
+	if (abs(mat_id-MAT_FLORA) <= MAT_FLORA_ELIPSON)
+	{
+		//float light = 1.0f - saturate(dot(L_hemi_color.rgb, float3(1,1,1)));
+		specular = alb_gloss.g * 0.05f;//max( light * 0.025f, 0.008f);
+	}
+	
 }
 
 //=================================================================================================
@@ -205,30 +219,36 @@ float3 Lit_Specular(float nDotL, float nDotH, float nDotV, float vDotH, float3 f
 
 float3 Lit_BRDF(float rough, float3 albedo, float3 f0, float3 V, float3 N, float3 L )
 {
-	float3 H = normalize(V + L );
+	// SPECULAR ADJUSTMENTS - SSS Update 18
+	// Color, intensity and some minor adjustments.
+	// https://www.moddb.com/mods/stalker-anomaly/addons/screen-space-shaders/
+	
+	float3 H = normalize(V + L);
+	
+	float DotNV = dot(N, V);
 	
 	float nDotL = saturate(dot(N, L));
 	float nDotH = saturate(dot(N, H));
-	//float nDotV = saturate(dot(N, V));
-	//float nDotV = 1e-5 + abs(dot(N, V)); //DICE
-	float nDotV = max(1e-5, dot(N, V));
+	float nDotV = max(1e-5, DotNV);
 	float vDotH = saturate(dot(V, H));
 	
 	float3 diffuse_term = Lit_Diffuse(nDotL, nDotV, vDotH, rough).rrr;
 	diffuse_term *= albedo;
 	
+	// Specular
 	float3 specular_term = Lit_Specular(nDotL, nDotH, nDotV, vDotH, f0, rough);
 	
-	// horizon occlusion with falloff, should be computed for direct specular too
-	//float R = reflect(V, N);
-	//float R = 2 * dot(N, V) * N - V;
-	//float horizon = saturate(1.0 + dot(R, N)); //needs vertex normals
-	float horizon = saturate(0.95 + dot(N, V));
-	horizon *= horizon;
-
-	specular_term *= horizon; //horizon atten
+	// Horizon falloff
+	float horizon = saturate(DotNV * 2.0f);
+	specular_term *= horizon * horizon;
 	
-	return (diffuse_term + specular_term) *  nDotL * PI;
+	// Specular color
+	float3 light = saturate(Ldynamic_color.rgb);
+	specular_term *= 1.0f - ((light.r + light.g + light.b) / 3.0) * (1.0f - ssfx_lightsetup_1.x);
+	specular_term *= lerp(1.0f, Ldynamic_color.rgb, ssfx_lightsetup_1.y);
+
+	// SSS Update 19 - Smooth Shading ( squared nDotL )
+	return (diffuse_term + specular_term) * nDotL * nDotL * PI;
 }
 
 //=================================================================================================
@@ -263,12 +283,13 @@ float3 Amb_Specular(float3 f0, float rough, float nDotV)
 
 float3 Amb_BRDF(float rough, float3 albedo, float3 f0, float3 env_d, float3 env_s, float3 V, float3 N)
 {
-	//float nDotV = saturate(dot(N, V));
+	float DotNV = dot(N, V);
 	//float nDotV = 1e-5 + abs(dot(N, V)); //DICE
-	float nDotV = max(1e-5, dot(N, V));
+	float nDotV = max(1e-5, DotNV);
 	 
 	float3 diffuse_term = Amb_Diffuse(f0, rough, nDotV);
 	diffuse_term *= env_d * albedo;
+	
 	
 	float3 specular_term = Amb_Specular(f0, rough, nDotV);
 	specular_term *= env_s;
@@ -276,7 +297,7 @@ float3 Amb_BRDF(float rough, float3 albedo, float3 f0, float3 env_d, float3 env_
 	// horizon occlusion with falloff, should be computed for direct specular too
 	//float R = reflect(V, N);
 	//float horizon = saturate(1.0 + dot(R, N)); //needs vertex normals
-	float horizon = saturate(0.95 + dot(N, V));
+	float horizon = saturate(DotNV * 2.0f); // 0.95
 	horizon *= horizon;
 
 	specular_term *= horizon; //horizon atten

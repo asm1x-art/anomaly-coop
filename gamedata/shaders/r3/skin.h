@@ -2,6 +2,7 @@
 #define SKIN_H
 
 #include "common.h"
+
 //RoH & SM+
 struct 	v_model_skinned_0
 {
@@ -55,7 +56,8 @@ float4 	u_position	(float4 v)	{ return float4(v.xyz, 1.0);	}	// -12..+12
 //uniform float4 	sbones_array	[256-22] : register(vs,c22);
 //tbuffer	SkeletonBones
 //{
-	float4 	sbones_array	[256-22];
+	float4 	sbones_array[256-22];
+	float4 	sbones_array_prev[256-22];
 //}
 
 float3 	skinning_dir 	(float3 dir, float3 m0, float3 m1, float3 m2)
@@ -80,26 +82,7 @@ float4 	skinning_pos 	(float4 pos, float4 m0, float4 m1, float4 m2)
 		);
 }
 
-#ifdef DLSS_MV
-// dlss_mv.h: the bones a frame ago (the engine fills them, CSkeletonX::_Render) and the vertex skinned with them
-float4 	sbones_array_prev	[256-22];
-static float4 skin_P_prev;
-float4 	skin_prev_pos	(float4 pos, int4 id, float4 w)
-{
-	float4 m0 = sbones_array_prev[id.x+0]*w.x + sbones_array_prev[id.y+0]*w.y + sbones_array_prev[id.z+0]*w.z + sbones_array_prev[id.w+0]*w.w;
-	float4 m1 = sbones_array_prev[id.x+1]*w.x + sbones_array_prev[id.y+1]*w.y + sbones_array_prev[id.z+1]*w.z + sbones_array_prev[id.w+1]*w.w;
-	float4 m2 = sbones_array_prev[id.x+2]*w.x + sbones_array_prev[id.y+2]*w.y + sbones_array_prev[id.z+2]*w.z + sbones_array_prev[id.w+2]*w.w;
-	return skinning_pos(pos, m0, m1, m2);
-}
-#define SKIN_PREV(pos, id, w)	skin_P_prev = skin_prev_pos(pos, id, w)
-#define SKIN_PREV_NONE(pos)		skin_P_prev = u_position(pos)
-#else
-#define SKIN_PREV(pos, id, w)
-#define SKIN_PREV_NONE(pos)
-#endif
-
-
-v_model skinning_0	(v_model_skinned_0	v)
+v_model skinning_0(v_model_skinned_0 v)
 {
 	//	Swizzle for D3DCOLOUR format
 	v.N			= v.N.zyx;
@@ -107,16 +90,18 @@ v_model skinning_0	(v_model_skinned_0	v)
 	v.B			= v.B.zyx;
 
 	// skinning
-	v_model 	o;
-	o.P 		= u_position	(v.P);
-	o.N 		= unpack_normal(v.N);
-	o.T 		= unpack_normal(v.T);
-	o.B 		= unpack_normal(v.B);
-	o.tc 		= v.tc;
-	SKIN_PREV_NONE(v.P);
+	v_model o;
+	o.P = u_position(v.P);
+	o.N = unpack_normal(v.N);
+	o.T = unpack_normal(v.T);
+	o.B = unpack_normal(v.B);
+	o.tc = v.tc;
+
+	o.P_prev = o.P;
+
 	return o;
 }
-v_model skinning_1 	(v_model_skinned_1	v)
+v_model skinning_1(v_model_skinned_1 v)
 {
 	//	Swizzle for D3DCOLOUR format
 	v.N.xyz		= v.N.zyx;
@@ -130,16 +115,19 @@ v_model skinning_1 	(v_model_skinned_1	v)
 	float4  m2 	= sbones_array[mid+2];
 
 	// skinning
-	v_model 	o;
-	o.P 		= skinning_pos(v.P, m0,m1,m2 );
-	o.N 		= skinning_dir(v.N, m0,m1,m2 );
-	o.T 		= skinning_dir(v.T, m0,m1,m2 );
-	o.B 		= skinning_dir(v.B, m0,m1,m2 );
-	o.tc 		= v.tc;
-	SKIN_PREV(v.P, int4(mid, mid, mid, mid), float4(1, 0, 0, 0));
+	v_model o;
+	o.P = skinning_pos(v.P, m0,m1,m2 );
+	o.N = skinning_dir(v.N, m0,m1,m2 );
+	o.T = skinning_dir(v.T, m0,m1,m2 );
+	o.B = skinning_dir(v.B, m0,m1,m2 );
+	o.tc = v.tc;
+
+	// Prev Skinning
+	o.P_prev = skinning_pos(v.P, sbones_array_prev[mid + 0], sbones_array_prev[mid + 1], sbones_array_prev[mid + 2]);
+
 	return o;
 }
-v_model skinning_2 	(v_model_skinned_2	v)
+v_model skinning_2(v_model_skinned_2 v)
 {
 	//	Swizzle for D3DCOLOUR format
 	v.N.xyz		= v.N.zyx;
@@ -156,23 +144,40 @@ v_model skinning_2 	(v_model_skinned_2	v)
 	float4  m1_1 	= sbones_array[id_1+1];
 	float4  m2_1 	= sbones_array[id_1+2];
 
+	// Prev Matrices
+	float4  m0_0_prev = sbones_array_prev[id_0 + 0];
+	float4  m1_0_prev = sbones_array_prev[id_0 + 1];
+	float4  m2_0_prev = sbones_array_prev[id_0 + 2];
+	
+	float4  m0_1_prev = sbones_array_prev[id_1 + 0];
+	float4  m1_1_prev = sbones_array_prev[id_1 + 1];
+	float4  m2_1_prev = sbones_array_prev[id_1 + 2];
+
 	// lerp
 	float 	w 	= v.N.w;
-	float4  m0 	= lerp(m0_0,m0_1,w);
-	float4  m1 	= lerp(m1_0,m1_1,w);
-	float4  m2 	= lerp(m2_0,m2_1,w);
+	float4  m0 	= lerp(m0_0, m0_1, w);
+	float4  m1 	= lerp(m1_0, m1_1, w);
+	float4  m2 	= lerp(m2_0, m2_1, w);
+
+	// Prev Lerp
+	float4  m0_prev = lerp(m0_0_prev, m0_1_prev, w);
+	float4  m1_prev = lerp(m1_0_prev, m1_1_prev, w);
+	float4  m2_prev = lerp(m2_0_prev, m2_1_prev, w);
 
 	// skinning
-	v_model 	o;
-	o.P 		= skinning_pos(v.P, m0,m1,m2 );
-	o.N 		= skinning_dir(v.N, m0,m1,m2 );
-	o.T 		= skinning_dir(v.T, m0,m1,m2 );
-	o.B 		= skinning_dir(v.B, m0,m1,m2 );
-	o.tc 		= v.tc;
-	SKIN_PREV(v.P, int4(id_0, id_1, id_0, id_0), float4(1 - w, w, 0, 0));
+	v_model o;
+	o.P = skinning_pos(v.P, m0,m1,m2 );
+	o.N = skinning_dir(v.N, m0,m1,m2 );
+	o.T = skinning_dir(v.T, m0,m1,m2 );
+	o.B = skinning_dir(v.B, m0,m1,m2 );
+	o.tc = v.tc;
+
+	// Previus Skinning
+	o.P_prev = skinning_pos(v.P, m0_prev, m1_prev, m2_prev);
+
 	return o;
 }
-v_model skinning_3 	(v_model_skinned_3	v)
+v_model skinning_3(v_model_skinned_3 v)
 {
 	//	Swizzle for D3DCOLOUR format
 	v.N.xyz		= v.N.zyx;
@@ -193,6 +198,19 @@ v_model skinning_3 	(v_model_skinned_3	v)
 	float4  m1_2 	= sbones_array[id_2+1];
 	float4  m2_2 	= sbones_array[id_2+2];
 
+	// Prev Matrices
+	float4 m0_0_prev = sbones_array_prev[id_0 + 0];
+	float4 m1_0_prev = sbones_array_prev[id_0 + 1];
+	float4 m2_0_prev = sbones_array_prev[id_0 + 2];
+
+	float4 m0_1_prev = sbones_array_prev[id_1 + 0];
+	float4 m1_1_prev = sbones_array_prev[id_1 + 1];
+	float4 m2_1_prev = sbones_array_prev[id_1 + 2];
+
+	float4 m0_2_prev = sbones_array_prev[id_2 + 0];
+	float4 m1_2_prev = sbones_array_prev[id_2 + 1];
+	float4 m2_2_prev = sbones_array_prev[id_2 + 2];
+
 	// lerp
 	float 	w0 	= v.N.w;
 	float 	w1 	= v.T.w;
@@ -209,21 +227,37 @@ v_model skinning_3 	(v_model_skinned_3	v)
 			m1 	+= m1_2*w2;
 			m2 	+= m2_2*w2;
 
+	// Prev Lerp
+	float4  m0_prev 	= m0_0_prev * w0;
+	float4  m1_prev 	= m1_0_prev * w0;
+	float4  m2_prev 	= m2_0_prev * w0;
+
+			m0_prev 	+= m0_1_prev * w1;
+			m1_prev 	+= m1_1_prev * w1;
+			m2_prev 	+= m2_1_prev * w1;
+
+			m0_prev 	+= m0_2_prev * w2;
+			m1_prev 	+= m1_2_prev * w2;
+			m2_prev 	+= m2_2_prev * w2;
+
 	// skinning
-	v_model 	o;
-	o.P 		= skinning_pos(v.P, m0,m1,m2 );
-	o.N 		= skinning_dir(v.N, m0,m1,m2 );
-	o.T 		= skinning_dir(v.T, m0,m1,m2 );
-	o.B 		= skinning_dir(v.B, m0,m1,m2 );
-	o.tc 		= v.tc;
+	v_model o;
+	o.P = skinning_pos(v.P, m0,m1,m2 );
+	o.N = skinning_dir(v.N, m0,m1,m2 );
+	o.T = skinning_dir(v.T, m0,m1,m2 );
+	o.B = skinning_dir(v.B, m0,m1,m2 );
+	o.tc = v.tc;
+
+	// Previus Skinning
+	o.P_prev = skinning_pos(v.P, m0_prev, m1_prev, m2_prev);
+
 #ifdef SKIN_COLOR
 	o.rgb_tint	= float3	(2,0,0)	;
 	if (id_0==id_1)	o.rgb_tint	= float3(1,2,0);
 #endif
-	SKIN_PREV(v.P, int4(id_0, id_1, id_2, id_0), float4(w0, w1, w2, 0));
 	return o;
 }
-v_model skinning_4 	(v_model_skinned_4	v)
+v_model skinning_4(v_model_skinned_4 v)
 {
 	//	Swizzle for D3DCOLOUR format
 	v.N.xyz		= v.N.zyx;
@@ -233,14 +267,19 @@ v_model skinning_4 	(v_model_skinned_4	v)
 
 	// matrices
 	float	id[4];
-	float4	m[4][3];	//	[bone index][matrix row or column???]
+	float4 	m[4][3];	//	[bone index][matrix row or column???]
+	float4 	m_prev[4][3]; // Prev data
+
 	[unroll]
 	for (int i=0; i<4; ++i)
 	{		
 		id[i] = v.ind[i]*255+0.3;
 		[unroll]
 		for (int j=0; j<3; ++j)
-			m[i][j] = sbones_array[id[i]+j];
+		{
+			m[i][j] = sbones_array[id[i] + j]; // Current
+			m_prev[i][j] = sbones_array_prev[id[i] + j]; // Prev
+		}
 	}
 
 	// lerp
@@ -250,27 +289,41 @@ v_model skinning_4 	(v_model_skinned_4	v)
 	w[2] 	= v.B.w;
 	w[3]	= 1-w[0]-w[1]-w[2];
 
-	float4  m0 	= m[0][0]*w[0];
-	float4  m1 	= m[0][1]*w[0];
-	float4  m2 	= m[0][2]*w[0];
+	// Current
+	float4  m0 	= m[0][0] * w[0];
+	float4  m1 	= m[0][1] * w[0];
+	float4  m2 	= m[0][2] * w[0];
+
+	// Prev
+	float4 m0_prev = m_prev[0][0] * w[0];
+	float4 m1_prev = m_prev[0][1] * w[0];
+	float4 m2_prev = m_prev[0][2] * w[0];
 
 	[unroll]
 	for (int i=1; i<4; ++i)
 	{
+		// Current
 		m0 	+= m[i][0]*w[i];
 		m1 	+= m[i][1]*w[i];
 		m2 	+= m[i][2]*w[i];
+		
+		// Prev
+		m0_prev += m_prev[i][0] * w[i];
+		m1_prev += m_prev[i][1] * w[i];
+		m2_prev += m_prev[i][2] * w[i];
 	}
 
 	// skinning
-	v_model 	o;
-	o.P 		= skinning_pos(v.P, m0,m1,m2 );
-	o.N 		= skinning_dir(v.N, m0,m1,m2 );
-	o.T 		= skinning_dir(v.T, m0,m1,m2 );
-	o.B 		= skinning_dir(v.B, m0,m1,m2 );
-	o.tc 		= v.tc;
+	v_model o;
+	o.P = skinning_pos(v.P, m0,m1,m2 );
+	o.N = skinning_dir(v.N, m0,m1,m2 );
+	o.T = skinning_dir(v.T, m0,m1,m2 );
+	o.B = skinning_dir(v.B, m0,m1,m2 );
+	o.tc = v.tc;
 
-	SKIN_PREV(v.P, int4(id[0], id[1], id[2], id[3]), float4(w[0], w[1], w[2], w[3]));
+	// Previus Skinning
+	o.P_prev = skinning_pos(v.P, m0_prev, m1_prev, m2_prev);
+
 	return o;
 }
 

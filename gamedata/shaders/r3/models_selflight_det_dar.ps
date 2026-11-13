@@ -1,0 +1,52 @@
+#include "common.h"
+
+#include "check_screenspace.h"
+
+#ifdef SSFX_RAINDROPS
+	#include "screenspace_hud_raindrops.h"
+#endif
+
+struct 	v2p
+{
+ 	float2 tc0		: TEXCOORD0;
+	float4 RDrops 	: TEXCOORD1;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Pixel
+float4 main( v2p I ) : SV_Target
+{
+	float4 drops = 0; // xy = Normal | z = Overall str | w = reflection str
+	float extra_col = 0;
+
+#ifdef SSFX_RAINDROPS
+	if (ssfx_hud_drops_1.y > 0)
+	{
+		// Calc droplets
+		drops.xyz = ssfx_hud_raindrops(s_hud_rain, I.RDrops.xyz, 1.0f);
+
+		// Only apply to facing up surfaces [ World Y+ ]
+		drops.xyz *= saturate(I.RDrops.w);
+
+		// Intensity from script ( Cover + Rain intensity )
+		drops.xyz *= ssfx_hud_drops_1.y;
+
+
+		drops.xy = clamp(drops.xy, -1.0f, 1.0f);
+
+		// Only apply to facing up surfaces [ World Y+ ]
+		drops.xyz *= saturate(I.RDrops.y);
+
+		// Intensity from script ( Cover + Rain intensity )
+		drops.xyz *= ssfx_hud_drops_1.y;
+
+		// Refraction
+		I.tc0.xy = I.tc0.xy - drops.xy;
+	}
+#endif
+
+	float4	t_base 	= s_base.Sample( smp_base, I.tc0);
+
+	// out
+	return  float4(t_base.rgb * 1.5, 1.0f);
+}
