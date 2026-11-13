@@ -99,6 +99,7 @@ MANTLING_SOUNDS = {f"sounds/ledge_grabbing/vaulting/{kind_}/{kind_}{n}.ogg": "[�
 # lowest first. A mod is added here only together with its files (one commit a mod)
 GFX_MODS = [
     "[Частицы_в2 и 12] Enh_Shaders_Color_G 1.10",  # Enhanced Shaders and Color Grading: light, tonemapping, bloom
+    "[ПНВ] Beefs_NVGs",  # Beef's shader based night vision
 ]
 # left out of the look's mods
 GFX_SKIP_PREFIX = ("scripts/orig/",)  # Beef's NVG: the mod's untouched copies

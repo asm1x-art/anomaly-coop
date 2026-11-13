@@ -1,3 +1,8 @@
+configs/text/eng/beef_nvg_mcm.xml
+configs/text/rus/beef_nvg_mcm.xml
+scripts/item_device.script
+scripts/z_beefs_nvgs.script
+scripts/z_beefs_nvgs_mcm.script
 shaders/r3/accum_base.ps
 shaders/r3/accum_emissive.ps
 shaders/r3/accum_emissivel.ps
@@ -28,11 +33,15 @@ shaders/r3/lmodel.h
 shaders/r3/mip_fog.h
 shaders/r3/models_selflight.s
 shaders/r3/models_selflightl.s
+shaders/r3/nightvision_gen_1.ps
+shaders/r3/nightvision_gen_2.ps
+shaders/r3/nightvision_gen_3.ps
 shaders/r3/pbr_brdf.h
 shaders/r3/pbr_brdf_blinn.h
 shaders/r3/pbr_brdf_ggx.h
 shaders/r3/pbr_cubemap_check.h
 shaders/r3/pbr_settings.h
+shaders/r3/pp_blur.ps
 shaders/r3/sky2.ps
 shaders/r3/sky2.vs
 shaders/r3/sload.h

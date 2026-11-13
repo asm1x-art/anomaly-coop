@@ -1,6 +1,6 @@
 #include "common.h"
 #include "anomaly_shaders.h"
-#include "hdr10.h"
+#include "night_vision.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #ifndef USE_MSAA
@@ -18,8 +18,6 @@ Texture2D 			s_distort;
 float4 e_barrier;	// x=norm(.8f), y=depth(.1f), z=clr
 float4 e_weights;	// x=norm, y=depth, z=clr
 float4 e_kernel;	// x=norm, y=depth, z=clr
-
-float4 vignette_control;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #include "mblur.h"
@@ -64,42 +62,25 @@ c2_out main( v2p_aa_AA I )
 #endif
 
     float3 img = s_image.Load(int3(center.xy * screen_res.xy, 0),0);
-	
     float4 bloom = s_bloom.Sample(smp_rtlinear,center);
 
 	img = mblur( center, ( gbd ).P, img.rgb);
 
-	img = blend_soft(img, bloom.xyz*bloom.w);
-		
-	if (!HDR10_IS_ENABLED) {
-		if (tnmp_onoff == 1.0)
-		{		
-			img = Uncharted2ToneMapping(img);
-		}
-
-		img = img_corrections(img);
-	}
-		
+	float lua_param_nvg_generation = floor(shader_param_8.x);             		// 1, 2, or 3
+	float lua_param_nvg_num_tubes = frac(shader_param_8.x) * 10.0f;            // 1, 2, 4, 1.1, or 1.2
+	// NVG CHANGE TO PREVENT WEIRD COLORS, ONLY APPLY BLOOM WHEN WE'RE NOT IN NVG MASK
+	if (lua_param_nvg_generation < 0.01f && compute_lens_mask(aspect_ratio_correction(I.Tex0), lua_param_nvg_num_tubes) == 0.0f)
 	{
-		/*
-		Vignette.
-		vignette_control.x 0->1: Darken the corners of the screen.
-		vignette_control.y 0->1: Darken the center of the screen.
-		vignette_control.z 0->1: Expand the dark edges toward the center.
-		*/
-		float2 mid_tc = I.Tex0.xy - 0.5;
-		float num = sqrt(dot(mid_tc, mid_tc)) * 2; /* [0.0:sqrt(2.0)] */
-		float edge_radius = sqrt(2.0) * (1.0 - saturate(vignette_control.z));
-		/* Make sure to avoid division by zero. */
-		if (num > edge_radius)
-			num = 1.0;
-		else if (edge_radius == 0)
-			num = 0.0;
-		else
-			num = num / edge_radius;
-		img *= lerp(1.0 - vignette_control.y, 1.0 - vignette_control.x, saturate(num));
+	img = blend_soft(img, bloom.xyz*bloom.w);
+	}
+	
+	if (tnmp_onoff == 1.0)
+	{		
+		img = Uncharted2ToneMapping(img);
 	}
 
+	img = img_corrections(img);
+		
 #ifdef 	USE_DISTORT
  	float3	blurred	= bloom*def_hdr	;
 			img		= lerp	(img,blurred,distort.z);
