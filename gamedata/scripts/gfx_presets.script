@@ -14,7 +14,7 @@
 	  - when the request file is found in appdata (the launcher or a person writes it):
 	        [apply]
 	        preset = tier_8gb
-	    The file is removed once the preset is applied.
+	    The file is emptied once the preset is applied (an empty file is no request).
 	  - by gfx_presets.apply("tier_8gb") from another script.
 	Nothing is forced after that: a player's own changes in the settings pages stay until the next request.
 
@@ -131,7 +131,13 @@ local function take_request()
 	local text = f:read("*all") or ""
 	f:close()
 	local preset = text:match("preset%s*=%s*([%w_%-]+)")
-	os.remove(path)
+	if text:match("^%s*$") then
+		return false -- emptied by an earlier start (the game's Lua cannot delete files)
+	end
+	f = io.open(path, "w") -- taken: emptied
+	if f then
+		f:close()
+	end
 	if not preset then
 		log("request file %s has no \"preset = <name>\" line", name)
 		return false
