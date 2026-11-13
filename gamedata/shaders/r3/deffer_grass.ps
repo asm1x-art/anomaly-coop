@@ -1,3 +1,7 @@
+// Co-op: grass is drawn by this shader with Screen Space Shaders (details_blend.s), not by the engine's blender that
+// gave its pixel shader ASH_GRASS: the mark for the Ash front's ash (gbuffer_stage.h, ash_ground.h)
+#define ASH_GRASS
+
 #if ( defined(MSAA_ALPHATEST_DX10_1_ATOC) || defined(MSAA_ALPHATEST_DX10_1) ) 
 #define EXTEND_F_DEFFER
 #endif
