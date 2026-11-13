@@ -13,12 +13,24 @@
 --              antirad_pause_s real seconds: time to reach a cover. Another one in the pause starts it over (no
 --              stacking); the engine's own radiation and the drug's boosts work as usual. A load or the front's end
 --              ends the pause
---   NPCs       the level's stalkers out of cover and not in sealed gear (the outfit of their visual, or their squad's
---              section: only_squads) die of it, each game the NPCs it runs: the level's authority. Online ones lose
---              health evenly from npc_harm_after_s and die npc_death_s after they were first out of cover; the
---              shelter's people (its smart's, or on their way into it) have npc_walk_in_s more to get in. Offline
---              squads out of the shelter (farther than offline_shelter_radius from its smart) for offline_death_min
---              real minutes are taken away. Story NPCs, players' companions and stand-ins, immune_communities never
+--   NPCs       the level's stalkers out of cover and not in sealed gear (the outfit their visual stands for: what they
+--              wear, never their faction or their squad's name) die of it, each game the NPCs it runs: the level's
+--              authority. Online ones lose health evenly from npc_harm_after_s and die npc_death_s after they were
+--              first out of cover; the shelter's people (its smart's, or on their way into it) have npc_walk_in_s more
+--              to get in. Offline squads out of the shelter (farther than offline_shelter_radius from its smart) for
+--              offline_death_min real minutes are taken away. Story NPCs (the safety net: the story can't break),
+--              players' companions and stand-ins, immune_communities never
+--   service    the level's story and service NPCs (traders, technicians, medics...: [zone_event_ash_service_<level>],
+--              a line per story id) sit the front out in the shelter:
+--                home     his place is in the shelter's covers as it is
+--                cond     his own logic has a place inside (night, surge): the xr_conditions listed are forced for him
+--                         while the front is on his level (is_night, !surge_started...), so his logic takes him there
+--                         and back after; the same in every game, from the event's fact alone
+--                shelter  his squad goes into the shelter with its people (the rel) and he takes one of the hide jobs
+--                         in its covers, invulnerable on it; back to his smart and his own job after
+--                stay     the fallback: where he stands, the ash never hurts him (as any story NPC not listed)
+--              One on home or cond out of the covers for service_teleport_s is put on his job's place in them when no
+--              player is within service_unseen_m of him or it (the authority)
 --   going in   the shelter's people who must hide (not in sealed gear, not story) go into its covers as in Anomaly's
 --              emission: the authority's smart jobs. For the front, on its level, a job of the shelter's smart out of
 --              its covers is not theirs, its surge jobs (in the covers) are; hide_jobs more walker jobs on the
@@ -29,11 +41,11 @@
 --              sets the same targets from the fact ash_rel. Story squads and companions stay where they are. A sealed
 --              shelter (sealed) lets nobody in, players neither: one who walks in within shelter_radius of it is put
 --              back where he was outside; one who comes into the world (or was) inside sits the front out there
---   leaving    the level's other stalker squads (not its shelter's people, not in sealed gear: only_squads) go to a smart
+--   leaving    the level's other stalker squads (not its shelter's people, not all in sealed suits) go to a smart
 --              of a neighbouring level (leave_<level>: levels) for the front and back to their own smarts after.
 --              Zombies stay. Squads that come onto the level later are sent too (the master, each rescan_s)
---   squads     only squads in sealed gear (only_squads: parts of their sections) take the level's smarts as targets;
---              the level's smarts respawn nobody (no_respawn)
+--   squads     only squads all in sealed suits take the level's smarts as targets (open_to); the level's smarts
+--              respawn nobody (no_respawn)
 --   players    are never kept off the level
 --   albinos    albino_squads (squad sections, none yet: their assets come later) are put on the level's smarts by the
 --              master at the start and taken away at the end
@@ -479,20 +491,199 @@ local function story(squad)
 	return false
 end
 
--- a squad the ash never hurts: story, a companion, immune, in sealed gear
+-- a squad the ash never hurts: story, a companion, immune
 local function spared(squad)
 	return story(squad) or (axr_companions and axr_companions.companion_squads[squad.id])
 		or listed(squad.get_squad_community and squad:get_squad_community() or "", "immune_communities")
-		or has_part(squad:section_name(), "only_squads")
 end
 
--- an NPC in a sealed suit: the outfit its visual stands for (death_manager's outfit_by_visual)
-local function npc_sealed(npc)
+-- a sealed suit by the visual: the outfit it stands for (death_manager's outfit_by_visual)
+local function visual_sealed(visual)
 	local ini = itms_manager and itms_manager.ini_death
-	local visual = ini and npc:get_visual_name()
-	local name = visual and string.match(visual, "([^\\/]+)$")
+	local name = ini and visual and string.match(visual, "([^\\/]+)$")
 	local outfit = name and ini:r_string_ex("outfit_by_visual", name)
 	return outfit and has_part(outfit, "sealed_suits") or false
+end
+
+-- an NPC in a sealed suit
+local function npc_sealed(npc)
+	return visual_sealed(npc:get_visual_name())
+end
+
+-- a squad all in sealed suits (its members' visuals: offline too; looked at again each 30 s)
+local sealed_squads = {} -- squad id -> { until (time_global), sealed }
+local function squad_sealed(squad)
+	local now = time_global()
+	local c = sealed_squads[squad.id]
+	if c and c[1] > now then
+		return c[2]
+	end
+	local n, yes = 0, true
+	for m in squad:squad_members() do
+		local se = alife_object(m.id)
+		n = n + 1
+		if not (se and se.visual_name and visual_sealed(se:visual_name())) then
+			yes = false
+			break
+		end
+	end
+	yes = yes and n > 0
+	sealed_squads[squad.id] = { now + 30000, yes }
+	return yes
+end
+
+-------------------------------------------------------------------------------
+-- the service and story NPCs of the level ([zone_event_ash_service_<level>]: <story id> = <how>[, conditions])
+
+local service = {}   -- level -> { story id -> { how = home | cond | shelter | stay, cond = { xr_conditions name -> forced value } } }
+local service_lvl    -- the level the front is on now (update)
+local service_ids = {} -- object id -> its line on service_lvl, false: none
+local service_out = {} -- npc id -> time_global() the authority first saw him out of the covers
+local next_service = 0
+
+local function read_service()
+	local conds = {}
+	for _, lvl in ipairs(ZE.ini_list(S, "levels")) do
+		local section = S .. "_service_" .. lvl
+		local t = {}
+		for i = 0, (ini_sys:section_exist(section) and ini_sys:line_count(section) or 0) - 1 do
+			local _, sid, value = ini_sys:r_line_ex(section, i, "", "")
+			local items = ZE.list(value)
+			local e = { how = items[1] or "stay", cond = {} }
+			for k = 2, #items do
+				local no, name = string.match(items[k], "^(!?)(.+)$")
+				e.cond[name] = no == ""
+				conds[name] = true
+			end
+			t[sid] = e
+		end
+		service[lvl] = t
+	end
+	return conds
+end
+
+-- the line of a service NPC (by its object's id) of the level
+local function service_on(lvl, id)
+	local sid = get_object_story_id(id)
+	return sid and service[lvl] and service[lvl][sid] or nil
+end
+
+-- the same on the front's level, remembered per object (a game or a server object, or its id)
+local function service_of(obj)
+	if not (service_lvl and obj) then
+		return nil
+	end
+	local id = type(obj) == "number" and obj or (type(obj.id) == "function" and obj:id() or obj.id)
+	local e = service_ids[id]
+	if e == nil then
+		e = service_on(service_lvl, id) or false
+		service_ids[id] = e
+	end
+	return e or nil
+end
+
+-- a squad with a service NPC sent into the shelter
+local function shelter_service(squad, lvl)
+	for m in squad:squad_members() do
+		local e = service_on(lvl, m.id)
+		if e and e.how == "shelter" then
+			return true
+		end
+	end
+	return false
+end
+
+-- xr_conditions of the service NPCs' own logic, forced while the front is on their level
+local function force_condition(name)
+	local original = xr_conditions[name]
+	if type(original) ~= "function" then
+		printf("! [coop] zone event ash: no xr_conditions.%s to force for the service NPCs", name)
+		return
+	end
+	xr_conditions[name] = function(actor, npc, ...)
+		local e = service_lvl and service_of(npc)
+		if e and e.how == "cond" and e.cond[name] ~= nil then
+			return e.cond[name]
+		end
+		return original(actor, npc, ...)
+	end
+end
+
+-- the place of an NPC's job now: its animpoint's cover or its path's first point
+local function job_place(id)
+	local st = db.storage[id]
+	local s = st and st.active_scheme and st[st.active_scheme]
+	if not s then
+		return nil
+	end
+	local cover = s.cover_name and bind_smart_cover.registered_smartcovers[s.cover_name]
+	if cover then
+		return cover:position()
+	end
+	if s.path_walk and level.patrol_path_exists(s.path_walk) then
+		return patrol(s.path_walk):point(0)
+	end
+end
+
+-- no player (ours, the others' stand-ins) within service_unseen_m of any of the places
+local function unseen(...)
+	local far = num("service_unseen_m", 40)
+	local players = {}
+	if not ghost() then
+		players[1] = db.actor:position()
+	end
+	if in_coop() then
+		for i = 1, #db.OnlineStalkers do
+			local id = db.OnlineStalkers[i]
+			local o = coop.stand_in_peer(id) ~= 0 and db.storage[id] and db.storage[id].object
+			if o then
+				players[#players + 1] = o:position()
+			end
+		end
+	end
+	for _, pos in ipairs({ ... }) do
+		for _, p in ipairs(players) do
+			if p:distance_to(pos) < far then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+-- the authority, each 5 s: the service NPCs with a place inside (home, cond) still out of the covers: said in the debug
+-- log, and after service_teleport_s put on their job's place in the covers when no player is near
+local function service_look(lvl)
+	local now = time_global()
+	if now < next_service then
+		return
+	end
+	next_service = now + 5000
+	local wait = num("service_teleport_s", 120) * 1000
+	local seen = {}
+	for i = 1, #db.OnlineStalkers do
+		local id = db.OnlineStalkers[i]
+		local e = service_of(id)
+		local npc = e and (e.how == "home" or e.how == "cond") and db.storage[id] and db.storage[id].object
+		if npc and npc:alive() and not in_cover(npc:position(), lvl) then
+			seen[id] = true
+			service_out[id] = service_out[id] or now
+			local place = job_place(id)
+			local inside = place and in_cover(place, lvl) or false
+			ZE.dbg("ash: service NPC %s out of the covers for %s s (job %s, its place %s)", npc:name(),
+				math.floor((now - service_out[id]) / 1000), tostring(db.storage[id].active_section),
+				inside and "in them" or "not in them")
+			if inside and now - service_out[id] >= wait and unseen(npc:position(), place) then
+				npc:set_npc_position(place)
+				printf("[coop] zone event ash: service NPC %s put on his place in the shelter", npc:name())
+			end
+		end
+	end
+	for id in pairs(service_out) do
+		if not seen[id] then
+			service_out[id] = nil
+		end
+	end
 end
 
 -- an offline squad of the shelter: at its smart (where its jobs are; offline nobody has a place in a cover)
@@ -572,7 +763,7 @@ local function npc_dose(ev, rel_ids)
 		if squad and squad.squad_members and not is_squad_monster[squad.player_id] and not squad.online
 			and not (in_coop() and coop.squad_online_elsewhere(sid)) and level_of(squad) == lvl
 			and not (squad.scripted_target and not rel_ids[sid]) -- a squad someone else leads (a task's)
-			and not spared(squad) and not squad_sheltered(squad, smart) then
+			and not spared(squad) and not squad_sealed(squad) and not squad_sheltered(squad, smart) then
 			found[sid] = true
 			local since = off_since[sid] or real
 			off_since[sid] = since
@@ -600,7 +791,14 @@ local job_covered = setmetatable({}, { __mode = "k" }) -- job -> its place is in
 local SURGE_JOBS = { [2] = true, [8] = true, [14] = true } -- gulag_general: surge, animpoint_surge, beh_surge
 local HIDE = "coop_ash_hide_" -- the hide jobs' section names and dynamic ltx (db.dynamic_ltx) per shelter smart
 
--- an NPC of the shelter who must go in: not story, not a stand-in, not immune, not in a spared squad or sealed gear
+-- a service NPC sent into the shelter (shelter): he takes a hide job there
+local function service_hides(obj)
+	local e = service_of(obj)
+	return e ~= nil and e.how == "shelter"
+end
+
+-- an NPC of the shelter who must go in: not story, not a stand-in, not immune, not in a spared squad or a sealed suit;
+-- or a service NPC sent in
 local function must_hide(se_obj)
 	local id = se_obj.id
 	local now = time_global()
@@ -608,12 +806,12 @@ local function must_hide(se_obj)
 	if c and c[1] > now then
 		return c[2]
 	end
-	local yes = false
+	local yes = service_hides(se_obj)
 	local squad = se_obj.group_id and se_obj.group_id ~= 65535 and alife_object(se_obj.group_id)
-	if squad and squad.squad_members and not get_object_story_id(id) and not (in_coop() and coop.stand_in_peer(id) ~= 0)
+	if not yes and squad and squad.squad_members and not get_object_story_id(id)
+		and not (in_coop() and coop.stand_in_peer(id) ~= 0)
 		and not listed(se_obj:community(), "immune_communities") and not spared(squad) then
-		local st = db.storage[id]
-		yes = not (st and st.object and npc_sealed(st.object)) -- offline: no visual to tell by, in he goes
+		yes = not (se_obj.visual_name and visual_sealed(se_obj:visual_name()))
 	end
 	hides_of[id] = { now + 5000, yes }
 	return yes
@@ -630,8 +828,13 @@ local function covered_job(job)
 	return c[2]
 end
 
+-- the hide jobs: walkers on the shelter's in-cover paths, for those who must hide and found no other job in a cover
+local function hide_job_ok(se_obj, smart)
+	return hide ~= nil and smart.id == hide.smart and must_hide(se_obj)
+end
+
 -- a job's precondition while hiding: for those who must hide, a job of the shelter out of its covers is not theirs, a
--- surge job in them is
+-- surge job in them is; a service NPC sent in takes a hide job only (he is invulnerable on it)
 local wrapped = {}
 local function hide_precondition(pre)
 	local key = pre or wrapped
@@ -639,6 +842,9 @@ local function hide_precondition(pre)
 	if not f then
 		f = function(se_obj, smart, job, info, ...)
 			if hide and smart.id == hide.smart and (not info or info.stype == 0) and must_hide(se_obj) then
+				if pre ~= hide_job_ok and service_hides(se_obj) then
+					return false
+				end
 				if not covered_job(job) then
 					return false
 				end
@@ -654,11 +860,6 @@ local function hide_precondition(pre)
 		wrapped[key] = f
 	end
 	return f
-end
-
--- the hide jobs: walkers on the shelter's in-cover paths, for those who must hide and found no other job in a cover
-local function hide_job_ok(se_obj, smart)
-	return hide ~= nil and smart.id == hide.smart and must_hide(se_obj)
 end
 
 local function hide_paths(lvl)
@@ -684,6 +885,7 @@ use_camp = true
 path_walk = %s
 def_state_standing = guard
 def_state_moving = {=dist_to_job_point_ge(25)} sprint, {=dist_to_job_point_ge(5)} run, patrol
+invulnerable = {=coop_ash_service} true, false
 ]], HIDE, i, HIDE, i, HIDE, i, paths[(i - 1) % #paths + 1])
 	end
 	db.dynamic_ltx[name] = create_ini_file(table.concat(text, "\n"))
@@ -858,16 +1060,21 @@ local function gather(lvl, known)
 	local gone = 0
 	for id in pairs(SIMBOARD.squads) do
 		local squad = alife_object(id)
-		-- a squad with a story NPC (a trader, a mechanic: jup_cont_trader_bandit...) stays: its people are needed there
+		-- a squad with a story NPC (a trader, a mechanic: jup_cont_trader_bandit...) stays: its people are needed
+		-- there; but one with a service NPC sent into the shelter (shelter)
 		if squad and squad.squad_members and not known[id] and not is_squad_monster[squad.player_id] and not squad.scripted_target
 			and not (target and squad.smart_id == target.id) and not (axr_companions and axr_companions.companion_squads[id])
-			and level_of(squad) == lvl and not story(squad) then
+			and level_of(squad) == lvl then
 			local own = squad.smart_id or 0
-			if theirs(squad) then
+			if story(squad) then
+				if target and shelter_service(squad, lvl) then
+					rel[#rel + 1] = id .. ":" .. own
+				end
+			elseif theirs(squad) then
 				if target then
 					rel[#rel + 1] = id .. ":" .. own
 				end
-			elseif squad.player_id ~= "zombied" and not has_part(squad:section_name(), "only_squads") then
+			elseif squad.player_id ~= "zombied" and not squad_sealed(squad) then
 				local smart = away_for(squad)
 				if smart then
 					rel[#rel + 1] = id .. ":" .. own .. ":" .. smart.id
@@ -964,6 +1171,9 @@ local function update(ev)
 	end
 	local on = ev and ev.stage == "on"
 	local on_here = on and ev.level == level.name()
+	if service_lvl ~= (on and ev.level or nil) then
+		service_lvl, service_ids, service_out = on and ev.level or nil, {}, {}
+	end
 	update_weather(on_here)
 	update_hide(ev, on_here)
 	if on_here then
@@ -978,6 +1188,9 @@ local function update(ev)
 	if on and authority(ev.level) then
 		local _, _, rel = read_rel()
 		npc_dose(ev, rel_set(rel))
+		if on_here then
+			service_look(ev.level)
+		end
 	elseif next(npc_since) or next(off_since) then
 		npc_since, off_since = {}, {}
 	end
@@ -998,7 +1211,14 @@ local next_dose = 0
 
 function on_game_start()
 	ZE = coop_zone_events
-	ZE.register(ID, { start = start, finish = finish, update = update, news_start = news_start })
+	ZE.register(ID, { start = start, finish = finish, update = update, news_start = news_start, open_to = squad_sealed })
+	-- the service NPCs: their lines, the conditions of their logic forced for the front, the hide jobs' own one
+	for name in pairs(read_service()) do
+		force_condition(name)
+	end
+	xr_conditions.coop_ash_service = function(actor, npc)
+		return service_hides(npc)
+	end
 	-- going in: the shelter smarts' hide jobs, and the jobs' preconditions while hiding
 	for name, lvl in pairs(shelter_levels()) do
 		hide_ltx(name, lvl)

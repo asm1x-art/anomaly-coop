@@ -53,7 +53,8 @@ sweep_ids           = 2048      ; ids the sweep of the Zone's artefacts looks at
 ; Пепельный фронт: fire hotspots in the Red Forest, the wind carries the ash to Yantar, Jupiter or Zaton; or the surge
 ; has shaken up the old machinery of the Truck Cemetery. The level's weather turns to ash, the background radiation
 ; there is deadly but in a sealed scientific suit, its people sit it out in a shelter, the other stalkers leave the
-; level. Players may always go there.
+; level. Players may always go there. Only squads all in sealed suits (sealed_suits, by what they wear: never by their
+; faction or their squad's name) take the level's smarts as targets or stay out in the ash.
 [zone_event_ash]
 enabled             = true
 slot                = world
@@ -64,9 +65,6 @@ real_hours_max      = 4
 levels              = l10_red_forest, l08_yantar, jupiter, zaton, k02_trucks_cemetery
 weather             = w_zev_ash ; environment\weathers\w_zev_ash.ltx
 buy_medical         = 1.2       ; anti-rad in demand
-; squads that may still take the level's smarts as targets: parts of their sections (the sealed gear's people; mercs in
-; SEVA have no squad section of their own yet)
-only_squads         = ecolog_, monolith_
 ; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
 sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit
 ; a player out of cover without one: radiation rad_rate a second up to rad_max (0.15-0.3 within 5-10 s, the max in
@@ -84,7 +82,7 @@ cover_rad_decay     = 0.02      ; radiation a second off in cover (the shelter's
 ; medkits (scientific/survival kits, Rebirth) or water tablets
 antirad_items       = antirad, antirad_kalium, antirad_cystamine, drug_radioprotector
 antirad_pause_s     = 60
-; NPCs (the level's stalkers, not in sealed gear: the outfit of their visual or only_squads) out of cover lose health
+; NPCs (the level's stalkers, not in a sealed suit: the outfit of their visual) out of cover lose health
 ; evenly from npc_harm_after_s and die npc_death_s real seconds after they were first out of it (each game the NPCs it
 ; runs; the shelter's people npc_walk_in_s later). Offline squads of the level out of the shelter are taken away after
 ; offline_death_min real minutes. Story NPCs, companions, players' stand-ins and immune_communities (e.g. zombied:
@@ -104,6 +102,12 @@ hide_paths_l08_yantar          = yan_smart_terrain_6_4_surge_1_walk, yan_smart_t
 hide_paths_jupiter             = jup_a6_duty_guard_walk, jup_a6_duty_leader_walk, jup_a6_freedom_leader_walk
 hide_paths_zaton               = zat_stalker_base_smart_garmata_4_walk, zat_stalker_base_smart_gonta_4_walk, zat_stalker_base_smart_zat_b33_stalker_snag_walk, zat_stalker_base_smart_b29_rival_leader_walk
 hide_paths_k02_trucks_cemetery = trc_sim_20_surge_1_walk, trc_sim_20_surge_2_walk, trc_sim_20_surge_3_walk, trc_sim_20_surge_4_walk, trc_sim_20_guard_2_walk
+; the service and story NPCs (traders, technicians, medics...) sit the front out in the shelter: a section per level,
+; [zone_event_ash_service_<level>] below, a line per NPC. One with a place inside (home, cond) still out of the covers
+; service_teleport_s real s after he was first seen out is put on his job's place in them, when no player is within
+; service_unseen_m metres of him or of it
+service_teleport_s  = 120
+service_unseen_m    = 40
 rescan_s            = 60        ; real s: the master sends squads that came onto the level since into cover or away
 no_respawn          = true      ; the level's smarts respawn nobody for the front
 ; the shelters: a smart per level; its people (communities; none: all) go in for the front, back after
@@ -127,7 +131,7 @@ shelter_covers_k02_trucks_cemetery = trc_sim_20_surge_hide_1, trc_sim_20_surge_h
 cover_fallback_radius = 10
 sealed              = jupiter, zaton  ; shelters that let nobody in for the front, players neither
 shelter_radius      = 60        ; metres from a sealed shelter's smart nobody walks into
-; the other stalker squads on the level (not its shelter's people, not in sealed gear) go to smarts (no bases) of the
+; the other stalker squads on the level (not its shelter's people, not all in sealed suits) go to smarts (no bases) of the
 ; neighbouring levels for the front, back to their own after; a level with none listed: they stay
 leave_l10_red_forest        = l07_military, l10_limansk, jupiter
 leave_l08_yantar            = l06_rostok, l09_deadcity, l03_agroprom
@@ -165,3 +169,60 @@ ground_bark_up        = 0.0, 0.7   ; world normal.y of the bark: no ash at the f
 ground_bark_strength  = 0.8        ; the most ash on bark (x ground_opacity), 0..1
 ground_grass_strength = 0.5        ; the most ash on grass (x the ground's), 0..1
 ground_aref_strength  = 0.8        ; the most on alpha tested surfaces: willows' hanging foliage, nets, fences, 0..1
+
+; ---------------------------------------------------------------------------------------------------------------
+; The ash front's service and story NPCs, a section per level: <story id> = <how>
+;   home                     his place is in the shelter's covers as it is (nothing is done; watched, see service_teleport_s)
+;   cond, <conditions>       his own logic has a place inside (night, surge): the xr_conditions listed are forced for him
+;                            while the front is on his level (name: true, !name: false), so it takes him there and back after
+;   shelter                  his squad goes into the level's shelter with its people, he takes one of its hide jobs
+;                            (hide_paths_<level>), invulnerable on it; back to his smart and his own job after
+;   stay                     the fallback: stays where he is, the ash never hurts him (so does any story NPC not listed)
+[zone_event_ash_service_l08_yantar]
+yan_stalker_sakharov               = home                            ; the trader: never leaves the bunker
+mechanic_army_yan_mlr              = cond, is_night, surge_started   ; the technician: his night place in the bunker
+yan_povar_army_mlr                 = cond, is_night, surge_started   ; the barman: his night place in the bunker
+yan_merc_01                        = stay                            ; the bunker's guards, in the scientists' suits
+yan_merc_02                        = stay
+yan_merc_03                        = stay
+
+[zone_event_ash_service_jupiter]
+jup_a6_stalker_barmen              = home                            ; Yanov station: all of them live inside
+jup_a6_stalker_medik               = home
+jup_b217_stalker_tech              = home
+zat_a2_stalker_mechanic            = home
+jup_b220_trapper                   = home
+jup_a6_freedom_trader_ashot        = home
+jup_a6_freedom_leader              = home
+guid_jup_stalker_garik             = home
+jup_b6_scientist_nuclear_physicist = stay                            ; the scientists' bunker: their own sealed place, 250 m off (Yanov is sealed for the front)
+jup_b6_scientist_biochemist        = stay
+jup_b6_scientist_tech              = stay
+jup_cont_trader_bandit             = stay                            ; the bandits' container yard: enemies of Yanov's people
+jup_cont_mech_bandit               = stay
+jup_a12_bandit_cashier             = stay
+jup_a12_bandit_guard               = stay
+
+[zone_event_ash_service_zaton]
+zat_a2_stalker_barmen              = home                            ; Skadovsk: all of them live inside
+zat_b30_owl_stalker_trader_id      = home
+zat_a2_stalker_nimble_id           = home
+zat_tech_mlr                       = home
+zat_b22_stalker_medic              = home
+guid_zan_stalker_locman            = home
+zat_b106_stalker_crab              = home
+zat_b106_stalker_gonta             = home
+zat_b106_stalker_garmata           = home
+zat_b18_noah                       = shelter                         ; Noah: from his barge into Skadovsk
+zat_stancia_trader_merc            = stay                            ; the mercenaries' station: enemies of Skadovsk's people
+zat_stancia_mech_merc              = stay
+zat_b7_stalker_victim_1            = stay
+
+[zone_event_ash_service_l10_red_forest]
+red_greh_trader                    = home                            ; Sin's cave: both live inside
+red_greh_tech                      = home
+red_forester_tech                  = stay                            ; the Forester: a trader object that can't walk, in his tower
+
+[zone_event_ash_service_k02_trucks_cemetery]
+trucks_cemetery_bandit_trader      = cond, surge_started, !is_night  ; his surge place in the building (his night place is outside the covers)
+trucks_cemetery_bandit_mechanic    = home
