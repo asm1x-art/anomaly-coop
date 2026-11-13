@@ -9,13 +9,13 @@ function on_mcm_load()
 
 			{id = "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_ssfx_module_fog_title",size= {512,50},spacing= 20 },
 
-			{id = "height_mcm", type = "track", val = 2, min=1.0,max=20.0,step=0.1, def = 8.0},
-			{id = "density_mcm", type = "track", val = 2, min=0.0,max=5.0,step=0.1, def = 1.3},
-			{id = "suncolor_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.05, def = 0.1},
+			{id = "height_mcm", type = "track", val = 2, min=1.0,max=20.0,step=0.1, def = 20.0},
+			{id = "density_mcm", type = "track", val = 2, min=0.0,max=5.0,step=0.1, def = 1.5},
+			{id = "suncolor_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.05, def = 0.11},
 
 			{ id = "line", type = "line" },
 
-			{id = "scattering_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0.7},
+			{id = "scattering_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 1.0},
 
 		}
 	}

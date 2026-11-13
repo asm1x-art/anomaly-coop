@@ -20,9 +20,9 @@ function on_mcm_load()
 
 			{id = "line", type = "line"},
 
-			{id = "global_int_mcm", type = "track", val = 2, min=0.0, max=4.0, step=0.1, def = 1.0},
+			{id = "global_int_mcm", type = "track", val = 2, min=0.0, max=4.0, step=0.1, def = 0.8},
 			{id = "hud_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 1.0},
-			{id = "flora_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 0.5},
+			{id = "flora_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 1.0},
 
 		}
 	}

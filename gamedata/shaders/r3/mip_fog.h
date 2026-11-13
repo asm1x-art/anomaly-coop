@@ -2,18 +2,18 @@
 //Mip Fog for STALKER Anomaly 
 //Inspired by Uncharted 4
 //=================================================================================================
-#define HEIGHTFOGMAX 50
+#define HEIGHTFOGMAX 60
 #define HEIGHTFOGMIN -75
 
-#define FOGMAXSHARPNESS 0.995
-#define FOGROUGHCURVE 1.5
+#define FOGMAXSHARPNESS 0.895
+#define FOGROUGHCURVE 1.0
 
-#define MIPFOGAMOUNT 1.0
-#define SUNFOGAMOUNT 0.25
+#define MIPFOGAMOUNT 2.0
+#define SUNFOGAMOUNT 0.35
 
-#define MINFOGDENSITY 0.2
-#define MAXFOGDENSITY 5.0
-#define HEIGHTFOGCURVE 5
+#define MINFOGDENSITY 0.35
+#define MAXFOGDENSITY 6.5
+#define HEIGHTFOGCURVE 5.5
 //=================================================================================================
 float Calc_Exponent(float a)
 {

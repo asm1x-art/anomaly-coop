@@ -28,7 +28,7 @@ v2p main (vi v)
 	o.tc1.xyz = v.tc1;                      					// copy tc
 	float	scale = s_tonemap.Load(int3(0,0,0) ).x;
 	
-	float3	tint  = v.c.rgb * 1.7;
+	float3	tint  = v.c.rgb * 1.70;
 	
 	//float3 tint = 1.0;
 	//float3 tint = env_color.rgb; 

@@ -9,16 +9,15 @@ ssfx_default_settings =
 {
 	["quality"]			= 0,
 
-	["render_scale"]	= 0.5,
-	["blur"]			= 0.0,
-	["temporal"]		= 0.6,
+	["render_scale"]	= 1.0,
+	["blur"]			= 0.6,
 	["use_noise"]		= 0.0,
 
 
-	["general_int"]		= 1.0,
+	["general_int"]		= 1.15,
 	["sky_int"]			= 1.0,
-	["weapon_int"]		= 1.0,
-	["weapon_int_max"]	= 0.02,
+	["weapon_int"]		= 0.6,
+	["weapon_int_max"]	= 0.1,
 
 }
 

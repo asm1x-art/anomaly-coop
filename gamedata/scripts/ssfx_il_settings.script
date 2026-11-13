@@ -14,9 +14,9 @@ ssfx_default_settings =
 
 	["distance"]		= 150.0,
 
-	["global_int"]		= 1.0,
+	["global_int"]		= 0.8,
 	["hud_int"]			= 1.0,
-	["flora_int"]		= 0.5,
+	["flora_int"]		= 1.0,
 
 }
 ----------------------------------------------------

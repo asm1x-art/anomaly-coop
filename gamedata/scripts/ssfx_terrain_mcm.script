@@ -10,7 +10,7 @@ function on_mcm_load()
 
 			{id = "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_ssfx_module_terrain_title",size= {512,50},spacing= 20 },
 
-			{id = "distance_mcm", type = "track", val = 2, min=0.0,max=40.0,step=1.0, def = 8.0},
+			{id = "distance_mcm", type = "track", val = 2, min=0.0,max=20.0,step=1.0, def = 8.0},
 
 			{id = "line", type = "line"},
 
@@ -25,7 +25,7 @@ function on_mcm_load()
 
 			{id = "line", type = "line"},
 
-			{id = "grass_align_mcm", type = "check", val = 1, def=false},
+			{id = "grass_align_mcm", type = "check", val = 1, def=true},
 			{id = "grass_slope_mcm", type = "track", val = 2, min=0.0, max=90.0, step=1.0, def = 90.0}, -- 27
 
 		}

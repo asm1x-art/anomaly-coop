@@ -19,15 +19,15 @@ function on_mcm_load()
 
 			{id = "line", type = "line"},
 
-			{id = "radius_mcm", type = "track", val = 2, min=1.0, max=5.0, step=0.1, def = 2.5},
+			{id = "radius_mcm", type = "track", val = 2, min=1.0, max=5.0, step=0.1, def = 1.9},
 
 			{id = "line", type = "line"},
 
-			{id = "max_occ_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 0.0},
+			{id = "max_occ_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.01, def = 0.21},
 
 			{id = "global_int_mcm", type = "track", val = 2, min=0.0, max=2.0, step=0.1, def = 1.0},
 			{id = "hud_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 1.0},
-			{id = "flora_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 1.0},
+			{id = "flora_int_mcm", type = "track", val = 2, min=0.0, max=1.0, step=0.1, def = 0.6},
 
 		}
 	}

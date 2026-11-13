@@ -321,8 +321,11 @@ float shadow_rain(float4 tc, float2 tcJ)			// jittered sampling
 float3x4 m_sunmask;	// ortho-projection
 float sunmask( float4 P )
 {
-	float2 		tc	= mul( m_sunmask, P );		//
-	return 		s_lmap.SampleLevel( smp_linear, tc, 0 ).w;	//Hemi map - ambient occlusion	
+	float2 tc = mul( m_sunmask, P );
+    float  s  = s_lmap.SampleLevel( smp_linear, tc, 0 ).w;
+
+    const float minShadow = 0.47;   // 0 = very dark, 1 = no shadow
+    return lerp( minShadow, 1.0, s );
 }
 #else
 float sunmask( float4 P ) { return 1.0; }		// 

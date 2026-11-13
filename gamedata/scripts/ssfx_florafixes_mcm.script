@@ -9,16 +9,16 @@ function on_mcm_load()
 
 			{id = "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_ssfx_module_florafixes_title",size= {512,50},spacing= 20 },
 
-			{id = "sss_int_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 2.0},
+			{id = "sss_int_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.5},
 			{id = "sss_color_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 1.0},
 
 			{id = "line", type = "line"},
 
 			{id = "grass_specular_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.3},
-			{id = "grass_specular_wet_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.21},
+			{id = "grass_specular_wet_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.38},
 
-			{id = "trees_specular_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.3},
-			{id = "trees_specular_wet_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.21},
+			{id = "trees_specular_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.5},
+			{id = "trees_specular_wet_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.55},
 
 		}
 	}

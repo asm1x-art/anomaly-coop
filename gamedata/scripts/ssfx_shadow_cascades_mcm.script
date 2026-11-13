@@ -15,7 +15,7 @@ function on_mcm_load()
 
 				{ id = "line", type = "line" },
 
-				{id = "grass_shw_quality_mcm", type = "list", val = 2, content={ {0.0,"shw_cascades_low"} , {1.0,"shw_cascades_medium"}, {2.0,"shw_cascades_high"}, {3.0,"shw_cascades_ultra"}}, def=0.0},
+				{id = "grass_shw_quality_mcm", type = "list", val = 2, content={ {0.0,"shw_cascades_low"} , {1.0,"shw_cascades_medium"}, {2.0,"shw_cascades_high"}, {3.0,"shw_cascades_ultra"}}, def=1.0},
 				{id = "grass_shw_distance_mcm", type = "track", val = 2, min=0.0,max=100.0,step=1.0, def = 35},
 				{id = "grass_shw_nondir_maxdistance_mcm", type = "track", val = 2, min=10.0,max=50.0,step=1.0, def = 30},
 				

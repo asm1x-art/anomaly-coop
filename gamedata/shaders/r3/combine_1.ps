@@ -88,6 +88,57 @@ struct	_out
 	float4	high	: SV_Target1;
 };
 
+//Credits Lvutner 
+//then replace fog_color with get_fog_color(gbd.P.xyz)
+
+float4 sky_color;
+TextureCube sky_s0;
+TextureCube sky_s1;
+
+#define frog_blur //blur to get sort of 'scattering'
+//#define frog_mirror //mirror top part of the sky in y axis
+
+float3 get_fog_color(float3 view_position)
+{
+    // eye‑space direction ----------------------------------------------
+    float3 temp = mul(m_inv_V, float4(view_position, 1.0)).xyz;
+    temp -= eye_position;
+    temp  = normalize(temp);
+
+    // rotate around vertical axis --------------------------------------
+    float2 rot;
+    sincos(sky_color.w, rot.x, rot.y);
+    temp.xz = float2(temp.x * rot.y - temp.z * rot.x,
+                     temp.x * rot.x + temp.z * rot.y);
+
+    // remap to skybox geometry -----------------------------------------
+    float3 vabs = abs(temp);
+#ifdef frog_mirror
+    temp.y = vabs.y;              // mirror Y for nicer horizon
+#endif
+    float vmax = max(vabs.x, max(vabs.y, vabs.z));
+    temp /= vmax;
+    temp.y = temp.y * 2.0f - 1.0f; // [-1,1] for cube lookup
+
+    // fake blur by sampling higher mips -------------------------------
+#ifndef frog_blur
+    float3 total;
+    [unroll] for(int i=0;i<4;++i)
+    {
+        float mip = 6.5 + i;      // 6.5,7.5,8.5,9.5
+        total += lerp(sky_s0.SampleLevel(smp_linear,temp,mip).xyz,
+                      sky_s1.SampleLevel(smp_linear,temp,mip).xyz,
+                      env_color.w);
+    }
+    return total * 0.25 * sky_color.zyx;
+#else
+    return lerp(sky_s0.SampleLevel(smp_linear,temp,8).xyz,
+                sky_s1.SampleLevel(smp_linear,temp,8).xyz,
+                env_color.w) * sky_color.zyx;
+#endif
+}
+
+
 //	TODO:	DX10: Replace Sample with Load
 #ifndef MSAA_OPTIMIZATION
 _out main ( _input I )
@@ -221,15 +272,29 @@ _out main ( _input I, uint iSample : SV_SAMPLEINDEX )
 
 	// here should be distance fog
 #ifdef SSFX_FOG
-	float3 		WorldP			= mul(m_inv_V, float4(P.xyz, 1));
-	float		fog				= SSFX_HEIGHT_FOG(P.xyz, WorldP.y, color);
+    float3 WorldP = mul(m_inv_V, float4(P.xyz, 1));
+    float  fog    = SSFX_HEIGHT_FOG(P.xyz, WorldP.y, color);
 #else
-	float		distance		= length		(P.xyz);
-	float		fog				= saturate		(distance*fog_params.w + fog_params.x);
-				color			= lerp			(color,fog_color,fog);
+    // ── distance‑fog branch ──────────────────────────────────────────────
+    // OLD reference version
+    // float  distance = length(P.xyz);
+    // float  fog      = saturate(distance * fog_params.w + fog_params.x);
+    // color           = lerp(color, fog_color, fog);
+
+    // NEW two‑stage gradient
+	// Credits Hippobot
+    float3 WorldP   = mul(m_inv_V, float4(P.xyz, 1));
+    float  distance = length(P.xyz);
+    float  fogD     = saturate(distance * fog_params.w + fog_params.x);
+    float  fogH     = saturate(exp(-WorldP.y * 0.002));
+    float  fog      = fogD * fogH;
+
+    // Mip‑fog tint sampled from blurred skybox
+    color = lerp(color, get_fog_color(P.xyz), fog);
 #endif
 
-	float		skyblend		= saturate		(fog*fog);
+	//float		skyblend		= saturate		(fog*fog);
+	float skyblend = saturate(pow(fog, 3.0));
 
 	float		tm_scale		= I.tc0.w; // interpolated from VS
 

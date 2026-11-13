@@ -101,6 +101,7 @@ GFX_MODS = [
     "[Частицы_в2 и 12] Enh_Shaders_Color_G 1.10",  # Enhanced Shaders and Color Grading: light, tonemapping, bloom
     "[ПНВ] Beefs_NVGs",  # Beef's shader based night vision
     "[Шейдеры] ScreenSpaceShaders 23.5",  # SSS update 23.5 (the archive of 2025-12-20)
+    "[Погода] Atmospherics 2.68.93_h3",  # weathers, skies, suns; its settings of SSS. No scripts that drive the weather
 ]
 # left out of the look's mods
 GFX_SKIP_PREFIX = ("scripts/orig/",)  # Beef's NVG: the mod's untouched copies

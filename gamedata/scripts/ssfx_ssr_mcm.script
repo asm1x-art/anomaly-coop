@@ -10,20 +10,20 @@ function on_mcm_load()
 			{id = "title",type= "slide",link= "ui_options_slider_player",text="ui_mcm_ssfx_module_ssr_title",size= {512,50},spacing= 20 },
 
 			{id = "quality_mcm", type = "list", val = 2, content={ {0.0,"ssfx_quality_very_low"} , {1.0,"ssfx_quality_low"}, {2.0,"ssfx_quality_medium"}, {3.0,"ssfx_quality_high"}, {4.0,"ssfx_quality_veryhigh"}, {5.0,"ssfx_quality_ultra"}}, def=0.0, restart=true},
-			{id = "render_scale_mcm", type = "track", val = 2, min=0.3,max=1.0,step=0.1, def = 1.0},
+			{id = "render_scale_mcm", type = "track", val = 2, min=0.5,max=1.0,step=0.1, def = 1.0},
 
 			{ id = "line", type = "line" },
 
-			{id = "blur_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.2},
+			{id = "blur_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.6},
 			{id = "use_noise_mcm", type = "check", val = 1, def=false},
 
 			{ id = "line", type = "line" },
 
-			{id = "general_int_mcm", type = "track", val = 2, min=0.0,max=2.0,step=0.01, def = 1.0},
+			{id = "general_int_mcm", type = "track", val = 2, min=0.0,max=2.0,step=0.01, def = 1.15},
 			{id = "sky_int_mcm", type = "track", val = 2, min=0.0,max=2.0,step=0.01, def = 1.0},
-			{id = "weapon_int_mcm", type = "track", val = 2, min=0.0,max=2.0,step=0.01, def = 0.5},
+			{id = "weapon_int_mcm", type = "track", val = 2, min=0.0,max=2.0,step=0.01, def = 0.6},
 
-			{id = "weapon_int_max_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.02},
+			{id = "weapon_int_max_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.01, def = 0.1},
 
 
 		}

@@ -8,18 +8,18 @@
 ssfx_default_settings = 
 {
 	-- Gloss
-	["min_gloss"]			= 0.6,	-- Minimum value of gloss.
-	["max_gloss"]			= 0.9,	-- Maximum value of gloss.
+	["min_gloss"]			= 0.65,	-- Minimum value of gloss.
+	["max_gloss"]			= 0.76,	-- Maximum value of gloss.
 	
 	["auto_gloss"]			= true,	-- Automatic adjustment of gloss based on wetness.
 	["auto_gloss_max"]		= 1.0,	-- Value to control the maximum value of gloss when full wetness is reached. ( 0 = 0% | 1 = 100% )
 	
-	["specular_int"]		= 0.35,	-- Set the intensity of specular lighting.
-	["specular_color"]		= 0.5,	-- Porcentage of the specular color. ( 0 = 0% | 1 = 100% )
+	["specular_int"]		= 0.5,	-- Set the intensity of specular lighting.
+	["specular_color"]		= 1.0,	-- Porcentage of the specular color. ( 0 = 0% | 1 = 100% )
 	
 	-- Wet Surfaces
-	["buildup_speed"]		= 1.0,	-- 
-	["dry_speed"]			= 0.3,	-- 
+	["buildup_speed"]		= 1.4,	-- 
+	["dry_speed"]			= 0.5,	-- 
 
 	["ripples_size"]		= 1.5,	-- 
 	["ripples_speed"]		= 1.4,	-- 

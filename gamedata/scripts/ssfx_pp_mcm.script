@@ -16,21 +16,21 @@ function on_mcm_load()
 					{id = "line", type = "line"},
 
 					{id = "threshold_mcm", type = "track", val = 2, min=1.0,max=10.0,step=0.1, def = 3.5},
-					{id = "exposure_mcm", type = "track", val = 2, min=1.0,max=100.0,step=0.1, def = 3.0},
+					{id = "exposure_mcm", type = "track", val = 2, min=1.0,max=100.0,step=0.1, def = 1},
 
 					{id = "line", type = "line"},
 
-					{id = "blur_mcm", type = "track", val = 2, min=1.0,max=5.0,step=0.1, def = 3.0},
+					{id = "blur_mcm", type = "track", val = 2, min=1.0,max=5.0,step=0.1, def = 1.7},
 
 					{id = "line", type = "line"},
 
-					{id = "vibrance_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.5},
+					{id = "vibrance_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.35},
 					{id = "sky_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 0.6},
 
 					{id = "line", type = "line"},
 
-					{id = "lens_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.5},
-					{id = "dirt_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.0},
+					{id = "lens_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 1.2},
+					{id = "dirt_mcm", type = "track", val = 2, min=0.0,max=10.0,step=0.1, def = 0.8},
 
 				}
 			},
@@ -62,8 +62,8 @@ function on_mcm_load()
 
 					{id = "line", type = "line"},
 
-					{id = "sharpness_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0},
-					{id = "jitter_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0},
+					{id = "sharpness_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0.6},
+					{id = "jitter_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0.5},
 				}
 			},
 

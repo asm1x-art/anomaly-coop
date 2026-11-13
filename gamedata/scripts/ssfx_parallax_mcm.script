@@ -17,7 +17,7 @@ function on_mcm_load()
 
 			{id = "range_mcm", type = "track", val = 2, min=0.0,max=40.0,step=0.1, def = 12},
 			{id = "height_mcm", type = "track", val = 2, min=0.01,max=0.05,step=0.001, def = 0.035},
-			{id = "ao_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0.4},
+			{id = "ao_mcm", type = "track", val = 2, min=0.0,max=1.0,step=0.1, def = 0.5},
 
 		}
 	}
