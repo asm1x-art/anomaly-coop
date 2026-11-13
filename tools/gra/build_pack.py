@@ -95,6 +95,19 @@ MANTLING_SOUNDS = {f"sounds/ledge_grabbing/vaulting/{kind_}/{kind_}{n}.ogg": "[�
                    for n in range(1, count + 1)}
 
 
+# GRA's look: its shader block, in Mod Organizer's priority (the same in the profiles 12 GB, 6 GB and 4 GB "Средние"),
+# lowest first. A mod is added here only together with its files (one commit a mod)
+GFX_MODS = [
+    "[Частицы_в2 и 12] Enh_Shaders_Color_G 1.10",  # Enhanced Shaders and Color Grading: light, tonemapping, bloom
+]
+# left out of the look's mods
+GFX_SKIP_PREFIX = ("scripts/orig/",)  # Beef's NVG: the mod's untouched copies
+GFX_SKIP = {
+    "scripts/item_device.script.bak",
+    "scripts/raid_lamp_color_change.script",  # GRA's own, lying in its ScreenSpaceShaders folder: raid gameplay
+}
+
+
 # the packs: each puts its code into gamedata, listed in its own file list (another pack's files count as the repo's:
 # a file two packs have goes to tools\gra\merge), and its assets into <prefix>_*.db
 PACKS = {
@@ -108,6 +121,10 @@ PACKS = {
                  "skip": {"scripts/demonized_geometry_ray.script", "scripts/demonized_randomizing_functions.script",
                           "scripts/demonized_ledge_grabbing_animation_data_blender_script.py",  # Blender's, not the game's
                           "anims/camera_effects/climbing_in.anm"}},  # unused: a script moves the camera
+    # GRA's look (docs/coop/graphics.md): shaders, weathers and their scripts into gamedata, skies and the other textures
+    # and sounds into gra_gfx_*.db. The repo's own files the mods replace are merged by hand (tools/gra/merge)
+    "gfx": {"mods": GFX_MODS, "extra": {}, "files": "pack_files_gfx.txt", "prefix": "gra_gfx", "skip": GFX_SKIP,
+            "skip_prefix": GFX_SKIP_PREFIX},
 }
 PACK = PACKS["weapons"]  # the one at work, --pack
 
@@ -115,6 +132,7 @@ PACK = PACKS["weapons"]  # the one at work, --pack
 def skipped(rel):
     """files of the taken mods left out"""
     return (rel in PACK.get("skip", ())
+            or rel.startswith(PACK.get("skip_prefix", ("//",)))
             or rel.startswith("scripts/это что такое/")  # a stray copy of MRAA's scripts; the engine doesn't read subfolders
             or rel == "scripts/raid_auto_cmd_graphics_parametrs.script"  # GRA's: forces graphics settings every start
             or rel == "particles.xr"  # BaS's is the same as vanilla's
