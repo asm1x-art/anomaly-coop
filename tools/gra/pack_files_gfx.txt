@@ -208,7 +208,6 @@ shaders/r3/deffer_base_hud_bump_d-hq.ps
 shaders/r3/deffer_base_hud_bump_d.ps
 shaders/r3/deffer_base_hud_bump_db-hq.ps
 shaders/r3/deffer_base_hud_flat.ps
-shaders/r3/deffer_grass.ps
 shaders/r3/deffer_grass.vs
 shaders/r3/deffer_impl_flat.ps
 shaders/r3/deffer_model_hud_bump-hq.vs
@@ -278,7 +277,6 @@ shaders/r3/screenspace_dof.h
 shaders/r3/screenspace_fog.h
 shaders/r3/screenspace_hud_raindrops.h
 shaders/r3/screenspace_lut.h
-shaders/r3/screenspace_mvectors.h
 shaders/r3/screenspace_reflections.h
 shaders/r3/screenspace_shadows.h
 shaders/r3/screenspace_water.h

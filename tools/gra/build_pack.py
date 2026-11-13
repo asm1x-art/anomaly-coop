@@ -110,6 +110,12 @@ GFX_SKIP = {
     "scripts/item_device.script.bak",
     "scripts/raid_lamp_color_change.script",  # GRA's own, lying in its ScreenSpaceShaders folder: raid gameplay
 }
+GFX_EXTRA = {
+    # Beef's own script: GRA's copy of it plays the goggles' animation through FDDA Redone (lam2), a mod not taken
+    "scripts/z_beefs_nvgs.script": ("[ПНВ] Beefs_NVGs", "gamedata/scripts/orig/z_beefs_nvgs.script"),
+}
+# archives the mods bring ready made: copied next to the pack's own (the sounds of steps in the rain)
+GFX_ARCHIVES = [("[Шейдеры] ScreenSpaceShaders 23.5", "db/mods/ssfx_rain_footsteps.db0")]
 
 
 # the packs: each puts its code into gamedata, listed in its own file list (another pack's files count as the repo's:
@@ -127,8 +133,8 @@ PACKS = {
                           "anims/camera_effects/climbing_in.anm"}},  # unused: a script moves the camera
     # GRA's look (docs/coop/graphics.md): shaders, weathers and their scripts into gamedata, skies and the other textures
     # and sounds into gra_gfx_*.db. The repo's own files the mods replace are merged by hand (tools/gra/merge)
-    "gfx": {"mods": GFX_MODS, "extra": {}, "files": "pack_files_gfx.txt", "prefix": "gra_gfx", "skip": GFX_SKIP,
-            "skip_prefix": GFX_SKIP_PREFIX},
+    "gfx": {"mods": GFX_MODS, "extra": GFX_EXTRA, "files": "pack_files_gfx.txt", "prefix": "gra_gfx", "skip": GFX_SKIP,
+            "skip_prefix": GFX_SKIP_PREFIX, "archives": GFX_ARCHIVES},
 }
 PACK = PACKS["weapons"]  # the one at work, --pack
 
@@ -179,7 +185,11 @@ def manifest():
                 if not skipped(rel):
                     files[rel] = (mod, full)
     for rel, mod in PACK["extra"].items():
-        full = os.path.join(MO2, mod, "gamedata", *rel.split("/"))
+        if isinstance(mod, tuple):  # (mod, the file's path inside the mod): taken from another place than its own
+            mod, source = mod
+            full = os.path.join(MO2, mod, *source.split("/"))
+        else:
+            full = os.path.join(MO2, mod, "gamedata", *rel.split("/"))
         assert os.path.isfile(full), full
         files[rel] = (mod, full)
     return files
@@ -312,6 +322,9 @@ def cmd_assets(stage, out):
         subprocess.run([CONVERTER, "-pack", folder, "-out", db, "-xdb", "-xdb_ud", header], check=True,
                        stdout=subprocess.DEVNULL)
         shutil.rmtree(folder)
+    for mod, source in PACK.get("archives", ()):
+        shutil.copyfile(os.path.join(MO2, mod, *source.split("/")), os.path.join(out, os.path.basename(source)))
+        print("as it is:", os.path.basename(source), flush=True)
 
 
 if __name__ == "__main__":
