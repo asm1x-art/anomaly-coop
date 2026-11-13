@@ -6,7 +6,7 @@
 [preset]
 title    = 10-12 GB
 vram     = 10
-version  = 1
+version  = 2
 ; GRA as it is: every page at Atmospherics' default (GRA's own values are the same), GRA's render distances
 
 [mcm]
@@ -86,3 +86,10 @@ r__detail_radius         = 140
 r__geometry_lod          = 1.5
 rs_vis_distance          = 1.5
 r2_sun_quality           = st_opt_medium
+; --- anti-aliasing: SMAA (off / low / medium / high / ultra) costs next to nothing and works on any card; MSAA off
+; (it can't go with DLSS and takes video memory), the old blur of r2_aa off. DLSS (r__dlss_mode) is the player's
+; choice in the video options, not a preset's: with it on the engine leaves SMAA out by itself
+r2_smaa                  = ultra
+r3_msaa                  = st_opt_off
+r3_msaa_alphatest        = st_opt_off
+r2_aa                    = off
