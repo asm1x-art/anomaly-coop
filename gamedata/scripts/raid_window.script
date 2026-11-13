@@ -94,6 +94,14 @@ local function reinforce()
 	end
 end
 
+-- the Cooling's news: who writes it and what, by the Cooling's number: the same in every game and in the journal
+-- (the text's variants st_raid_cooling_text_1, _2, ...: coop_event_news.script)
+local function cooling_news(seq)
+	local senders = str_explode(ini_sys:r_string_ex(S, "senders") or "", ",")
+	local sender = game.translate_string(senders[coop_event_news.index(#senders, seq, 2)] or "")
+	return sender, game.translate_string(coop_event_news.text_id("st_raid_cooling_text", seq, 0))
+end
+
 -- a new cycle: the rescue's roll; the event, while the Scorcher works; the Monolith, once it is off
 local function new_cycle(t)
 	raid_rescue.new_cycle()
@@ -104,12 +112,12 @@ local function new_cycle(t)
 		return
 	end
 	shelter.set_state("cool_open", t)
-	shelter.set_state("cool_seq", (state_num("cool_seq") or 0) + 1)
+	local seq = (state_num("cool_seq") or 0) + 1
+	shelter.set_state("cool_seq", seq)
 	printf("raid_window: Cooling at world hour %s", t)
 	-- the server's journal: the news every game tells now (hear), with the window it opens
-	local senders = str_explode(ini_sys:r_string_ex(S, "senders") or "", ",")
-	local sender = game.translate_string(senders[math.random(math.max(1, #senders))] or "")
-	coop_news.publish("cooling", sender .. ": " .. game.translate_string("st_raid_cooling_text") .. " "
+	local sender, text = cooling_news(seq)
+	coop_news.publish("cooling", sender .. ": " .. text .. " "
 		.. string.format(game.translate_string("st_coop_news_cooling_window"), num("window_hours", 6)))
 end
 
@@ -134,7 +142,7 @@ local function clock()
 	local closes = opened and opened + num("window_hours", 6)
 	if closes and t >= closes and t < closes + 2 and state_num("cool_end_told") ~= seq then
 		shelter.set_state("cool_end_told", seq)
-		coop_news.publish("cooling_end", game.translate_string("st_coop_news_cooling_end"))
+		coop_news.publish("cooling_end", game.translate_string(coop_event_news.text_id("st_coop_news_cooling_end", seq, 1)))
 	end
 	local nxt = state_num("cool_next")
 	if not nxt then
@@ -166,11 +174,9 @@ local function hear()
 	end
 	save_var(db.actor, "raid_cool_heard", seq)
 	if open_now() and not off() then
-		local senders = str_explode(ini_sys:r_string_ex(S, "senders") or "", ",")
-		local sender = senders[math.random(math.max(1, #senders))] or ""
 		-- the sender in the text too: the HUD's caption is faint on a bright background
-		sender = game.translate_string(sender)
-		db.actor:give_game_news(game.translate_string("st_raid_cooling_title"), sender .. ": " .. game.translate_string("st_raid_cooling_text"),
+		local sender, text = cooling_news(seq)
+		db.actor:give_game_news(game.translate_string("st_raid_cooling_title"), sender .. ": " .. text,
 			"ui_inGame2_Radiopomehi", 0, 20000)
 		xr_sound.set_sound_play(AC_ID, "pda_tips")
 	end

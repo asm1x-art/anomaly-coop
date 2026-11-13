@@ -984,10 +984,10 @@ local function update(ev)
 end
 
 local function news_start(ev)
-	local key = "st_zev_ash_start_" .. ev.level
+	local key = coop_event_news.text_id("st_zev_ash_start_" .. ev.level, ev.from, 0)
 	local text = game.translate_string(key)
 	if text == key then
-		return tr("st_zev_ash_start", ZE.where(ev.level))
+		return tr(coop_event_news.text_id("st_zev_ash_start", ev.from, 0), ZE.where(ev.level))
 	end
 	return text
 end

@@ -73,7 +73,8 @@ local function actor_on_interaction(typ, obj, name)
 		going[kind] = true
 	end
 	if started_at and time_global() - started_at >= QUIET_MS then
-		publish(kind, game.translate_string(n[2]))
+		-- one of the text's variants (coop_event_news): only this game tells the journal, so the choice is its own
+		publish(kind, game.translate_string(coop_event_news.text_id(n[2], os.time())))
 	end
 end
 

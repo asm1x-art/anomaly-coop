@@ -4,19 +4,64 @@
 	<string id="st_coop_news_cooling_window">
 		<text>Окно для рейда - %s ч.</text>
 	</string>
-	<string id="st_coop_news_cooling_end">
-		<text>Охлаждение закончилось: Мозговыжигатель снова работает, окно для рейда закрыто.</text>
+	<string id="st_coop_news_cooling_end_1">
+		<text>Выжигатель снова жарит в полную силу: антенны на Радаре раскрутились, окно на Лиманск закрылось. Кто не успел — ждите следующего охлаждения.</text>
 	</string>
-	<string id="st_coop_news_surge">
-		<text>Приближается выброс - ищите укрытие!</text>
+	<string id="st_coop_news_cooling_end_2">
+		<text>Всё, мужики, лавочка закрыта: Радар опять гудит, пси-фон вернулся. Охлаждение кончилось, на Лиманск сейчас не пройти.</text>
 	</string>
-	<string id="st_coop_news_surge_end">
-		<text>Выброс закончился.</text>
+	<string id="st_coop_news_cooling_end_3">
+		<text>Охлаждение кончилось. Мозговыжигатель работает как раньше, окно для рейда закрыто — не суйтесь, мозги спечёт.</text>
 	</string>
-	<string id="st_coop_news_psi">
-		<text>Начинается пси-шторм - ищите укрытие!</text>
+	<string id="st_coop_news_cooling_end_4">
+		<text>Антенны на Радаре снова на полных оборотах. Окно для рейда закрыто до следующего охлаждения.</text>
 	</string>
-	<string id="st_coop_news_psi_end">
-		<text>Пси-шторм закончился.</text>
+	<string id="st_coop_news_surge_1">
+		<text>Мужики, выброс на подходе! Небо краснеет, земля гудит — все в укрытие, живо!</text>
+	</string>
+	<string id="st_coop_news_surge_2">
+		<text>Внимание всем: приближается выброс! Бросайте хабар и ищите крышу над головой, времени мало.</text>
+	</string>
+	<string id="st_coop_news_surge_3">
+		<text>Выброс идёт! Кто в поле — бегом под бетон, в подвал, куда угодно. Потом договорим.</text>
+	</string>
+	<string id="st_coop_news_surge_4">
+		<text>Зона сейчас рванёт: приближается выброс. Ищите укрытие, кто на открытом месте — не геройствуйте.</text>
+	</string>
+	<string id="st_coop_news_surge_end_1">
+		<text>Выброс закончился. Вылезаем, считаем живых.</text>
+	</string>
+	<string id="st_coop_news_surge_end_2">
+		<text>Отгремело: выброс прошёл. Можно выходить из укрытий.</text>
+	</string>
+	<string id="st_coop_news_surge_end_3">
+		<text>Всё, выброс кончился. Кто живой — отзовитесь. Самое время пройтись по аномалиям за свежим хабаром.</text>
+	</string>
+	<string id="st_coop_news_surge_end_4">
+		<text>Выброс прошёл, небо чистое. Выходите из укрытий.</text>
+	</string>
+	<string id="st_coop_news_psi_1">
+		<text>Пси-шторм начинается! Голова уже трещит — все в укрытие, под крышу!</text>
+	</string>
+	<string id="st_coop_news_psi_2">
+		<text>Внимание: идёт пси-шторм! Кто на открытом месте — прячьтесь, иначе мозги выжжет.</text>
+	</string>
+	<string id="st_coop_news_psi_3">
+		<text>Мужики, небо засверкало — пси-шторм. В укрытие, живо, и не высовывайтесь, пока не стихнет.</text>
+	</string>
+	<string id="st_coop_news_psi_4">
+		<text>Начинается пси-шторм, ищите укрытие! На улице сейчас делать нечего, кроме как сходить с ума.</text>
+	</string>
+	<string id="st_coop_news_psi_end_1">
+		<text>Пси-шторм закончился. Голова на месте — уже хорошо.</text>
+	</string>
+	<string id="st_coop_news_psi_end_2">
+		<text>Стихло: пси-шторм прошёл. Можно выходить из укрытий.</text>
+	</string>
+	<string id="st_coop_news_psi_end_3">
+		<text>Всё, пси-шторм кончился. Кто слышал голоса — это пройдёт. Наверное.</text>
+	</string>
+	<string id="st_coop_news_psi_end_4">
+		<text>Пси-шторм отгремел, небо успокоилось. Выходим.</text>
 	</string>
 </string_table>

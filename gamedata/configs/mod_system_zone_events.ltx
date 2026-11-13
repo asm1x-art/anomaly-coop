@@ -11,6 +11,14 @@ quiet_s             = 20        ; a game that has just loaded the world settles 
 end_news_real_hours = 2         ; a player who heard an event begin hears its end only this many real hours after it
 min_gap_real_hours  = 1         ; the director starts no world-state event sooner after the last one ended
 
+; The events' news as stalkers write them (coop_event_news.script): who may write an event's news,
+; <string id of the caption>:<community, for the icon>. One of them for an event, the same for every player. The
+; texts' variants are in the text files: <key>_1, <key>_2, ... (st_zone_events.xml, st_coop_news.xml, st_raid.xml):
+; a variant more is a string more, no number here. No senders: the event's title and the radio icon, as before.
+[coop_event_news]
+calm_senders        = st_evnews_who_1:stalker, st_evnews_who_2:stalker, st_evnews_who_3:stalker, st_evnews_who_4:csky, st_evnews_who_5:freedom, st_evnews_who_6:dolg
+ash_senders         = st_evnews_who_1:stalker, st_evnews_who_2:stalker, st_evnews_who_3:stalker, st_evnews_who_5:freedom, st_evnews_who_6:dolg, st_evnews_who_7:stalker
+
 ; prices while an event runs, by category: what an item's "kind" is (ammo also by its own kind of price)
 [zone_events_price_kinds]
 ammo                = ammo

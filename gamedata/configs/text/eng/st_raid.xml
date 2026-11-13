@@ -87,8 +87,17 @@
 	<string id="st_raid_too_late">
 		<text>Too dangerous. Too much time has passed, the safest stretch is over</text>
 	</string>
-	<string id="st_raid_cooling_text">
+	<string id="st_raid_cooling_text_1">
 		<text>"Guys, the Radar antennas have slowed down, the background has dropped! Whoever wanted to slip through to Limansk, move it before our brains boil again!"</text>
+	</string>
+	<string id="st_raid_cooling_text_2">
+		<text>"The Scorcher has gone quiet! The Radar antennas barely hum, the psi background has dropped. The road to Limansk is open: whoever meant to go, leave now, it won't last."</text>
+	</string>
+	<string id="st_raid_cooling_text_3">
+		<text>"Checked it myself: the radiation at the Radar has dropped, my head doesn't split. The installation is cooling. Whoever needs to get to Limansk, there won't be another window soon, move your feet."</text>
+	</string>
+	<string id="st_raid_cooling_text_4">
+		<text>"People, the Radar is cooling: the antennas have slowed down. You can slip through to Limansk before the Scorcher fires up again. Don't dawdle: you won't get your brains back."</text>
 	</string>
 	<string id="st_raid_cooling_sender_1">
 		<text>Grey, master</text>
