@@ -15,6 +15,8 @@
 // Used by FOG and IL. Keep it here for the moment...
 uniform float4 fakescope_params3;
 
+uniform float4 vignette_control; // Co-op: the engine's console command of the same name
+
 #ifdef SSFX_LUT_INUSE
 	#include "screenspace_lut.h"
 #endif
@@ -125,6 +127,21 @@ c2_out main( v2p_aa_AA I )
 	img = ssfx_lut_pp(img);
 #endif
 // ----------------------------------------------
+
+	// Co-op: the engine's vignette_control (x darkens the corners, y the centre, z brings the dark edge inward), as in
+	// the shader Screen Space Shaders' one replaced
+	{
+		float2 mid_tc = I.Tex0.xy - 0.5;
+		float num = sqrt(dot(mid_tc, mid_tc)) * 2;
+		float edge_radius = sqrt(2.0) * (1.0 - saturate(vignette_control.z));
+		if (num > edge_radius)
+			num = 1.0;
+		else if (edge_radius == 0)
+			num = 0.0;
+		else
+			num = num / edge_radius;
+		img *= lerp(1.0 - vignette_control.y, 1.0 - vignette_control.x, saturate(num));
+	}
 		
 #ifdef 	USE_DISTORT
  	float3	blurred	= bloom*def_hdr	;
