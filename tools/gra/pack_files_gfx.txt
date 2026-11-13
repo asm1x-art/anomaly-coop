@@ -223,6 +223,7 @@ shaders/r3/deffer_tree_branch_aref_bump-hq.ps
 shaders/r3/deffer_tree_branch_aref_bump_db-hq.ps
 shaders/r3/deffer_tree_branch_aref_flat.ps
 shaders/r3/deffer_tree_bump-hq.vs
+shaders/r3/depth_of_field.ps
 shaders/r3/details_blend.s
 shaders/r3/dx11/tess.ds
 shaders/r3/dx11/tess.hs

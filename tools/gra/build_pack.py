@@ -147,8 +147,9 @@ def skipped(rel):
             or rel == "scripts/raid_auto_cmd_graphics_parametrs.script"  # GRA's: forces graphics settings every start
             or rel == "particles.xr"  # BaS's is the same as vanilla's
             or os.path.basename(rel).startswith("не нужно")  # GRA's way of turning a file off ("not needed")
-            or rel in INSPECT_DOF  # Inspect Weapons' depth of field is ScreenSpaceShaders' (not here); inspecting works
-            or rel in IWP_FDDA)  # I.W.P.'s add-on to FDDA (not here): its exo hands stay
+            # the weapons pack only (the look's pack brings ScreenSpaceShaders' own depth_of_field.ps):
+            or (PACK["prefix"] == "gra" and rel in INSPECT_DOF)  # Inspect Weapons' depth of field is ScreenSpaceShaders'; inspecting works
+            or (PACK["prefix"] == "gra" and rel in IWP_FDDA))  # I.W.P.'s add-on to FDDA (not here): its exo hands stay
 
 
 # Inspect Weapons' blur behind the weapon: built on ScreenSpaceShaders' headers, which this project hasn't
