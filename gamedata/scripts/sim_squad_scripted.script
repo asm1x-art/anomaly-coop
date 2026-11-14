@@ -12,6 +12,15 @@ local STAY_POINT_IDLE_MAX = 8*60*60
 dbg_map_hud = false
 local excl_dist = ui_options.get("alife/general/excl_dist")
 
+-- co-op: the option is the server's (coop_world_options.script), which comes after this file loads and may change
+local function read_excl_dist()
+	excl_dist = ui_options.get("alife/general/excl_dist")
+end
+function on_game_start()
+	RegisterScriptCallback("on_game_load", read_excl_dist)
+	RegisterScriptCallback("on_option_change", read_excl_dist)
+end
+
 -- setup location types
 local location_types = {}
 do -- to localize below

@@ -53,6 +53,31 @@ export const DEFAULT_SETTINGS = {
     scorcher: true, // the way to the Brain Scorcher (shelter_scorcher.script)
     shelter_group_only: true, // the shelter's entrance opens for a group only (shelter_entrance.script)
     psi_immunity: true, // Monolith and Sin are immune to psi (coop_psi.script)
+    // The Zone: Anomaly's own options of the world (its options menu, alife/event, alife/general, gameplay/general),
+    // one value for the whole world; a game in co-op reads them from here and hides them in its options menu
+    // (coop_world_options.script). The defaults are Anomaly's own. A choice is its number in RULE_CHOICES (from 1).
+    surge: true, // surges (alife/event/emission_state)
+    surge_hours: 24, // game hours: the next surge comes in half of it to all of it
+    surge_fate: 2, // what a surge does to NPCs out of cover
+    surge_warning: 1, // how a surge is warned of
+    surge_task: true, // the «hide» task
+    psi_storm: true,
+    psi_hours: 24,
+    psi_fate: 1,
+    psi_siren: true, // the siren before a psi storm
+    psi_task: true,
+    stalker_pop: 50, // % of stalker squads the smarts keep (alife/general/alife_stalker_pop)
+    mutant_pop: 75, // % of mutant squads
+    offline_combat: 1,
+    excl_dist: 75, // m: an offline squad this close to a player doesn't come online in front of him; 0: off
+    dynamic_relations: false, // the factions' goodwill moves with what their members do
+    war_goodwill_reset: false, // goodwill toward a faction at war resets
+    heli_spawn: false, // smarts spawn helicopters
+    hardcore_ai_aim: false, // NPCs aim faster and better (gameplay/general/hardcore_ai_aim)
+    npc_loot_distance: 5, // m: NPCs loot bodies this far; 0: they don't
+    corpse_max_count: 5, // bodies a level keeps before the far ones go (coop_cleanup.script)
+    corpse_min_dist: 75, // m: no body goes this close to any player
+    release_dropped_items: true, // a dropped thing nobody took goes after 4 game hours (off: after 12)
   },
 };
 
@@ -71,6 +96,26 @@ export const RULE_LIMITS = {
   tool_group_share: [0, 100],
   rank_loss: [0, 100],
   travel_enemy_radius: [0, 500],
+  surge_hours: [6, 168],
+  surge_fate: [1, 4],
+  surge_warning: [1, 4],
+  psi_hours: [6, 168],
+  psi_fate: [1, 3],
+  stalker_pop: [25, 100],
+  mutant_pop: [25, 100],
+  offline_combat: [1, 3],
+  excl_dist: [0, 100],
+  npc_loot_distance: [0, 25],
+  corpse_max_count: [5, 30],
+  corpse_min_dist: [75, 200],
+};
+
+// rules that are a choice: their values' names, the first is 1 (the game's own values in coop_world_options.script)
+export const RULE_CHOICES = {
+  surge_fate: ['гибнут в конце', 'гибнут на волне', 'становятся зомби', 'их разрывает'],
+  surge_warning: ['сирена и радио', 'сирена', 'радио', 'без предупреждения'],
+  psi_fate: ['гибнут от вихря', 'становятся зомби', 'не страдают'],
+  offline_combat: ['везде', 'только в смартах', 'нет'],
 };
 
 const clampInt = (value, min, max, fallback) =>

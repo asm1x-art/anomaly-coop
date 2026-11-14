@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="windows-1251"?>
 
 <string_table>
+	<string id="ui_mm_coop_server_owned">
+		<text>In co-op, surges and psi storms are the same for the whole world: the server sets them (the admin window, "Zone").</text>
+	</string>
 	<string id="ui_mm_menu_coop">
 		<text>Co-op</text>
 	</string>

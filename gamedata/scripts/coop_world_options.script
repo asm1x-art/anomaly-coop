@@ -1,0 +1,218 @@
+-- Co-op: Anomaly's own options of the world are the server's. Surges and psi storms (on, how often, what they do to
+-- NPCs, the warning, the task), the population, offline combat, NPCs' aim and looting, the bodies' and dropped
+-- things' cleanup used to be each player's own (his options menu, axr_options.ltx): one player had surges and the
+-- other none, the NPCs' fate in a surge and the population were the level's authority's... Now they are the rules
+-- "the Zone" of coop-server/src/settings.js (the admin page, the bot's /set, the in-game admin window's "Zone"):
+-- while connected, ui_options.get gives the server's value for them, and the options menu hides them.
+-- Dynamic anomalies stay off in co-op (coop_sync.script): the option says so.
+-- A Zone's surge or psi storm turning NPCs into zombies makes the zombies for everyone (they were the level
+-- authority's own objects: the others only saw the NPCs vanish).
+
+local function in_coop()
+	return coop and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] world options: " .. fmt, ...)
+	end
+end
+
+-- a choice rule's number (from 1) -> Anomaly's value
+local CHOICES = {
+	surge_fate = { "kill_at_end", "kill_at_wave", "turn_to_zombie", "explode" },
+	surge_warning = { "siren_radio", "siren", "radio", "no_warning" },
+	psi_fate = { "kill_at_vortex", "turn_to_zombie", "unhurt" },
+	offline_combat = { "full", "on_smarts_only", "off" },
+}
+
+-- the defaults are Anomaly's own, as the server's (for a server that doesn't send a rule yet)
+local function flag(key, default)
+	return function() return coop_rules.flag(key, default) end
+end
+local function number(key, default)
+	return function() return coop_rules.number(key, default) end
+end
+local function part(key, default) -- % -> 0..1
+	return function() return coop_rules.number(key, default) / 100 end
+end
+local function choice(key, default)
+	return function()
+		local list = CHOICES[key]
+		return list[coop_rules.number(key, default)] or list[default]
+	end
+end
+
+-- Anomaly's option -> the server's value
+local OPTIONS = {
+	["alife/event/emission_state"] = flag("surge", true),
+	["alife/event/emission_frequency"] = number("surge_hours", 24),
+	["alife/event/emission_fate"] = choice("surge_fate", 2),
+	["alife/event/emission_warning"] = choice("surge_warning", 1),
+	["alife/event/emission_task"] = flag("surge_task", true),
+	["alife/event/psi_storm_state"] = flag("psi_storm", true),
+	["alife/event/psi_storm_frequency"] = number("psi_hours", 24),
+	["alife/event/psi_storm_fate"] = choice("psi_fate", 1),
+	["alife/event/psi_storm_warning"] = function() return coop_rules.flag("psi_siren", true) and "siren" or "no_warning" end,
+	["alife/event/psi_storm_task"] = flag("psi_task", true),
+	["alife/general/alife_stalker_pop"] = part("stalker_pop", 50),
+	["alife/general/alife_mutant_pop"] = part("mutant_pop", 75),
+	["alife/general/offline_combat"] = choice("offline_combat", 1),
+	["alife/general/excl_dist"] = number("excl_dist", 75),
+	["alife/general/dynamic_anomalies"] = function() return false end,
+	["alife/general/dynamic_relations"] = flag("dynamic_relations", false),
+	["alife/general/war_goodwill_reset"] = flag("war_goodwill_reset", false),
+	["alife/general/heli_spawn"] = flag("heli_spawn", false),
+	["gameplay/general/hardcore_ai_aim"] = flag("hardcore_ai_aim", false),
+	["gameplay/general/npc_loot_distance"] = number("npc_loot_distance", 5),
+	["gameplay/general/corpse_max_count"] = number("corpse_max_count", 5),
+	["gameplay/general/corpse_min_dist"] = number("corpse_min_dist", 75),
+	["gameplay/general/release_dropped_items"] = flag("release_dropped_items", true),
+}
+
+-- the server's value of an option of the world, nil for any other or out of co-op
+function get(path)
+	local f = in_coop() and OPTIONS[path]
+	if f then
+		return f()
+	end
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- The options menu: the options of the world are hidden while connected; a page of them only (alife/event) says
+-- the server sets it
+
+local function shown()
+	return not in_coop()
+end
+
+local function find(list, id)
+	for _, t in ipairs(list or {}) do
+		if t.id == id then
+			return t
+		end
+	end
+end
+
+local patched -- the options table patch_menu last did (init_opt_base makes a new one)
+
+local function patch_menu()
+	local options = ui_options.options
+	if not options or #options == 0 or options == patched then
+		return
+	end
+	patched = options
+	for path in pairs(OPTIONS) do
+		local a, b, c = string.match(path, "^([^/]+)/([^/]+)/([^/]+)$")
+		local page = find(find(options, a) and find(options, a).gr, b)
+		local row = page and find(page.gr, c)
+		if not page then
+			printf("! [coop] options menu: no page %s/%s", a, b)
+		elseif path:find("^alife/event/") then
+			page.precondition = { shown }
+			page.output = "ui_mm_coop_server_owned"
+		elseif row then
+			local own = row.precondition
+			row.precondition = own and { function(...) return shown() and ui_options.exec(unpack(own)) end } or { shown }
+		end
+	end
+end
+
+-------------------------------------------------------------------------------------------------------------------
+-- What the server says, logged; a change while in the world tells the scripts that keep an option (as the options
+-- menu's Apply does)
+
+local said = nil
+
+local function values()
+	local keys = {}
+	for path in pairs(OPTIONS) do
+		keys[#keys + 1] = path
+	end
+	table.sort(keys)
+	local parts = {}
+	for _, path in ipairs(keys) do
+		parts[#parts + 1] = string.match(path, "[^/]+$") .. "=" .. tostring(OPTIONS[path]())
+	end
+	return table.concat(parts, " ")
+end
+
+-- NPCs' aim is console values (bind_stalker_ext.actor_on_net_spawn sets them as the level loads)
+local function apply_aim()
+	local hard = OPTIONS["gameplay/general/hardcore_ai_aim"]()
+	exec_console_cmd(hard and "ai_aim_max_angle 20.0" or "ai_aim_max_angle 0.7854")
+	exec_console_cmd(hard and "ai_aim_min_angle 17.0" or "ai_aim_min_angle 0.19635")
+	exec_console_cmd(hard and "ai_aim_min_speed 2.00" or "ai_aim_min_speed 0.24")
+	exec_console_cmd(hard and "ai_aim_predict_time 0.28" or "ai_aim_predict_time 0.40")
+end
+
+local next_look = 0
+
+local function look()
+	if time_global() < next_look or not in_coop() then
+		return
+	end
+	next_look = time_global() + 2000
+	local now = values()
+	if now == said then
+		return
+	end
+	local first = said == nil
+	local aim_was = said and string.match(said, "hardcore_ai_aim=(%a+)")
+	said = now
+	printf("[coop] the Zone's options from the server: %s", now)
+	if not first then
+		SendScriptCallback("on_option_change")
+		if aim_was ~= string.match(now, "hardcore_ai_aim=(%a+)") then
+			apply_aim()
+		end
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local get_option = ui_options.get
+	ui_options.get = function(path, ...)
+		local v = get(path)
+		if v ~= nil then
+			return v
+		end
+		return get_option(path, ...)
+	end
+
+	local init = ui_options.init_opt_base
+	ui_options.init_opt_base = function(...)
+		local res = init(...)
+		patch_menu()
+		return res
+	end
+	patch_menu()
+
+	-- the zombies of a surge or psi storm (both go through the surge manager's) are everyone's
+	local class = surge_manager.CSurgeManager
+	local to_zombie = class and class.turn_to_zombie
+	if type(to_zombie) == "function" then
+		class.turn_to_zombie = function(self, ...)
+			if not in_coop() then
+				return to_zombie(self, ...)
+			end
+			coop.begin_shared()
+			local ok, err = pcall(to_zombie, self, ...)
+			coop.end_shared()
+			if not ok then
+				error(err, 0)
+			end
+			dbg("an NPC turned into a zombie, shared")
+		end
+	else
+		printf("! [coop] surge_manager.CSurgeManager.turn_to_zombie not found: zombies stay the authority's own")
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		said = nil
+		next_look = 0
+	end)
+	RegisterScriptCallback("actor_on_update", look)
+end

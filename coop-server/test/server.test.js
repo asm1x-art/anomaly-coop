@@ -533,6 +533,19 @@ test('the admin window: the admin password, then the admin page commands; the st
     assert.match(text(await until(a, M.ADMIN_RESULT)), /3$/);
     assert.equal(server.coop.settings().rules.group_max, 3);
     assert.match(text(await until(a, M.ADMIN_STATE)), /setting\trules\tgroup_max\t3/);
+    // a Zone's choice: its values' names in the state, set by name or number, every game told at once
+    assert.deepEqual(state.find((l) => l[2] === 'surge_fate'), ['setting', 'rules', 'surge_fate', '2', '1', '4',
+      'Выброс: NPC вне укрытия', 'гибнут в конце|гибнут на волне|становятся зомби|их разрывает']);
+    assert.equal(state.find((l) => l[2] === 'surge')[4], '');
+    a.send(M.ADMIN_COMMAND, line('set\tsurge_fate\tстановятся зомби'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /: становятся зомби \(3\)$/);
+    for (let i = 0; i < 100 && !/^surge_fate=3$/m.test(b.settings.at(-1)); i++) await new Promise((r) => setTimeout(r, 10));
+    assert.match(b.settings.at(-1), /^surge_fate=3$/m);
+    await until(a, M.ADMIN_STATE);
+    a.send(M.ADMIN_COMMAND, line('set\tsurge_fate\t9'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /от 1 до 4: 1 — гибнут в конце/);
+    assert.equal(server.coop.settings().rules.surge_fate, 3);
+    await until(a, M.ADMIN_STATE);
     a.send(M.ADMIN_COMMAND, line('faction\tmonolith\toff'));
     assert.match(text(await until(a, M.ADMIN_RESULT)), /Монолит: нет/);
     assert.ok(!server.coop.settings().factions.includes('monolith'));

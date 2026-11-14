@@ -1,4 +1,4 @@
-import { FACTIONS, DEFAULT_SETTINGS, RULE_LIMITS } from './settings.js';
+import { FACTIONS, DEFAULT_SETTINGS, RULE_LIMITS, RULE_CHOICES } from './settings.js';
 
 // What an admin may change, and how, for the Telegram bot (telegram.js) and the in-game admin window (server.js
 // ADMIN_*): Russian titles and answers.
@@ -20,10 +20,24 @@ export const RULE_TITLES = {
   help_rewards_all: 'Награда за «Помочь с:» — всем',
   offline_sim: 'Оффлайн-симуляция (мир живёт без игроков)', cleaner: 'Уборщик тел и мусора', bar_events: 'События бара',
   scorcher: 'Выжигатель мозгов', shelter_group_only: 'Вход в убежище только группой', psi_immunity: 'Пси-иммунитет Монолита и Греха',
+  surge: 'Выбросы', surge_hours: 'Выброс не реже, чем раз в, игровых ч', surge_fate: 'Выброс: NPC вне укрытия',
+  surge_warning: 'Выброс: предупреждение', surge_task: 'Выброс: задание «укрыться»',
+  psi_storm: 'Пси-штормы', psi_hours: 'Пси-шторм не реже, чем раз в, игровых ч', psi_fate: 'Пси-шторм: NPC у вихря',
+  psi_siren: 'Пси-шторм: сирена', psi_task: 'Пси-шторм: задание «укрыться»',
+  stalker_pop: 'Население: сталкеры, %', mutant_pop: 'Население: мутанты, %', offline_combat: 'Офлайн-бой отрядов',
+  excl_dist: 'Отряд не появляется ближе к игроку, м', dynamic_relations: 'Динамические отношения фракций',
+  war_goodwill_reset: 'Сброс отношений при войне', heli_spawn: 'Вертолёты из смартов',
+  hardcore_ai_aim: 'Меткие NPC (hardcore AI aim)', npc_loot_distance: 'NPC обыскивают трупы в пределах, м',
+  corpse_max_count: 'Трупов на локации до уборки дальних', corpse_min_dist: 'Труп не убирается ближе к игроку, м',
+  release_dropped_items: 'Брошенные вещи убираются через 4 ч (выкл. — 12 ч)',
 };
-// a rule the bot has no title for still shows, under its key
+// a rule the bot has no title for still shows, under its key; a choice also has its values' names (from 1)
 export const RULES = Object.entries(DEFAULT_SETTINGS.rules).map(([key, value]) =>
-  (typeof value === 'boolean' ? [key, RULE_TITLES[key] ?? key] : [key, RULE_TITLES[key] ?? key, ...RULE_LIMITS[key]]));
+  (typeof value === 'boolean' ? [key, RULE_TITLES[key] ?? key]
+    : [key, RULE_TITLES[key] ?? key, ...RULE_LIMITS[key], ...(RULE_CHOICES[key] ? [RULE_CHOICES[key]] : [])]));
+// a setting's value as the admins read it
+export const shownValue = ([, , min, , choices], value) =>
+  (min === undefined ? yesNo(value) : choices ? `${choices[value - 1] ?? value} (${value})` : String(value));
 export const FACTION_NAMES = {
   stalker: 'Одиночки', dolg: 'Долг', freedom: 'Свобода', csky: 'Чистое Небо', ecolog: 'Учёные', killer: 'Наёмники',
   army: 'Военные', bandit: 'Бандиты', monolith: 'Монолит', renegade: 'Ренегаты', greh: 'Грех', isg: 'ИСГ',
@@ -46,20 +60,24 @@ export function setSetting(coop, key = '', value = '') {
   const world = WORLD.find(([k]) => k === key);
   const entry = world ?? RULES.find(([k]) => k === key);
   if (!entry) return `Нет такой настройки${key ? `: ${key}` : ''}. Ключи: ${[...WORLD, ...RULES].map(([k]) => k).join(', ')}`;
-  const [, title, min, max] = entry;
+  const [, title, min, max, choices] = entry;
   let parsed;
   if (min === undefined) {
     parsed = YES.includes(value.toLowerCase()) ? true : NO.includes(value.toLowerCase()) ? false : undefined;
     if (parsed === undefined) return `${key}: нужно «да» или «нет» (1 или 0).`;
   } else {
-    parsed = Number(value);
-    if (!/^-?\d+$/.test(value) || parsed < min || parsed > max) return `${key}: нужно целое от ${min} до ${max}.`;
+    // a choice by its number or by its name
+    const named = choices ? choices.findIndex((c) => c === value.toLowerCase()) + 1 : 0;
+    parsed = named || Number(value);
+    if (!(named || /^-?\d+$/.test(value)) || parsed < min || parsed > max) {
+      return choices ? `${key}: нужно число от ${min} до ${max}: ${choices.map((c, i) => `${i + 1} — ${c}`).join(', ')}.`
+        : `${key}: нужно целое от ${min} до ${max}.`;
+    }
   }
   const s = coop.settings();
   const group = world ? 'world' : 'rules';
   coop.saveSettings({ ...s, [group]: { ...s[group], [key]: parsed } });
-  const now = coop.settings()[group][key];
-  return `${title}: ${typeof now === 'boolean' ? yesNo(now) : now}`;
+  return `${title}: ${shownValue(entry, coop.settings()[group][key])}`;
 }
 
 // a faction allowed for new characters or not (value: on/off, да/нет...); null when it was done, else what was wrong
