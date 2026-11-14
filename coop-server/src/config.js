@@ -19,7 +19,7 @@ export const CONFIG_FILE = 'server.cfg';
 const DEFAULTS = {
   server: { port: 7777, admin_port: 8080, admin_password: '', data_dir: 'data', max_players: 4, builds_file: '',
     allow_dev: false, allow_tests: false, crash_max_mb: 64, news_keep: 50, news_types: DEFAULT_NEWS_TYPES.join(','),
-    language: 'rus' },
+    language: 'rus', idle_timeout: 300 },
   host: { game_dir: '', exe: 'bin\\AnomalyDX11.exe', args: '', autosave_minutes: 5, pause_when_empty: true },
   telegram: { token: '', admins: [] },
 };
@@ -32,6 +32,7 @@ const LIMITS = {
   autosave_minutes: [0, 24 * 60], // 0: no autosaves
   crash_max_mb: [0, 1024], // 0: no crash reports from the launchers
   news_keep: [0, 1000], // 0: no news journal
+  idle_timeout: [0, 24 * 3600], // 0: silent connections are never dropped
 };
 
 const ENV = { COOP_PORT: ['server', 'port'], COOP_HTTP_PORT: ['server', 'admin_port'], COOP_ADMIN_PASSWORD: ['server', 'admin_password'],
@@ -59,6 +60,7 @@ crash_max_mb = 64      # отчёты о вылетах и баги от лау�
 news_keep = 50         # журнал важных новостей мира для лаунчеров (data/news.json): сколько последних хранить; 0 — не вести
 news_types = ${DEFAULT_NEWS_TYPES.join(',')}  # какие новости важные (присылает хост или мастер симуляции)
 language = rus         # язык мира: rus или eng; на нём хост пишет новости и ответы админам
+idle_timeout = 300     # сколько секунд игра может молчать (уровень грузится молча), пока сервер не сочтёт связь мёртвой и не освободит место; 0 — не отключать
 
 [host]
 game_dir =             # папка игры для хоста; пусто — без хоста (мир держит игрок, как раньше)
