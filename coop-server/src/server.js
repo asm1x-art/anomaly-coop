@@ -19,10 +19,12 @@ const PUBLIC_NEWS = 30; // the newest news in the public status
 // no player is in it, as the rule offline_sim says (off: it stands). allowTests: a test server, whose admins have
 // the test modes and cheats for themselves (server.cfg allow_tests). adminPassword: the admin page's,
 // for the in-game admin window too (null: the one made up in data/admin.json). builds: { file, allowDev } for
-// builds.js; none lets every build in
+// builds.js; none lets every build in. idleTimeoutMs: a connection nothing came from for that long is dead and is
+// dropped (server.cfg idle_timeout; 0: never): a game that lost its way here without a word (its packets lost, its PC
+// gone) would hold its place until the system gave up resending, a quarter of an hour
 export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', log = console.log, hostSecret = null,
   journalOverlapMs = 60000, autosaveMinutes = null, pauseWhenEmpty = false, adminPassword = null, builds = {},
-  news: newsConfig = {}, adminLockMs = 5 * 60000, allowTests = false, language = 'rus' } = {}) {
+  news: newsConfig = {}, adminLockMs = 5 * 60000, allowTests = false, language = 'rus', idleTimeoutMs = 0 } = {}) {
   const storage = openStorage(dataDir);
   // the world's important news, for the launchers (news.js)
   const news = createNews({ load: () => storage.loadNews(), save: (list) => storage.saveNews(list),
@@ -430,6 +432,18 @@ tests=1` : ''));
     clock.persist();
     announceTime();
   }, TIME_TICK_MS).unref();
+  // every connection, said HELLO or not: { id, heard, drop }, for the idle check
+  const links = new Set();
+  const idleCheck = idleTimeoutMs > 0 && setInterval(() => {
+    const now = Date.now();
+    for (const link of links) {
+      if (now - link.heard < idleTimeoutMs) continue;
+      const c = clients.get(link.id);
+      log(`[${link.id}] ${c ? `'${c.name}'` : 'a connection that never said hello'}: nothing from it for `
+        + `${Math.round((now - link.heard) / 1000)} s, ${link.pending()} bytes not taken: dropped as dead`);
+      link.drop();
+    }
+  }, Math.max(20, Math.min(5000, idleTimeoutMs / 4))).unref();
   const rollback = (revision, how) => {
     const now = storage.rollback(revision);
     if (!now) return 0;
@@ -721,6 +735,12 @@ tests=1` : ''));
     };
     let client = null; // set after HELLO
     let upload = null; // { files: Buffer[] } while this client sends the world
+    // drop: off the server now, the others told at once (a dead connection's 'close' may be long in coming)
+    const link = { id, heard: Date.now(), pending: () => socket.writableLength, drop: () => {
+      gone();
+      socket.destroy();
+    } };
+    links.add(link);
 
     const handle = (type, payload) => {
       if (!client && type !== M.HELLO) {
@@ -753,12 +773,19 @@ tests=1` : ''));
             log(`[${id}] '${name}' says it is the host: ${hostId !== null ? 'there is one' : 'wrong secret'}, turned away`);
             return refuse(REFUSED.HOST, 0);
           }
+          // the same player from the same address again: the session they had is stale (their game lost it, or was
+          // started twice) and goes, so it holds no place against them and no second character walks the world
+          if (!isHost) for (const [oldId, old] of players()) {
+            if (old.name !== name || old.socket.remoteAddress !== socket.remoteAddress) continue;
+            log(`[${oldId}] '${name}' comes in again from ${addr}: the session they had is dropped`);
+            old.drop();
+          }
           const max = storage.settings().rules.max_players;
           if (!isHost && players().length >= max) {
             log(`[${id}] '${name}' turned away: ${players().length} of ${max} online`);
             return refuse(REFUSED.FULL, max);
           }
-          client = { send, name, state: null, host: isHost, socket, since: Date.now() };
+          client = { send, name, state: null, host: isHost, socket, since: Date.now(), drop: link.drop };
           clients.set(id, client);
           names.set(id, name);
           storage.saveClientNames(names);
@@ -1155,6 +1182,7 @@ tests=1` : ''));
     const decode = createDecoder(handle);
     socket.on('data', (chunk) => {
       traffic.in += chunk.length;
+      link.heard = Date.now();
       try {
         decode(chunk);
       } catch (e) {
@@ -1163,7 +1191,10 @@ tests=1` : ''));
       }
     });
     socket.on('error', () => {}); // 'close' follows and reports
-    socket.on('close', () => {
+    socket.on('close', () => gone());
+    // the connection is over: once, from 'close' or at once from drop()
+    function gone() {
+      links.delete(link);
       if (!clients.has(id)) return;
       clients.delete(id);
       if (!client.host && client.inWorld) leaving(client);
@@ -1190,7 +1221,7 @@ tests=1` : ''));
       else if (vote?.waiting.delete(id) && !vote.waiting.size) endVote(ROLLBACK.ACCEPTED);
       if (!players().length && pausedBy) setPaused(''); // nobody left to let it go on
       updateEmptyPause();
-    });
+    }
   });
 
   let hostProcess = null; // host.js, when this server starts the host itself
@@ -1311,7 +1342,10 @@ tests=1` : ''));
     restartHost: () => hostProcess?.restart() ?? false,
   };
 
-  server.on('close', () => clearInterval(tick));
+  server.on('close', () => {
+    clearInterval(tick);
+    clearInterval(idleCheck);
+  });
 
   return new Promise((resolve) => {
     server.listen(port, host, () => {
