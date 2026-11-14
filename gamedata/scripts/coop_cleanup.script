@@ -5,7 +5,8 @@
 -- kept from the game's own cleanup (release_body_manager and the rest, which go through safe_release_manager or
 -- alife_release) for protect_hours of the world's time. The kept ids and until when are a fact on the server
 -- ("coop_keep"), so every game knows them.
--- Cleaning: the host, every clean_interval_s, releases bodies with nothing worth taking (no things, or junk only:
+-- Cleaning: the sim master (the host; with no host, the player's game that runs the world), every clean_interval_s,
+-- releases bodies with nothing worth taking (no things, or junk only:
 -- cheaper than junk_price, a section matching junk_sections, worn below junk_condition) that are not kept, not
 -- a story's, not on a level with a player (nor near one), beyond keep_bodies_per_level on their level, at most max_per_pass per level each time.
 -- The game's own cleanup, in co-op: every game ran it for itself, and its releases reach everyone, so one player
@@ -182,9 +183,23 @@ local function protect_near(sender, payload)
 end
 
 ----------------------------------------------------------------------------------------------------
--- The host's cleaner
+-- The sim master's cleaner: the host's, or with no host the game of the player who runs the world (only on levels
+-- with no player on them, its own included)
 
 local next_clean = 0
+
+-- a player stands on the level: one of the others, or we (a player's game)
+local function level_has_player(lname)
+	if db.actor and not coop.is_host() and level.name() == lname then
+		return true
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lname then
+			return true
+		end
+	end
+	return false
+end
 
 local function near_player(se, lname, distance)
 	for _, p in ipairs(coop.peers()) do
@@ -211,8 +226,8 @@ local function clean()
 	local keep_n, max_n, distance = num("keep_bodies_per_level", 5), num("max_per_pass", 10), num("min_player_distance", 200)
 	local released = 0
 	for lname, l in pairs(per_level) do
-		-- a level with a player on it is theirs (its authority's), not the host's
-		local n = coop.is_authority(lname) and math.min(#l.junk, l.count - keep_n, max_n) or 0
+		-- a level with a player on it is theirs (its authority's), not the cleaner's
+		local n = not level_has_player(lname) and coop.is_authority(lname) and math.min(#l.junk, l.count - keep_n, max_n) or 0
 		for i = 1, #l.junk do
 			if n <= 0 then
 				break
@@ -368,7 +383,7 @@ local function update()
 		next_dropped = time_global() + num("dropped_check_s", 60) * 1000
 		release_dropped()
 	end
-	if not (coop.is_host() and coop.is_sim_master()) then
+	if not coop.is_sim_master() then
 		return
 	end
 	local now = time_global()

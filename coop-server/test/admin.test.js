@@ -86,6 +86,17 @@ test('the Zone: Anomaly\'s own defaults, kept in range, sent to the games as num
   assert.match(setSetting(coop, 'offline_combat', 'никогда'), /^offline_combat: нужно число от 1 до 3: 1 — везде/);
   assert.equal(saved.rules.offline_combat, 3);
   assert.equal(setSetting(coop, 'surge', 'нет'), 'Выбросы: нет');
+  // disguise and silent kills: Anomaly's defaults too, the factors in %
+  assert.deepEqual([r.sk_enabled, r.sk_fresh_time, r.disguise, r.disguise_outfit_pct, r.disguise_distance_factor,
+    r.disguise_stay_time_factor], [false, 300, true, 100, 5, 20]);
+  assert.equal(normalizeSettings({ rules: { disguise_outfit_pct: 500 } }).rules.disguise_outfit_pct, 200);
+  assert.equal(setSetting(coop, 'disguise_helmet_pct', '150'), 'Маскировка: шлем, %: 150');
+});
+
+test('the admin page has a field for every rule of the Zone, disguise and silent kills', () => {
+  const page = fs.readFileSync(new URL('../src/admin.html', import.meta.url), 'utf8');
+  const keys = Object.keys(DEFAULT_SETTINGS.rules);
+  for (const key of keys.slice(keys.indexOf('surge'))) assert.match(page, new RegExp(`\\['${key}', `), key);
 });
 
 test('admin: password required, settings saved and kept, players listed', async () => {

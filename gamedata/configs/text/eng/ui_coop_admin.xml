@@ -1085,4 +1085,19 @@
 	<string id="st_coop_adm_h_release_dropped_items">
 		<text>A dropped thing nobody took is released by the world's master (the host) after 4 game hours (off: 12), and only on a level with no player on it.</text>
 	</string>
+	<string id="st_coop_adm_sec_disguise">
+		<text>Disguise</text>
+	</string>
+	<string id="st_coop_adm_sec_silent">
+		<text>Silent kills</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_on">
+		<text>What gives a disguised player away</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_factors">
+		<text>How much, % (distance and time as in Anomaly)</text>
+	</string>
+	<string id="st_coop_adm_zg_sk">
+		<text>A kill nobody noticed is not put on the killer</text>
+	</string>
 </string_table>

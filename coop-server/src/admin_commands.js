@@ -30,6 +30,19 @@ export const RULE_TITLES = {
   hardcore_ai_aim: 'Меткие NPC (hardcore AI aim)', npc_loot_distance: 'NPC обыскивают трупы в пределах, м',
   corpse_max_count: 'Трупов на локации до уборки дальних', corpse_min_dist: 'Труп не убирается ближе к игроку, м',
   release_dropped_items: 'Брошенные вещи убираются через 4 ч (выкл. — 12 ч)',
+  sk_enabled: 'Тихие убийства', sk_melee_enabled: 'Тихие: ножом', sk_all_melee_ok: 'Тихие: любым оружием ближнего боя',
+  sk_gun_enabled: 'Тихие: оружием с глушителем', sk_headshot_only: 'Тихие: только в голову',
+  sk_fresh_time: 'Тихие: труп «свежий», игровых с', sk_suspect_dist: 'Тихие: подозревают ближе, м',
+  sk_melee_hear_dist: 'Тихие: удар ножом слышно, м', sk_gun_hear_dist: 'Тихие: выстрел с глушителем слышно, м',
+  disguise: 'Маскировка', disguise_active_item: 'Маскировка: оружие в руках', disguise_active_item_pct: 'Маскировка: оружие в руках, %',
+  disguise_weapon: 'Маскировка: оружие в слотах', disguise_weapon_pct: 'Маскировка: оружие в слотах, %',
+  disguise_outfit: 'Маскировка: костюм', disguise_outfit_pct: 'Маскировка: костюм, %',
+  disguise_helmet: 'Маскировка: шлем', disguise_helmet_pct: 'Маскировка: шлем, %',
+  disguise_backpack: 'Маскировка: рюкзак', disguise_backpack_pct: 'Маскировка: рюкзак, %',
+  disguise_inventory: 'Маскировка: вещи', disguise_inventory_pct: 'Маскировка: вещи, %',
+  disguise_speed: 'Маскировка: бег', disguise_speed_pct: 'Маскировка: бег, %',
+  disguise_distance: 'Маскировка: расстояние', disguise_distance_factor: 'Маскировка: расстояние (как в Anomaly)',
+  disguise_stay_time: 'Маскировка: время рядом', disguise_stay_time_factor: 'Маскировка: время рядом (как в Anomaly)',
 };
 // a rule the bot has no title for still shows, under its key; a choice also has its values' names (from 1)
 export const RULES = Object.entries(DEFAULT_SETTINGS.rules).map(([key, value]) =>

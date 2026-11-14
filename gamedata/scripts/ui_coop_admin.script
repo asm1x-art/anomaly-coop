@@ -150,7 +150,7 @@ local SECTIONS = {
 	{ id = "overview", group = "server" }, { id = "players", group = "server" }, { id = "rules", group = "server" },
 	{ id = "world", group = "server" }, { id = "saves", group = "server" }, { id = "journal", group = "server" },
 	{ id = "events", group = "host" }, { id = "mechanics", group = "host" }, { id = "zone", group = "host" },
-	{ id = "tests", group = "host" },
+	{ id = "disguise", group = "host" }, { id = "silent", group = "host" }, { id = "tests", group = "host" },
 	{ id = "debug", group = "mine" }, { id = "map", group = "mine" }, { id = "render", group = "mine" },
 }
 local GROUP_OF = {}
@@ -180,15 +180,30 @@ local ZONE_GROUPS = {
 		"heli_spawn" } },
 	{ "npc", { "hardcore_ai_aim", "npc_loot_distance", "corpse_max_count", "corpse_min_dist", "release_dropped_items" } },
 }
-local IS_ZONE = {}
-for _, g in ipairs(ZONE_GROUPS) do
-	for _, k in ipairs(g[2]) do
-		IS_ZONE[k] = true
+-- disguise and silent kills: theirs too, each a section of its own
+local DISGUISE_GROUPS = {
+	{ "dg_on", { "disguise", "disguise_active_item", "disguise_weapon", "disguise_outfit", "disguise_helmet",
+		"disguise_backpack", "disguise_inventory", "disguise_speed", "disguise_distance", "disguise_stay_time" } },
+	{ "dg_factors", { "disguise_active_item_pct", "disguise_weapon_pct", "disguise_outfit_pct", "disguise_helmet_pct",
+		"disguise_backpack_pct", "disguise_inventory_pct", "disguise_speed_pct", "disguise_distance_factor",
+		"disguise_stay_time_factor" } },
+}
+local SILENT_GROUPS = {
+	{ "sk", { "sk_enabled", "sk_melee_enabled", "sk_all_melee_ok", "sk_gun_enabled", "sk_headshot_only", "sk_fresh_time",
+		"sk_suspect_dist", "sk_melee_hear_dist", "sk_gun_hear_dist" } },
+}
+local SECTION_GROUPS = { zone = ZONE_GROUPS, disguise = DISGUISE_GROUPS, silent = SILENT_GROUPS }
+local IS_ZONE = {} -- key -> its section
+for section, groups in pairs(SECTION_GROUPS) do
+	for _, g in ipairs(groups) do
+		for _, k in ipairs(g[2]) do
+			IS_ZONE[k] = section
+		end
 	end
 end
 -- a rule's section
 local function rule_section(key)
-	return IS_MECHANIC[key] and "mechanics" or IS_ZONE[key] and "zone" or "rules"
+	return IS_MECHANIC[key] and "mechanics" or IS_ZONE[key] or "rules"
 end
 -- a setting's value as shown: a choice by its name
 local function shown_value(s, value)
@@ -1061,13 +1076,13 @@ function UICoopAdmin:main_journal(box, X, Y, W, H, L)
 	self:text(24, y + 26, W - 48, 40, tr("st_coop_adm_logs_hint"), C.dim, box, nil, "s")
 end
 
--- Зона: Anomaly's own options of the world, the server's; two columns of groups
-function UICoopAdmin:main_zone(box, X, Y, W, H, L)
+-- Зона, Маскировка, Тихие убийства: Anomaly's own options of the world, the server's; two columns of groups
+function UICoopAdmin:zone_groups(section, box, X, Y, W, H, L)
 	local d = data
-	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_zone"), box, tr("st_coop_adm_zone_sub"))
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_" .. section), box, tr("st_coop_adm_zone_sub"))
 	local cw = math.floor((W - 48 - 24) / 2)
 	local ys = { 72, 72 }
-	for _, g in ipairs(ZONE_GROUPS) do
+	for _, g in ipairs(SECTION_GROUPS[section]) do
 		local col = ys[1] <= ys[2] and 1 or 2
 		local x = 24 + (col - 1) * (cw + 24)
 		local y = ys[col]
@@ -1082,6 +1097,16 @@ function UICoopAdmin:main_zone(box, X, Y, W, H, L)
 		end
 		ys[col] = y + 12
 	end
+end
+
+function UICoopAdmin:main_zone(...)
+	return self:zone_groups("zone", ...)
+end
+function UICoopAdmin:main_disguise(...)
+	return self:zone_groups("disguise", ...)
+end
+function UICoopAdmin:main_silent(...)
+	return self:zone_groups("silent", ...)
 end
 
 -- Механики мира: the server's rules for the whole world

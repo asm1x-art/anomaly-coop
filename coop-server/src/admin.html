@@ -164,6 +164,13 @@
   </section>
 
   <section>
+    <h2>Маскировка и тихие убийства</h2>
+    <p class="note">Тоже одни на весь мир: что выдаёт игрока в чужой форме и когда убийство не ставят в вину. Множители маскировки — в процентах (100 — как в Anomaly по умолчанию).</p>
+    <div class="row" id="stealth-numbers"></div>
+    <div class="grid" id="stealth-checks" style="margin-top:14px"></div>
+  </section>
+
+  <section>
     <h2>Фракции</h2>
     <p class="note">Из каких фракций игроки могут создать персонажа. Хотя бы одна.</p>
     <div class="grid" id="factions"></div>
@@ -232,6 +239,38 @@
     ['heli_spawn', 'Вертолёты из смартов', ''],
     ['hardcore_ai_aim', 'Меткие NPC', 'hardcore AI aim'],
     ['release_dropped_items', 'Брошенные вещи — через 4 ч', 'Брошенное, что никто не поднял, убирается через 4 игровых часа; выключено — через 12'],
+  ];
+  const STEALTH_NUMBERS = [
+    ['sk_fresh_time', 'Тихие: труп «свежий», игровых с', '', 0, 3600],
+    ['sk_suspect_dist', 'Тихие: подозревают ближе, м', '', 0, 100],
+    ['sk_melee_hear_dist', 'Тихие: удар ножом слышно, м', '', 0, 100],
+    ['sk_gun_hear_dist', 'Тихие: выстрел с глушителем слышно, м', '', 0, 100],
+    ['disguise_active_item_pct', 'Маскировка: оружие в руках, %', '', 10, 200],
+    ['disguise_weapon_pct', 'Маскировка: оружие в слотах, %', '', 10, 200],
+    ['disguise_outfit_pct', 'Маскировка: костюм, %', '', 10, 200],
+    ['disguise_helmet_pct', 'Маскировка: шлем, %', '', 10, 200],
+    ['disguise_backpack_pct', 'Маскировка: рюкзак, %', '', 10, 200],
+    ['disguise_inventory_pct', 'Маскировка: вещи, %', '', 10, 200],
+    ['disguise_speed_pct', 'Маскировка: бег, %', '', 10, 200],
+    ['disguise_distance_factor', 'Маскировка: расстояние', 'как в Anomaly, 1–100', 1, 100],
+    ['disguise_stay_time_factor', 'Маскировка: время рядом', 'как в Anomaly, 1–100', 1, 100],
+  ];
+  const STEALTH_CHECKS = [
+    ['sk_enabled', 'Тихие убийства', 'Убийство, которого никто не заметил, не ставят в вину'],
+    ['sk_melee_enabled', 'Тихие: ножом', ''],
+    ['sk_all_melee_ok', 'Тихие: любым оружием ближнего боя', ''],
+    ['sk_gun_enabled', 'Тихие: оружием с глушителем', ''],
+    ['sk_headshot_only', 'Тихие: только в голову', ''],
+    ['disguise', 'Маскировка', 'В форме чужой фракции её бойцы принимают игрока за своего'],
+    ['disguise_active_item', 'Выдаёт: оружие в руках', ''],
+    ['disguise_weapon', 'Выдаёт: оружие в слотах', ''],
+    ['disguise_outfit', 'Выдаёт: костюм', ''],
+    ['disguise_helmet', 'Выдаёт: шлем', ''],
+    ['disguise_backpack', 'Выдаёт: рюкзак', ''],
+    ['disguise_inventory', 'Выдаёт: вещи', ''],
+    ['disguise_speed', 'Выдаёт: бег', ''],
+    ['disguise_distance', 'Выдаёт: расстояние', ''],
+    ['disguise_stay_time', 'Выдаёт: время рядом', ''],
   ];
   const FACTION_NAMES = {
     stalker: 'Одиночки', dolg: 'Долг', freedom: 'Свобода', csky: 'Чистое Небо', ecolog: 'Учёные',
@@ -502,8 +541,8 @@
     for (const key of ['difficulty', 'economy']) $(key).value = String(w[key]);
     const r = state.settings.rules;
     shownRules = r;
-    for (const [key] of [...RULE_NUMBERS, ...ZONE_NUMBERS]) $('r_' + key).value = String(r[key]);
-    for (const [key] of [...RULE_CHECKS, ...ZONE_CHECKS]) $('r_' + key).checked = r[key];
+    for (const [key] of [...RULE_NUMBERS, ...ZONE_NUMBERS, ...STEALTH_NUMBERS]) $('r_' + key).value = String(r[key]);
+    for (const [key] of [...RULE_CHECKS, ...ZONE_CHECKS, ...STEALTH_CHECKS]) $('r_' + key).checked = r[key];
     for (const f of state.factions) $('f_' + f).checked = state.settings.factions.includes(f);
     dirty = false;
     $('savebar').classList.remove('show');
@@ -515,8 +554,8 @@
     for (const key of ['difficulty', 'economy']) world[key] = Number($(key).value);
     const factions = [...document.querySelectorAll('#factions input:checked')].map((i) => i.id.slice(2));
     const rules = { ...shownRules };
-    for (const [key] of [...RULE_NUMBERS, ...ZONE_NUMBERS]) rules[key] = Math.round(Number($('r_' + key).value));
-    for (const [key] of [...RULE_CHECKS, ...ZONE_CHECKS]) rules[key] = $('r_' + key).checked;
+    for (const [key] of [...RULE_NUMBERS, ...ZONE_NUMBERS, ...STEALTH_NUMBERS]) rules[key] = Math.round(Number($('r_' + key).value));
+    for (const [key] of [...RULE_CHECKS, ...ZONE_CHECKS, ...STEALTH_CHECKS]) rules[key] = $('r_' + key).checked;
     return { world, factions, rules };
   }
 
@@ -549,7 +588,7 @@
 
   for (const [key, title, hint] of WORLD_CHECKS) $('world-checks').append(check(key, title, hint));
   for (const [key, title, hint] of RULE_CHECKS) $('rule-checks').append(check('r_' + key, title, hint));
-  for (const [list, numbers] of [[RULE_NUMBERS, 'rule-numbers'], [ZONE_NUMBERS, 'zone-numbers']]) {
+  for (const [list, numbers] of [[RULE_NUMBERS, 'rule-numbers'], [ZONE_NUMBERS, 'zone-numbers'], [STEALTH_NUMBERS, 'stealth-numbers']]) {
     for (const [key, title, hint, min, max, choices] of list) {
       const label = document.createElement('label');
       label.className = 'field';
@@ -562,6 +601,7 @@
     }
   }
   for (const [key, title, hint] of ZONE_CHECKS) $('zone-checks').append(check('r_' + key, title, hint));
+  for (const [key, title, hint] of STEALTH_CHECKS) $('stealth-checks').append(check('r_' + key, title, hint));
   document.addEventListener('input', (e) => {
     if (e.target.closest('section') && e.target.type === 'number') markDirty();
   });

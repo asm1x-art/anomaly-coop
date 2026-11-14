@@ -78,6 +78,36 @@ export const DEFAULT_SETTINGS = {
     corpse_max_count: 5, // bodies a level keeps before the far ones go (coop_cleanup.script)
     corpse_min_dist: 75, // m: no body goes this close to any player
     release_dropped_items: true, // a dropped thing nobody took goes after 4 game hours (off: after 12)
+    // silent kills (gameplay/silent_kills): a kill nobody hears or sees isn't put on the killer
+    sk_enabled: false,
+    sk_melee_enabled: true,
+    sk_all_melee_ok: false, // any melee weapon, not the knife alone
+    sk_gun_enabled: true, // a silenced gun
+    sk_headshot_only: true,
+    sk_fresh_time: 300, // game s a body is fresh: found then, its killer is suspected
+    sk_suspect_dist: 10, // m
+    sk_melee_hear_dist: 5, // m
+    sk_gun_hear_dist: 10, // m
+    // disguise (gameplay/disguise): what gives a disguised player away; the factors in % (Anomaly's 0.1..2)
+    disguise: true,
+    disguise_active_item: true,
+    disguise_active_item_pct: 100,
+    disguise_weapon: true,
+    disguise_weapon_pct: 100,
+    disguise_outfit: true,
+    disguise_outfit_pct: 100,
+    disguise_helmet: true,
+    disguise_helmet_pct: 100,
+    disguise_backpack: true,
+    disguise_backpack_pct: 100,
+    disguise_inventory: true,
+    disguise_inventory_pct: 100,
+    disguise_speed: true,
+    disguise_speed_pct: 100,
+    disguise_distance: true,
+    disguise_distance_factor: 5,
+    disguise_stay_time: true,
+    disguise_stay_time_factor: 20,
   },
 };
 
@@ -108,6 +138,19 @@ export const RULE_LIMITS = {
   npc_loot_distance: [0, 25],
   corpse_max_count: [5, 30],
   corpse_min_dist: [75, 200],
+  sk_fresh_time: [0, 3600],
+  sk_suspect_dist: [0, 100],
+  sk_melee_hear_dist: [0, 100],
+  sk_gun_hear_dist: [0, 100],
+  disguise_active_item_pct: [10, 200],
+  disguise_weapon_pct: [10, 200],
+  disguise_outfit_pct: [10, 200],
+  disguise_helmet_pct: [10, 200],
+  disguise_backpack_pct: [10, 200],
+  disguise_inventory_pct: [10, 200],
+  disguise_speed_pct: [10, 200],
+  disguise_distance_factor: [1, 100],
+  disguise_stay_time_factor: [1, 100],
 };
 
 // rules that are a choice: their values' names, the first is 1 (the game's own values in coop_world_options.script)
