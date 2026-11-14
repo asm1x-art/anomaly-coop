@@ -22,6 +22,7 @@ namespace coop
 		xr_string name;      // as the server keeps it
 		bool mark_sent;      // renamed to ..._sent once sent (not this session's log, still being written)
 		bool packed = false; // read and compressed when its turn comes (on a worker; set here once it's done)
+		bool empty = false;  // nothing in the file: set by the worker, read here once it's done
 		u32 raw = 0;
 		xr_vector<u8> data;  // compressed
 		u32 offset = 0;
@@ -90,7 +91,9 @@ namespace coop
 	static bool pack(SUpload& upload)
 	{
 		xr_vector<u8> raw;
-		if (!read_file(upload.path.c_str(), raw) || raw.empty() || !compress(raw, upload.data))
+		const bool read = read_file(upload.path.c_str(), raw);
+		upload.empty = read && raw.empty();
+		if (!read || raw.empty() || !compress(raw, upload.data))
 		{
 			Msg("! [coop] %s can't be read or packed: not sent", upload.name.c_str());
 			return false;
@@ -191,6 +194,9 @@ namespace coop
 					return;
 				if (!g_packing.get())
 				{
+					// an empty file will never pack: set aside as sent, or every connection would queue it again
+					if (upload.empty && upload.mark_sent)
+						mark_sent(upload.path);
 					g_queue.pop_front();
 					continue;
 				}

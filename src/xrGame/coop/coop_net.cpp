@@ -90,6 +90,7 @@ namespace coop
 		xr_string m_name;
 		xr_string m_error;
 		xr_string m_refusal;
+		int m_socket_error = 0; // what recv ended with (WSAGetLastError; 0: the server closed), for coop_debug
 
 		u32 m_client_id = 0;
 		u32 m_master_id = 0; // 0: not known yet, ids start at 1
@@ -207,6 +208,7 @@ namespace coop
 		m_name = name;
 		m_error.clear();
 		m_refusal.clear();
+		m_socket_error = 0;
 		m_hello_sent = false;
 		m_welcomed = false;
 		m_client_id = 0;
@@ -356,7 +358,10 @@ namespace coop
 		{
 			int n = recv(m_socket, p, (int)size, 0);
 			if (n <= 0)
+			{
+				m_socket_error = n < 0 ? WSAGetLastError() : 0;
 				return false;
+			}
 			p += n;
 			size -= n;
 		}
@@ -746,6 +751,12 @@ namespace coop
 				m_inbox.clear();
 			}
 			Msg("! [coop] disconnected: %s", m_error.c_str());
+			// 0: the server closed it. 10053/10060: this PC gave up resending, so its packets or the answers to them
+			// were lost on the way (big ones only when a VPN or the tunnel's MTU cuts them; the server then still
+			// holds the connection). 10054: reset from the other side
+			if (debug_mode)
+				Msg("[coop dbg] the connection ended with socket error %d, %u ms after our last ping, rtt %u ms",
+				    m_socket_error, Device.dwTimeContinual - m_last_ping, m_rtt);
 			FlushLog(); // the log is flushed from OnFrame, which ends here
 			Device.seqFrame.Remove(this);
 			close();
