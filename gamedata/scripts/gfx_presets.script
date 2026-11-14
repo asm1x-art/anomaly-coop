@@ -120,7 +120,8 @@ function apply(name, starting)
 	return true
 end
 
--- The list in the settings window, Video > Advanced (the row is added in ui_options_modded_exes.script).
+-- The list in the settings window, Video > Advanced (the rows are added and the preset is applied in
+-- ui_options_modded_exes.script).
 -- Its entries: {name, label}; the label is the string ui_mm_gfx_preset_<name>, or the preset's title when there is none
 function option_content()
 	local content = {}
@@ -133,11 +134,6 @@ function option_content()
 		content[#content + 1] = {name, label}
 	end
 	return content
-end
-
--- the window's Apply with another entry chosen (the window calls it only when the value was changed)
-function option_apply()
-	apply(ui_options.get(OPTION_ID))
 end
 
 -- the request file in appdata: applied and removed. Returns true when a preset was applied
