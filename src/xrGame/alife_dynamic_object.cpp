@@ -8,6 +8,7 @@
 
 #include "stdafx.h"
 #include "coop/coop_npc.h"
+#include "coop/coop_shadow.h"
 #include "xrServer_Objects_ALife.h"
 #include "alife_simulator.h"
 #include "alife_schedule_registry.h"
@@ -36,7 +37,9 @@ void CSE_ALifeDynamicObject::on_register()
 		VERIFY(object);
 	}
 
-	if (!alife().graph().level().object(object->ID, true))
+	// A player's things in their shadow keep it wherever the shadow stands: they come out of it onto the player's
+	// actor (coop_save.cpp put_character) and go into the exit save from it (on_exit_things_request).
+	if (!alife().graph().level().object(object->ID, true) && !coop::is_shadow(object))
 		clear_client_data();
 
     ::luabind::functor<void> funct;

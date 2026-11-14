@@ -571,8 +571,12 @@ namespace coop
 		object->m_tGraphID = game_vertex; // where it is stays ours
 		object->m_tNodeID = level_vertex;
 		object->m_fDistance = distance;
-		if (!client.empty())
-			object->client_data = client;
+		// Written where the thing was offline (the host, for an exit save: out of our shadow there), its client data
+		// is in the spawn packet only. Without it a weapon forgot which modular scope was on it (CWeapon::save,
+		// m_cur_scope) and CWeapon::net_Spawn picked a random one on every load.
+		const xr_vector<u8>& data = client.empty() ? state->client_data : client;
+		if (!data.empty())
+			object->client_data = data;
 		::luabind::functor<void> take_lua;
 		if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
 			take_lua(object->ID, lua.c_str());
