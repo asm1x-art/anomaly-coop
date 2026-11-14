@@ -1036,6 +1036,8 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     master.send(M.ITEM_PARENT, Buffer.from('item 1'));
     master.send(M.SCRIPT_EVENT, event('news', 'hello'));
     master.send(M.SCRIPT_EVENT, event('stash_opened', '77'));
+    master.send(M.SCRIPT_EVENT, event('loot_ask', '78\tbody'));
+    master.send(M.SCRIPT_EVENT, event('loot_kept', '78\tbody'));
     master.send(M.ENTITY_DEATH, Buffer.from('death'));
     master.send(M.NPC_STATES, Buffer.from('npcs'));
     await roundTrip(master);
@@ -1055,7 +1057,7 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     }
     const by = (type, payload, id = 2) => Buffer.concat([u16le(type), ...(id ? [u32le(id)] : []), payload]);
     assert.deepEqual(journal, [by(M.ITEM_PARENT, Buffer.from('item 1')), by(M.SCRIPT_EVENT, event('stash_opened', '77')),
-      by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
+      by(M.SCRIPT_EVENT, event('loot_kept', '78\tbody')), by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
     assert.equal(names.readUInt16LE(0), 3);
     assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['menu']);
     assert.ok(!(await drain(master)).includes(M.SAVE_NOW));

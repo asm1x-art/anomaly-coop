@@ -238,7 +238,7 @@ tests=1` : ''));
   const ADMIN_EVENT = 'coop_admin';
   const ADMIN_INFO = 'coop_admin_info';
   const EVENTS_INFO = 'coop_admin_events'; // the world's game on its events (coop_world_events.script)
-  const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  const JOURNAL_EVENTS = new Set(['loot_created', 'loot_kept', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
     if (!storage.worldInfo()) return;
