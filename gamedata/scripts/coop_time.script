@@ -200,29 +200,29 @@ local function patch_weather_manager()
 	return wm
 end
 
--- A weather effect is over (a surge's, a psi storm's: its last frames or an early stop). The engine goes back to the
--- frames of the weather it had before the effect began, the next of them often still ahead of the clock: the sky then
--- stands on that frame until the clock reaches it, up to a game hour, and the world's weather comes only after the
--- frame past it. Every game sets the world's weather now at once instead, as a game here all along shows it: the
--- master's pick of the hour (its own published one in the master's game), or the ash's over it
+-- A weather effect is over (a surge's, a psi storm's: its last frames or an early stop). The engine goes on from the
+-- effect's last frame to the next frame of the weather it has now (CEnvironment::StopWFX; it used to go back to the
+-- frames of the weather from before the effect, often still ahead of the clock: the sky stood on one until the clock
+-- got there, up to a game hour). That weather is made the world's here, in every game: the master's pick of the hour
+-- (its own published one in the master's game), or the ash's over it. No step: only the frame ahead is set
 local wfx_on = false
 
 local function after_wfx()
-	local over = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
-	if over then
-		if not weather.is_paused() then
-			level.set_weather(over, true)
-		end
-		dbg("weather effect over: %s, under the ash", over)
+	if weather.is_paused() then
 		return
 	end
+	local file = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
 	local wm = patch_weather_manager()
-	local w = parse_weather(published.weather or coop.fact("weather"))
-	if wm and w and w.file ~= "" and wm.weatherType == "atmosfear" then
-		wm.weather_file = w.file
-		show(w, true)
-		dbg("weather effect over: %s after %s, at once", w.file, w.before)
+	if not file then
+		local w = parse_weather(published.weather or coop.fact("weather"))
+		if not (wm and w and w.file ~= "" and wm.weatherType == "atmosfear") then
+			return
+		end
+		file = w.file
+		wm.weather_file = file
 	end
+	level.set_weather_smooth(file)
+	dbg("weather effect over: from its last frame to %s", file)
 end
 
 ------------------------------------------------------------------------------------------------

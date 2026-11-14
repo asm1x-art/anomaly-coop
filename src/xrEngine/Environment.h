@@ -320,6 +320,7 @@ public:
 	bool bWFX;
 	float wfx_time;
 	CEnvDescriptor* WFX_end_desc[2];
+	CEnvDescriptor* WFX_last; // the effect's last frame: the look it ends on (StopWFX goes on from it)
 
 	EnvVec* CurrentWeather;
 	shared_str CurrentWeatherName;
