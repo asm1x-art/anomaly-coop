@@ -914,8 +914,7 @@ local REPORT_DELAY = 4 -- s
 local function faction_penalty(community)
 	local amount = coop_rules.number("faction_penalty", 100)
 	if amount > 0 and db.actor and community and community ~= "" then
-		relation_registry.change_community_goodwill(community, AC_ID, -amount)
-		printf("[coop] %s like us %s less", community, amount)
+		coop_relations.penalty(community, amount)
 	end
 end
 

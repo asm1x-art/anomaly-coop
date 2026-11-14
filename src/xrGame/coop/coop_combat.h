@@ -13,6 +13,8 @@
 // that player, in every game: the game running the level makes them and sends them around, so whoever
 // runs the level next has them too. They stand in for vanilla's goodwill of the NPC to the actor, which
 // co-op leaves out (RELATION_REGISTRY::Action): every player is the actor of the world's save.
+// The world keeps them as facts (gamedata/scripts/coop_relations.script): they come back with a load, go back
+// with a rollback, and are forgotten in time once the player got away.
 
 class CObject;
 class CGameObject;
@@ -43,6 +45,7 @@ namespace coop
 	// or a stand-in); also coop.grudge(npc id, other id) for Lua
 	bool has_grudge(const CEntityAlive* npc, const CEntityAlive* other);
 	bool has_grudge_id(u16 npc, u16 other);
+	bool set_grudge(u16 key, LPCSTR name, bool on); // coop.set_grudge: as the world's facts have it
 	// our player fell (coop_death.script: lying wounded, back at the save point): the squads that turned on
 	// them calm down, in every game
 	void on_player_fell();
@@ -67,5 +70,5 @@ namespace coop
 
 	void update_combat();  // per frame
 	void clear_proxies();  // disconnect, level unload
-	void clear_grudges();  // disconnect
+	void clear_grudges();  // disconnect; coop.clear_grudges: a load, before the world's facts put them on again
 }

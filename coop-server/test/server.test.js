@@ -2023,3 +2023,35 @@ test('the world\'s language goes to the games with the settings (the host runs i
     plain.close();
   }
 });
+
+test('facts about a player: a name that comes in with no character starts over, one with a character keeps them', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    a.send(M.CHARACTER, Buffer.from('record a'));
+    for (const [key, value] of [['grudge:23337:artem', '100'], ['grudge:23337:друг', '100'], ['penalty:artem:ecolog', '200'],
+      ['penalty:друг:ecolog', '300'], ['penalty:друг:dolg', '100'], ['rel:dolg:freedom', '-5000']])
+      a.send(M.FACT, fact(key, value));
+    await roundTrip(a);
+    assert.equal(server.coop.facts()['penalty:друг:ecolog'], '300');
+    // 'друг' has no character in the world: what was held against that name goes, and the others are told
+    const b = await player(port, 'друг');
+    let got = await until(a, M.FACT);
+    const gone = [readStringsZ(got.payload, 0, 2)];
+    gone.push(readStringsZ((await until(a, M.FACT)).payload, 0, 2), readStringsZ((await until(a, M.FACT)).payload, 0, 2));
+    assert.deepEqual(gone.sort(), [['grudge:23337:друг', ''], ['penalty:друг:dolg', ''], ['penalty:друг:ecolog', '']]);
+    assert.deepEqual(server.coop.facts(), { 'grudge:23337:artem': '100', 'penalty:artem:ecolog': '200', 'rel:dolg:freedom': '-5000' });
+    // 'artem' has one: coming in again changes nothing
+    a.socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    const again = await player(port, 'artem');
+    again.send(M.PING, Buffer.alloc(4));
+    await until(again, M.PONG);
+    assert.deepEqual(server.coop.facts(), { 'grudge:23337:artem': '100', 'penalty:artem:ecolog': '200', 'rel:dolg:freedom': '-5000' });
+    b.socket.destroy();
+    again.socket.destroy();
+  } finally {
+    server.close();
+  }
+});

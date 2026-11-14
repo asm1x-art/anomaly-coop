@@ -58,6 +58,18 @@ export function startServer({ port = 7777, host = '0.0.0.0', dataDir = 'data', l
   const broadcast = (fromId, type, payload) => {
     for (const [id, c] of clients) if (id !== fromId) c.send(type, payload);
   };
+  // the facts about one player (coop_relations.script): "grudge:<squad>:<player>", "penalty:<player>:<faction>"
+  const forgetPlayerFacts = (name) => {
+    let gone = 0;
+    for (const key of Object.keys(storage.facts())) {
+      const grudge = /^grudge:\d+:(.*)$/s.exec(key);
+      const penalty = key.startsWith('penalty:') && key.slice(8, key.lastIndexOf(':'));
+      if ((grudge ? grudge[1] : penalty) !== name || !storage.setFact(key, '')) continue;
+      broadcast(null, M.FACT, Buffer.concat([stringZ(key), stringZ('')]));
+      gone++;
+    }
+    if (gone) log(`'${name}' has no character: ${gone} fact(s) about the old one dropped`);
+  };
   const peerState = (id, c) => Buffer.concat([u32(id), stringZ(c.name), c.state]);
   // the sim master runs offline A-Life and world spawns for empty levels, and saves the world: the host once it
   // runs the world; else the longest-connected player in the world (ids only grow), or anyone while nobody is in it
@@ -763,6 +775,10 @@ tests=1` : ''));
           // before WORLD_INFO: a client loading the world needs it to put its own character in
           const record = storage.character(client.name);
           if (record) send(M.CHARACTER, record);
+          // no character of that name in the world (never was, or its record was taken out): the one made now starts
+          // over, and what the world held against the old one goes: squads' grudges and the factions' goodwill lost
+          // (gamedata/scripts/coop_relations.script)
+          else if (!isHost) forgetPlayerFacts(client.name);
           // an exit save and another one: the player chooses which to go on from
           const own = isHost ? [] : storage.characterSaves(client.name);
           if (own.some((m) => m.exit) && own.some((m) => !m.exit)) send(M.SAVE_CHOICE, savesPayload(client.name));

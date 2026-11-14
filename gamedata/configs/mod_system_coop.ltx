@@ -427,3 +427,13 @@ transition_pair_m = 40 ; m: a level changer this near the drop point of the game
 ; Co-op: the world's events an admin starts (coop_world_events.script, the admin window's "Events")
 [coop_admin_events]
 lead_s = 15 ; real s: a surge or psi storm an admin starts begins this long after (every game takes the timetable first)
+
+; Co-op: grudges of squads against players who attacked them (coop_relations.script; who turns on whom: the admin
+; page's rules witness_radius and faction_penalty). A grudge is kept by the world; it goes when the player falls,
+; when nobody of the squad is left, or in time once the player got away.
+[coop_relations]
+forget_hours        = 2   ; game hours away from the squad after which it forgets (2 game h = 20 real min at x6)
+escape_distance     = 150 ; m: "away" is farther than this from every living one of the squad (another level and
+                          ; out of the game count as away too)
+contact_refresh_min = 10  ; game min: while the player stays near, the time of the last contact is noted this often
+check_s             = 5   ; real s between checks
