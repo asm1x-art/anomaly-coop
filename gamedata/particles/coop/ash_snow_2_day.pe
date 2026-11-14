@@ -57,7 +57,7 @@ version = 1
 action_name = source
 flags = 1
 flt_0000 = 0 ; Age Sigma
-flt_0001 = 0.95 ; Color\Alpha
+flt_0001 = 1 ; Color\Alpha
 flt_0002 = 1 ; Parent Motion
 flt_0003 = 130 ; Rate
 flt_0004 = 0 ; Starting Age
@@ -84,7 +84,7 @@ v2 = 0, 0, 0
 
 [domain_action_0003_0003] ; Size Point
 type = 0
-v0 = 0.1, 0.1, 0.1
+v0 = 0.2, 0.2, 0.2
 v1 = 0, 0, 0
 v2 = 0, 0, 0
 
