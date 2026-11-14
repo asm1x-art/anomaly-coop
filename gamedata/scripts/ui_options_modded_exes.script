@@ -299,6 +299,30 @@ function on_xml_read()
 				need_init_opt_coder = true
 			end
 		end
+
+		-- Preset by video memory (gfx_presets.script), the first row of Video > Advanced: right under the window's own
+		-- "Presets" list (the game's quality presets of this page), so the two read as a pair.
+		-- The window runs the functor on Apply only when another entry was chosen; a line under the list says what a
+		-- preset overwrites and how it differs from the game's presets (the same text as the hint)
+		if advanced and advanced.gr and gfx_presets and advanced.gr[1] and advanced.gr[1].id ~= "gfx_preset" then
+			table.insert(advanced.gr, 1, {
+				id      = "gfx_preset",
+				type    = "list",
+				val     = 0,
+				def     = {gfx_presets.current},
+				content = {gfx_presets.option_content},
+				no_str  = true,
+				functor = {gfx_presets.option_apply},
+				restart = true, -- shader quality levels are built into the shaders at the game's start
+			})
+			table.insert(advanced.gr, 2, {
+				id   = "gfx_preset_note",
+				type = "desc",
+				text = "ui_mm_video_advanced_gfx_preset_desc",
+				clr  = {255, 200, 200, 200},
+			})
+			need_init_opt_coder = true
+		end
 		if need_init_opt_coder and ui_options.init_opt_coder then
 			ui_options.init_opt_coder()
 		end

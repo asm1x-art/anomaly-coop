@@ -15,7 +15,8 @@
 	        [apply]
 	        preset = tier_8gb
 	    The file is emptied once the preset is applied (an empty file is no request).
-	  - by gfx_presets.apply("tier_8gb") from another script.
+	  - by gfx_presets.apply("tier_8gb") from another script;
+	  - by the player: the list "Preset by video memory" in the settings window, Video > Advanced.
 	Nothing is forced after that: a player's own changes in the settings pages stay until the next request.
 
 	Shader quality levels are compiled into the shaders, so part of a preset shows only after the game is started again;
@@ -27,6 +28,7 @@
 
 local SETTINGS = "gfx_presets.ltx"
 local STORE = "gfx_presets" -- the section of axr_options.ltx with what was applied
+local OPTION_ID = "video/advanced/gfx_preset" -- the settings window's list (ui_options keeps its value in [options])
 
 local settings -- ini_file of SETTINGS
 local take_request_done = false -- a request file was applied at this start
@@ -100,6 +102,7 @@ function apply(name, starting)
 	end
 	axr_main.config:w_value(STORE, "current", name)
 	axr_main.config:w_value(STORE, "version", ini:r_float_ex("preset", "version") or 0)
+	axr_main.config:w_value("options", OPTION_ID, name) -- what the settings window's list shows
 	axr_main.config:save()
 
 	local console = get_console()
@@ -115,6 +118,26 @@ function apply(name, starting)
 	end
 	log("preset \"%s\" applied: %d settings of the mods' pages, %d console commands", name, #mcm_order, #order)
 	return true
+end
+
+-- The list in the settings window, Video > Advanced (the row is added in ui_options_modded_exes.script).
+-- Its entries: {name, label}; the label is the string ui_mm_gfx_preset_<name>, or the preset's title when there is none
+function option_content()
+	local content = {}
+	for _, name in ipairs(preset_names()) do
+		local id = "ui_mm_gfx_preset_" .. name
+		local label = game.translate_string(id)
+		if label == id then
+			label = preset_file(name):r_string_ex("preset", "title") or name
+		end
+		content[#content + 1] = {name, label}
+	end
+	return content
+end
+
+-- the window's Apply with another entry chosen (the window calls it only when the value was changed)
+function option_apply()
+	apply(ui_options.get(OPTION_ID))
 end
 
 -- the request file in appdata: applied and removed. Returns true when a preset was applied
