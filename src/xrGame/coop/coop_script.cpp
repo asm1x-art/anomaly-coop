@@ -188,6 +188,7 @@ namespace coop
 			def("clear_grudges", &clear_grudges),   // a load: the world's facts put them on again
 			def("begin_shared", &begin_shared_spawns),
 			def("end_shared", &end_shared_spawns),
+			def("send_item_state", &send_world_item_state), // (id) an item no player holds, as we have it: the others take it
 			def("send_event", &script_send_event),
 
 			def("group", &script_group),

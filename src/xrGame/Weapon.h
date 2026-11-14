@@ -1104,6 +1104,9 @@ public:
 	u8 GetAmmoType() { return m_ammoType; };
 	//-Alundaio
 
+	// co-op: another game's state of this weapon, which no player of ours holds (coop_world.cpp take_state_online)
+	void coop_take_state(u8 addons, u8 ammo_type, u16 ammo_elapsed);
+
 protected:
 	// This is because when scope is attached we can't ask scope for these params
 	// therefore we should hold them by ourself :-((

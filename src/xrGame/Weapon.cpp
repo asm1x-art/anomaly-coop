@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "coop/coop_puppet.h"
 #include "coop/coop_npc.h"
+#include "coop/coop_world.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -1009,7 +1010,9 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
 	{
-		m_cur_scope = ::Random.randI(1, m_scopes.size());
+		// No index in the client data (a new weapon, or one that was offline): the one kept with it, else one by its id
+		// and section - the same in every game and on every load. ::Random here gave another scope each time.
+		m_cur_scope = coop::weapon_scope(ID(), cNameSect().c_str(), m_scopes.size());
 		CWeaponMagazined* wm = smart_cast<CWeaponMagazined*>(this);
 		if (wm)
 		{
@@ -1166,6 +1169,42 @@ void CWeapon::load(IReader& input_packet)
 		OnZoomOut();
 
 	load_data(m_bRememberActorNVisnStatus, input_packet);
+}
+
+void CWeapon::coop_take_state(u8 addons, u8 ammo_type, u16 ammo_elapsed)
+{
+	if (ammo_type < m_ammoTypes.size() && (ammo_type != m_ammoType || int(ammo_elapsed) != iAmmoElapsed))
+	{
+		if (ammo_type != m_ammoType)
+		{
+			m_ammoType = ammo_type;
+			m_magazine.clear(); // the rounds of the other type go, SetAmmoElapsed loads ours
+			m_DefaultCartridge.Load(m_ammoTypes[m_ammoType].c_str(), m_ammoType, m_APk);
+		}
+		SetAmmoElapsed(ammo_elapsed);
+	}
+	u8 scope = m_cur_scope;
+	if (m_modular_attachments && (addons & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
+		scope = coop::weapon_scope(ID(), cNameSect().c_str(), m_scopes.size());
+	if (addons == m_flagsAddOnState && scope == m_cur_scope)
+		return;
+	m_flagsAddOnState = addons;
+	m_cur_scope = scope;
+	// a modular scope's numbers and model, as net_Spawn makes them
+	CWeaponMagazined* wm = smart_cast<CWeaponMagazined*>(this);
+	if (m_scopeItem)
+	{
+		g_player_hud->detach_item(m_scopeItem);
+		xr_delete(m_scopeItem);
+	}
+	if (wm && m_modular_attachments && IsScopeAttached() && m_scopes.size() > 1)
+	{
+		wm->LoadScopeKoeffs();
+		m_scopeItem = xr_new<CAnonHudItem>();
+		m_scopeItem->Load(m_scopes[m_cur_scope].c_str());
+	}
+	InitAddons();
+	UpdateAddonsVisibility();
 }
 
 void CWeapon::OnEvent(NET_Packet& P, u16 type)
