@@ -1,0 +1,7 @@
+; Co-op: the state of items no player holds, one game's word for the world (coop_items.script): a body's loot is
+; decided once, by its level's authority, and the state of its items goes to the others.
+[coop_items]
+states_delay_s = 2  ; real s after the loot is decided (or made at the first search) before the state of the body's
+                    ; items goes out: the scripts set an outfit's condition and merge ammo boxes frames later
+ask_delay_s    = 1  ; real s a game with an undecided body online waits for the authority's word before asking it
+ask_again_s    = 30 ; real s before it asks again about the same body (the authority left, the answer got lost)

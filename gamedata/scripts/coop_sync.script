@@ -355,6 +355,7 @@ local function wrap_corpse_loot()
 		local res = shared(original, npc)
 		if not already and se_load_var(id, name, "death_dropped") then
 			send("loot_created", id, name)
+			coop_items.after_loot(id) -- its items as they are here once it is all made (ammo merged)
 		end
 		return res
 	end)
