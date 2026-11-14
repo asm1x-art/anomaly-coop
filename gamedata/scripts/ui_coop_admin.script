@@ -1504,7 +1504,7 @@ function UICoopAdmin:card_player(box, X, Y, W, H, L)
 		self.spawn.count = math.min(100, self.spawn.count + (self.spawn.count >= 10 and 10 or 1))
 		self:build_aside()
 	end, L, box, X, Y)
-	self:btn(130, y, W - 146, 30, self.spawn.picked and tr("st_coop_adm_give_item", self.spawn.count) or
+	self:btn(130, y, W - 146, 30, self.spawn.picked and tr("st_coop_adm_give_item", self.spawn.count, self.spawn.picked) or
 		tr("st_coop_adm_pick_item"), function()
 		if self.spawn.picked then
 			command("give", p.name, self.spawn.picked, tostring(self.spawn.count))
