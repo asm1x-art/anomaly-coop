@@ -293,7 +293,7 @@ end
 -- its file's rain_density at the hour; its own weather when there is no file (single player, the master indoors)
 local weather_ini = {}
 local function world_rain()
-	local hour, file = string.match(in_coop() and coop.fact("weather") or "", "^(%d+)|[^|]*|[^|]*|%a|(.+)$")
+	local hour, file = string.match(in_coop() and coop.fact("weather") or "", "^(%d+)|[^|]*|[^|]*|%a|([^|]+)")
 	if file then
 		local ini = weather_ini[file]
 		if ini == nil then

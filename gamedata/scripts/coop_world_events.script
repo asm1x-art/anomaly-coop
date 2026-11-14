@@ -181,6 +181,7 @@ local function weather(cycle, name)
 	wm.preset = random_key_table(presets)
 	wm:reset_change_date(true) -- the cycle keeps for its whole period from now
 	wm.transition_period, wm.pre_blowout_period = false, false
+	wm:forced_weather_change() -- a weather of its own from now, nothing of the one before in it
 	wm:select_weather(true) -- published with it (coop_time)
 	return tr("st_coop_ev_r_weather", title(name))
 end

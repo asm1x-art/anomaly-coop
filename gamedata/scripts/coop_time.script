@@ -2,7 +2,8 @@
 -- engine's (src/xrGame/coop/coop_time.h): every game runs the server's game time. Here the sim master's game
 -- decides what Anomaly leaves to chance - the weather cycle and preset each hour, when the next surge and psi
 -- storm come - and publishes it as facts the server keeps ("weather", "surge", "psi"); the other games take
--- them instead of rolling their own. Whether a surge reaches a player is still his level's business (indoor
+-- them instead of rolling their own: the weather a game shows is the master's and nothing else, however and
+-- whenever it came into the world. Whether a surge reaches a player is still his level's business (indoor
 -- levels, Generators...). NPCs a surge or psi storm kills on a level are killed by that level's authority only:
 -- the deaths reach the others as any death does.
 -- Settings: [coop_time] in mod_system_coop.ltx.
@@ -35,12 +36,14 @@ local function publish(fact, value)
 end
 
 ------------------------------------------------------------------------------------------------
--- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>": mode n (normal), t (the hour of a change of
--- cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors.
+-- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>|<before>": mode n (normal), t (the hour of a change
+-- of cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors; before
+-- the file of the hour before (none: the same file).
 
 local function parse_weather(value)
-	local hour, cycle, preset, mode, file = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|(.*)$")
-	return hour and { hour = tonumber(hour), cycle = cycle, preset = preset, mode = mode, file = file }
+	local hour, cycle, preset, mode, file, before = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|([^|]*)|?(.*)$")
+	return hour and { hour = tonumber(hour), cycle = cycle, preset = preset, mode = mode, file = file,
+		before = before ~= "" and before or file }
 end
 
 -- mode nil: as published this hour, else normal
@@ -51,7 +54,10 @@ local function publish_weather(wm, mode)
 		mode = w and w.hour == hour and w.mode or "n"
 	end
 	local file = wm.weatherType == "atmosfear" and wm.weather_file or ""
-	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "" }, "|"))
+	-- last_weather_file: the one before this pick (aaaa_script_fixes_mp), none when the pick began anew (a clock that
+	-- jumped, the admin's weather)
+	local before = file ~= "" and wm.last_weather_file or file
+	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "", before or "" }, "|"))
 end
 
 -- the master's weather onto ours, before the hour's pick (which then picks the same)
@@ -74,34 +80,103 @@ end
 
 local select_weather, change_period -- level_weathers.WeatherManager's own
 
-local function pick(wm, now)
-	if not coop_on() then
-		return select_weather(wm, now)
+-- the day's second of a weather file's first frame after the hour began (most come on the hour, some on the half)
+local frames = {} -- file -> its frames' seconds, sorted
+local function next_frame(file, hour)
+	local list = frames[file]
+	if not list then
+		list = {}
+		local ini = ini_file("environment\\weathers\\" .. file .. ".ltx")
+		if ini then
+			ini:section_for_each(function(section)
+				local h, m, s = string.match(section, "^(%d+):(%d+):(%d+)$")
+				if h then
+					list[#list + 1] = h * 3600 + m * 60 + s
+				end
+				return false
+			end)
+		end
+		table.sort(list)
+		frames[file] = list
 	end
-	if master() then
-		local mode = wm.transition_period and "t" or wm.pre_blowout_period and "p" or "n"
-		local res = select_weather(wm, now)
-		publish_weather(wm, mode)
-		return res
-	end
-	local w = take_weather(wm)
-	local res = select_weather(wm, now)
-	-- a pick of its own (the cloudy preset of a change of cycle) gives way to the master's
-	if w and w.file ~= "" and wm.weatherType == "atmosfear" and wm.weather_file ~= w.file then
-		wm.weather_file = w.file
-		if not (weather.is_paused() or level.is_wfx_playing()) then
-			level.set_weather(w.file, now and true or false)
+	for i = 1, #list do
+		if list[i] > hour * 3600 then
+			return list[i]
 		end
 	end
-	dbg("weather %s (master's %s)", tostring(wm.weather_file), tostring(w and w.file))
+	return 86400
+end
+
+-- The world's weather onto the screen, the same picture in every game whenever it came into the world: an hour goes
+-- from its own frame of the weather before to the next frame of the weather now, and on from there in the weather
+-- now. Each hour only the frame ahead is changed (set_weather_smooth), seconds into the hour, when it weighs nothing
+-- yet: no game sees a step. now: the whole picture is set at once, to what a game here all along shows - for a game
+-- that came, whose clock jumped, or the admin's weather.
+local function show(w, now)
+	if weather.is_paused() then
+		return
+	end
+	if level.is_wfx_playing() then
+		level.set_weather(w.file, false) -- a surge runs: the weather it gives way to
+		return
+	end
+	if now then
+		local Y, M, D, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+		-- the master's pick for this hour, and its first frame still ahead: we are between the two weathers. A pick
+		-- of the hour before (the master's new one is seconds away) is this hour's weather before
+		if w.hour == h and w.before ~= w.file and h * 3600 + m * 60 + s < next_frame(w.file, h) then
+			level.set_weather(w.before, true)
+		else
+			level.set_weather(w.file, true)
+			return
+		end
+	end
+	level.set_weather_smooth(w.file)
+end
+
+local shown_hour -- the hour our weather was set for last
+
+-- over: a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the
+-- master publishes stays the world's
+local function pick(wm, now, over)
+	-- select_weather itself takes a clock that jumped (forced_weather_change) for now; an hour that isn't the next
+	-- one is the same thing (the clock of a game that has just come settles)
+	local hour = level.get_time_hours()
+	local at_once = now or wm.forced_weather_change_on_time_change or
+		shown_hour ~= nil and hour ~= shown_hour and hour ~= (shown_hour + 1) % 24 or false
+	shown_hour = hour
+	local w, res
+	if master() then
+		local mode = wm.transition_period and "t" or wm.pre_blowout_period and "p" or "n"
+		res = select_weather(wm, now)
+		publish_weather(wm, mode)
+		w = parse_weather(published.weather)
+	else
+		w = take_weather(wm)
+		res = select_weather(wm, now) -- the manager's own fields; what it set gives way to the master's below
+	end
+	local world = w and w.file ~= "" and wm.weatherType == "atmosfear"
+	if world then
+		wm.weather_file = w.file
+	end
+	if over then
+		if not (weather.is_paused() or level.is_wfx_playing()) then
+			level.set_weather(over, at_once and true or false)
+		end
+	elseif world then
+		show(w, at_once)
+	end
+	dbg("weather %s after %s%s%s", tostring(wm.weather_file), tostring(w and w.before), at_once and ", at once" or "",
+		over and ", under " .. over or "")
 	return res
 end
 
--- a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the master
--- publishes stays the world's
 local function wrapped_select(wm, now)
-	local res = pick(wm, now)
 	local over = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
+	if coop_on() then
+		return pick(wm, now, over)
+	end
+	local res = select_weather(wm, now)
 	if over and not (weather.is_paused() or level.is_wfx_playing()) then
 		level.set_weather(over, now and true or false)
 	end
@@ -214,13 +289,44 @@ local function sync_timetable(fact, mgr, last, duration)
 	end
 end
 
+-- Our weather is set anew, at once, when a level has loaded (the load left the weather of the save:
+-- aaaa_script_fixes_mp keeps a save's own) and when the clock jumped: not before this frame (the sky takes a new
+-- time a frame after the clock does), and not before our clock is the world's (it becomes that after the load)
+local settle_frame
+local max_hold = 120 -- game s our clock may wait ahead of the world's (max_hold_s)
+
+local function settle()
+	settle_frame = device().frame + 2
+end
+
+local function clock_settled()
+	local world = coop.clock()
+	if world <= 0 then
+		return true -- a world with no clock
+	end
+	local Y, M, D, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	local off = math.abs(h * 3600 + m * 60 + s - math.floor(world / 1000) % 86400)
+	return math.min(off, 86400 - off) <= max_hold + 5
+end
+
 local function check()
-	if not (coop_on() and db.actor) or time_global() < next_check then
+	if not (coop_on() and db.actor) then
+		return
+	end
+	if settle_frame and device().frame >= settle_frame and clock_settled() then
+		settle_frame = nil
+		local wm = patch_weather_manager()
+		if wm and not master() then
+			wm:select_weather(true)
+		end
+	end
+	if time_global() < next_check then
 		return
 	end
 	next_check = time_global() + check_every
 	local wm = patch_weather_manager()
-	if master() and wm and wm.weather_file then
+	-- not between the hour's turn and the manager's pick for it (up to 3 s): the old weather under the new hour
+	if master() and wm and wm.weather_file and wm.last_hour == level.get_time_hours() then
 		publish_weather(wm)
 	end
 	sync_timetable("surge", surge_manager.get_surge_manager(), "last_surge_time", "surge_time")
@@ -247,6 +353,7 @@ function on_game_start()
 		return -- not the co-op engine
 	end
 	check_every = (ini_sys:r_float_ex(SECTION, "schedule_check_s") or 2) * 1000
+	max_hold = ini_sys:r_float_ex(SECTION, "max_hold_s") or max_hold
 
 	local class = level_weathers.WeatherManager
 	select_weather, change_period = class.select_weather, class.change_period
@@ -266,12 +373,18 @@ function on_game_start()
 		end
 	end)
 
-	-- the engine moved our clock far (we came into the world, someone slept): the weather is picked again
+	-- the engine moved our clock far (we came into the world, someone slept): the weather is picked again. Ours is
+	-- the master's, set anew right away (settle): left to forced_weather_change, the next hour's would come all at
+	-- once, a step in the sky up to an hour after we came
 	_G.coop_on_time_jump = function(seconds)
-		dbg("clock moved %d game s", seconds)
+		dbg("clock moved %s game s", seconds)
 		local wm = db.actor and level_weathers.get_weather_manager()
 		if wm then
-			wm:forced_weather_change()
+			if master() then
+				wm:forced_weather_change()
+			else
+				settle()
+			end
 		end
 		published = {}
 	end
@@ -280,6 +393,8 @@ function on_game_start()
 		published = {}
 		taken = {}
 		next_check = 0
+		shown_hour = nil
+		settle()
 	end)
 	RegisterScriptCallback("actor_on_update", check)
 end
