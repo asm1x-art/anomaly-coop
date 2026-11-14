@@ -352,6 +352,12 @@ clean_interval_s      = 300   ; real s between the host's cleaner passes
 keep_bodies_per_level = 5     ; a level keeps this many bodies even with nothing on them
 max_per_pass          = 10    ; at most this many released per level each pass
 min_player_distance   = 200   ; m: no body this close to a player goes (on a player's level none go at all)
+; the game's own cleanup in co-op (the limits are the server's rules corpse_max_count, corpse_min_dist and
+; release_dropped_items, the admin window's "Зона")
+body_stay_s           = 180   ; real s a body lies before the level's authority may release it over the limit
+dropped_check_s       = 60    ; real s between the sim master's looks at the dropped things
+dropped_hours         = 4     ; game hours a dropped thing nobody took lies (on a level with no player) before it goes
+dropped_hours_off     = 12    ; the same with the rule release_dropped_items off
 
 ; Co-op: a player of these factions isn't hurt by the Brain Scorcher and the Miracle Machine (coop_psi.script). In
 ; story mode Anomaly turns both off for the whole game when one starts as one of them (ui_mm_faction_select,
