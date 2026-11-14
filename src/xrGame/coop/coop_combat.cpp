@@ -72,7 +72,6 @@ namespace coop
 	static xr_map<u32, SProxy> g_proxies; // peer id -> its stand-in here
 	static u32 g_last_orphan_check = 0;
 	static xr_set<std::pair<u16, u32>> g_grudges; // (squad id, or a squadless NPC's own; peer id)
-	static xr_map<u32, shared_str> g_grudged_on;  // player -> the level they were on then: leaving it, all is forgiven
 	static xr_map<u16, SActorHit> g_actor_hits;   // NPC id: our actor hit it lately
 
 	// _G.<name>(args...) when Lua has it
@@ -208,14 +207,6 @@ namespace coop
 		return monster && monster->m_group_id != NO_OBJECT ? monster->m_group_id : npc;
 	}
 
-	static shared_str level_of_player(u32 peer)
-	{
-		if (peer == my_id())
-			return g_pGameLevel ? Level().name() : shared_str();
-		auto it = peers().find(peer);
-		return it != peers().end() ? it->second.level : shared_str();
-	}
-
 	// f(id) for each member of a squad, or the one NPC
 	template <typename F>
 	static void for_members(u16 key, F f)
@@ -232,8 +223,6 @@ namespace coop
 	{
 		if (!g_grudges.insert({key, peer}).second)
 			return;
-		if (!g_grudged_on.count(peer))
-			g_grudged_on[peer] = level_of_player(peer);
 		if (ours)
 		{
 			NET_Packet P;
@@ -247,6 +236,10 @@ namespace coop
 		auto player = peers().find(peer);
 		Msg("[coop] %s (id=%u) holds a grudge against %s", holder ? holder->name_replace() : "?", key,
 		    peer == my_id() ? "us" : player != peers().end() ? player->second.name.c_str() : "a player gone");
+		// made here: the world keeps it from now on (coop_relations.script), whoever runs the level or loads the world
+		const xr_string* name = peer == my_id() ? &my_name() : player != peers().end() ? &player->second.name : nullptr;
+		if (ours && name)
+			call_lua("_G.coop_on_grudge", key, name->c_str());
 	}
 
 	// The squads that stand up for a stalker who was hit: the others of its faction in its camp (the smart
@@ -314,28 +307,6 @@ namespace coop
 		call_lua("_G.coop_on_calm", key);
 	}
 
-	// a player gone from the level where squads turned on them, or from the game: they calm down
-	static void forget_player(u32 peer)
-	{
-		u32 forgotten = 0;
-		for (auto it = g_grudges.begin(); it != g_grudges.end();)
-		{
-			if (it->second != peer)
-			{
-				++it;
-				continue;
-			}
-			if (peer == my_id())
-				calm(it->first);
-			it = g_grudges.erase(it);
-			++forgotten;
-		}
-		g_grudged_on.erase(peer);
-		if (forgotten)
-			Msg("[coop] %u grudge(s) against %s forgotten: gone from that level", forgotten,
-			    peer == my_id() ? "us" : "a player");
-	}
-
 	// A player fell: the squads that turned on them got even and calm down, towards the player's group as
 	// well. The faction's goodwill stays as the attack left it.
 	static void settle_with(u32 peer)
@@ -372,14 +343,24 @@ namespace coop
 		send(P);
 	}
 
-	static void forget_gone_players()
+	// Lua (coop_relations.script): the world's grudges are kept by the server as facts and put on here by the
+	// player's name, in every game, after every load; taken off as they are forgiven. False: no such player here now
+	bool set_grudge(u16 key, LPCSTR name, bool on)
 	{
-		xr_vector<u32> gone;
-		for (const auto& [peer, level] : g_grudged_on)
-			if ((peer != my_id() && !peers().count(peer)) || level_of_player(peer) != level)
-				gone.push_back(peer);
-		for (u32 peer : gone)
-			forget_player(peer);
+		u32 peer = u32(-1);
+		if (my_name() == name)
+			peer = my_id();
+		else
+			for (const auto& [id, other] : peers())
+				if (other.name == name)
+					peer = id;
+		if (peer == u32(-1))
+			return false;
+		if (on)
+			g_grudges.insert({key, peer});
+		else if (g_grudges.erase({key, peer}) && peer == my_id())
+			calm(key);
+		return true;
 	}
 
 	bool has_grudge_id(u16 npc, u16 other)
@@ -424,7 +405,6 @@ namespace coop
 		if (!world_ready() || !is_connected())
 			return;
 		judge_actor_hits();
-		forget_gone_players();
 
 		const shared_str& level = Level().name();
 		remove_orphans();
@@ -802,6 +782,5 @@ namespace coop
 	void clear_grudges()
 	{
 		g_grudges.clear();
-		g_grudged_on.clear();
 	}
 }

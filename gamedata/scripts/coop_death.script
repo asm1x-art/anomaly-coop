@@ -110,6 +110,7 @@ local function go_down()
 	db.actor:hide_weapon()
 	hud(true)
 	coop.fell()
+	coop_relations.on_fell()
 	coop_sync.send_event("downed", coop.my_name())
 	printf("[coop] down, waiting for help")
 end
@@ -198,6 +199,7 @@ end
 -- no own save: back where we were when the world was last saved
 local function back_to_save_point()
 	coop.fell()
+	coop_relations.on_fell()
 	stand(1)
 	recover()
 	db.actor.power = 1

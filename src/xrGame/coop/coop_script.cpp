@@ -184,6 +184,8 @@ namespace coop
 			def("progress_fresh", &progress_fresh),    // a new character: the save's personal Lua state goes
 			def("remote_death", &is_dying_remotely), // (id) another game's death of it is being applied here
 			def("grudge", &has_grudge_id),          // (npc id, id of our actor or a stand-in): its squad was shot by that player
+			def("set_grudge", &set_grudge),         // (squad id, player's name, on): as the world's facts have it (coop_relations.script)
+			def("clear_grudges", &clear_grudges),   // a load: the world's facts put them on again
 			def("begin_shared", &begin_shared_spawns),
 			def("end_shared", &end_shared_spawns),
 			def("send_event", &script_send_event),

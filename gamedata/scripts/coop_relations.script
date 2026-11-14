@@ -1,0 +1,186 @@
+-- Co-op: grudges, kept by the world. A squad a player shot holds it against that player and the player's group
+-- (src/xrGame/coop/coop_combat.h): the engine makes a grudge in the game that runs the level. Here each one becomes a
+-- fact about the world on the server ("grudge:<squad id>:<player>" = the world's clock, in game minutes, when that
+-- player was last near the squad; coop_facts.script), so every game has the same ones whoever runs the level, they
+-- come back after a level change, a reconnect or a load, and a rollback takes them back with the rest of the world.
+-- A grudge goes when:
+--   the player fell (coop_death.script): the squads that turned on them forgive them and their group;
+--   the player got away: farther than escape_distance from every living one of the squad (or on another level, or
+--   out of the game) for forget_hours of game time;
+--   nobody of the squad is left.
+-- The faction's goodwill lost for the attack (coop_sync.script, the rules' faction_penalty) stays, also when the
+-- player comes back from a death as an older save has them: what a player lost in all is a fact too
+-- ("penalty:<player>:<faction>"), what of it the character has taken is the character's own (the actor's variable
+-- coop_penalty_<faction>, a part of the progress), and the difference is taken whenever there is one.
+-- Numbers: [coop_relations] in mod_system_coop.ltx.
+
+local SEC = "coop_relations"
+local PREFIX = "grudge:"
+local kept = {}      -- "<squad id>:<player>" -> game minutes of the last contact, as the world's facts have it
+local next_check = 0 -- time_global()
+
+local function cfg(key, default)
+	return ini_sys:r_float_ex(SEC, key) or default
+end
+
+local function dbg(text, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] relations: %s", string.format(text, ...)) -- printf knows %s alone
+	end
+end
+
+local function minutes()
+	return math.floor(coop.clock() / 60000)
+end
+
+local function split(k)
+	local key, name = string.match(k, "^(%d+):(.+)$")
+	return tonumber(key), name
+end
+
+-- one grudge as the facts have it now, onto this game; value nil: forgiven
+local function put(key, name, value)
+	kept[key .. ":" .. name] = value
+	coop.set_grudge(key, name, value ~= nil)
+end
+
+-- a change made here: onto this game and to the server, which tells the others
+local function set(key, name, value)
+	put(key, name, value)
+	coop.report_fact(PREFIX .. key .. ":" .. name, value and string.format("%.0f", value) or "")
+end
+
+local function forgive(key, name, why)
+	if kept[key .. ":" .. name] then
+		printf("[coop] grudge of squad %s against %s forgotten: %s", key, name, why)
+		set(key, name, nil)
+	end
+end
+
+-- a living one of the squad (or the squadless NPC) on our level, no farther than radius from our player
+local function squad_near(se, key, radius)
+	local pos = db.actor:position()
+	local function near(id)
+		local npc = level.object_by_id(id)
+		return npc ~= nil and npc:alive() and npc:position():distance_to(pos) <= radius
+	end
+	if se.squad_members then
+		for member in se:squad_members() do
+			if near(member.id) then
+				return true
+			end
+		end
+		return false
+	end
+	return near(key)
+end
+
+-- The goodwill of factions we attacked: what the world knows we lost and our character hasn't yet (a save from before).
+local function take_penalties()
+	local me = coop.my_name()
+	for _, community in ipairs(game_relations.factions_table) do
+		local total = tonumber(coop.fact("penalty:" .. me .. ":" .. community)) or 0
+		local taken = load_var(db.actor, "coop_penalty_" .. community, 0)
+		if total > taken then
+			relation_registry.change_community_goodwill(community, AC_ID, taken - total)
+			save_var(db.actor, "coop_penalty_" .. community, total)
+			printf("[coop] %s like us %s less", community, total - taken)
+		end
+	end
+end
+
+-- We attacked a squad of that faction that wasn't hostile (coop_sync.script): its goodwill toward us drops by amount.
+function penalty(community, amount)
+	local fact = "penalty:" .. coop.my_name() .. ":" .. community
+	local total = (tonumber(coop.fact(fact)) or 0) + amount
+	coop.report_fact(fact, tostring(total))
+	if tonumber(coop.fact(fact)) == total then
+		take_penalties()
+	else -- the facts aren't up yet: this once without the world knowing
+		relation_registry.change_community_goodwill(community, AC_ID, -amount)
+		printf("[coop] %s like us %s less", community, amount)
+	end
+end
+
+-- nobody of the squad (or the squadless NPC) lives
+local function wiped(se)
+	if se.squad_members then
+		return se:npc_count() == 0
+	end
+	return se.alive ~= nil and not se:alive()
+end
+
+-- Our player fell (lying wounded, back at a save): the squads that turned on us got even, with our group as well.
+function on_fell()
+	local me, squads, all = coop.my_name(), {}, {}
+	for k in pairs(kept) do
+		local key, name = split(k)
+		all[#all + 1] = { key, name }
+		if name == me then
+			squads[key] = true
+		end
+	end
+	for _, g in ipairs(all) do
+		if squads[g[1]] then
+			forgive(g[1], g[2], "the player they turned on fell")
+		end
+	end
+end
+
+local function update()
+	local tg = time_global()
+	if tg < next_check or not (coop.connected() and db.actor) then
+		return
+	end
+	next_check = tg + cfg("check_s", 5) * 1000
+	local now = minutes()
+	if now <= 0 then
+		return
+	end
+	take_penalties()
+	local me, master = coop.my_name(), coop.is_sim_master()
+	local forget = cfg("forget_hours", 2) * 60
+	local refresh = cfg("contact_refresh_min", 10)
+	local radius = cfg("escape_distance", 150)
+	for k, last in pairs(kept) do
+		local key, name = split(k)
+		local se = alife_object(key)
+		coop.set_grudge(key, name, true) -- a player who came in since, under a new id
+		if name == me or master then
+			if not se or wiped(se) then
+				forgive(key, name, "nobody of it is left")
+			elseif last > now + refresh then
+				set(key, name, now) -- the world's clock was taken back
+			elseif name == me and squad_near(se, key, radius) then
+				if now - last >= refresh then
+					dbg("still near squad %s, %s min since the last note", key, now - last)
+					set(key, name, now)
+				end
+			elseif now - last >= forget + (name == me and 0 or 2 * refresh) then
+				-- ours: we got away; another player's (the sim master, for those out of the game): theirs is overdue
+				forgive(key, name, string.format("%s game min away from it", now - last))
+			end
+		end
+	end
+end
+
+function on_game_start()
+	if not (coop and coop.set_grudge and coop_facts) then
+		return -- not the co-op engine
+	end
+	-- the engine's are from before this load (another level, a save the world went back to): the facts put the
+	-- world's on again at the actor's first update
+	coop.clear_grudges()
+	coop_facts.on_fact(PREFIX, function(fact, value)
+		local key, name = split(string.sub(fact, #PREFIX + 1))
+		if key then
+			dbg("%s = '%s'", fact, value)
+			put(key, name, tonumber(value))
+		end
+	end)
+	-- the engine, in the game that runs the level: a squad turned on a player (and on each of the player's group)
+	_G.coop_on_grudge = function(key, name)
+		set(key, name, minutes())
+	end
+	RegisterScriptCallback("actor_on_update", update)
+end
