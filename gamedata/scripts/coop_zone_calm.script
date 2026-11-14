@@ -4,7 +4,7 @@
 -- and none is born there meanwhile. Then the anomalies come back and bear artefacts as after a surge.
 --   anomalies  every game on that level puts them out (and keeps them out when Anomaly's artefact zones switch their
 --              layers); each remembers what it put out (its save) and puts it back once the calm is over there, the
---              zones' layers as they were
+--              zones' layers as the world's seed has them (coop_anom_layers)
 --   artefacts  Anomaly's come only from its artefact zones (bind_anomaly_zone spawn_artefact_randomly; single
 --              anomalies bear none: the engine's zones have no artefact birth, dynamic anomalies are off in co-op);
 --              disable_anomaly_fields alone would not stop them, a zone spawns by its own refresh() whatever its fields
@@ -18,6 +18,7 @@
 --   the end    a game on the level spawns new artefacts at once, as after a surge (coop_sync: its authority, for
 --              everyone); with nobody there the sim master marks the level for the world ("zone_event:respawn:<level>"):
 --              the first game to load it as its authority spawns them. Stopped by an admin («Ñòîï»): no new ones.
+--              The level's authority rolls its anomaly layers anew, for the world (coop_anom_layers.roll), as a surge.
 
 local ID = "calm"
 local S = "zone_event_calm"
@@ -96,7 +97,7 @@ local function put_back()
 		end
 	end
 	state.off[lvl] = nil
-	-- the artefact zones' layers as they were: the fields of their other layers out again
+	-- the artefact zones' layers (the world's: coop_anom_layers): the fields of their other layers out again
 	for _, zone in pairs(db.anomaly_by_name or {}) do
 		if zone.disable_anomaly_fields then
 			pcall(zone.disable_anomaly_fields, zone)
@@ -167,8 +168,12 @@ local function sweep(lvl)
 end
 
 -- new artefacts as after a surge: at once if we are on the level (its authority spawns them, coop_sync), else, if the
--- level is ours (nobody is on it: the sim master's), when the next one loads it
+-- level is ours (nobody is on it: the sim master's), when the next one loads it. Its anomaly layers anew, as after a
+-- surge: its authority rolls them for the world
 local function respawn(lvl)
+	if authority(lvl) and coop_anom_layers and coop_anom_layers.roll then
+		coop_anom_layers.roll(lvl)
+	end
 	if level.name() == lvl then
 		bind_anomaly_zone.force_spawn_artefacts()
 		return
