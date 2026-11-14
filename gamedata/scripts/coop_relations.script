@@ -12,6 +12,9 @@
 -- player comes back from a death as an older save has them: what a player lost in all is a fact too
 -- ("penalty:<player>:<faction>"), what of it the character has taken is the character's own (the actor's variable
 -- coop_penalty_<faction>, a part of the progress), and the difference is taken whenever there is one.
+-- A character made anew under a name starts clean: the server drops that name's grudges and penalties when a
+-- player comes in with no character in the world (coop-server server.js forgetPlayerFacts); a world reset drops
+-- every fact.
 -- Numbers: [coop_relations] in mod_system_coop.ltx.
 
 local SEC = "coop_relations"
@@ -85,6 +88,10 @@ local function take_penalties()
 			relation_registry.change_community_goodwill(community, AC_ID, taken - total)
 			save_var(db.actor, "coop_penalty_" .. community, total)
 			printf("[coop] %s like us %s less", community, total - taken)
+		elseif total < taken then
+			-- the world dropped what it held against this name (a character made anew, coop-server server.js
+			-- forgetPlayerFacts): the count starts over with it, the goodwill is the character's as it is
+			save_var(db.actor, "coop_penalty_" .. community, total > 0 and total or nil)
 		end
 	end
 end
