@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!-- The graphics preset list in the video options (gfx_presets.script, ui_options_modded_exes.script) -->
+<string_table>
+	<string id="ui_mm_video_advanced_gfx_preset">
+		<text>Пресет по видеопамяти</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_desc">
+		<text>Готовый набор под объём видеопамяти: страницы Screen Space Shaders (меню настроек модов) и значения рендера, подобранные под этот объём. «Применить» с другим пунктом перезаписывает эти настройки; свои правки потом можно вносить снова. Качество шейдеров начинает действовать только после перезапуска игры. Список «Пресеты» вверху окна — другое: это пресеты качества самой игры, они меняют только базовые настройки движка на этой странице. Если выбрать такой пресет позже, он заменит часть значений этого набора (трава, детализация, дальность, лучи солнца, объёмный свет, MSAA), а страницы шейдеров не тронет.</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_note">
+		<text>Набор настроек графики под объём видеопамяти; перезаписывает настройки графики и страницы Screen Space Shaders. Полностью действует после перезапуска игры.</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_again">
+		<text>Применить заново</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_again_desc">
+		<text>Применить выбранный пресет по видеопамяти ещё раз, даже если он уже действует: вернуть его значения после своих правок или после пресета качества игры. Заодно применяются остальные изменённые настройки, окно закрывается.</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_4gb">
+		<text>4 ГБ видеопамяти</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_8gb">
+		<text>6–8 ГБ видеопамяти</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_12gb">
+		<text>10–12 ГБ видеопамяти</text>
+	</string>
+</string_table>

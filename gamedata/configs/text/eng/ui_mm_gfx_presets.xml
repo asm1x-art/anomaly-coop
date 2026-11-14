@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="windows-1251" ?>
+
+<!-- The graphics preset list in the video options (gfx_presets.script, ui_options_modded_exes.script) -->
+<string_table>
+	<string id="ui_mm_video_advanced_gfx_preset">
+		<text>Preset by video memory</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_desc">
+		<text>A ready set for the amount of video memory: the Screen Space Shaders pages (Mod Configuration Menu) and the render values tuned for that amount. Apply with another entry chosen overwrites these settings; you can make your own changes again afterwards. Shader quality takes effect only after the game is restarted. The Presets list at the top of the window is a different thing: the game's own quality presets, which change only the base engine settings of this page. If you pick one of those later, it replaces part of this set's values (grass, detail, view distance, sun shafts, volumetric lights, MSAA) and leaves the shader pages alone.</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_note">
+		<text>A set of graphics settings for the amount of video memory; overwrites the graphics settings and the Screen Space Shaders pages. In full force after the game is restarted.</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_again">
+		<text>Apply again</text>
+	</string>
+	<string id="ui_mm_video_advanced_gfx_preset_again_desc">
+		<text>Apply the chosen preset by video memory once more, even if it is already in force: brings its values back after your own changes or after one of the game's quality presets. The other changed settings are applied too and the window closes.</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_4gb">
+		<text>4 GB of video memory</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_8gb">
+		<text>6-8 GB of video memory</text>
+	</string>
+	<string id="ui_mm_gfx_preset_tier_12gb">
+		<text>10-12 GB of video memory</text>
+	</string>
+</string_table>

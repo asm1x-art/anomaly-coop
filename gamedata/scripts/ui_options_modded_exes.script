@@ -47,6 +47,25 @@ function dlss_not_chosen()
 	return not dlss_chosen()
 end
 
+-- Preset by video memory (gfx_presets.script): the entry chosen in the window's list (pending first, else the stored one)
+local GFX_ID = "video/advanced/gfx_preset"
+local function gfx_preset_chosen(self)
+	local v = ui_options.get_opt_table(GFX_ID)
+	return v and v.id and self:GetCurrentValue("video/advanced", "gfx_preset", v) or nil
+end
+
+-- the "Apply again" button: the chosen preset is put in force even if it is the one already applied, then the window's
+-- own Apply runs (the other pending rows go on top, the window closes with the notice to restart the game)
+function gfx_preset_again(self)
+	local chosen = gfx_preset_chosen(self)
+	if not (chosen and gfx_presets.apply(chosen)) then
+		return
+	end
+	self.Change_Done = true
+	self.Need_Restart = true
+	self:On_Accept()
+end
+
 -- the options window's hooks: DLSS wins over MSAA in the pending values; the page is drawn anew after a DLSS change
 -- (on the next update, not inside the list's own callback)
 local function hook_options_window()
@@ -87,6 +106,17 @@ local function hook_options_window()
 			end
 			self.dlss_redraw = true
 		end
+	end
+
+	-- Apply: a preset by video memory chosen in the list (the pending value is not the stored one) is put in force
+	-- before the window sends the other changed rows, so the player's own changes of the same Apply stay on top
+	local base_accept = cls.On_Accept
+	function cls:On_Accept()
+		local chosen = gfx_preset_chosen(self)
+		if chosen and chosen ~= ui_options.get(GFX_ID) then
+			gfx_presets.apply(chosen)
+		end
+		return base_accept(self)
 	end
 
 	local base_update = cls.Update
@@ -298,6 +328,35 @@ function on_xml_read()
 				hook_options_window()
 				need_init_opt_coder = true
 			end
+		end
+
+		-- Preset by video memory (gfx_presets.script), the first row of Video > Advanced: right under the window's own
+		-- "Presets" list (the game's quality presets of this page), so the two read as a pair.
+		-- The preset is put in force by the window's Apply when another entry was chosen (the On_Accept hook above),
+		-- or by the button under the list; a short line under them, the rest is in the list's hint
+		if advanced and advanced.gr and gfx_presets and advanced.gr[1] and advanced.gr[1].id ~= "gfx_preset" then
+			table.insert(advanced.gr, 1, {
+				id      = "gfx_preset",
+				type    = "list",
+				val     = 0,
+				def     = {gfx_presets.current},
+				content = {gfx_presets.option_content},
+				no_str  = true,
+				restart = true, -- shader quality levels are built into the shaders at the game's start
+			})
+			table.insert(advanced.gr, 2, {
+				id         = "gfx_preset_again",
+				type       = "button",
+				functor_ui = {gfx_preset_again},
+			})
+			table.insert(advanced.gr, 3, {
+				id   = "gfx_preset_note",
+				type = "desc",
+				text = "ui_mm_video_advanced_gfx_preset_note",
+				clr  = {255, 200, 200, 200},
+			})
+			hook_options_window()
+			need_init_opt_coder = true
 		end
 		if need_init_opt_coder and ui_options.init_opt_coder then
 			ui_options.init_opt_coder()
