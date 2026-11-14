@@ -189,24 +189,28 @@ local function update_weather(on)
 end
 
 -------------------------------------------------------------------------------
--- the ash on the ground (each game its own picture; the engine's ash pass, shaders/r3/ash_ground.h): the shader bus
--- lanes ash_cover (cover 0..1, opacity, gloss kept, patchiness), ash_look (albedo, patch size), ash_mask (normal.y
--- and open sky from no ash to full), ash_shape (how far it smooths the surface, grain) and ash_flora (foliage and far
--- tree LODs: their facing, strength, how much a crown's own shade is ignored), ash_bark (tree trunks: facing,
--- strength) and ash_kinds (the most on grass and on alpha tested surfaces). On ground_levels only, 0 anywhere else,
--- in the headless host and on an exe without the bus. Every game works it out from shared facts, so all show the same:
---   falling  while the front is on: 0 to 1 over ground_ramp_up_min real minutes from its start (the event's from)
---   lying    after it: what had settled fades over ground_linger_game_h GAME hours, (1 - t) ^ ground_linger_curve; the
---            master writes the fact "zone_event:ash_ground_<level>" = "<game second of the end>|<cover then>|<rain>"
---            when the front ends (the event's slot can go to another event, this stays), so it outlives saves,
---            rejoins, level changes and host restarts. A new front on a level with ash still lying: the larger of the two
---   rain     washes it off quicker: while ash lies on a level the master adds up the world's rain (rain density x game
---            seconds: the weather the master publishes, coop_time's "weather" fact, its file's rain_density at the
---            hour; its own weather without co-op) into <rain> of the fact, and every game counts ground_rain_wash
---            game seconds of lying more for each one of it: the same in every game, as it is a shared fact
+-- the ash: how hard it falls and how much of it lies on the ground. The master decides both for each of the front's
+-- levels and keeps them as the fact "zone_event:ash_now_<level>" = "<cover>|<cover a s>|<fall>|<fall a s>": the values
+-- now and how fast each goes (a real second). Every game with a player only shows what the fact says (ash_now()),
+-- going on from it at its rates till the next one, so two players on a level see the same, and a join, a level change
+-- or a reconnect starts where the others are. The fact outlives saves, rejoins and host restarts.
+--   fall    the front's strength 0..1 (the falling ash, coop_zone_ash_fx.script): up over ramp_in_min real minutes
+--           from the front's start, down over ramp_out_min before its planned end, over ramp_stop_s when it ended
+--           otherwise (an admin's stop) ([zone_event_ash_fx])
+--   cover   the ash on the ground 0..1, on ground_levels only: settles at fall / ground_full_min a real minute while
+--           the front is on; after it goes at 1 / ground_linger_game_h a GAME hour (a sleep takes its share) and, while
+--           the world's weather rains (the weather the master publishes), rain density / ground_rain_wash_min a real
+--           minute more
+-- The master looks each look of the events (check_s), sends a change of course at once and the rest each
+-- ground_publish_s real seconds. A game eases what it showed onto a new fact over ground_blend_s (a gap above
+-- ground_snap is taken at once) and goes on at the fact's rates for ground_extrapolate_s at most (no master: it stops).
+-- The picture of the ground's ash (the engine's ash pass, shaders/r3/ash_ground.h): the shader bus lanes ash_cover
+-- (cover 0..1, opacity, gloss kept, patchiness), ash_look (albedo, patch size), ash_mask (normal.y and open sky from
+-- no ash to full), ash_shape (how far it smooths the surface, grain), ash_flora (foliage and far tree LODs: their
+-- facing, strength, how much a crown's own shade is ignored), ash_bark (tree trunks: facing, strength) and ash_kinds
+-- (the most on grass and on alpha tested surfaces). Not in the headless host, nor on an exe without the bus.
 
 local ground_tokens -- { cover, look, mask, shape, flora, bark }, nil: no bus
-local ground_ev     -- the slot's ash event as update() last saw it (on or over), nil: none
 local ground_last = -1
 local next_ground = 0
 
@@ -255,38 +259,27 @@ local function game_seconds()
 	return math.floor(game.get_game_time():diffSec(level.get_start_time()))
 end
 
--- the falling ash's cover at real second t of the front ev
-local function ground_falling(ev, t)
-	local up = math.max(1, num("ground_ramp_up_min", 20) * 60)
-	return math.min(1, math.max(0, (t - ev.from) / up))
+local function clamp01(x)
+	return math.max(0, math.min(1, x))
 end
 
--- the ash still lying on lvl from a front that ended there
--- the fact of the ash lying on lvl: the game second the front ended, the cover then, the rain since (density x s)
-local function ground_fact(lvl)
-	local at, cover, rain = string.match(ZE.mark_of("ash_ground_" .. lvl) or "", "^(%d+)|([%d%.]+)|?([%d%.]*)$")
-	if not at then
+local function fx_num(key, default)
+	return ini_sys:r_float_ex("zone_event_ash_fx", key) or default
+end
+
+local function now_key(lvl)
+	return "ash_now_" .. lvl
+end
+
+-- the fact ash_now_<level>: cover, its rate, fall, its rate (nil: none)
+local function parse_now(text)
+	local n = "([%d%.eE%+%-]+)"
+	local c, cr, f, fr = string.match(text or "", "^" .. n .. "|" .. n .. "|" .. n .. "|" .. n .. "$")
+	c, cr, f, fr = tonumber(c), tonumber(cr), tonumber(f), tonumber(fr)
+	if not (c and cr and f and fr) then
 		return nil
 	end
-	return tonumber(at), tonumber(cover), tonumber(rain) or 0
-end
-
--- how far (0..1) the ash lying on lvl has gone: game time since the front, rain counting extra
-local function ground_gone(at, rain)
-	local t = game_seconds() - at + rain * num("ground_rain_wash", 4)
-	return math.max(0, t) / math.max(1, num("ground_linger_game_h", 60) * 3600)
-end
-
-local function ground_lying(lvl)
-	local at, cover, rain = ground_fact(lvl)
-	if not at then
-		return 0
-	end
-	local x = ground_gone(at, rain)
-	if x >= 1 then
-		return 0
-	end
-	return cover * (1 - x) ^ num("ground_linger_curve", 1.5)
+	return c, cr, f, fr
 end
 
 -- the world's rain now (master): the weather the master publishes (coop_time: "weather" = hour|cycle|preset|mode|file),
@@ -309,65 +302,146 @@ local function world_rain()
 	return level.rain_factor()
 end
 
--- master, each ground_rain_sample_s real seconds: the rain since the last look onto every level's lying ash
-local rain_last_gs, next_rain = nil, 0
-local function ground_rain()
-	local now = time_global()
-	if now < next_rain then
+-- the master: each level's ash, as it last looked (level -> { c, cr, f, fr: cover, fall and their rates a real s;
+-- sent: time_global() it last sent them }), from the fact when it begins
+local ash_state = {}
+local last_look, last_gs = nil, nil
+
+-- the fact of the ash lying after a front as it was before ash_now ("<game s of the end>|<cover then>|<rain>"): taken
+-- over once, without the rain
+local function old_lying(lvl, gs)
+	local key = "ash_ground_" .. lvl
+	local at, cover = string.match(ZE.mark_of(key) or "", "^(%d+)|([%d%.]+)")
+	if not at then
+		return 0
+	end
+	ZE.mark(key, "")
+	return clamp01(tonumber(cover) * (1 - (gs - tonumber(at)) / math.max(1, num("ground_linger_game_h", 60) * 3600)))
+end
+
+local function sign(x)
+	return x > 0 and 1 or x < 0 and -1 or 0
+end
+
+-- the master, each look: how far each level's ash went since the last one, its course from now, the fact
+local function ash_master(ev)
+	local t = time_global()
+	if last_look and t - last_look < 500 then
 		return
 	end
-	next_rain = now + num("ground_rain_sample_s", 30) * 1000
+	local dt = last_look and (t - last_look) / 1000 or 0
 	local gs = game_seconds()
-	local dt = rain_last_gs and math.max(0, gs - rain_last_gs) or 0
-	rain_last_gs = gs
+	local gdt = last_gs and math.max(0, gs - last_gs) or 0
+	last_look, last_gs = t, gs
 	local rain = world_rain()
-	if dt <= 0 or rain <= 0.001 then
-		return
-	end
-	for _, lvl in ipairs(ZE.ini_list(S, "ground_levels")) do
-		local at, cover, wet = ground_fact(lvl)
-		if at and ground_gone(at, wet) < 1 then
-			wet = wet + rain * dt
-			ZE.mark("ash_ground_" .. lvl, string.format("%d|%.3f|%d", at, cover, math.floor(wet)))
-			ZE.dbg("%s", string.format("rain %.2f on the ash of %s: %d", rain, lvl, math.floor(wet)))
+	local full = math.max(1, num("ground_full_min", 3) * 60)
+	local linger = math.max(1, num("ground_linger_game_h", 60) * 3600)
+	local wash = math.max(1, num("ground_rain_wash_min", 5) * 60)
+	local ramp_in = math.max(1, fx_num("ramp_in_min", 1) * 60)
+	local ramp_out = math.max(1, fx_num("ramp_out_min", 10) * 60)
+	local ramp_stop = math.max(1, fx_num("ramp_stop_s", 30))
+	for _, lvl in ipairs(ZE.levels(ID)) do
+		local s = ash_state[lvl]
+		if not s then
+			local c, _, f = parse_now(ZE.mark_of(now_key(lvl)))
+			s = { c = c or old_lying(lvl, gs), f = f or 0, cr = 0, fr = 0 }
+			ash_state[lvl] = s
+		end
+		local on = ev and ev.stage == "on" and ev.level == lvl
+		local ground = listed(lvl, "ground_levels")
+		-- since the last look
+		s.f = clamp01(s.f + s.fr * dt)
+		if not ground then
+			s.c = 0
+		elseif on then
+			s.c = clamp01(s.c + s.cr * dt)
+		else
+			s.c = clamp01(s.c - gdt / linger - rain * dt / wash) -- the game's time: a sleep takes its share
+		end
+		-- from now
+		local fr, cr = 0, 0
+		if on then
+			local left = ev.till - ZE.now()
+			if left <= ramp_out then
+				fr = -s.f / math.max(1, left)
+			elseif s.f < 1 then
+				fr = 1 / ramp_in
+			end
+		elseif s.f > 0 then
+			fr = -1 / ramp_stop
+		end
+		if ground and on then
+			cr = s.c < 1 and s.f / full or 0
+		elseif ground and s.c > 0 then
+			cr = -(level.get_time_factor() / linger + rain / wash)
+		end
+		local turned = sign(fr) ~= sign(s.fr) or sign(cr) ~= sign(s.cr)
+		s.fr, s.cr = fr, cr
+		if turned or not s.sent or t - s.sent >= num("ground_publish_s", 5) * 1000 then
+			s.sent = t
+			local text = ""
+			if s.c > 0 or s.f > 0 or cr ~= 0 or fr ~= 0 then
+				text = string.format("%.4f|%.6g|%.4f|%.6g", s.c, cr, s.f, fr)
+			end
+			if text ~= ZE.mark_of(now_key(lvl)) then
+				ZE.mark(now_key(lvl), text)
+				ZE.dbg("ash on %s: %s (rain %s)", lvl, text, string.format("%.2f", rain))
+			end
 		end
 	end
 end
 
-local function ground_cover()
-	local lvl = level.name()
-	if not listed(lvl, "ground_levels") then
-		return 0
+-- each game with a player: the fact of its level as it took it (raw), when (at), and the gap it eases out (dc, df)
+local view = {}
+
+local function shown(t)
+	if not view.raw then
+		return 0, 0
 	end
-	local cover = ground_lying(lvl)
-	local ev = ground_ev
-	if ev and ev.stage == "on" and ev.level == lvl then
-		cover = math.max(cover, ground_falling(ev, ZE.now()))
-	end
-	return cover
+	local age = math.min(math.max(0, (t - view.at) / 1000), num("ground_extrapolate_s", 20))
+	local ease = math.max(0, 1 - (t - view.at) / (math.max(0.001, num("ground_blend_s", 2)) * 1000))
+	return clamp01(view.c + view.cr * age + view.dc * ease), clamp01(view.f + view.fr * age + view.df * ease)
 end
 
--- master, as the front ends (ev.till: now): what lies on the ground from now on
-local function ground_settle(ev)
-	if listed(ev.level, "ground_levels") then
-		local cover = math.max(ground_lying(ev.level), ground_falling(ev, ev.till))
-		ZE.mark("ash_ground_" .. ev.level, string.format("%d|%.3f|0", game_seconds(), cover))
-		ZE.dbg("%s", string.format("ash lies on %s: %.3f", ev.level, cover))
+-- the ash on our level now, as the master decided it: the ground's cover and the fall's strength, 0..1 each
+function ash_now()
+	if not level.present() then
+		return 0, 0
 	end
+	local t, lvl = time_global(), level.name()
+	if view.lvl ~= lvl then
+		view = { lvl = lvl } -- another level: its fact as it is, nothing to ease from
+	end
+	local raw = ZE.mark_of(now_key(lvl)) or ""
+	if raw ~= view.raw then
+		local c, cr, f, fr = parse_now(raw)
+		c, cr, f, fr = c or 0, cr or 0, f or 0, fr or 0
+		local dc, df = 0, 0
+		if view.raw then
+			local oc, of = shown(t)
+			local snap = num("ground_snap", 0.2)
+			dc = math.abs(oc - c) <= snap and oc - c or 0
+			df = math.abs(of - f) <= snap and of - f or 0
+		end
+		view.raw, view.at, view.c, view.cr, view.f, view.fr, view.dc, view.df = raw, t, c, cr, f, fr, dc, df
+	end
+	return shown(t)
 end
 
 local function ground_update()
 	if not ground_tokens then
 		return
 	end
-	local cover = ground_cover()
+	local cover = ash_now()
 	if math.abs(cover - ground_last) < 0.0005 then
 		return
+	end
+	if math.floor(cover * 50) ~= math.floor(ground_last * 50) then
+		ZE.dbg("%s", string.format("ash on the ground %.3f", cover))
 	end
 	ground_last = cover
 	shader_bus.set(ground_tokens.cover, cover, num("ground_opacity", 0.85), num("ground_gloss_keep", 0.15),
 		num("ground_patchiness", 1))
-	ZE.dbg("%s", string.format("ash on the ground %.3f", cover))
 end
 
 -------------------------------------------------------------------------------
@@ -1146,7 +1220,6 @@ local function start(ev)
 end
 
 local function finish(ev, how)
-	ground_settle(ev)
 	-- the squads home from now on (relocate, in every game)
 	local lvl, _, rel = read_rel()
 	if lvl == ev.level then
@@ -1165,9 +1238,10 @@ end
 -- each look
 
 local function update(ev)
-	ground_ev = ev
 	if ZE.master() then
-		ground_rain()
+		ash_master(ev)
+	elseif last_look then
+		ash_state, last_look, last_gs = {}, nil, nil -- no longer the master: the next one goes on from the fact
 	end
 	local on = ev and ev.stage == "on"
 	local on_here = on and ev.level == level.name()

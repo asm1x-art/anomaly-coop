@@ -1,11 +1,13 @@
-; Co-op: the ash front's falling ash (coop_zone_ash_fx.script moves it with the camera): Anomaly's snow
-; rezy\environment\effects\snow\snow_test copied, day tone. Changed from the snow: colour (Source Color), alpha (Source
-; Color\Alpha), fewer flakes (max_particles, Source Rate a second), slower (Source Velocity), bigger (Source Size),
-; shorter lives (Age Limit: without collisions they fall on under the ground), no collisions (flags). A plain text
-; file: change these numbers here; the game reads it at start.
+; Co-op: the ash front's falling ash (coop_zone_ash_fx.script moves it with the camera and the wind): Anomaly's snow
+; rezy\environment\effects\snow copied, day tone, ring 0 of five (radius 0.3..4 m round the emitter). Changed
+; from the snow: colour (Source Color), alpha (Source Color\Alpha), how many (Source Rate a second; max_particles = rate
+; x Age Limit), slower (Source Velocity), size (Source Size), born 8 m up (Source Domain Disc: centre, normal, radii),
+; Age Limit (without collisions they fall on under the ground), no collisions (flags), Parent Motion 1: the script hands
+; the weather's wind as the emitter's motion, so each flake drifts with it. A plain text file: change these numbers
+; here; the game reads it at start.
 [_effect]
 version = 1
-max_particles = 200
+max_particles = 770
 flags = 37889
 action_count = 5
 
@@ -29,7 +31,7 @@ action_type = 10
 version = 1
 action_name = killold
 flags = 1
-flt_0000 = 9 ; Age Limit
+flt_0000 = 7 ; Age Limit
 bool_0000 = off ; Kill Less Than
 
 ; Gravity
@@ -55,9 +57,9 @@ version = 1
 action_name = source
 flags = 1
 flt_0000 = 0 ; Age Sigma
-flt_0001 = 0.5 ; Color\Alpha
-flt_0002 = 0 ; Parent Motion
-flt_0003 = 23.3 ; Rate
+flt_0001 = 0.85 ; Color\Alpha
+flt_0002 = 1 ; Parent Motion
+flt_0003 = 110 ; Rate
 flt_0004 = 0 ; Starting Age
 bool_0000 = off ; Allow Rotate
 bool_0001 = off ; Single Size
@@ -70,9 +72,9 @@ v2 = 1, 1, 1
 
 [domain_action_0003_0001] ; Domain Disc
 type = 9
-v0 = 0, 10, 0
+v0 = 0, 8, 0
 v1 = 0, 0.5, 0
-v2 = 1, 5, 0
+v2 = 0.3, 4, 0
 
 [domain_action_0003_0002] ; Rotation Point
 type = 0
@@ -82,13 +84,13 @@ v2 = 0, 0, 0
 
 [domain_action_0003_0003] ; Size Point
 type = 0
-v0 = 0.07, 0.07, 0.07
+v0 = 0.05, 0.05, 0.05
 v1 = 0, 0, 0
 v2 = 0, 0, 0
 
 [domain_action_0003_0004] ; Velocity Point
 type = 0
-v0 = 0, -2.2, 0
+v0 = 0, -1.6, 0
 v1 = 0, 0, 0
 v2 = 0, 0, 0
 
