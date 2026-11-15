@@ -81,8 +81,6 @@ namespace coop
 		return g_local_objects;
 	}
 
-	bool is_local_object(u16 id) { return local_objects().count(id) != 0; }
-
 	void begin_shared_spawns() { ++g_shared_scope; }
 	void end_shared_spawns() { if (g_shared_scope) --g_shared_scope; }
 
@@ -412,6 +410,11 @@ namespace coop
 	{
 		local_objects().erase(object->ID);
 		send_spawn(object);
+	}
+
+	bool is_local_object(u16 id)
+	{
+		return local_objects().count(id) > 0;
 	}
 
 	// The last holder each thing left (not our actor, not a shadow), to tell the server where our actor took it from

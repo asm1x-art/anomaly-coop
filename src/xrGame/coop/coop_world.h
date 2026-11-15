@@ -54,10 +54,10 @@ namespace coop
 	// a level is running: world changes can be applied and sent (not while loading or tearing down)
 	bool world_ready();
 
-	// made in our game this session and not shared (yet): the others have no such object
-	bool is_local_object(u16 id);
 	// sends an object to the others as a whole, as when our actor takes something new
 	void share_object(CSE_ALifeDynamicObject* object);
+	// made here this session and not the others' yet (shared once our actor takes it)
+	bool is_local_object(u16 id);
 	// an item our actor carries goes to another player (trading): false when it can't
 	bool give_item(u16 id, u32 peer);
 
