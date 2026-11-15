@@ -21,6 +21,7 @@ class World:
             src = open(SCRIPT, 'rb').read().decode('cp1251')
             mod = L.eval('function(src) local env = setmetatable({}, {__index = _G}); local f = assert(loadstring(src, "coop_physics")); setfenv(f, env); f(); return env end')(src)
             mod.on_game_start()
+            L.globals().coop_physics_mod = mod
             self.games[n] = (L, mod)
 
     def sender(self, name):
@@ -44,6 +45,14 @@ class World:
                 for n in targets:
                     self.games[n][0].globals().deliver_event(a, sender, b)
             elif kind == 'fact':
+                if a.startswith('once:'):  # a claim: the first stays, the claimer is told whose it is
+                    kept = self.server_facts.get(a, '')
+                    if not kept and b:
+                        self.server_facts[a] = b
+                        for n in targets:
+                            self.games[n][0].globals().deliver_fact(a, b)
+                    self.games[sender][0].globals().deliver_fact(a, kept or b)
+                    continue
                 if self.server_facts.get(a, '') == b:
                     continue
                 self.server_facts[a] = b
@@ -72,74 +81,84 @@ def check(what, ok):
 
 def loot_made(w, n):
     g = w.G(n)
-    return sum(1 for i in range(1, len(g.spawns) + 1) if g.spawns[i] is not None)
+    return len(g.spawns)
 
-def shared_loot(w, n):
+def loot_list(w, n):
     g = w.G(n)
-    return sum(1 for i in range(1, len(g.spawns) + 1) if g.spawns[i].shared)
+    return sorted(str(g.spawns[i].section) + ':' + str(g.spawns[i].ammo) for i in range(1, len(g.spawns) + 1))
 
-def setup(names, authority):
+def live(w, n):
+    g = w.G(n)
+    return sum(1 for i in range(1, len(g.spawns) + 1) if g.objects_se[g.spawns[i].id] is not None)
+
+def shared_count(w, n):
+    g = w.G(n)
+    return sum(1 for _ in g.shared_ids.items())
+
+def setup(names, seed='12345'):
     w = World(names)
     for n in names:
-        w.lua(n, f'G.authority["l01_escape"] = {"true" if n == authority else "false"}')
-        w.lua(n, 'math.randomseed(1); make_box(500, "esc_box_wood_0001")')
+        w.lua(n, 'G.authority["l01_escape"] = ' + ('true' if n == names[0] else 'false'))
+        w.lua(n, 'make_box(500, "esc_box_wood_0001"); make_box(501, "esc_box_wood_0002")')
+        w.lua(n, 'ini_sys.r_float_ex = function(self, s, k) if k == "plain_box_loot_chance" then return 1.01 end end')
+        if seed:
+            w.lua(n, 'G.facts["once:seed:loot"] = "' + seed + '"')
+            w.server_facts['once:seed:loot'] = seed
     return w
 
-# 1. a player who isn't the authority breaks a box
-w = setup(['A', 'B', 'C'], 'A')
-w.lua('B', 'break_box(500)')
-w.pump()
-check('1: the breaker spawns no loot of its own', loot_made(w, 'B') == 0)
-check('1: the authority made the loot, shared (0 or 2 items: the plain box chance)', loot_made(w, 'A') in (0, 2) and loot_made(w, 'A') == shared_loot(w, 'A'))
-check('1: the others got the same items (as spawns)', (w.G('B').remote_spawns or 0) == loot_made(w, 'A') and (w.G('C').remote_spawns or 0) == loot_made(w, 'A'))
-check('1: C broke its copy, with no loot', w.G('C').hits == 1 and loot_made(w, 'C') == 0)
-check('1: the box is a fact on the server', w.server_facts.get('box:esc_box_wood_0001') in ('0', '1'))
-w.tick(1000, 20)
-check('1: nobody decides it again later', loot_made(w, 'B') == 0 and loot_made(w, 'C') == 0 and w.queue == [])
+# 0. the roll is the world's: the same box, the same seed, the same loot in any game
+w = setup(['A', 'B'])
+la = list(w.lua('A', 'local t = {} for _, x in ipairs(coop_physics_mod.roll_loot("esc_box_wood_0001", "plain", false)) do t[#t+1] = x[1] .. ":" .. tostring(x[2]) end table.sort(t) return table.concat(t, ",")').split(','))
+lb = list(w.lua('B', 'local t = {} for _, x in ipairs(coop_physics_mod.roll_loot("esc_box_wood_0001", "plain", false)) do t[#t+1] = x[1] .. ":" .. tostring(x[2]) end table.sort(t) return table.concat(t, ",")').split(','))
+check(f'0: the same loot in two games ({len(la)} item(s))', la == lb and la != [''])
+lo = w.lua('A', 'local n = 0 for i = 1, 20 do if #coop_physics_mod.roll_loot("box_" .. i, "plain", false) > 0 then n = n + 1 end end return n')
+w.lua('A', 'ini_sys.r_float_ex = function() return nil end')
+half = w.lua('A', 'local n = 0 for i = 1, 400 do if #coop_physics_mod.roll_loot("box_" .. i, "plain", false) > 0 then n = n + 1 end end return n')
+check(f"0: Anomaly's 0.5 chance for a plain box ({half}/400 with loot)", 160 < half < 240)
+w.lua('B', 'G.facts["once:seed:loot"] = "999"')
+lc = w.lua('B', 'local t = {} for _, x in ipairs(coop_physics_mod.roll_loot("esc_box_wood_0001", "plain", false)) do t[#t+1] = x[1] .. ":" .. tostring(x[2]) end table.sort(t) return table.concat(t, ",")')
+check('0: another world (seed), other loot', lc.split(',') != la)
 
-# 1b. force the loot on: chance 1 (ini), a drop for sure
-w = setup(['A', 'B'], 'A')
-w.lua('A', 'ini_sys.r_float_ex = function(s, k) if k == "plain_box_loot_chance" then return 1.01 end end')
+# 1. a player breaks a box: its loot at once, then everyone's
+w = setup(['A', 'B', 'C'])
 w.lua('B', 'break_box(500)')
+n = loot_made(w, 'B')
+check(f'1: the breaker has its loot at once, before any answer ({n} item(s))', n > 0 and shared_count(w, 'B') == 0)
 w.pump()
-check('1b: chance 1 -> two shared items from the authority, two spawns at B', shared_loot(w, 'A') == 2 and w.G('B').remote_spawns == 2)
+check('1: the server says ours: all of it goes to the others', shared_count(w, 'B') == n and w.G('A').remote_spawns == n and w.G('C').remote_spawns == n)
+check('1: the others broke their copy, with no loot of their own', w.G('A').hits == 1 and w.G('C').hits == 1 and loot_made(w, 'A') == 0 and loot_made(w, 'C') == 0)
+check("1: their release is the breaker's", w.G('A').theirs[500] and w.G('C').theirs[500])
+check('1: the claim is on the server', w.server_facts.get('once:box:esc_box_wood_0001') == 'B')
+w.tick(1000, 5)
+check('1: nothing more later', w.queue == [] and loot_made(w, 'A') == 0)
 
-# 2. an explosion breaks it in two games at once (the authority and another)
-w = setup(['A', 'B'], 'A')
-w.lua('A', 'ini_sys.r_float_ex = function(s, k) if k == "plain_box_loot_chance" then return 1.01 end end')
+# 2. two games break it at the same moment (an explosion)
+w = setup(['A', 'B', 'C'])
 w.lua('A', 'break_box(500)')
 w.lua('B', 'break_box(500)')
+check('2: both rolled the same loot', loot_list(w, 'A') == loot_list(w, 'B'))
 w.pump()
-w.tick(1000, 20)
-check('2: one loot for the world', shared_loot(w, 'A') == 2 and loot_made(w, 'B') == 0 and w.G('B').remote_spawns == 2)
+na = loot_made(w, 'A')
+check("2: the first claim (A) stays: A's loot shared, B's own gone, never sent", shared_count(w, 'A') == na and shared_count(w, 'B') == 0 and live(w, 'B') == 0 and w.G('B').released == na)
+check('2: C got one loot only', w.G('C').remote_spawns == na)
 
-# 2b. two non-authority games break it at once
-w = setup(['A', 'B', 'C'], 'A')
-w.lua('A', 'ini_sys.r_float_ex = function(s, k) if k == "plain_box_loot_chance" then return 1.01 end end')
-w.lua('B', 'break_box(500)')
-w.lua('C', 'break_box(500)')
-w.pump()
-w.tick(1000, 20)
-check('2b: one loot for the world', shared_loot(w, 'A') == 2 and loot_made(w, 'B') == 0 and loot_made(w, 'C') == 0)
+# 3. a box the world has a claim for gives nothing
+w = setup(['A', 'B'])
+w.lua('B', 'G.facts["once:box:esc_box_wood_0002"] = "A"; break_box(501)')
+check('3: broken again where the world had it broken: no loot', loot_made(w, 'B') == 0)
 
-# 3. the authority is gone: the breaker decides after confirm_s x confirm_tries
-w = setup(['A', 'B'], 'A')
-w.down.add('A')
-w.lua('B', 'ini_sys.r_float_ex = function(s, k) if k == "plain_box_loot_chance" then return 1.01 end end')
-w.lua('B', 'break_box(500)')
-w.pump()
-w.tick(1000, 4)
-check('3: still waiting at 4 s', loot_made(w, 'B') == 0)
-w.tick(1000, 8)
-check('3: decided by the breaker itself after the tries', shared_loot(w, 'B') == 2)
+# 3b. no loot seed yet: the first game claims one
+w = setup(['A', 'B'], seed='')
+w.tick(100)
+check('3b: a loot seed claimed, the same for both', w.server_facts.get('once:seed:loot') and w.lua('A', 'return coop.fact("once:seed:loot")') == w.lua('B', 'return coop.fact("once:seed:loot")'))
 
 # 4. single player: Anomaly's own
-w = setup(['A'], 'A')
+w = setup(['A'])
 w.lua('A', 'G.connected = false; break_box(500)')
-check('4: without co-op the box spawns its loot as Anomaly does', loot_made(w, 'A') == 2 and shared_loot(w, 'A') == 0)
+check('4: without co-op the box spawns its loot as Anomaly does', loot_made(w, 'A') == 1 and shared_count(w, 'A') == 0)
 
 # 5. doors
-w = setup(['A', 'B', 'C'], 'A')
+w = setup(['A', 'B', 'C'])
 for n in ('A', 'B'):
     w.lua(n, 'make_door(700, "bar_door_1", "ph_door@close", true); door_online(700)')
 w.lua('C', 'make_door(700, "bar_door_1", "ph_door@close", false)')
@@ -171,6 +190,10 @@ check('5: a logic switch off the authority is not sent', w.lua('A', 'return sect
 w.lua('A', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@close")')
 w.pump()
 check('5: the authority\'s logic switch reaches everyone', all(w.lua(n, 'return section_of(700)') == 'ph_door@close' for n in 'ABC'))
+
+check("5: a door with a motor is its logic's, not the engine's rests", all(w.G(n).by_logic[700] == True for n in 'ABC'))
+w.lua('A', 'db.storage[700].ph_door = { no_force = true }; xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")')
+check("5: a door swinging free is the engine's rests", w.G('A').by_logic[700] == False)
 
 for n in 'ABC':
     if n in w.games:

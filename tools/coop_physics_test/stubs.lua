@@ -85,26 +85,62 @@ function tick(ms)
 end
 
 -- world items
+G.next_id = 1000
+G.released = 0
+G.shared_ids = {}
+G.objects_se = {}
 function alife_create_item(section, place, t)
-	local id = #G.spawns + 1
-	G.spawns[id] = { section = section, shared = G.shared > 0 }
+	G.next_id = G.next_id + 1
+	local id = G.next_id
+	G.spawns[#G.spawns + 1] = { section = section, shared = G.shared > 0, id = id, ammo = t and t.ammo }
+	local se = { id = id, section = section }
+	G.objects_se[id] = se
 	if G.shared > 0 then
 		net_send("spawn", section, "")
 	end
+	if t and t.ammo then
+		return { se } -- ammo comes as a list of boxes
+	end
+	return se
 end
+function alife_object(id) return G.objects_se[id] end
+function alife_release_id(id) G.objects_se[id] = nil; G.released = G.released + 1 end
+function coop.share(id)
+	if not G.objects_se[id] or G.shared_ids[id] then return false end
+	G.shared_ids[id] = true
+	net_send("spawn", G.objects_se[id].section, "")
+	return true
+end
+G.theirs = {}
+function coop.release_theirs(id) G.theirs[id] = true end
+G.by_logic = {}
+function coop.prop_by_logic(id, on) G.by_logic[id] = on end
+function IsItem(kind, section) return string.find(section, "^ammo") ~= nil end
+ini_sys.section_exist = function(self, s) return true end
+ini_sys.line_exist = function(self, s, k) return true end
 
 game_achievements = { has_achievement = function() return false end }
 
--- Anomaly's xr_box, as it spawns: two items per box here
+-- Anomaly's xr_box: its lists in module locals, filled by the ph_item_box constructor; spawn_items reads them
 xr_box = {}
-local manager = {
+local item_by_community = {}
+local count_by_level = {}
+xr_box.ph_item_box = setmetatable({
 	spawn_items = function(self, obj)
+		local _ = item_by_community, count_by_level
 		local p = obj:position()
-		for i = 1, 2 do
-			alife_create_item("medkit", { p, obj:level_vertex_id(), obj:game_vertex_id() })
-		end
+		alife_create_item("medkit", { p, obj:level_vertex_id(), obj:game_vertex_id() })
 	end,
-}
+}, { __call = function()
+	for _, c in ipairs({ "small_box_generic", "small_box_ussr", "small_box_nato", "small_box_army", "small_box_science" }) do
+		item_by_community[c] = { medkit = 0.5, bandage = 0.7, ammo_9x18_fmj = 0.4, conserva = 0.6, vodka = 0.3 }
+	end
+	count_by_level.medkit = { 0, 2 }
+	count_by_level.bandage = { 1, 3 }
+	count_by_level.ammo_9x18_fmj = { 5, 20 }
+	G.box_tables_made = (G.box_tables_made or 0) + 1
+end })
+local manager = { spawn_items = xr_box.ph_item_box.spawn_items }
 function xr_box.get_box_manager() return manager end
 
 -- level and objects
@@ -187,7 +223,7 @@ function make_door(id, name, section, online)
 	local o = setmetatable({ _id = id, _name = name, _pos = vector():set(0, 0, 0), _visual = "door", online = online }, O)
 	o.binder = setmetatable({ object = o, initialized = false }, { __index = binder })
 	G.objects[id] = o
-	db.storage[id] = { ini = INI, active_section = section, active_scheme = "ph_door" }
+	db.storage[id] = { ini = INI, active_section = section, active_scheme = "ph_door", ph_door = { no_force = false } }
 	db.level_doors[id] = o._pos
 	return o
 end

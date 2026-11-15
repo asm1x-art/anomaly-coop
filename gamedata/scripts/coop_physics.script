@@ -1,19 +1,25 @@
 -- Co-op: doors and breakable boxes are the world's, not each game's (Notion audit item 6).
--- Settings: mod_system_coop_physics.ltx [coop_physics]. Without co-op nothing changes.
+-- Settings: mod_system_coop_physics.ltx [coop_physics]. Without co-op nothing changes. Where things lie and glass:
+-- the engine (src/xrGame/coop/coop_props.h).
 --
 -- Breakable boxes. A box broken in one game rolled its loot there (bind_physic_object death_callback ->
 -- xr_box spawn_items, alife_create_item outside the shared scope): items only that game had. The box itself went
 -- for the others only seconds later, when the breaker's game released it after its particles and sound
 -- (CPHDestroyable -> GE_DESTROY -> M_OBJECT_RELEASE); in that time, and whenever an explosion broke it in two games
 -- at once, every game that broke it rolled loot of its own: one for each player to take.
--- Now a box's loot is decided once for the world, by the authority of its level (coop.is_authority): the game
--- that breaks it tells everyone ("box_broken": id, name, level, place, kind, the breaker's loot achievement); the
--- others break their copy too, in front of their player, with no loot; the authority rolls the loot (Anomaly's
--- spawn_items, and for a plain box Anomaly's 50% chance) in the shared scope, so the items are the same ones in
--- every game, and marks the box in a fact of the server ("box:<name>"), kept with the world and rolled back with it,
--- so no game decides it again. The breaker waits for that fact and tells the authority again if it doesn't come
--- (confirm_s, confirm_tries), then decides it itself (the authority left meanwhile). The box's release still goes
--- as before (the journal has it for those who come later).
+-- Now:
+--   the roll   is the world's, not a game's: Anomaly's spawn_items made over with a random of the box's name and the
+--              world's loot seed (a fact of the server, "once:seed:loot", claimed once by the first game to need it),
+--              keys in a fixed order: any game that breaks the box rolls the same loot, Anomaly's chance for a plain
+--              box (plain_box_loot_chance) included.
+--   at once    the game that breaks it puts that loot out there and then, for its own player (not the others' yet), and
+--              claims the box: "once:box:<name>" = its player, a claim of the server (the first one stays, kept with
+--              the world and rolled back with it).
+--   the claim  the server's answer: ours, the loot goes to the others (coop.share), the same items for everyone; not
+--              ours (another game broke it at the same moment), ours goes (never sent) and the other's comes, the same
+--              loot in the same place.
+--   the others are told at once ("box_broken"): their copy breaks in front of their player, with no loot of its own;
+--              its release is the breaker's (coop.release_theirs). A box the world has a claim for gives nothing.
 --
 -- Doors (ph_door). Whether a door is open, closed, locked or free is its active logic section, which each game
 -- switched on its own: a door a player opened stayed closed for the others, and one game's NPCs opened and closed
@@ -21,11 +27,12 @@
 -- door or shoots its lock (in that player's game) and when the level's authority switches it by its logic (its NPCs
 -- open doors only there); every game puts its door on that section when the fact changes and when the door comes
 -- online (a load, a join, a level change). The server tells the sender too (coop-server: echoed facts), so two
--- players using a door at once end up with the same door. A door's free swing (section with no_force) is physics
--- and stays each game's.
+-- players using a door at once end up with the same door. A door with a motor (open, closed) is where its section
+-- puts it; one swinging free (no_force) is where the world's physics has it (the engine's rests, coop.prop_by_logic).
 
 local S = "coop_physics"
-local BOX = "box:"
+local BOX = "once:box:"
+local SEED = "once:seed:loot"
 local DOOR = "door:"
 
 local function num(key, def)
@@ -42,6 +49,77 @@ local function dbg(fmt, ...)
 	end
 end
 
+local function upvalue(fn, wanted)
+	for i = 1, 255 do
+		local name, value = debug.getupvalue(fn, i)
+		if not name then
+			return
+		end
+		if name == wanted then
+			return value
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- The world's random: the same numbers in every game
+
+local TWO32 = 4294967296
+
+-- (h xor c) * 1000003 mod 2^32: exact in doubles (h < 2^32, the factor < 2^20)
+local function mix(h, c)
+	return (bit.bxor(h, c) % TWO32) * 1000003 % TWO32
+end
+
+function hash(text)
+	local h = 2166136261
+	for i = 1, #text do
+		h = mix(h, string.byte(text, i))
+	end
+	h = mix(h, bit.rshift(h, 16))
+	return bit.bxor(h, bit.rshift(h, 13)) % TWO32
+end
+
+-- a math.random of its own (xorshift32): random() in [0, 1), random(n) in 1..n, random(a, b) in a..b, as LuaJIT's
+function seeded_random(seed)
+	local s = seed % TWO32
+	if s == 0 then
+		s = 2463534242
+	end
+	return function(a, b)
+		s = bit.bxor(s, bit.lshift(s, 13)) % TWO32
+		s = bit.bxor(s, bit.rshift(s, 17)) % TWO32
+		s = bit.bxor(s, bit.lshift(s, 5)) % TWO32
+		local r = s / TWO32
+		if a == nil then
+			return r
+		end
+		if b == nil then
+			a, b = 1, a
+		end
+		return a + math.floor(r * (b - a + 1))
+	end
+end
+
+local seed_asked = nil -- time_global() we claimed the loot seed
+
+local function loot_seed()
+	return tonumber(coop.fact(SEED)) or 0
+end
+
+-- the world has no loot seed yet: the first game to look claims one (the server keeps the first)
+local function claim_seed()
+	if coop.fact(SEED) ~= "" then
+		return
+	end
+	local now = time_global()
+	if seed_asked and now - seed_asked < 10000 then
+		return
+	end
+	seed_asked = now
+	coop.report_fact(SEED, tostring(math.random(1, 2147483646)))
+end
+
 ------------------------------------------------------------------------------------------------
 -- Breakable boxes
 
@@ -50,6 +128,9 @@ local BOX_VISUALS = {
 	[ [[dynamics\box\box_wood_01]] ] = true,
 	[ [[dynamics\box\box_wood_02]] ] = true,
 }
+
+-- as bind_physic_object's death_callback picks them (ph_item_box:spawn_items for "def_box")
+local COMMUNITIES = { "small_box_generic", "small_box_ussr", "small_box_nato", "small_box_army", "small_box_science" }
 
 -- "drop" for a box with drop_box in its spawn (always has loot), "plain" for one of Anomaly's box visuals (a
 -- chance), nil for anything else: as bind_physic_object's death_callback tells them
@@ -63,65 +144,115 @@ local function box_kind(obj)
 	end
 end
 
-local decided = {} -- box name -> true: its loot is decided, here or (we heard) elsewhere
 local remote = {}  -- box name -> true: we break our copy because another game broke it
-local waiting = {} -- box name -> { fields = the box_broken fields, at = time_global(), tries }: ours, undecided yet
+local waiting = {} -- box name -> ids of the loot we put out, ours until the server says whose the box is
 
-local function is_decided(name)
-	return decided[name] or coop.fact(BOX .. name) ~= ""
+local function is_claimed(name)
+	return coop.fact(BOX .. name) ~= ""
 end
 
--- the box_broken fields: 1 id, 2 name, 3 level, 4-6 x y z, 7 level vertex, 8 game vertex, 9 kind, 10 achievement
-local function box_fields(obj, kind)
-	local pos = obj:position()
-	local ach = game_achievements and game_achievements.has_achievement("infantile_pleasure")
-	return { obj:id(), obj:name(), level.name(), pos.x, pos.y, pos.z, obj:level_vertex_id(), obj:game_vertex_id(),
-		kind, ach and 1 or 0 }
+-- what the box gives: { { section, ammo count or nil }... }, as xr_box's spawn_items rolls it, from the world's random
+function roll_loot(name, kind, achievement)
+	local random = seeded_random(hash(name .. ":" .. loot_seed()))
+	if kind == "plain" and not (random(1, 100) / 100 < num("plain_box_loot_chance", 0.5)) then
+		return {}
+	end
+	-- xr_box keeps its lists in its own locals, by the level the box manager was first made on; made again here, on
+	-- the box's level
+	xr_box.ph_item_box()
+	local spawn_items = xr_box.ph_item_box.spawn_items
+	local by_community = upvalue(spawn_items, "item_by_community")
+	local counts = upvalue(spawn_items, "count_by_level") or {}
+	local list = by_community and by_community[COMMUNITIES[random(#COMMUNITIES)]]
+	if not list then
+		return {}
+	end
+	local keys = {}
+	for k in pairs(list) do
+		keys[#keys + 1] = k
+	end
+	table.sort(keys) -- pairs' order is no game's word
+	local ach = achievement and 1.33 or 1
+	local loot = {}
+	for _, section in ipairs(keys) do
+		local rnd = list[section] * ach
+		if rnd > 0 then
+			local number = counts[section] and random(counts[section][1], counts[section][2]) or random(0, 1)
+			-- xr_box.create_items
+			if number > 0 and not (ini_sys:section_exist(section) and not ini_sys:line_exist(section, "cform")) then
+				if IsItem("ammo", section) then
+					if random() <= rnd then
+						loot[#loot + 1] = { section, number }
+					end
+				else
+					for i = 1, number do
+						if random() <= rnd then
+							loot[#loot + 1] = { section }
+						end
+					end
+				end
+			end
+		end
+	end
+	return loot
 end
 
--- the loot of a box, rolled here for the world: what Anomaly's death_callback would spawn, from the box's place
-local function decide(f)
-	local name = f[2]
-	if is_decided(name) then
+-- we broke it: its loot out at once, ours until the claim's answer
+local function broken(obj, kind)
+	local name = obj:name()
+	if is_claimed(name) then
+		dbg("box %s: the world had it broken already, no loot", name)
 		return
 	end
-	decided[name] = true
-	waiting[name] = nil
-	local chance = f[9] == "plain" and num("plain_box_loot_chance", 0.5) or 1
-	local made = (math.random(1, 100) / 100) < chance -- Anomaly's own roll
-	if made then
-		local pos = vector():set(tonumber(f[4]) or 0, tonumber(f[5]) or 0, tonumber(f[6]) or 0)
-		local lvid, gvid = tonumber(f[7]) or 0, tonumber(f[8]) or 0
-		local box = {
-			position = function() return vector():set(pos) end,
-			level_vertex_id = function() return lvid end,
-			game_vertex_id = function() return gvid end,
-		}
-		-- the breaker's achievement, not ours (it gives a third more chance for every item)
-		local has = game_achievements.has_achievement
-		game_achievements.has_achievement = function(a, ...)
-			if a == "infantile_pleasure" then
-				return tostring(f[10]) == "1"
+	coop_sync.send_event("box_broken", obj:id(), name) -- the others break theirs
+	local ach = game_achievements and game_achievements.has_achievement("infantile_pleasure")
+	local loot = roll_loot(name, kind, ach)
+	local pos = obj:position()
+	local place = { vector():set(pos.x, pos.y + 0.3, pos.z), obj:level_vertex_id(), obj:game_vertex_id() }
+	local ids = {}
+	for _, item in ipairs(loot) do
+		local made = alife_create_item(item[1], place, item[2] and { ammo = item[2] } or nil)
+		for _, se_obj in ipairs(type(made) == "table" and made.id == nil and made or { made }) do -- ammo: a list of boxes
+			if se_obj and se_obj.id then
+				ids[#ids + 1] = se_obj.id
 			end
-			return has(a, ...)
-		end
-		coop.begin_shared()
-		local ok, err = pcall(function()
-			xr_box.get_box_manager():spawn_items(box)
-		end)
-		coop.end_shared()
-		game_achievements.has_achievement = has
-		if not ok then
-			printf("! [coop] the loot of box %s: %s", name, err)
 		end
 	end
-	coop.report_fact(BOX .. name, made and "1" or "0")
-	printf("[coop] the loot of box %s (%s) decided here, for everyone: %s", name, f[1], made and "some" or "none")
+	waiting[name] = ids
+	coop.report_fact(BOX .. name, coop.my_name())
+	dbg("box %s broken here: %s item(s) out, the box claimed", name, #ids)
 end
 
--- our copy of a box another game broke: it breaks here too (no loot: decided once, by the authority)
+-- the server's word on a box: whose loot stays
+local function on_claim(fact, whose)
+	local name = string.sub(fact, #BOX + 1)
+	local ids = waiting[name]
+	if not ids then
+		return
+	end
+	waiting[name] = nil
+	if whose == coop.my_name() then
+		local n = 0
+		for _, id in ipairs(ids) do
+			if coop.share(id) then
+				n = n + 1
+			end
+		end
+		printf("[coop] box %s: ours, its loot (%s item(s)) goes to everyone", name, n)
+		return
+	end
+	for _, id in ipairs(ids) do
+		if alife_object(id) then
+			alife_release_id(id)
+		end
+	end
+	printf("[coop] box %s: %s broke it first, their loot stays", name, whose)
+end
+
+-- our copy of a box another game broke: it breaks here too (no loot: the breaker's)
 local function break_here(obj)
 	remote[obj:name()] = true
+	coop.release_theirs(obj:id())
 	local h = hit()
 	h.draftsman = obj
 	h.type = hit.fire_wound
@@ -131,60 +262,12 @@ local function break_here(obj)
 	obj:hit(h)
 end
 
--- we broke it
-local function broken(obj, kind)
-	local name = obj:name()
-	if is_decided(name) then
-		return
-	end
-	local f = box_fields(obj, kind)
-	coop_sync.send_event("box_broken", unpack(f))
-	if coop.is_authority(level.name()) then
-		decide(f)
-	else
-		waiting[name] = { fields = f, at = time_global(), tries = 1 }
-		dbg("box %s broken here: the level's authority decides its loot", name)
-	end
-end
-
 local function on_box_broken(sender, payload)
 	local f = str_explode(payload, "\t")
-	local id, name, lvl = tonumber(f[1]), f[2], f[3]
-	if not (id and name and lvl) then
-		return
-	end
-	if lvl == level.name() then
-		if coop.is_authority(lvl) then
-			decide(f)
-		end
-		local obj = level.object_by_id(id)
-		if obj and obj:name() == name and box_kind(obj) and not remote[name] then
-			break_here(obj)
-		end
-	elseif coop.is_authority(lvl) then
-		decide(f) -- we speak for a level nobody else is on (the host): the place came with it
-	end
-end
-
-local function update_waiting()
-	if next(waiting) == nil then
-		return
-	end
-	local now = time_global()
-	local wait = num("confirm_s", 5) * 1000
-	for name, w in pairs(waiting) do
-		if is_decided(name) then
-			waiting[name] = nil
-		elseif now - w.at > wait then
-			if coop.is_authority(w.fields[3]) or w.tries >= num("confirm_tries", 2) then
-				decide(w.fields) -- ours to decide now, or nobody answers
-			else
-				w.tries = w.tries + 1
-				w.at = now
-				coop_sync.send_event("box_broken", unpack(w.fields))
-				dbg("box %s: no word from the level's authority, told it again", name)
-			end
-		end
+	local id, name = tonumber(f[1]), f[2]
+	local obj = id and level.object_by_id(id)
+	if obj and obj:name() == name and box_kind(obj) and not remote[name] then
+		break_here(obj)
 	end
 end
 
@@ -195,6 +278,16 @@ local applying = false -- putting a door on the world's section: not a change of
 local acting = 0       -- > 0 inside a door's use or hit: a player's doing (or the authority's NPC's)
 local fresh = {}       -- id -> binder of a physic object just online: put on its fact once its logic is up
 local original_switch  -- xr_logic.switch_to_section as it was
+
+-- a door with a motor is where its section puts it: the engine sends no rests of it; one swinging free, it does
+local function update_by_logic(obj)
+	local st = db.storage[obj:id()]
+	if not st then
+		return
+	end
+	local door = st.active_scheme == "ph_door" and st.ph_door
+	coop.prop_by_logic(obj:id(), door and not door.no_force or false)
+end
 
 local function put_door(obj, section, quiet)
 	local st = db.storage[obj:id()]
@@ -216,6 +309,7 @@ local function put_door(obj, section, quiet)
 		printf("! [coop] door %s onto %s: %s", obj:name(), section, err)
 		return
 	end
+	update_by_logic(obj)
 	dbg("door %s: %s -> %s, as the world has it", obj:name(), was, section)
 end
 
@@ -223,10 +317,12 @@ local function on_switch(obj, ini, section)
 	local st = obj and db.storage[obj:id()]
 	local before = st and st.active_scheme
 	local switched = original_switch(obj, ini, section)
-	if switched and not applying and coop_on() and (before == "ph_door" or st.active_scheme == "ph_door")
-		and (acting > 0 or coop.is_authority(level.name())) and st.active_section then
-		coop.report_fact(DOOR .. obj:name(), st.active_section)
-		dbg("door %s now %s, sent", obj:name(), st.active_section)
+	if switched and coop_on() and (before == "ph_door" or st.active_scheme == "ph_door") then
+		update_by_logic(obj)
+		if not applying and (acting > 0 or coop.is_authority(level.name())) and st.active_section then
+			coop.report_fact(DOOR .. obj:name(), st.active_section)
+			dbg("door %s now %s, sent", obj:name(), st.active_section)
+		end
 	end
 	return switched
 end
@@ -256,6 +352,7 @@ local function update_fresh()
 			if value ~= "" then
 				put_door(obj, value, true)
 			end
+			update_by_logic(obj)
 		end
 	end
 end
@@ -264,14 +361,14 @@ end
 
 local function on_update()
 	if coop_on() then
-		update_waiting()
+		claim_seed()
 		update_fresh()
 	end
 end
 
 function on_game_start()
-	if not (coop and bind_physic_object and xr_box and ph_door and xr_logic) then
-		return -- not the co-op engine
+	if not (coop and coop.share and bind_physic_object and xr_box and ph_door and xr_logic) then
+		return -- not the co-op engine (or one before coop.share)
 	end
 	local binder = bind_physic_object.generic_physics_binder
 
@@ -291,7 +388,10 @@ function on_game_start()
 		if remote[name] then
 			remote[name] = nil
 		else
-			broken(victim, kind)
+			local ok2, err2 = pcall(broken, victim, kind)
+			if not ok2 then
+				printf("! [coop] box %s: %s", name, err2)
+			end
 		end
 		if not ok then
 			error(err, 0)
@@ -339,13 +439,7 @@ function on_game_start()
 	xr_logic.switch_to_section = on_switch
 
 	coop_sync.on_event("box_broken", on_box_broken)
-	coop_facts.on_fact(BOX, function(fact, value)
-		local name = string.sub(fact, #BOX + 1)
-		if value ~= "" then
-			decided[name] = true
-			waiting[name] = nil
-		end
-	end)
+	coop_facts.on_fact(BOX, on_claim)
 	coop_facts.on_fact(DOOR, on_door_fact)
 	RegisterScriptCallback("actor_on_update", on_update)
 end

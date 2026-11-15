@@ -1,8 +1,11 @@
-; Co-op: doors and breakable boxes are the world's, not each game's (coop_physics.script).
+; Co-op: doors, breakable boxes, where things lie and glass are the world's, not each game's (coop_physics.script,
+; src/xrGame/coop/coop_props.cpp).
 [coop_physics]
 plain_box_loot_chance = 0.5 ; chance a plain wooden or metal box (no drop_box in its spawn) has loot when broken,
-                            ; rolled once for the world by the level's authority; Anomaly's own is 0.5
+                            ; rolled from the box's name and the world's loot seed; Anomaly's own is 0.5
 break_hit_power = 100       ; power of the hit (fire wound) that breaks our copy of a box another player broke
-confirm_s       = 5         ; real s the game that broke a box waits for the level's authority to decide its loot
-                            ; before telling it again
-confirm_tries   = 2         ; times it tells it; then it decides the loot itself (the authority left meanwhile)
+; where things lie (a physic object, a door swinging free, an item on the ground): told when it comes to rest
+rest_min_move   = 0.25      ; m any of its physics elements moved from where the world has it
+rest_min_turn   = 10        ; degrees any of them turned
+rest_check_ms   = 500       ; real ms between two looks at the things online here
+rest_min_gap_ms = 1000      ; real ms at least between two rests of one thing sent
