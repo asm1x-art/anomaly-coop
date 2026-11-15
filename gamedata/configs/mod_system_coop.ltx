@@ -536,3 +536,6 @@ inner_door           = yan_smart_terrain_6_4_ph_door_inner
 zone                 = yan_smart_terrain_6_4_sr_steam ; the space between the doors
 stuck_s              = 10    ; real s: a player between the doors with both shut and nothing moving gets the inner door opened
 npc_wait_s           = 4     ; real s: an NPC who wants a shut door of the airlock open (the engine's doors) this long gets his use again
+open_ignores_bodies  = true  ; an open door goes through NPCs and loose things (as it does while it moves): no body pushes it shut
+door_swing_m         = 1.6   ; m from a door's hinge: its leaf's sweep
+npc_aside_m          = 3     ; m: an NPC standing still in an open door's sweep (not on his way through) is moved this far from it

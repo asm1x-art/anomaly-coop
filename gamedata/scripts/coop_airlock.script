@@ -128,6 +128,54 @@ local function npcs_through(now, obj, section)
 	end
 end
 
+-- Bodies in a door's way. An open airlock door (OPEN) lets no body push it back: NPCs and loose things go through its
+-- leaf while it is open as they do while it moves (ph_door's door_ignore_dynamics, here kept on once it is open too;
+-- players still meet it in their own games), and only a player's use or the door's timer shuts it, never an NPC's
+-- (one who passed it or stands by it: the motivator's and the engine's doors' uses). The level's authority moves an
+-- NPC standing still within door_swing_m of an open door's hinge, not on his way through it, npc_aside_m away from
+-- it on his side (not one between the doors: there both doors go through him)
+local OPEN = { ["ph_door@open_in"] = true, ["ph_door@open_out"] = true, ["ph_door@open"] = true }
+local standing = {} -- npc id -> his position at the last look
+
+local function airlock(obj)
+	local name = obj and obj:name()
+	return name ~= nil and (name == ini_sys:r_string_ex(S, "outer_door") or name == ini_sys:r_string_ex(S, "inner_door"))
+end
+
+local function aside(obj, section, zone, seen)
+	if not OPEN[section] then
+		return
+	end
+	local hinge = obj:position()
+	local swing = ini_sys:r_float_ex(S, "door_swing_m") or 1.6
+	local away = ini_sys:r_float_ex(S, "npc_aside_m") or 3
+	for i = 1, #db.OnlineStalkers do
+		local id = db.OnlineStalkers[i]
+		local npc = db.storage[id] and db.storage[id].object
+		if npc and npc:alive() and not (coop and coop.stand_in_peer and coop.stand_in_peer(id) ~= 0) then
+			local p = npc:position()
+			if p:distance_to(hinge) <= swing and not (zone and zone:inside(p)) then
+				seen[id] = true
+				local was = standing[id]
+				standing[id] = vector():set(p)
+				if was and was:distance_to(p) < 0.2 then
+					local dir = vector():set(p.x - hinge.x, 0, p.z - hinge.z)
+					if dir:magnitude() < 0.1 then
+						dir = vector():set(1, 0, 0)
+					end
+					dir:normalize()
+					local v = level.vertex_in_direction(npc:level_vertex_id(), dir, away)
+					if v and v < 4294967295 then
+						npc:set_npc_position(level.vertex_position(v))
+						standing[id] = nil
+						printf("[coop] airlock: %s stood in the way of %s: moved aside", npc:name(), obj:name())
+					end
+				end
+			end
+		end
+	end
+end
+
 local function safety_net()
 	local now = time_global()
 	if now < next_look then
@@ -148,6 +196,18 @@ local function safety_net()
 	end
 	if inner then
 		npcs_through(now, inner, si)
+	end
+	local seen = {}
+	if outer then
+		aside(outer, so, zone, seen)
+	end
+	if inner then
+		aside(inner, si, zone, seen)
+	end
+	for id in pairs(standing) do
+		if not seen[id] then
+			standing[id] = nil
+		end
 	end
 	if not (zone and SHUT_OUTER[so] and SHUT_INNER[si] and player_between(zone)) then
 		still_since = nil
@@ -171,6 +231,28 @@ function on_game_start()
 	end
 	RegisterScriptCallback("actor_on_update", update_steam)
 	RegisterScriptCallback("actor_on_update", safety_net)
+	local action = ph_door and ph_door.action_door
+	if action then
+		local open_fastcall = action.open_fastcall
+		action.open_fastcall = function(self)
+			local res = open_fastcall(self)
+			if res and airlock(self.object) and ini_sys:r_bool_ex(S, "open_ignores_bodies", true) then
+				local ph = self.object:get_physics_object()
+				if ph then
+					ph:set_door_ignore_dynamics()
+				end
+			end
+			return res
+		end
+		local use = action.use_callback
+		action.use_callback = function(self, obj, who)
+			local st = self.object and db.storage[self.object:id()]
+			if st and OPEN[st.active_section] and airlock(self.object) and not (who and db.actor and who:id() == db.actor:id()) then
+				return -- an NPC's use: the door stays open till its timer
+			end
+			return use(self, obj, who)
+		end
+	end
 	xr_conditions.coop_door_in = function(actor, npc, p)
 		local obj = p and p[1] and door(p[1])
 		local st = obj and db.storage[obj:id()]
