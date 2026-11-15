@@ -434,11 +434,29 @@ void CWeapon::SetUIScope(LPCSTR scope_texture)
 BOOL useSeparateUBGLKeybind = TRUE;
 // a MAS weapon with a built-in sight (the 3D scopes' variants, wpn_dvl10_marchf...) has the sight permanent and no
 // sight section: GetScopeName() is empty there, and reading it crashed on the wpn_func key (V, or Alt while aiming)
+bool CWeapon::ScopeHasAltAim()
+{
+	return m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false);
+}
+
+// a MAS weapon's own alternative aim only when its model has a second sight of its own (the RD-74M ISG's canted red
+// dot): the weapon's section then sets that sight's zoom, scope_zoom_factor_alt. The other MAS weapons keep the
+// alternative aim of the pack's configs without MAS, made for other sights: it moved the gun aside with nothing at the
+// screen's centre, so with a MAS sight that has no second aim either the alternative aim is not taken at all
+bool CWeapon::AltAimAllowed()
+{
+	if (g_player_hud->m_adjust_mode || ScopeHasAltAim())
+		return true;
+	if (!m_altAimPos)
+		return false;
+	return !(m_modular_attachments && m_scopes.size()) || pSettings->line_exist(cNameSect(), "scope_zoom_factor_alt");
+}
+
 void CWeapon::SwitchZoomType()
 {
 	if (!useSeparateUBGLKeybind)
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && AltAimAllowed())
 		{
             SetZoomTypeAndParams(1);
 		}
@@ -456,7 +474,7 @@ void CWeapon::SwitchZoomType()
 	}
     else
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && AltAimAllowed())
 		{
 			SetZoomTypeAndParams(1);
 		}
@@ -2473,7 +2491,7 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		// its own (MAS's placeholder for none has none), the alternative aim takes the weapon's aim_hud_offset_alt_* the
 		// way a weapon without MAS does. It used the sight's (zero) or the main aim, and looked the same as the main one
 		const bool weapon_alt_aim = idx == 3 && mas_aim && hi->alt_aim_offset_pos().square_magnitude() > 0.f
-			&& !(si && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false));
+			&& !(si && ScopeHasAltAim());
 		if (weapon_alt_aim)
 		{
 			curr_offs = hi->alt_aim_offset_pos();

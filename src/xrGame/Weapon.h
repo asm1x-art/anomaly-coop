@@ -554,6 +554,8 @@ protected:
 	virtual void UpdateFireDependencies_internal();
 	void UpdateUIScope();
 	void SwitchZoomType();
+	bool AltAimAllowed();
+	bool ScopeHasAltAim();
 	void ToggleGrenadeLauncher();
     void SetZoomType(u8 new_zoom_type);
 	void SetZoomTypeAndParams(u8 zoomType);
