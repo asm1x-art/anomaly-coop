@@ -362,11 +362,20 @@ void attachable_hud_item::render_item_ui()
 	}
 }
 
+// the HUD's projection keeps its vertical field of view at every aspect ratio, so offsets set for 16:9 hold at 4:3 and
+// 5:4 too (checked at 16:9, 16:10, 21:9, 5:4). The aspect only chose between two sets of keys: at 4:3 and 5:4 (a 1280x1024
+// window) the keys without _16x9, which the GRA pack's weapons have stale or not at all (MAS's attach_* offsets then
+// zero): guns sat aside and too big, sights off centre. A section with the _16x9 set takes it at every aspect
+static bool hud_keys_16x9(LPCSTR sect)
+{
+	return UI().is_widescreen() || pSettings->line_exist(sect, "hands_position_16x9");
+}
+
 void hud_item_measures::load(const shared_str& sect_name, IKinematics* K)
 {
 	bool is_16x9 = UI().is_widescreen();
 	string64 _prefix;
-	xr_sprintf(_prefix, "%s", is_16x9 ? "_16x9" : "");
+	xr_sprintf(_prefix, "%s", hud_keys_16x9(sect_name.c_str()) ? "_16x9" : "");
 	string128 val_name;
 
 	strconcat(sizeof(val_name), val_name, "hands_position", _prefix);
@@ -1620,7 +1629,7 @@ u32 player_hud::script_anim_play(u8 hand, LPCSTR section, LPCSTR anm_name, bool 
 	xr_string pos = "hands_position";
 	xr_string rot = "hands_orientation";
 
-	if (UI().is_widescreen())
+	if (hud_keys_16x9(section))
 	{
 		pos.append("_16x9");
 		rot.append("_16x9");

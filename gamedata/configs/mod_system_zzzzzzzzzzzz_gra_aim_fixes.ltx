@@ -6,9 +6,52 @@
 ![wpn_ak74_isg_hud]
         aim_hud_offset_alt_pos           = -0.0768, -0.0574, -0.031075
         aim_hud_offset_alt_pos_16x9      = -0.0768, -0.0574, -0.031075
+        aim_hud_offset_alt_rot           = -0.003662, 0.011757, 0.788824
+        aim_hud_offset_alt_rot_16x9      = -0.003662, 0.011757, 0.788824
 
 ; ACOG (Pizza's Ultimate Sight model): MAS gave it the alternative aim of a scope with a canted side sight, but this
 ; ACOG has none: the alternative aim rolled the gun 60 degrees with nothing to look through. Without it the
 ; alternative aim is the weapon's own (the ISG's canted red dot), or none
 ![acog]
+        use_alt_aim_hud                  = false
+
+; MAS sights given the alternative aim of a scope with a canted side sight (rolled 60 or 30 degrees), but whose
+; models have no second sight there: the alternative aim rolled or moved the gun with nothing at the screen's centre
+; (checked in game one by one). Without it the alternative aim is the weapon's own, or none. Sights whose alternative
+; aim looks through something (the C79's, Echo1's and G36 dove's backup sights on top, Specter, Razor...) keep theirs
+![e0t2_magd]
+        use_alt_aim_hud                  = false
+![exps3_mag]
+        use_alt_aim_hud                  = false
+![uh1_magd]
+        use_alt_aim_hud                  = false
+![tango6]
+        use_alt_aim_hud                  = false
+![ts12x]
+        use_alt_aim_hud                  = false
+![vudu]
+        use_alt_aim_hud                  = false
+![bossxe]
+        use_alt_aim_hud                  = false
+![1p29]
+        use_alt_aim_hud                  = false
+![ps01]
+        use_alt_aim_hud                  = false
+![pso1m21]
+        use_alt_aim_hud                  = false
+![wpn_addon_scope_pu]
+        use_alt_aim_hud                  = false
+![wpn_addon_scope_zf4]
+        use_alt_aim_hud                  = false
+![wpn_addon_scope_po4x34]
+        use_alt_aim_hud                  = false
+![wpn_addon_scope_galil]
+        use_alt_aim_hud                  = false
+; the EOTech/EXPS3/UH-1 with the magnifier flipped aside: the alternative aim rolled the gun 60 degrees and put the
+; magnifier's dark back end below and left of the centre
+![e0t2_magd_flipped]
+        use_alt_aim_hud                  = false
+![exps3_mag_flipped]
+        use_alt_aim_hud                  = false
+![uh1_magd_flipped]
         use_alt_aim_hud                  = false
