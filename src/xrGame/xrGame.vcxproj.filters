@@ -6504,6 +6504,9 @@
     <ClInclude Include="coop\coop_props.h">
       <Filter>coop</Filter>
     </ClInclude>
+    <ClInclude Include="coop\coop_heli.h">
+      <Filter>coop</Filter>
+    </ClInclude>
     <ClInclude Include="coop\coop_npc.h">
       <Filter>coop</Filter>
     </ClInclude>
@@ -8997,6 +9000,9 @@
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_props.cpp">
+      <Filter>coop</Filter>
+    </ClCompile>
+    <ClCompile Include="coop\coop_heli.cpp">
       <Filter>coop</Filter>
     </ClCompile>
     <ClCompile Include="coop\coop_npc.cpp">

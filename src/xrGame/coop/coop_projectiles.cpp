@@ -4,6 +4,7 @@
 #include "coop_combat.h"
 #include "coop_puppet.h"
 #include "coop_world.h"
+#include "coop_heli.h"
 #include "Level.h"
 #include "Level_Bullet_Manager.h"
 #include "Actor.h"
@@ -12,6 +13,7 @@
 #include "Explosive.h"
 #include "ShootingObject.h"
 #include "ai/stalker/ai_stalker.h"
+#include "helicopter.h"
 #include "ParticlesObject.h"
 #include "../xrEngine/GameMtlLib.h"
 #include "HudSound.h"
@@ -140,8 +142,10 @@ namespace coop
 	{
 		if (!is_connected() || !g_pGameLevel || !thrower)
 			return;
+		// a helicopter's rockets: the authority's, the others' helicopters only show it (coop_heli.h)
 		const bool ours = thrower == g_actor ||
-			(smart_cast<const CAI_Stalker*>(thrower) && !is_proxy(thrower) && is_authority(Level().name()));
+			(smart_cast<const CAI_Stalker*>(thrower) && !is_proxy(thrower) && is_authority(Level().name())) ||
+			(smart_cast<const CHelicopter*>(thrower) && !is_heli_puppet(smart_cast<const CHelicopter*>(thrower)));
 		if (ours)
 			g_flying[projectile.ID()] = Device.dwTimeContinual;
 	}
@@ -302,6 +306,8 @@ namespace coop
 		// our copy of the very thing that blew up (a barrel), lying about: it blows up too, as a blank
 		CGameObject* object = smart_cast<CGameObject*>(Level().Objects.net_Find(id));
 		CExplosive* explosive = object ? smart_cast<CExplosive*>(object) : nullptr;
+		if (CHelicopter* heli = smart_cast<CHelicopter*>(object))
+			on_heli_exploded(*heli, position); // a puppet's crash: it breaks as the authority's, then blows up below
 		if (explosive && !object->H_Parent() && object->cNameSect() == section &&
 		    explosive->coop_blank_explode(position, direction, seed))
 			return;

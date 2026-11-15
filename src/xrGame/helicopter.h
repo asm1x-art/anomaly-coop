@@ -19,6 +19,11 @@ class CLAItem;
 class CHelicopterMovManager;
 class CHelicopter;
 
+namespace coop
+{
+	struct SHeliAccess; // coop_heli.cpp: another game's helicopter shown here
+}
+
 enum EHeliHuntState { eEnemyNone, eEnemyPoint, eEnemyEntity };
 
 struct SHeliEnemy
@@ -151,6 +156,7 @@ class CHelicopter : public CEntity,
 
 {
 	typedef CEntity inherited;
+	friend struct coop::SHeliAccess;
 public:
 	enum EHeliState
 	{
@@ -214,6 +220,7 @@ public:
 	bool m_ready_explode;
 	bool m_exploded;
 	bool m_dead;
+	bool m_engine_on = false; // TurnEngineSound's, for the other games' puppets (coop_heli.h)
 
 protected:
 	SHeliEnemy m_enemy;

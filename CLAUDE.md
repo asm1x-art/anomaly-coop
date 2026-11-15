@@ -6,7 +6,7 @@ Personal notes (project state, decisions, test stands) live in a separate privat
 ## Branches and worktrees
 Each branch is checked out as its own git worktree next to this folder (`xray-monolith-<branch>`; `coop` sits in `xray-monolith`).
 - `main` — upstream `themrdemonized/xray-monolith`, branch `all-in-one-vs2022-wpo`. Never commit here.
-- `coop` — the one main branch, everything that works goes here: engine networking in `src/xrGame/coop/`, Lua sync in `gamedata/scripts/coop_sync.script`, DLTX in `gamedata/configs/mod_system_coop.ltx`, Node server in `coop-server/` (protocol 26), plus all of the merged branches below. Since 2026-11-05 it holds `shelter` (with `raid`), `timesync` (the server's clock), `launcher` (build id in HELLO, `-coop_auto`), `multiplayer` and `render`.
+- `coop` — the one main branch, everything that works goes here: engine networking in `src/xrGame/coop/`, Lua sync in `gamedata/scripts/coop_sync.script`, DLTX in `gamedata/configs/mod_system_coop.ltx`, Node server in `coop-server/` (protocol 27), plus all of the merged branches below. Since 2026-11-05 it holds `shelter` (with `raid`), `timesync` (the server's clock), `launcher` (build id in HELLO, `-coop_auto`), `multiplayer` and `render`.
 - `integrate` — where `shelter`, `launcher` and `multiplayer` were brought together before going into `coop` (2026-11-05); merged.
 - `raid` — the Limansk raid: six level copies in one spawn pack (`tools/raid/`), scripted transitions. Merged into `coop` (via `shelter`).
 - `shelter` — the group's own hideout on top of coop and raid: questline, floors and lifts, laptop apps, bar, trade, perimeter, AI vision. Merged into `coop`.

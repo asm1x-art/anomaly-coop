@@ -4,6 +4,7 @@
 #include "xrMessages.h"
 #include "../Include/xrRender/Kinematics.h"
 #include "Level.h"
+#include "coop/coop_heli.h"
 
 void
 CHelicopter::BoneMGunCallbackX(CBoneInstance* B)
@@ -147,7 +148,9 @@ void CHelicopter::OnShot()
 		fire_dir.sub(enemy_pos, fire_pos).normalize_safe();
 	};
 
-	FireBullet(fire_pos, fire_dir, fireDispersionBase, m_CurrentAmmo, ID(), ID(), OnServer(), ::Random.randI(0, 30));
+	const int shot_num = ::Random.randI(0, 30);
+	FireBullet(fire_pos, fire_dir, fireDispersionBase, m_CurrentAmmo, ID(), ID(), OnServer(), shot_num);
+	coop::on_heli_shot(*this, fire_pos, m_vCurrentShootDir, shot_num, m_iCurrentBulletSeed); // blanks for the others
 
 	StartShotParticles();
 	if (m_bLightShotEnabled)
@@ -349,6 +352,7 @@ void CHelicopter::startRocket(u16 idx)
 		m_last_launched_rocket = idx;
 
 		m_layered_sounds.PlaySound("sndRocket", xform.c, this, false);
+		coop::on_heli_rocket(*this, xform.c); // the rocket itself flies in the other games as any (coop_projectiles.h)
 	}
 }
 

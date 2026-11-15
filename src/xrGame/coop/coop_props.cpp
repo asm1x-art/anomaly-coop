@@ -279,8 +279,20 @@ namespace coop
 			return;
 		CPhysicsShellHolder* holder = object->m_bOnline ? prop_of(Level().Objects.net_Find(id)) : nullptr;
 		if (object->m_bOnline && !holder)
-			return; // online here but not a thing we keep (yet made, or carried)
+		{
+			// online here but not a thing we keep (yet made, or carried); the world's place of a piece another game made,
+			// which fell through the ground here or isn't shown yet, is put on the next look all the same
+			if (word && smart_cast<CSE_ALifeObjectPhysic*>(object))
+				g_pending[id] = rest;
+			return;
+		}
 		const bool moving = holder && holder->PPhysicsShell()->isEnabled();
+		if (word && holder && !holder->getVisible())
+		{
+			// a piece hidden until all of its original's pieces are here (CPHDestroyable): put there once it shows
+			g_pending[id] = rest;
+			return;
+		}
 
 		if (!word)
 		{
@@ -318,9 +330,15 @@ namespace coop
 			return;
 		}
 
-		// the world's word; a copy moving here (ours being pushed, carried) gives its own rest when it lies still
+		// the world's word; a copy moving here (ours being pushed, carried) gives its own rest when it lies still. One still
+		// falling since it came online here (a helicopter's piece, made by another game) is put there on the next look
 		if (moving)
+		{
+			auto prop = g_props.find(id);
+			if (prop == g_props.end() || !prop->second.known)
+				g_pending[id] = rest;
 			return;
+		}
 		if (holder)
 			put_online(holder, rest.poses);
 		else
@@ -355,27 +373,36 @@ namespace coop
 		++scan;
 		const bool word = is_authority(Level().name());
 
+		// the world's places that came while a thing here couldn't take them (offline, falling, under the ground)
+		for (auto it = g_pending.begin(); it != g_pending.end();)
+		{
+			CPhysicsShellHolder* holder = smart_cast<CPhysicsShellHolder*>(Level().Objects.net_Find(it->first));
+			if (!holder || holder->getDestroy() || holder->H_Parent() || !holder->getVisible() || !holder->PPhysicsShell())
+			{
+				++it;
+				continue;
+			}
+			const bool put = put_online(holder, it->second.poses);
+			if (debug_mode)
+				Msg("[coop dbg] %s (id=%u) put where the world has it%s", holder->cNameSect().c_str(), it->first,
+				    put ? ", which came while it couldn't take it" : ": its elements differ, left");
+			it = g_pending.erase(it);
+		}
+
 		for (u32 i = 0, n = Level().Objects.o_count(); i < n; ++i)
 		{
 			CPhysicsShellHolder* holder = prop_of(Level().Objects.o_get_by_iterator(i));
 			if (!holder)
 				continue;
 			const u16 id = holder->ID();
-			if (is_local_object(id) || is_by_logic(id))
-				continue;
+			if (is_local_object(id) || is_by_logic(id) || !holder->getVisible())
+				continue; // a hidden piece waits for the rest of its original's (CPHDestroyable): not lying anywhere yet
 			CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
 			if (!object)
 				continue;
 			SProp& prop = g_props[id];
 			prop.seen = scan;
 
-			auto pending = g_pending.find(id);
-			if (pending != g_pending.end())
-			{
-				put_online(holder, pending->second.poses); // the world's place, which came while it was offline here
-				g_pending.erase(pending);
-				continue;
-			}
 			if (holder->PPhysicsShell()->isEnabled())
 			{
 				prop.awake = true;

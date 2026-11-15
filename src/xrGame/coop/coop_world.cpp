@@ -13,6 +13,7 @@
 #include "coop_puppet.h"
 #include "coop_props.h"
 #include "coop_combat.h"
+#include "coop_heli.h"
 #include "Helicopter.h"
 #include "PhysicsShellHolder.h"
 #include "../xrPhysics/PhysicsShell.h"
@@ -602,6 +603,15 @@ namespace coop
 			Msg("[coop dbg] the state of our %u thing(s) sent", sent);
 	}
 
+	bool send_object_state(u16 id)
+	{
+		CSE_ALifeDynamicObject* object = ai().get_alife() ? ai().alife().objects().object(id, true) : nullptr;
+		if (!object || local_objects().count(id) || !should_send())
+			return false;
+		send_item_state(object);
+		return true;
+	}
+
 	// state's condition, upgrades, ammo...: onto object, which stays where it is
 	static void take_state(CSE_ALifeDynamicObject* object, CSE_Abstract* state, const xr_vector<u8>& client, const xr_string& lua)
 	{
@@ -1017,7 +1027,11 @@ namespace coop
 		CSE_ALifeDynamicObject* parent = ai().alife().objects().object(object->ID_Parent, true);
 		const bool parent_shared = !parent || !local_objects().count(parent->ID);
 		if (is_actor(parent) || (g_shared_scope && parent_shared))
+		{
 			send_spawn(object);
+			if (heli_breaking())
+				note_moved(object->ID); // a helicopter's piece: where it comes to rest is the world's (coop_heli.h)
+		}
 		else
 			local_objects().insert(object->ID);
 	}

@@ -67,6 +67,9 @@ namespace coop
 	// Lua: one of ours goes to the others now (a box's loot the world gave us, coop_physics.script); false when it is
 	// gone or theirs already
 	bool share_local(u16 id);
+	// Lua: a shared object's state as our A-Life has it now goes to the others (M_OBJECT_STATE), for the copies offline
+	// there: data a script sets after the spawn went (a helicopter's, utils_stpk.set_heli_data). False: none, or ours only
+	bool send_object_state(u16 id);
 	// an item our actor carries goes to another player (trading): false when it can't
 	bool give_item(u16 id, u32 peer);
 

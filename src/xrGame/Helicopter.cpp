@@ -12,6 +12,7 @@
 #include "../xrEngine/LightAnimLibrary.h"
 //#include "physicscommon.h"
 #include "ui_base.h"
+#include "coop/coop_heli.h"
 //50fps fixed
 float STEP = 0.02f;
 
@@ -215,11 +216,21 @@ BOOL CHelicopter::net_Spawn(CSE_Abstract* DC)
 	IKinematicsAnimated* A = smart_cast<IKinematicsAnimated*>(Visual());
 	if (A)
 	{
-			A->PlayCycle(*heli->startup_animation);
+		// co-op: one spawned by a script before its data was set ("$editor", as alife_create leaves it, the
+		// smarts' utils_stpk.set_heli_data comes after) flies with "idle" instead of failing on a missing cycle
+		MotionID startup = A->ID_Cycle_Safe(heli->startup_animation);
+		if (!startup.valid())
+		{
+			Msg("! %s (id=%u): no startup cycle '%s', 'idle' instead", cName().c_str(), ID(), heli->startup_animation.c_str());
+			startup = A->ID_Cycle_Safe("idle");
+		}
+		if (startup.valid())
+			A->PlayCycle(startup);
 		K->CalculateBones(TRUE);
 	}
 
-	m_engineSound.create(*heli->engine_sound, st_Effect, sg_SourceType);
+	m_engineSound.create(heli->engine_sound.size() ? *heli->engine_sound : "vehicles\\helicopter\\helicopter", st_Effect,
+	                     sg_SourceType);
 	m_engineSound.play_at_pos(0, XFORM().c, sm_Looped);
 
 	CShootingObject::Light_Create();
@@ -401,6 +412,8 @@ void CHelicopter::UpdateCL()
 {
 	inherited::UpdateCL();
 	CExplosive::UpdateCL();
+	if (coop::drive_heli_puppet(*this))
+		return; // another co-op game flies it: it goes where that game has it (coop_heli.h)
 	if (PPhysicsShell() && (state() == CHelicopter::eDead))
 	{
 		PPhysicsShell()->InterpolateGlobalTransform(&XFORM());
@@ -465,6 +478,8 @@ void CHelicopter::shedule_Update(u32 time_delta)
 		for (u32 i = getRocketCount(); i < 4; ++i)
 			CRocketLauncher::SpawnRocket(*m_sRocketSection, this);
 	}
+	if (m_ready_explode && coop::is_heli_puppet(this))
+		m_ready_explode = false; // it blows up when the game flying it says so
 	if (m_ready_explode)ExplodeHelicopter();
 }
 

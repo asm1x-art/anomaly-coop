@@ -461,3 +461,10 @@ check_s             = 5   ; real s between checks
 ; Dead calm
 [coop_anom_layers]
 min_gap_s = 60 ; real s: a level's seed is rolled again by the same game no sooner (a surge's end comes more than once)
+
+; Co-op: helicopters (src/xrGame/coop/coop_heli.h, gamedata/scripts/coop_heli.script). The level's authority flies
+; them; the others' are puppets that follow it.
+[coop_heli]
+follow_rate   = 6    ; 1/s: how fast a puppet closes in on where the authority's helicopter is
+snap_distance = 30   ; m: a puppet farther off than this is put there at once
+fly_on_s      = 0.5  ; s: how long a puppet flies on with the last speed heard before it waits for the next state

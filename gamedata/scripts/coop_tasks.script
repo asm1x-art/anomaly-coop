@@ -437,7 +437,15 @@ local function share_helicopters()
 		if coop.remote_death(id) then -- downed in another game: it told who did
 			killer = coop.fact("killed:" .. id)
 		else
-			killer = last_hitter[id] == AC_ID and coop.my_name() or "-"
+			-- the authority flies it for everyone (coop_heli.script): another player's hit came through their stand-in
+			local hitter = last_hitter[id]
+			local peer = hitter and hitter ~= AC_ID and coop.stand_in_peer(hitter) or 0
+			killer = hitter == AC_ID and coop.my_name() or "-"
+			for _, p in ipairs(peer ~= 0 and coop.peers() or {}) do
+				if p.id == peer then
+					killer = p.name
+				end
+			end
 			coop.report_fact("killed:" .. id, killer)
 		end
 		if killer == coop.my_name() then

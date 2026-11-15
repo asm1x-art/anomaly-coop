@@ -6,6 +6,7 @@
 #include "coop_combat.h"
 #include "coop_projectiles.h"
 #include "coop_props.h"
+#include "coop_heli.h"
 #include "Level.h"
 #include "Actor.h"
 #include "Inventory.h"
@@ -767,6 +768,10 @@ namespace coop
 			return apply_prop_rest(sender, P);
 		if (action == eGlassBreak)
 			return apply_glass_break(P);
+		if (action == eHeliShot)
+			return play_heli_shot(sender, P);
+		if (action == eHeliBreak)
+			return play_heli_break(sender, P);
 		auto it = g_puppets.find(sender);
 		if (it == g_puppets.end())
 			return; // not on our level: nothing to see or hear
