@@ -23,6 +23,11 @@
 //   bus_ash_bark   tree trunks and branches (ASH_BARK): x..y world normal.y from no ash to full, z the most of it;
 //                  the view from above and the hemi ignored as for foliage
 //   bus_ash_kinds  x the most ash on grass (ASH_GRASS), y on alpha tested surfaces (ASH_AREF: willows, nets, fences)
+//   bus_ash_hud    the player's hands and weapon (the HUD: ASH_KIND_HUD, the tag the deffer_base_hud_* shaders write
+//                  for any model drawn as the HUD; coop_zone_ash.script hud_*): x how much ash 0..1, y the most it
+//                  hides, z..w world normal.y from no ash to full; the sky, the view from above and alive are not asked
+//                  (the script knows where he stood)
+//   bus_ash_hud_look  x the patches' grain per metre (view space: the HUD moves with the camera), y patchiness
 // ash_smap (engine): x 1 while the rain's shadow map (the view from above) is valid, y..z view distance where it fades
 // out (beyond it only the hemi tells a roof). m_shadow (the map's xform) comes from shadow.h.
 
@@ -36,6 +41,8 @@ uniform float4 bus_ash_shape;
 uniform float4 bus_ash_flora;
 uniform float4 bus_ash_bark;
 uniform float4 bus_ash_kinds;
+uniform float4 bus_ash_hud;
+uniform float4 bus_ash_hud_look;
 uniform float4 ash_smap;
 
 // with MSAA the G-buffer is multisampled: every pass here runs once a pixel and reads its sample 0 (and writes all the
@@ -86,17 +93,20 @@ void ash_gbuffer(float2 tc, float4 pos2d, out float3 P, out float3 N, out float 
 }
 
 // what a surface is, from the heat target's alpha its pixel shader wrote (gbuffer_stage.h, the defines the blenders
-// compile them with): 0.25 grass (ASH_GRASS, details), 0.375 alpha tested level and model surfaces (ASH_AREF: hanging
-// foliage, willows, nets, fences), 0.5 tree leaves (ASH_FOLIAGE), 0.75 tree trunks (ASH_BARK); foliage textures with
-// Anomaly's flora material and the far tree LODs by the material
+// compile them with): 0.125 the HUD (ASH_HUD: the hands and weapon), 0.25 grass (ASH_GRASS, details), 0.375 alpha
+// tested level and model surfaces (ASH_AREF: hanging foliage, willows, nets, fences), 0.5 tree leaves (ASH_FOLIAGE),
+// 0.75 tree trunks (ASH_BARK); foliage textures with Anomaly's flora material and the far tree LODs by the material
 #define ASH_KIND_GROUND 0
 #define ASH_KIND_FLORA 1
 #define ASH_KIND_BARK 2
 #define ASH_KIND_GRASS 3
 #define ASH_KIND_AREF 4
+#define ASH_KIND_HUD 5
 
 uint ash_kind(float heat_w, uint mtl)
 {
+	if (abs(heat_w - 0.125) < 0.06)
+		return ASH_KIND_HUD;
 	if (abs(heat_w - 0.75) < 0.06)
 		return ASH_KIND_BARK;
 	if (abs(heat_w - 0.5) < 0.06 || mtl == ASH_MTL_FLORA || mtl == ASH_MTL_LOD)
@@ -188,16 +198,29 @@ float ash_amount(float2 tc, float4 pos2d, float3 P, float3 N, float hemi, uint m
 	float grow = saturate(cover * (1.0 + spread) - ash_patch_noise(Pw) * spread);
 
 	ash_dbg = float3(saturate(up), saturate(open), alive);
-	return saturate(grow * up * open * hud * (1.0 - alive)) * opacity;
+	if (kind != ASH_KIND_HUD)
+		return saturate(grow * up * open * hud * (1.0 - alive)) * opacity;
+
+	// the HUD: the player's hands and weapon, their upper sides, in patches fixed to the view
+	if (bus_ash_hud.x <= 0)
+		return 0;
+	float hup = smoothstep(bus_ash_hud.z, max(bus_ash_hud.w, bus_ash_hud.z + 0.01), Nw.y);
+	float sc = bus_ash_hud_look.x > 0 ? bus_ash_hud_look.x : 40.0;
+	float n = 0.55 * ash_vnoise(P.xy * sc) + 0.3 * ash_vnoise(P.xy * sc * 2.7 + 5.1) + 0.15 * ash_vnoise(P.xy * sc * 7.3 + 1.7);
+	float spread_h = bus_ash_hud_look.y;
+	float hgrow = saturate(bus_ash_hud.x * (1.0 + spread_h) - n * spread_h);
+	return hgrow * hup * (bus_ash_hud.y > 0 ? bus_ash_hud.y : 0.8);
 }
 
 // the ash's albedo at a pixel: a fine grain (gone with distance) and the patches so it is not flat
-float3 ash_color(float3 P)
+float3 ash_color(float3 P, bool on_hud)
 {
 	float3 look = any(bus_ash_look.xyz) ? bus_ash_look.xyz : float3(0.42, 0.41, 0.40);
 	float amp = bus_ash_shape.y > 0 ? bus_ash_shape.y : 0.36;
 	float3 Pw = mul(m_inv_V, float4(P, 1.0));
-	float grain = ash_vnoise(Pw.xz * 3.1) * 0.6 + ash_vnoise(Pw.xz * 11.0) * 0.4;
+	// the HUD's grain in view space (it moves with the camera), the world's on the ground
+	float2 gp = on_hud ? P.xy * 25.0 : Pw.xz;
+	float grain = ash_vnoise(gp * 3.1) * 0.6 + ash_vnoise(gp * 11.0) * 0.4;
 	grain = lerp(grain, 0.5, smoothstep(15.0, 60.0, P.z));
 	return look * (1.0 + amp * (grain - 0.5)) * (0.9 + 0.2 * ash_patch_noise(Pw));
 }
