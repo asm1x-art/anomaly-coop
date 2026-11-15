@@ -5,7 +5,7 @@
 -- there with nobody online:
 --   "zone_event:<slot>" = "<id>|<level>|<seq>|<from>|<till>|<stage>|<how>|<data>"
 --     slot   world (a world state: Dead calm, Ash front) or scene; at most one event in each
---     from, till  real seconds (UTC, os.time) it began and ends (once over: when it ended): an event lasts real time,
+--     from, till  real seconds (UTC, the server's clock: now()) it began and ends (once over: when it ended): an event lasts real time,
 --                 a player's sleep or the world's speed (a surge's x10) neither shortens nor stretches it
 --     stage  on | end;  how  timer | outcome | stop (how it ended);  data  the event's own "k=v;k=v"
 --   "zone_event:last_<id>" = the real second the last one of that event ended (the director's cooldown);
@@ -78,9 +78,15 @@ end
 
 -------------------------------------------------------------------------------
 -- the events' clock: real seconds (UTC). The world's game time won't do: a player's sleep moves it for everyone and
--- its speed changes (a surge runs x10). The master decides an event's end by its own clock.
+-- its speed changes (a surge runs x10). In co-op it is the server's clock (coop.server_time, from its M_TIME), the
+-- same in every game: a PC whose clock is off no longer sees another ash cover or ends an event at another second.
+-- Without co-op, or from a server that doesn't send it, the PC's own (os.time).
 
 function now()
+	local t = in_coop() and coop.server_time and coop.server_time() or 0
+	if t > 0 then
+		return math.floor(t)
+	end
 	return os.time()
 end
 

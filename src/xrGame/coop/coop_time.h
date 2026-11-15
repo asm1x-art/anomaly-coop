@@ -25,4 +25,7 @@ namespace coop
 
 	// Lua: the world's game time now as this game counts it (ms since the start of the calendar), 0 without one
 	double clock_ms();
+	// Lua: real time as the server's clock has it (UTC, s, as os.time but the same in every game), 0 before the
+	// first M_TIME or from a server that doesn't send it
+	double server_utc_s();
 }

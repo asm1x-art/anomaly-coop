@@ -39,7 +39,7 @@ function connect(port) {
 // the world's clock as a TIME message tells it
 function timeOf(p) {
   return { game: Number(p.readBigUInt64LE(0)), factor: p.readFloatLE(8), running: (p[12] & 1) !== 0, set: (p[12] & 2) !== 0,
-    epoch: p.readUInt32LE(13) };
+    epoch: p.readUInt32LE(13), utc: p.length >= 25 ? Number(p.readBigUInt64LE(17)) : null };
 }
 
 function hello(name, version = PROTOCOL_VERSION, build = 'dev') {
@@ -1461,6 +1461,7 @@ test('clock: set by the first game in the world, runs only while someone is in i
     const a = await player(port, 'artem');
     await settle(a);
     assert.equal(a.time.at(-1).set, false); // told after WELCOME: no clock yet
+    assert.ok(Math.abs(a.time.at(-1).utc - Date.now()) < 5000); // the server's real time, for the Zone's events
 
     // not in the world: not taken
     a.send(M.TIME_SET, timeSet(0, ['u64', 7_000_000], ['f32', 6]));

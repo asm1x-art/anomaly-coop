@@ -172,6 +172,7 @@ namespace coop
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
 			def("clock", &clock_ms),                   // the world's game time (ms) as we count it, 0 without one
+			def("server_time", &server_utc_s),         // real time (UTC s) by the server's clock, 0 without it
 			def("is_host", &is_host),                  // this game is the world's headless host
 			def("server_address", &server_address),    // "host:port" we connected to, "" before
 			def("admin_login", &admin_login),          // (password) for the admin window: _G.coop_on_admin_state comes
