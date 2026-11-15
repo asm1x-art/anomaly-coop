@@ -58,6 +58,9 @@ namespace coop
 	void share_object(CSE_ALifeDynamicObject* object);
 	// made here this session and not the others' yet (shared once our actor takes it)
 	bool is_local_object(u16 id);
+	// Lua: a shared object's state as our A-Life has it now goes to the others (M_OBJECT_STATE), for the copies offline
+	// there: data a script sets after the spawn went (a helicopter's, utils_stpk.set_heli_data). False: none, or ours only
+	bool send_object_state(u16 id);
 	// an item our actor carries goes to another player (trading): false when it can't
 	bool give_item(u16 id, u32 peer);
 

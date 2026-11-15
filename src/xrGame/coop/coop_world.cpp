@@ -558,6 +558,15 @@ namespace coop
 			Msg("[coop dbg] the state of our %u thing(s) sent", sent);
 	}
 
+	bool send_object_state(u16 id)
+	{
+		CSE_ALifeDynamicObject* object = ai().get_alife() ? ai().alife().objects().object(id, true) : nullptr;
+		if (!object || local_objects().count(id) || !should_send())
+			return false;
+		send_item_state(object);
+		return true;
+	}
+
 	// state's condition, upgrades, ammo...: onto object, which stays where it is
 	static void take_state(CSE_ALifeDynamicObject* object, CSE_Abstract* state, const xr_vector<u8>& client, const xr_string& lua)
 	{

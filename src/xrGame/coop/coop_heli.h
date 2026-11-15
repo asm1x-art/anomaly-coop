@@ -32,7 +32,8 @@ namespace coop
 	// the others'
 	void read_heli_states(NET_Packet& P);           // the tail of M_NPC_STATES
 	void play_heli_shot(u32 sender, NET_Packet& P);  // M_ACTOR_ACTION eHeliShot
-	void on_heli_exploded(CHelicopter& heli);        // the authority's blew up (eExplosion): the puppet's breaks the same
+	// the authority's blew up there (eExplosion): the puppet's breaks the same, from that place
+	void on_heli_exploded(CHelicopter& heli, const Fvector& position);
 
 	void clear_heli_sync(); // disconnect, level unload
 }

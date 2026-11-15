@@ -161,6 +161,8 @@ namespace coop
 		// where the authority's is now: its last state, flown on for as long as it is old
 		static void follow(CHelicopter& heli, SHeliPuppet& puppet, const SHeliState& state)
 		{
+			if (heli.m_exploded)
+				return; // broken where the authority's broke: its pieces lie about, it stays there
 			const SHeliSettings& cfg = settings();
 			const float age = _min(float(Device.dwTimeContinual - state.received) / 1000.f, cfg.fly_on_s);
 			Fvector target;
@@ -215,7 +217,7 @@ namespace coop
 			if (!(state.flags & fFiring))
 				heli.StopFlameParticles();
 			if ((state.flags & fExploded) && !heli.m_exploded)
-				explode(heli); // the effects come with the explosion (eExplosion), whichever is first
+				explode(heli, state.position); // the effects come with the explosion (eExplosion)
 		}
 
 		// every frame, fresh state or not: the muzzle (for the shots' flame and light), smoke, sounds, bones
@@ -236,11 +238,18 @@ namespace coop
 			K->CalculateBones();
 		}
 
-		// what CHelicopter::ExplodeHelicopter does besides the explosion itself
-		static void explode(CHelicopter& heli)
+		// what CHelicopter::ExplodeHelicopter does besides the explosion itself, where the authority's blew up (its
+		// pieces fly from there)
+		static void explode(CHelicopter& heli, const Fvector& at)
 		{
 			if (heli.m_exploded)
 				return;
+			heli.XFORM().translate_over(at);
+			if (CPhysicsShell* shell = heli.PPhysicsShell())
+				shell->SetTransform(heli.XFORM(), mh_unspecified);
+			auto puppet = g_puppets.find(heli.ID());
+			if (puppet != g_puppets.end())
+				puppet->second.position = at;
 			heli.m_ready_explode = false;
 			heli.m_exploded = true;
 			if (heli.m_pParticle)
@@ -432,10 +441,10 @@ namespace coop
 		}
 	}
 
-	void on_heli_exploded(CHelicopter& heli)
+	void on_heli_exploded(CHelicopter& heli, const Fvector& position)
 	{
 		if (is_heli_puppet(&heli))
-			SHeliAccess::explode(heli);
+			SHeliAccess::explode(heli, position);
 	}
 
 	void clear_heli_sync()

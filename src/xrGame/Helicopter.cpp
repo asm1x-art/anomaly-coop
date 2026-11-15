@@ -216,11 +216,21 @@ BOOL CHelicopter::net_Spawn(CSE_Abstract* DC)
 	IKinematicsAnimated* A = smart_cast<IKinematicsAnimated*>(Visual());
 	if (A)
 	{
-			A->PlayCycle(*heli->startup_animation);
+		// co-op: one spawned by a script before its data was set ("$editor", as alife_create leaves it, the
+		// smarts' utils_stpk.set_heli_data comes after) flies with "idle" instead of failing on a missing cycle
+		MotionID startup = A->ID_Cycle_Safe(heli->startup_animation);
+		if (!startup.valid())
+		{
+			Msg("! %s (id=%u): no startup cycle '%s', 'idle' instead", cName().c_str(), ID(), heli->startup_animation.c_str());
+			startup = A->ID_Cycle_Safe("idle");
+		}
+		if (startup.valid())
+			A->PlayCycle(startup);
 		K->CalculateBones(TRUE);
 	}
 
-	m_engineSound.create(*heli->engine_sound, st_Effect, sg_SourceType);
+	m_engineSound.create(heli->engine_sound.size() ? *heli->engine_sound : "vehicles\\helicopter\\helicopter", st_Effect,
+	                     sg_SourceType);
 	m_engineSound.play_at_pos(0, XFORM().c, sm_Looped);
 
 	CShootingObject::Light_Create();

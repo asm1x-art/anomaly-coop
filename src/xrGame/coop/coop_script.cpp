@@ -214,6 +214,7 @@ namespace coop
 			def("set_climbing", &set_climbing),          // our player climbs onto a ledge (climb_rules.script)
 			def("stand_in_peer", &script_stand_in_peer), // (object id) whose stand-in it is, 0 for none
 			def("heli_puppet", &script_heli_puppet),     // (id) a helicopter another game flies: its logic stays off here
+			def("send_object_state", &send_object_state), // (id) a shared object as we have it, for the others' copies
 			def("last_shot", &script_last_shot)          // (shooter id) { weapon, ammo, age } fired here from another game
 		];
 	}

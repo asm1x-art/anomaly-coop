@@ -162,10 +162,25 @@ local function patch_combat()
 	end
 end
 
+-- A helicopter spawned by a script gets its model, startup motion and engine sound after alife_create
+-- (smart_terrain.try_respawn, heli_alife_warfare): the spawn has gone to the others without them by then
+-- (src/xrGame/coop/coop_world.cpp on_object_registered), they get them now
+local function patch_heli_data()
+	local set = utils_stpk.set_heli_data
+	utils_stpk.set_heli_data = function(data, se_obj, ...)
+		local r = set(data, se_obj, ...)
+		if se_obj and coop.connected() then
+			coop.send_object_state(se_obj.id)
+		end
+		return r
+	end
+end
+
 function on_game_start()
-	if not (coop and coop.heli_puppet and bind_heli and heli_combat and db) then
+	if not (coop and coop.heli_puppet and coop.send_object_state and bind_heli and heli_combat and db) then
 		return -- not the co-op engine
 	end
+	patch_heli_data()
 	patch_storage()
 	patch_binder()
 	patch_combat()

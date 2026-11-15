@@ -307,7 +307,7 @@ namespace coop
 		CGameObject* object = smart_cast<CGameObject*>(Level().Objects.net_Find(id));
 		CExplosive* explosive = object ? smart_cast<CExplosive*>(object) : nullptr;
 		if (CHelicopter* heli = smart_cast<CHelicopter*>(object))
-			on_heli_exploded(*heli); // a puppet's crash: it breaks as the authority's, then blows up below
+			on_heli_exploded(*heli, position); // a puppet's crash: it breaks as the authority's, then blows up below
 		if (explosive && !object->H_Parent() && object->cNameSect() == section &&
 		    explosive->coop_blank_explode(position, direction, seed))
 			return;

@@ -106,7 +106,10 @@ coop = {
 	stand_in_peer = function(id) return id == 900 and 7 or 0 end,
 	downed = function(peer) return downed[peer] or false end,
 	peers = function() return { { id = 7, name = "Friend", level = "l01_escape", stand_in = 900 } } end,
+	sent_states = {},
+	send_object_state = function(id) coop.sent_states[#coop.sent_states + 1] = id return true end,
 }
+utils_stpk = { set_heli_data = function(data, se) se.heli_data = data end }
 
 function run(load)
 	bind_heli = load("bind_heli")
@@ -114,6 +117,11 @@ function run(load)
 	heli_alife = { distance_2d_sqr = function() return 1 end }
 	coop_heli = load("coop_heli")
 	coop_heli.on_game_start()
+
+	-- 0. a script's helicopter: its data set after the spawn went goes to the others
+	local se_new = { id = 501 }
+	utils_stpk.set_heli_data({ startup_animation = "idle" }, se_new)
+	check("set_heli_data: data set and sent to the others", se_new.heli_data and coop.sent_states[1] == 501)
 
 	local st = { heliObject = heli_obj }
 	db.storage[500] = st
