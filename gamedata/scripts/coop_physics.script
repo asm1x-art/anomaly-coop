@@ -25,22 +25,47 @@
 -- switched on its own: a door a player opened stayed closed for the others, and one game's NPCs opened and closed
 -- doors in every game, and counted its timers (on_game_timer, on_timer: a door closing by itself) from its own
 -- moment. Now the section is a fact of the server, "door:<name>" = "section|moment", the moment on the world's clock
--- (coop.clock): set when a player uses a door or shoots its lock (in that player's game), when the level's authority
--- switches it by its logic (its NPCs open doors only there), and when any game switches it by logic that asks only
--- the world (its infos, its timers, its rolls from the world's random: world_logic), so a door with no authority near
--- doesn't wait for one. Every game puts its door on that section and counts its timers from that moment when the fact
+-- (coop.clock): set when a player uses a door or shoots its lock (in that player's game) and when the level's
+-- authority switches it by its logic (all of a door's logic runs there, its NPCs open doors only there; its rolls
+-- from the world's random). Every game puts its door on that section and counts its timers from that moment when the fact
 -- changes and when the door comes online (a load, a join, a level change). The server tells the sender too
 -- (coop-server: echoed facts), so two players using a door at once, or two games closing it at once, end up with the
 -- same door. A door with a motor (open, closed) is where its section
 -- puts it; one swinging free (no_force) is where the world's physics has it (the engine's rests, coop.prop_by_logic).
+--
+-- A door's logic (how near the player, in a zone, what he carries, what he knows, its timers) is the level's
+-- authority's alone, and it asks about all the level's players, not its own: "near" is the nearest of them, "in a zone"
+-- any of them, "out of it" none of them, an info any of them / none of them (ALL_PLAYERS, coop_door_info). A key is its
+-- holder's: "has the item" is a player within key_reach_m of the door holding it, and a game whose player hasn't the
+-- key gets no use out of the door (has_keys), so nobody opens it while the holder is elsewhere on the level, and the
+-- use's effects (remove_item, its infos) run in the holder's game. The infos a switch of the authority gives go to the
+-- player it was for (the one near, in the zone, with the key; else the one nearest to the door): his game gives them,
+-- and coop_story takes them along his group as it takes the story ([coop_story_infos]); a flag it takes goes from every
+-- player of the level who has it (route_infos). The other games run no such logic of their own (their own player
+-- would make the door go back and forth between them): they take the door from its fact and play what the authority's
+-- switch or a player's use played (its sounds, particles, knocks: replay_effects). The authority has online every door near any player
+-- (the engine's A-Life, coop_npc.h), its own player's place and the others' (coop.peers), and what the others carry
+-- and know from their own games ("carry:<player>", "knows:<player>": what door logic asks about).
 
 local S = "coop_physics"
 local BOX = "once:box:"
 local SEED = "once:seed:loot"
 local DOOR = "door:"
+local CARRY = "carry:"
+local KNOWS = "knows:"
 
 local function num(key, def)
 	return ini_sys:r_float_ex(S, key) or def
+end
+
+-- a comma list of the settings as a set
+local function set_of(key, def)
+	local text = ini_sys.r_string_ex and ini_sys:r_string_ex(S, key) or def
+	local out = {}
+	for word in string.gmatch(text or "", "[^,%s]+") do
+		out[word] = true
+	end
+	return out
 end
 
 local function coop_on()
@@ -278,10 +303,343 @@ end
 ------------------------------------------------------------------------------------------------
 -- Doors
 
-local applying = false -- putting a door on the world's section: not a change of ours
-local acting = 0       -- > 0 inside a door's use or hit: a player's doing (or the authority's NPC's)
-local fresh = {}       -- id -> binder of a physic object just online: put on its fact once its logic is up
-local original_switch  -- xr_logic.switch_to_section as it was
+local applying = false  -- putting a door on the world's section: not a change of ours
+local acting = 0        -- > 0 inside a door's use or hit: a player's doing (or the authority's NPC's)
+local replaying = false -- playing here what another game's switch of a door played: its knocks aren't our hits
+local fresh = {}        -- id -> binder of a physic object just online: put on its fact once its logic is up
+local original_switch   -- xr_logic.switch_to_section as it was
+local replayed = {}     -- xr_effects a switch decided elsewhere plays here too (replay_effects)
+
+------------------------------------------------------------------------------------------------
+-- The level's players, for a door's logic the authority runs
+
+local deciding = false   -- the authority runs a door's logic: "the actor" in it is every player of the level
+local real_inside        -- db.actor_inside_zones as it is, while the proxy stands in for it
+local watched = {}       -- item sections door logic asks about: each game tells which its player carries (CARRY)
+local watched_infos = {} -- info portions door logic asks about or changes: each game tells which its player has (KNOWS)
+local cause_gate         -- the player xr_logic's own check of a way out found (near, in the zone)
+local cause_entry        -- the player the conditions of the way out being looked at found
+local matched, matched_cause -- the way out taken (its index in the condlist the authority ran) and its player
+local players_at, players_now = nil, nil
+
+-- ours (the headless host has no player) and those on the level heard from lately: { name, pos, me }
+local function players()
+	local now = time_global()
+	if players_at == now and players_now then
+		return players_now
+	end
+	local out = {}
+	if db.actor and not (coop.is_host and coop.is_host()) then
+		out[1] = { name = coop.my_name(), pos = db.actor:position(), me = true }
+	end
+	local lvl = level.name()
+	local stale = num("peer_stale_s", 10) * 1000
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lvl and p.age < stale then
+			out[#out + 1] = { name = p.name, pos = vector():set(p.position) }
+		end
+	end
+	players_at, players_now = now, out
+	return out
+end
+
+-- the nearest player to pos: its squared distance and name, nil with no player
+local function nearest(pos)
+	local best, who
+	for _, p in ipairs(players()) do
+		local d = pos:distance_to_sqr(p.pos)
+		if not best or d < best then
+			best, who = d, p.name
+		end
+	end
+	return best, who
+end
+
+local function listed(list, name)
+	return string.find("," .. list .. ",", "," .. name .. ",", 1, true) ~= nil
+end
+
+-- the first player in the zone (ours as its restrictor tells), nil for none
+local function who_in(zone_name)
+	local zone = db.zone_by_name[zone_name]
+	for _, p in ipairs(players()) do
+		if p.me and real_inside and real_inside[zone_name] then
+			return p.name
+		end
+		if zone and zone:inside(p.pos) then
+			return p.name
+		end
+	end
+end
+
+-- The player at the door with the item (the nearest one within key_reach_m): a key is its holder's, the door takes it
+-- from no one else, wherever else on the level the holder is. Ours from our inventory, the others' from CARRY.
+local function holder_at(npc, section)
+	local pos, reach = npc:position(), num("key_reach_m", 5)
+	local best, who
+	for _, p in ipairs(players()) do
+		local has
+		if p.me then
+			has = db.actor:object(section) ~= nil
+		else
+			has = listed(coop.fact(CARRY .. p.name), section)
+		end
+		local d = pos:distance_to_sqr(p.pos)
+		if has and d <= reach * reach and (not best or d < best) then
+			best, who = d, p.name
+		end
+	end
+	return who
+end
+
+-- the level's players who have the info portion: ours from our actor, the others' from KNOWS
+local function who_knows(info)
+	local out = {}
+	for _, p in ipairs(players()) do
+		if p.me then
+			if db.actor:has_info(info) then
+				out[#out + 1] = p.name
+			end
+		elseif listed(coop.fact(KNOWS .. p.name), info) then
+			out[#out + 1] = p.name
+		end
+	end
+	return out
+end
+
+-- xr_conditions about the actor, as they go for all the level's players; a check that finds a player makes him the
+-- one the way out is for (cause_entry): the infos it gives go to him
+local ALL_PLAYERS = {
+	-- near: the nearest player is that near
+	dist_to_actor_le = function(actor, npc, p)
+		local d = tonumber(p and p[1])
+		local n, who = nearest(npc:position())
+		if d ~= nil and n ~= nil and n <= d * d then
+			cause_entry = who
+			return true
+		end
+		return false
+	end,
+	-- far: every player is that far
+	dist_to_actor_ge = function(actor, npc, p)
+		local d, n = tonumber(p and p[1]), nearest(npc:position())
+		return d ~= nil and (n == nil or n >= d * d)
+	end,
+	-- in a zone: any player in it
+	actor_in_zone = function(actor, npc, p)
+		for i = 1, #(p or {}) do
+			local who = who_in(p[i])
+			if who then
+				cause_entry = who
+				return true
+			end
+		end
+		return false
+	end,
+	-- out of a zone: none of them in it
+	actor_out_zone = function(actor, npc, p)
+		return who_in(p and p[1]) == nil
+	end,
+	-- has the item: a player at the door holds it (holder_at)
+	actor_has_item = function(actor, npc, p)
+		local who = p and p[1] and holder_at(npc, p[1])
+		if who then
+			cause_entry = who
+			return true
+		end
+		return false
+	end,
+}
+
+-- what the authority's run of a door's logic asks instead of xr_logic's own (ways_of)
+local DOOR_CONDITIONS = {
+	-- the start of a way out: no player found yet
+	coop_door_way_start = function()
+		cause_entry = nil
+		return true
+	end,
+	-- +info / -info of the actor: any player of the level has it / none has it
+	coop_door_info = function(actor, npc, p)
+		local who = p and p[1] and who_knows(p[1])[1]
+		if who then
+			cause_entry = cause_entry or who -- a player found near, in the zone, with the key comes first
+			return true
+		end
+		return false
+	end,
+}
+
+-- db.actor_inside_zones while the authority decides (xr_logic's on_actor_in_zone, on_actor_not_in_zone): any player
+local inside_proxy = setmetatable({}, {
+	__index = function(_, name)
+		local who = who_in(name)
+		if who then
+			cause_gate = who
+			return db.zone_by_name[name] or true
+		end
+	end,
+	__newindex = function(_, name, value)
+		real_inside[name] = value
+	end,
+})
+
+local function is_actor(obj)
+	return obj ~= nil and (obj == db.actor or (type(obj.id) == "function" and obj:id() == 0))
+end
+
+-- what each game's player carries and knows of what door logic asks about, for the authority (CARRY, KNOWS)
+local report_next = 0
+
+local function report_list(key, set, has)
+	local list = {}
+	for name in pairs(set) do
+		if has(name) then
+			list[#list + 1] = name
+		end
+	end
+	table.sort(list)
+	local value = table.concat(list, ",")
+	if coop.fact(key) ~= value then
+		coop.report_fact(key, value)
+		dbg("%s now [%s]", key, value)
+	end
+end
+
+local function update_carry(now_too)
+	local now = time_global()
+	if (now < report_next and not now_too) or not db.actor or (coop.is_host and coop.is_host()) then
+		return
+	end
+	report_next = now + num("carry_check_ms", 1000)
+	report_list(CARRY .. coop.my_name(), watched, function(section) return db.actor:object(section) ~= nil end)
+	report_list(KNOWS .. coop.my_name(), watched_infos, function(info) return db.actor:has_info(info) end)
+end
+
+-- Infos a way out the authority took gives or takes: "+x" to the player it was for (his own game gives it, and
+-- coop_story takes it along his group as it takes the story), "-x" from every player of the level who has it (a
+-- door's flag goes for all who hold it, or the door would come back for the one still holding it)
+local function apply_infos(list)
+	if not db.actor then
+		return
+	end
+	for _, item in ipairs(list) do
+		local info = string.sub(item, 2)
+		if string.sub(item, 1, 1) == "+" then
+			if not db.actor:has_info(info) then
+				db.actor:give_info_portion(info)
+			end
+		elseif db.actor:has_info(info) then
+			db.actor:disable_info_portion(info)
+		end
+	end
+	update_carry(true)
+end
+
+function route_infos(door, infos, who)
+	local to, order = {}, {}
+	local function add(name, item)
+		if not to[name] then
+			to[name] = {}
+			order[#order + 1] = name
+		end
+		table.insert(to[name], item)
+	end
+	for _, info in ipairs(infos) do
+		if info[2] then
+			if who then
+				add(who, "+" .. info[1])
+			end
+		else
+			for _, name in ipairs(who_knows(info[1])) do
+				add(name, "-" .. info[1])
+			end
+		end
+	end
+	for _, name in ipairs(order) do
+		dbg("door %s: [%s] for %s", door:name(), table.concat(to[name], ","), name)
+		if name == coop.my_name() then
+			apply_infos(to[name])
+		else
+			coop_sync.send_event("door_infos", name, door:name(), table.concat(to[name], ","))
+		end
+	end
+end
+
+local function on_door_infos(sender, payload)
+	local f = str_explode(payload, "\t")
+	if f[1] == coop.my_name() and f[3] and f[3] ~= "" then
+		dbg("door %s: [%s] from %s's run of its logic", f[2], f[3], sender)
+		apply_infos(str_explode(f[3], ","))
+	end
+end
+
+-- A condlist as the authority runs it: the actor's info checks ask all the level's players (coop_door_info), a way
+-- out starts with no player found (coop_door_way_start) and tells it was taken (coop_door_way) instead of giving its
+-- infos here; route_infos gives them. Made once a condlist (xr_logic keeps one per text).
+local ways = setmetatable({}, { __mode = "k" })
+local WAY_START = { "coop_door_way_start", 3 }
+
+local function ways_of(condlist)
+	local w = ways[condlist]
+	if w then
+		return w
+	end
+	w = { list = condlist, infos = {} }
+	local list, changed = {}, false
+	for i, cond in ipairs(condlist) do
+		local checks, effects, infos = { WAY_START }, {}, {}
+		for _, c in ipairs(cond[2] or {}) do
+			if (c[2] == 1 or c[2] == 2) and not c[3] then -- an info of the actor (not an npcx_ one)
+				checks[#checks + 1] = { "coop_door_info", c[2] == 1 and 3 or 4, { c[1] } }
+				changed = true
+			else
+				checks[#checks + 1] = c
+			end
+		end
+		for _, e in ipairs(cond[3] or {}) do
+			if (e[2] == 1 or e[2] == 2) and not e[3] then
+				infos[#infos + 1] = { e[1], e[2] == 1 }
+			else
+				effects[#effects + 1] = e
+			end
+		end
+		if #infos > 0 then
+			table.insert(effects, 1, { "coop_door_way", 3, { i } })
+			w.infos[i] = infos
+			changed = true
+		end
+		list[i] = { cond[1], checks, effects }
+	end
+	if changed then
+		w.list = list
+	end
+	ways[condlist] = w
+	return w
+end
+
+local function decided_pick(original)
+	return function(actor, npc, condlist)
+		if not (deciding and condlist) then
+			return original(actor, npc, condlist)
+		end
+		local w = ways_of(condlist)
+		matched, matched_cause, cause_entry = nil, nil, nil
+		local res = original(actor, npc, w.list)
+		local gate = cause_gate
+		cause_gate = nil -- xr_logic checks a way out's own condition right before this pick
+		local way = matched
+		matched = nil
+		if way and w.infos[way] then
+			local who = matched_cause or gate
+			if not who then
+				local _, n = nearest(npc:position())
+				who = n -- a way out no player made (an info, a timer, a roll): the one at the door
+			end
+			route_infos(npc, w.infos[way], who)
+		end
+		return res
+	end
+end
 
 -- a door with a motor is where its section puts it: the engine sends no rests of it; one swinging free, it does
 local function update_by_logic(obj)
@@ -321,6 +679,37 @@ local function door_value(value)
 	return section or "", tonumber(act)
 end
 
+-- A switch another game decided: what it played there (xr_logic runs a way out's effects in the game that takes it),
+-- here too, as far as it is only seen and heard (replay_effects): the knocks of a door the authority runs for a player
+-- here, the decoder's sound of a player's use. The way out is the first of the door's logic, then of its on_use, that
+-- leads to the new section with effects.
+function replay(obj, logic, section, on_use)
+	local lists = {}
+	for _, c in ipairs(logic or {}) do
+		lists[#lists + 1] = c.condlist
+	end
+	lists[#lists + 1] = on_use and on_use.condlist
+	for _, condlist in ipairs(lists) do
+		for _, cond in ipairs(condlist or {}) do
+			if cond[1] == section and cond[3] then
+				replaying = true
+				for _, e in ipairs(cond[3]) do
+					local fn = (e[2] == 3 or e[2] == 4) and replayed[e[1]] and xr_effects[e[1]]
+					if fn then
+						local ok, err = pcall(fn, db.actor, obj, e[3])
+						if not ok then
+							printf("! [coop] door %s, %s: %s", obj:name(), e[1], err)
+						end
+					end
+				end
+				replaying = false
+				dbg("door %s -> %s: its effects played here", obj:name(), section)
+				return
+			end
+		end
+	end
+end
+
 local function put_door(obj, value, quiet)
 	local section, act = door_value(value)
 	local st = db.storage[obj:id()]
@@ -339,6 +728,9 @@ local function put_door(obj, value, quiet)
 	end
 	if quiet then
 		st.script_used_more_than_once = nil -- ph_door's reset then makes no sound (a door coming online)
+	else
+		local scheme = st.active_scheme and st[st.active_scheme]
+		replay(obj, scheme and scheme.logic, section, scheme and scheme.on_use)
 	end
 	local was = st.active_section
 	applying = true
@@ -353,27 +745,64 @@ local function put_door(obj, value, quiet)
 	dbg("door %s: %s -> %s, as the world has it", obj:name(), was, section)
 end
 
--- xr_logic's ways out of a section that ask only the world: its infos, its timers (on the world's clock), a signal
-local WORLD_CONDITIONS = { on_info = true, on_timer = true, on_game_timer = true, on_signal = true }
+-- What a section's logic asks, once a section: xr_logic makes its logic table anew on each switch.
+-- items: what its actor_has_item ask about; infos: the actor's info portions it asks about or changes (the authority
+-- asks all the players about them)
+local logic_infos = setmetatable({}, { __mode = "k" })
+local NO_LOGIC = { items = {}, infos = {} }
 
--- A door section every game leaves alike, so any game may tell the world it did (the server takes the last one and
--- tells everyone, the sender too): its conditions are the world's infos and timers, and its rolls the world's random
--- (in_door_logic). One that asks about the player (how near, in a zone, what he carries) is the level's authority's
--- to tell; the others go along with it, and on their own while it doesn't have the door online.
-function world_logic(door_st)
-	for _, c in ipairs(door_st and door_st.logic or {}) do
-		if not WORLD_CONDITIONS[c.name] then
-			return false
-		end
+local function logic_info(logic)
+	if not logic then
+		return NO_LOGIC
+	end
+	local info = logic_infos[logic]
+	if info then
+		return info
+	end
+	info = { items = {}, infos = {} }
+	local infos = info.infos
+	for _, c in ipairs(logic) do
 		for _, cond in ipairs(c.condlist or {}) do
 			for _, check in ipairs(cond[2] or {}) do
 				if check[2] == 3 or check[2] == 4 then -- =function, !function
-					return false
+					if check[1] == "actor_has_item" and check[3] and check[3][1] then
+						info.items[#info.items + 1] = tostring(check[3][1])
+					end
+				elseif (check[2] == 1 or check[2] == 2) and not check[3] then -- +info, -info of the actor
+					infos[#infos + 1] = check[1]
+				end
+			end
+			for _, e in ipairs(cond[3] or {}) do
+				if (e[2] == 1 or e[2] == 2) and not e[3] then
+					infos[#infos + 1] = e[1]
 				end
 			end
 		end
 	end
+	logic_infos[logic] = info
+	return info
+end
+
+-- our player holds every key the door's section asks for (actor_has_item): a key door is its holder's to use
+function has_keys(door_st)
+	for _, section in ipairs(logic_info(door_st and door_st.logic).items) do
+		if not (db.actor and db.actor:object(section)) then
+			return false
+		end
+	end
 	return true
+end
+
+-- what our player carries and knows of it goes to the world from now on (update_carry)
+local function note_needs(door_st)
+	local info = logic_info(door_st and door_st.logic)
+	for _, section in ipairs(info.items) do
+		watched[section] = true
+	end
+	for _, name in ipairs(info.infos) do
+		watched_infos[name] = true
+	end
+	return info
 end
 
 local function report_door(obj, st)
@@ -387,32 +816,44 @@ end
 local function on_switch(obj, ini, section)
 	local st = obj and db.storage[obj:id()]
 	local before = st and st.active_scheme
-	local world = before == "ph_door" and world_logic(st.ph_door)
 	local switched = original_switch(obj, ini, section)
 	if switched and coop_on() and (before == "ph_door" or st.active_scheme == "ph_door") then
 		update_by_logic(obj)
 		-- a door just online here waits for the world's word (update_fresh) before its own counts
 		if not applying and not fresh[obj:id()] and st.active_section and
-			(acting > 0 or world or coop.is_authority(level.name())) then
+			(acting > 0 or coop.is_authority(level.name())) then
+			-- what the new section asks about the players goes before the door: the authority has it when the door
+			-- comes (a flag our use just gave us, read back by the door's logic)
+			note_needs(st[st.active_scheme])
+			update_carry(true)
 			report_door(obj, st)
 		end
 	end
 	return switched
 end
 
--- a door's logic rolls (~50 in its condlists) from the world's random: the door, its section, since when, the second
--- of the world's clock; every game that has it online rolls the same
+-- A door's logic runs at the level's authority alone, where the actor it asks about is every player of the level
+-- (ALL_PLAYERS, coop_door_info): even a section asking only infos and timers, as players' groups know other infos.
+-- Its rolls (~50 in its condlists) from the world's random: the door, its section, since when, the second of the
+-- world's clock, so a new authority rolls on as the last one would have.
 local function in_door_logic(original, npc, st, actor)
 	local root = coop_on() and npc and db.storage[npc:id()]
 	if not (root and root.active_scheme == "ph_door") then
 		return original(npc, st, actor)
 	end
+	note_needs(st)
+	if not coop.is_authority(level.name()) then
+		return false -- the authority's to tell; ours comes as its fact
+	end
 	local now = coop.clock() or 0
 	local random = math.random
 	math.random = seeded_random(hash(npc:name() .. ":" .. tostring(root.active_section) .. ":" ..
 		tostring(root.coop_act or 0) .. ":" .. math.floor(now / 1000)))
+	local zones = db.actor_inside_zones
+	deciding, real_inside, db.actor_inside_zones, cause_gate = true, zones, inside_proxy, nil
 	local res = { pcall(original, npc, st, actor) }
 	math.random = random
+	deciding, real_inside, db.actor_inside_zones = false, nil, zones
 	if not res[1] then
 		error(res[2], 0)
 	end
@@ -455,6 +896,7 @@ local function on_update()
 	if coop_on() then
 		claim_seed()
 		update_fresh()
+		update_carry()
 	end
 end
 
@@ -506,9 +948,20 @@ function on_game_start()
 	for _, name in ipairs({ "use_callback", "hit_callback" }) do
 		local original = ph_door.action_door[name]
 		ph_door.action_door[name] = function(self, ...)
+			if replaying then
+				return -- a knock another game's switch played here: the door is that game's word, not this hit's
+			end
+			local on_use = self.st and self.st.on_use
+			if name == "use_callback" and on_use and coop_on() and not has_keys(self.st) then
+				self.st.on_use = nil -- a key door takes no use without the key: as one with no way to use
+				dbg("door %s: its key is a holder's, not ours", self.object and self.object:name() or "?")
+			end
 			acting = acting + 1
 			local res = { pcall(original, self, ...) }
 			acting = acting - 1
+			if on_use then
+				self.st.on_use = on_use
+			end
 			if not res[1] then
 				error(res[2], 0)
 			end
@@ -527,6 +980,42 @@ function on_game_start()
 		end
 	end
 
+	-- a door's logic the authority runs asks about every player of the level, not its own
+	watched = set_of("carry_items", "decoder, pri_b35_lab_x8_key")
+	for name, fn in pairs(DOOR_CONDITIONS) do
+		xr_conditions[name] = fn
+	end
+	xr_effects.coop_door_way = function(actor, npc, p)
+		matched, matched_cause = p and p[1], cause_entry
+	end
+	xr_logic.pick_section_from_condlist = decided_pick(xr_logic.pick_section_from_condlist)
+	replayed = set_of("replay_effects", "play_sound, play_sound_looped, stop_sound_looped, play_particle_on_path, hit_npc")
+	for name, all in pairs(ALL_PLAYERS) do
+		local original = xr_conditions and xr_conditions[name]
+		if original then
+			xr_conditions[name] = function(...)
+				if deciding then
+					return all(...)
+				end
+				return original(...)
+			end
+		end
+	end
+	local distance = _G.distance_between
+	if distance then
+		-- xr_logic's on_actor_dist_le(_nvis), on_actor_dist_ge(_nvis): the nearest player
+		_G.distance_between = function(a, b)
+			if deciding and (is_actor(a) or is_actor(b)) then
+				local n, who = nearest((is_actor(a) and b or a):position())
+				if n then
+					cause_gate = who
+					return math.sqrt(n)
+				end
+			end
+			return distance(a, b)
+		end
+	end
+
 	original_switch = xr_logic.switch_to_section
 	xr_logic.switch_to_section = on_switch
 	local try_switch = xr_logic.try_switch_to_another_section
@@ -535,6 +1024,7 @@ function on_game_start()
 	end
 
 	coop_sync.on_event("box_broken", on_box_broken)
+	coop_sync.on_event("door_infos", on_door_infos)
 	coop_facts.on_fact(BOX, on_claim)
 	coop_facts.on_fact(DOOR, on_door_fact)
 	RegisterScriptCallback("actor_on_update", on_update)
