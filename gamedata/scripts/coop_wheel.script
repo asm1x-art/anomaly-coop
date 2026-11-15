@@ -69,13 +69,17 @@ function UICoopWheel:__init() super()
 	xml:ParseFile("ui_coop_wheel.xml")
 	self.dialog = xml:InitStatic("wheel", self)
 	local parts = { xml:InitStatic("wheel:background", self.dialog) }
-	self.buttons, self.icons = {}, {}
+	self.discs, self.buttons, self.icons = {}, {}, {}
 	for action in pairs(ACTIONS) do
+		-- the disc is a static of its own, the button a bare click area over it: a 3t button's face keeps the width it
+		-- was made with when the button is narrowed, and slid off its icon on a wide screen
+		self.discs[action] = xml:InitStatic("wheel:disc_" .. action, self.dialog)
 		self.buttons[action] = xml:Init3tButton("wheel:btn_" .. action, self.dialog)
 		self:Register(self.buttons[action], "btn_" .. action)
 		self:AddCallback("btn_" .. action, ui_events.BUTTON_CLICKED, function() self:Do(action) end, self)
 		self.icons[action] = xml:InitStatic("wheel:icon_" .. action, self.dialog) -- over its button
 		self:SetIcon(action, action == "group" and "group_add" or action) -- the group's is set for the player (Reset)
+		parts[#parts + 1] = self.discs[action]
 		parts[#parts + 1] = self.buttons[action]
 		parts[#parts + 1] = self.icons[action]
 	end
@@ -122,6 +126,15 @@ function UICoopWheel:Update()
 		local over = not lit and button:IsCursorOverWindow()
 		self.icons[action]:SetTextureColor(over and ICON_LIT or ICON)
 		lit = lit or over and action
+	end
+	if lit ~= self.disc_lit then -- the disc under the cursor lit, as the 3t button's face was
+		for action, disc in pairs(self.discs) do
+			if action == lit or action == self.disc_lit then
+				disc:InitTexture("ui\\coop\\wheel_btn_" .. (action == lit and "h" or "e"))
+				disc:SetStretchTexture(true)
+			end
+		end
+		self.disc_lit = lit
 	end
 	if lit then
 		local hint = ACTIONS[lit].hint(self.id, self.player)
