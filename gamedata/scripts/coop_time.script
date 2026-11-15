@@ -48,8 +48,8 @@ end
 
 ------------------------------------------------------------------------------------------------
 -- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>|<before>": mode n (normal), t (the hour of a change
--- of cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors; before
--- the file of the hour before (none: the same file).
+-- of cycle), p (before a surge); file the weather set on an outdoor level, the master's own pick or, when the master is
+-- indoors, the one it would pick outdoors (outdoor_file); before the file of the hour before (none: the same file).
 
 local function parse_weather(value)
 	local hour, cycle, preset, mode, file, before = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|([^|]*)|?(.*)$")
@@ -57,17 +57,55 @@ local function parse_weather(value)
 		before = before ~= "" and before or file }
 end
 
+-- An indoor level's select_weather picks nothing for outdoors (its file is "indoor"), leaves a change of cycle's and
+-- a coming surge's hour standing (they are put off only outdoors) and keeps a preset that isn't of the cycle: with
+-- the master underground, the others picked their weather themselves. Here the master's manager picks for outdoors
+-- as level_weathers' atmosfear branch does: a cycle's own preset (one of its presets once it has none of them), the
+-- cloudy one of a change of cycle, one of the surge's; once an hour (pub: what we published this hour, nil none)
+local function outdoor_file(wm, mode, pub)
+	if pub and pub.file ~= "" and pub.mode == mode then
+		return pub.file
+	end
+	local file
+	if mode == "p" then
+		file = wm.presets_pre_blowout and random_key_table(wm.presets_pre_blowout)
+	else
+		local list = wm.presets and wm.presets[mode == "t" and "cloudy" or (wm.cycle or "clear")]
+		if list then
+			if not (wm.preset and list[wm.preset]) then
+				wm.preset = random_key_table(list)
+			end
+			file = wm.preset
+		end
+	end
+	wm.transition_period = false
+	wm.pre_blowout_period = false
+	return file or ""
+end
+
 -- mode nil: as published this hour, else normal
 local function publish_weather(wm, mode)
 	local hour = level.get_time_hours()
+	local w = parse_weather(published.weather)
+	w = w and w.hour == hour and w or nil
 	if not mode then
-		local w = parse_weather(published.weather)
-		mode = w and w.hour == hour and w.mode or "n"
+		mode = w and w.mode or "n"
 	end
-	local file = wm.weatherType == "atmosfear" and wm.weather_file or ""
-	-- last_weather_file: the one before this pick (aaaa_script_fixes_mp), none when the pick began anew (a clock that
-	-- jumped, the admin's weather)
-	local before = file ~= "" and wm.last_weather_file or file
+	local outdoors = wm.weatherType == "atmosfear"
+	local file = outdoors and wm.weather_file or outdoor_file(wm, mode, w)
+	local before
+	if outdoors then
+		-- last_weather_file: the one before this pick (aaaa_script_fixes_mp), none when the pick began anew (a clock
+		-- that jumped, the admin's weather)
+		before = file ~= "" and wm.last_weather_file or file
+	elseif w then
+		before = w.before -- this hour's, as published at its start
+	else
+		-- indoors the manager keeps no file of the hour before: it is the last one published (the world's, once we
+		-- took the world over)
+		local last = parse_weather(published.weather)
+		before = last and last.file ~= "" and last.file or file
+	end
 	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "", before or "" }, "|"))
 end
 

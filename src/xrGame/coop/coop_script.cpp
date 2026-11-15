@@ -173,11 +173,14 @@ namespace coop
 			def("is_sim_master", &is_sim_master),
 			def("is_authority", &script_is_authority),
 			def("clock", &clock_ms),                   // the world's game time (ms) as we count it, 0 without one
+			def("server_time", &server_utc_s),         // real time (UTC s) by the server's clock, 0 without it
 			def("is_host", &is_host),                  // this game is the world's headless host
 			def("server_address", &server_address),    // "host:port" we connected to, "" before
 			def("admin_login", &admin_login),          // (password) for the admin window: _G.coop_on_admin_state comes
 			def("admin_command", &admin_command),      // (tab-split command): _G.coop_on_admin_result, _admin_state
 			def("squad_online_elsewhere", &squad_online_elsewhere), // (squad id) the host: a player's game has it online
+			def("set_offline_health", &set_offline_health), // (id, health) an offline creature as the host has it
+			def("follow_crow", &follow_crow),            // (id, position, direction) a crow as the level's authority flies it
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none
 			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count

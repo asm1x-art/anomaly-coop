@@ -403,11 +403,12 @@ tests=1` : ''));
   // The world's clock (clock.js): every game in the world runs its game time. It runs while someone is in the
   // world and the world isn't paused, and stands still otherwise.
   const timePayload = () => {
-    const p = Buffer.alloc(17);
+    const p = Buffer.alloc(25);
     p.writeBigUInt64LE(BigInt(clock.now()), 0);
     p.writeFloatLE(clock.factor(), 8);
     p[12] = (clock.running() ? TIME_FLAG.RUNNING : 0) | (clock.isSet() ? TIME_FLAG.SET : 0);
     p.writeUInt32LE(clock.epoch(), 13);
+    p.writeBigUInt64LE(BigInt(Date.now()), 17); // real time (UTC ms): the Zone's events' clock, the same in every game
     return p;
   };
   const announceTime = () => {

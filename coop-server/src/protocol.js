@@ -114,8 +114,8 @@ export const M = {
                       // kick <name> | rollback <revision>; ADMIN_RESULT (but for state), then ADMIN_STATE back
   ADMIN_RESULT: 61,   // s->c: stringZ what happened, as the admin reads it (Russian)
   // the world's clock (clock.js): every game in the world runs the server's game time
-  TIME: 62,           // s->c: u64 game time (ms), f32 factor, u8 TIME_FLAG bits, u32 epoch; after WELCOME, to all on
-                      // every change and every TIME_TICK_MS
+  TIME: 62,           // s->c: u64 game time (ms), f32 factor, u8 TIME_FLAG bits, u32 epoch, u64 the server's real time
+                      // (UTC ms: the Zone's events' clock); after WELCOME, to all on every change and every TIME_TICK_MS
   TIME_SET: 63,       // c->s: u8 TIME_SET kind, then INIT: u64 game time, f32 factor (taken only while the server has
                       // no clock); JUMP: u32 ms forward; FACTOR: f32 (the sim master's only)
   // A player's exit save and their things going back (docs/coop/multiplayer.md «Сохранения»)

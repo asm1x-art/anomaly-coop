@@ -472,6 +472,16 @@ namespace coop
 	static xr_map<u16, SStreamedSquad> g_streamed;
 	static const u32 STREAM_GONE_MS = 3000;
 
+	// an offline creature's health as another game has it; not a dead one's (deaths come as deaths)
+	static bool take_health(CSE_ALifeCreatureAbstract* creature, float health)
+	{
+		if (!creature || creature->m_bOnline || !creature->g_Alive() || creature->get_killer_id() != u16(-1) ||
+		    !(health > 0.f))
+			return false;
+		creature->set_health(_min(health, 1.f));
+		return true;
+	}
+
 	static void note_streamed(const shared_str& level, NET_Packet& P)
 	{
 		SNpcState state;
@@ -479,10 +489,20 @@ namespace coop
 		{
 			const u16 id = P.r_u16();
 			read_state(P, state);
-			const CSE_ALifeMonsterAbstract* npc = smart_cast<const CSE_ALifeMonsterAbstract*>(ai().alife().objects().object(id, true));
+			CSE_ALifeMonsterAbstract* npc = smart_cast<CSE_ALifeMonsterAbstract*>(ai().alife().objects().object(id, true));
 			if (npc && npc->m_group_id != u16(-1))
 				g_streamed[npc->m_group_id] = {Device.dwTimeContinual, level, state.position};
+			// as wounded as it is there: the host's world (its saves, a player who comes in) and the squads' health it
+			// tells the others (coop_squads.script) have it so
+			take_health(npc, state.health);
 		}
+	}
+
+	bool set_offline_health(u16 id, float health)
+	{
+		if (!ai().get_alife() || is_host())
+			return false;
+		return take_health(smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true)), health);
 	}
 
 	bool squad_online_elsewhere(u16 squad_id)
@@ -862,12 +882,68 @@ namespace coop
 			weapon->coop_state_sound(state);
 	}
 
+	//------------------------------------------------------------------------------------------------
+	// Crows (CAI_Crow is no CCustomMonster, not in M_NPC_STATES): the level's authority's flight, from its coop_crows
+	// events (where each crow is and where it faces, every send_ms), in the others' games
+
+	struct SCrowTarget
+	{
+		Fvector position, direction, velocity;
+		u32 received = 0;
+		Fvector at;         // where it is shown
+		bool placed = false;
+	};
+	static xr_map<u16, SCrowTarget> g_crows;
+	static const u32 CROW_STALE_MS = 1500;   // no news for so long: it flies on by itself
+	static const float CROW_SNAP_DISTANCE = 20.f;
+	static const float CROW_AHEAD_S = 0.5f;  // a position is carried on by its speed at most so long
+
+	void follow_crow(u16 id, const Fvector& position, const Fvector& direction)
+	{
+		SCrowTarget& c = g_crows[id];
+		const u32 now = Device.dwTimeContinual;
+		if (c.received && now > c.received && now - c.received < CROW_STALE_MS)
+			c.velocity.sub(position, c.position).div(float(now - c.received) / 1000.f);
+		else
+			c.velocity.set(0.f, 0.f, 0.f);
+		c.position = position;
+		c.direction = direction;
+		c.received = now;
+	}
+
+	bool drive_crow(u16 id, float dt, Fvector& position, Fvector& hpb)
+	{
+		if (!is_connected() || !g_pGameLevel || is_authority(Level().name()))
+			return false;
+		auto it = g_crows.find(id);
+		if (it == g_crows.end())
+			return false;
+		SCrowTarget& c = it->second;
+		const u32 age = Device.dwTimeContinual - c.received;
+		if (age > CROW_STALE_MS)
+			return false;
+		Fvector target;
+		target.mad(c.position, c.velocity, _min(float(age) / 1000.f, CROW_AHEAD_S));
+		if (!c.placed || c.at.distance_to(target) > CROW_SNAP_DISTANCE)
+		{
+			c.at = target;
+			c.placed = true;
+		}
+		c.at.lerp(c.at, target, _min(1.f, dt * FOLLOW_RATE));
+		position = c.at;
+		float h, p;
+		c.direction.getHP(h, p);
+		hpb.set(h, p, 0.f);
+		return true;
+	}
+
 	void clear_npc_sync()
 	{
 		show_all();
 		g_states.clear();
 		g_puppets.clear();
 		g_brought.clear();
+		g_crows.clear();
 		g_puppet_level = false;
 	}
 }

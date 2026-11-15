@@ -1,0 +1,114 @@
+-- Co-op: the crows of a level are the world's, not each game's.
+-- Anomaly's crow spawner (sr_crow_spawner, a space restrictor's scheme) puts a crow at the start of one of its paths
+-- now and then, up to max_crows_on_level, farther than 100 m from its actor. Its alife_create was outside the shared
+-- spawns: every game had crows of its own, which only it saw, shot and found dead after a surge.
+-- Now only the level's authority spawns them, shared (coop.begin_shared): every game has the same crows, counts them
+-- (bind_crow.crow_counter) and sees the same ones fall. A crow comes no nearer than min_distance to any player on the
+-- level. How they fly is the authority's too: every send_ms it tells the others where its crows are and where they
+-- face (event crow_fly; crows aren't in the NPC stream), and their crows follow (coop.follow_crow, CAI_Crow's flight
+-- in the engine); with no news for 1.5 s a crow flies on by itself. The spawner's own waits (10 s a path, 2 min when
+-- full) decide nothing the world keeps: how many crows there are is the world's.
+-- Settings: [coop_crows] in mod_system_coop_world.ltx. Without co-op nothing changes.
+
+local S = "coop_crows"
+local send_ms = 200
+local next_send = 0
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function far_from_players(pos, min_sqr, lvl)
+	if db.actor:position():distance_to_sqr(pos) <= min_sqr then
+		return false
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lvl and vector():set(p.position):distance_to_sqr(pos) <= min_sqr then
+			return false
+		end
+	end
+	return true
+end
+
+-- as crowkiller:check_for_spawn_new_crow, the authority's, shared, away from every player
+local function check_for_spawn(self)
+	if not self.st.path_table then
+		return
+	end
+	local lvl = level.name()
+	if not coop.is_authority(lvl) then
+		return false
+	end
+	local selected_path = self.st.path_table[math.random(1, #self.st.path_table)]
+	local tg = time_global()
+	if selected_path and (self.spawn_points_idle[selected_path] == nil or tg > self.spawn_points_idle[selected_path]) then
+		local ptr = patrol(selected_path)
+		local min = ini_sys:r_float_ex(S, "min_distance") or 100
+		if ptr and far_from_players(ptr:point(0), min * min, lvl) then
+			self.spawn_points_idle[selected_path] = tg + 10000
+			coop.begin_shared()
+			local ok, err = pcall(alife_create, "m_crow", ptr:point(0), ptr:level_vertex_id(0), ptr:game_vertex_id(0))
+			coop.end_shared()
+			if not ok then
+				error(err, 0)
+			end
+			return true
+		end
+	end
+	return false
+end
+
+-- the authority's: where its crows fly, for the others on the level
+local function send_flight()
+	local now = time_global()
+	if now < next_send or not (db.actor and in_coop()) then
+		return
+	end
+	next_send = now + send_ms
+	local lvl = level.name()
+	if not coop.is_authority(lvl) then
+		return
+	end
+	local part = {}
+	for id in pairs(bind_crow.crow_storage) do
+		local crow = level.object_by_id(id)
+		if crow and crow:alive() then
+			local p, d = crow:position(), crow:direction()
+			part[#part + 1] = string.format("%d,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f", id, p.x, p.y, p.z, d.x, d.y, d.z)
+		end
+	end
+	if #part > 0 then
+		coop_sync.send_event("crow_fly", lvl, table.concat(part, ";"))
+	end
+end
+
+local NUM = "([%-%d%.]+)"
+local CROW = "(%d+)," .. NUM .. "," .. NUM .. "," .. NUM .. "," .. NUM .. "," .. NUM .. "," .. NUM
+
+local function on_flight(sender, payload)
+	local lvl, list = string.match(payload or "", "^([^	]*)	(.*)$")
+	if not (lvl and db.actor and coop.follow_crow and level.name() == lvl) or coop.is_authority(lvl) then
+		return
+	end
+	for id, x, y, z, dx, dy, dz in string.gmatch(list, CROW) do
+		coop.follow_crow(tonumber(id), vector():set(tonumber(x), tonumber(y), tonumber(z)),
+			vector():set(tonumber(dx), tonumber(dy), tonumber(dz)))
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	send_ms = ini_sys:r_float_ex(S, "send_ms") or 200
+	RegisterScriptCallback("actor_on_update", send_flight)
+	coop_sync.on_event("crow_fly", on_flight)
+	local class = sr_crow_spawner.crowkiller
+	local original = class.check_for_spawn_new_crow
+	class.check_for_spawn_new_crow = function(self)
+		if not in_coop() then
+			return original(self)
+		end
+		return check_for_spawn(self)
+	end
+end
