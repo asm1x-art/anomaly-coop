@@ -281,6 +281,12 @@ namespace coop
 		if (object->m_bOnline && !holder)
 			return; // online here but not a thing we keep (yet made, or carried)
 		const bool moving = holder && holder->PPhysicsShell()->isEnabled();
+		if (word && holder && !holder->getVisible())
+		{
+			// a piece hidden until all of its original's pieces are here (CPHDestroyable): put there once it shows
+			g_pending[id] = rest;
+			return;
+		}
 
 		if (!word)
 		{
@@ -318,9 +324,15 @@ namespace coop
 			return;
 		}
 
-		// the world's word; a copy moving here (ours being pushed, carried) gives its own rest when it lies still
+		// the world's word; a copy moving here (ours being pushed, carried) gives its own rest when it lies still. One still
+		// falling since it came online here (a helicopter's piece, made by another game) is put there on the next look
 		if (moving)
+		{
+			auto prop = g_props.find(id);
+			if (prop == g_props.end() || !prop->second.known)
+				g_pending[id] = rest;
 			return;
+		}
 		if (holder)
 			put_online(holder, rest.poses);
 		else
@@ -361,8 +373,8 @@ namespace coop
 			if (!holder)
 				continue;
 			const u16 id = holder->ID();
-			if (is_local_object(id) || is_by_logic(id))
-				continue;
+			if (is_local_object(id) || is_by_logic(id) || !holder->getVisible())
+				continue; // a hidden piece waits for the rest of its original's (CPHDestroyable): not lying anywhere yet
 			CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
 			if (!object)
 				continue;
