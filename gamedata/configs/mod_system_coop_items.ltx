@@ -1,0 +1,13 @@
+; Co-op: the state of items no player holds, one game's word for the world (coop_items.script): a body's loot is
+; decided once, by its level's authority, and the state of its items goes to the others; so do things a script set up
+; after making them (a stash's, a box's) and the wear of live NPCs' weapons, from the game that runs them.
+[coop_items]
+states_delay_s = 2  ; real s after the loot is decided (or made at the first search) before the state of the body's
+                    ; items goes out: the scripts set an outfit's condition and merge ammo boxes frames later
+ask_delay_s    = 1  ; real s a game with an undecided body online waits for the authority's word before asking it
+ask_again_s    = 30 ; real s before it asks again about the same body (the authority left, the answer got lost)
+made_delay_s   = 1  ; real s after a script set a thing's condition, uses or rounds (ItemProcessor: a stash's, a box's
+                    ; things) before its state goes to the others: they need a moment to have the new thing online
+npc_weapons_look_s = 5    ; real s between the level's authority's looks at its live NPCs' weapons (their wear)
+npc_weapon_step    = 0.02 ; a live NPC's weapon whose condition moved this much since its state last went out: to the
+                          ; others now (less goes when the NPC goes offline there, or the authority leaves the level)

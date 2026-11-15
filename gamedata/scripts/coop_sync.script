@@ -355,6 +355,7 @@ local function wrap_corpse_loot()
 		local res = shared(original, npc)
 		if not already and se_load_var(id, name, "death_dropped") then
 			send("loot_created", id, name)
+			coop_items.after_loot(id) -- its items as they are here once it is all made (ammo merged)
 		end
 		return res
 	end)
@@ -512,6 +513,17 @@ function item_lua(id)
 		for _, key in ipairs(ITEM_TABLES) do
 			data[key] = m_data[key] and m_data[key][id]
 		end
+		-- An item online here: its uses and condition as it has them now. bind_item takes them a frame later, and puts
+		-- its own back on the item each time it comes online: an older one would undo the state that goes with it.
+		local obj = level.object_by_id(id)
+		if obj then
+			local sec = obj:section()
+			if IsItem("multiuse", sec) then
+				data.item_remaining_uses = obj:get_remaining_uses()
+			elseif ini_sys:r_bool_ex(sec, "use_condition") then
+				data.item_condition = obj:condition()
+			end
+		end
 		return serialize(data)
 	end)
 	return ok and text or ""
@@ -541,6 +553,11 @@ function take_item_lua(id, text)
 	end
 	if m_data.se_object then
 		m_data.se_object[id] = data.se
+	end
+	-- online here (coop_world.cpp take_state_online): the engine sets its condition, its uses are only Lua's
+	local obj = data.item_remaining_uses and level.object_by_id(id)
+	if obj and IsItem("multiuse", obj:section()) and obj:get_remaining_uses() ~= data.item_remaining_uses then
+		obj:set_remaining_uses(data.item_remaining_uses)
 	end
 end
 
