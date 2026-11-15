@@ -4,6 +4,8 @@ tier downloads only the difference.
   build_tiers.py plan                      the components and tiers, sizes, what was left out and why
   build_tiers.py build <stage> <out>       pack every component into <out>\<component>\db\patches\<component>_*.db
                                            and write <out>\tiers.json for the release builder
+  build_tiers.py check                     each packed file against the file GRA's own profile of the tier has on that
+                                           path: where they differ, and whether a base file (weapons pack) would be overridden
 Options: --mo2 <mods folder> (or GRA_MO2), --converter <converter.exe> (or GRA_CONVERTER), --loose <gamedata folder>
 (loose files of a release outside git: they win over archives, so their paths are not packed; may repeat),
 --only <component> (may repeat), --sample <MB> (the first files of each component up to that size: a pipeline test),
@@ -170,6 +172,41 @@ def cmd_plan(components, tiers, notes, files_out):
                     f.write(f"{cid}\t{rel}\t{size}\t{full}\n")
 
 
+def cmd_check(mo2, components):
+    """the file each tier packs against the winner of its GRA profile (Mod Organizer: the last enabled mod wins)"""
+    profiles = os.path.join(os.path.dirname(os.path.normpath(mo2)), "profiles")
+    base_mods = set(build_pack.MODS)
+    bad = 0
+    for t in T.TIERS:
+        ours = {}
+        for cid, c in components.items():
+            if t["id"] in c["tiers"]:
+                for rel, _, _, mod in c["files"]:
+                    ours[rel] = mod
+        lines = open(os.path.join(profiles, t["gra_profile"], "modlist.txt"), encoding="utf-8").read().splitlines()
+        winner = {}
+        for mod in reversed([line[1:] for line in lines if line.startswith("+")]):  # the file lists the highest first
+            root = os.path.join(mo2, mod, "gamedata")
+            for dirpath, _, names in os.walk(root):
+                for name in names:
+                    rel = os.path.relpath(os.path.join(dirpath, name), root).replace("\\", "/").lower()
+                    if rel in ours:
+                        winner[rel] = mod
+        diff = {}
+        for rel, mod in ours.items():
+            gra = winner.get(rel)
+            if gra != mod:
+                diff.setdefault((mod, gra), []).append(rel)
+        print(f"tier {t['id']} ({t['gra_profile']}): {len(ours)} files, {sum(map(len, diff.values()))} not as GRA has them")
+        for (mod, gra), rels in sorted(diff.items(), key=lambda x: -len(x[1])):
+            mark = "!" if gra in base_mods else " "
+            bad += gra in base_mods
+            why = T.LEFT_OUT.get(gra, "") if gra else "GRA's profile has the mod off"
+            print(f"  {mark}{len(rels):5d}  ours {mod}  GRA {gra}  e.g. {rels[0]}" + (f"  ({why[:60]})" if why else ""))
+    if bad:
+        sys.exit("! a tier pack would override files of the weapons pack (the base), which GRA ranks higher")
+
+
 def link_or_copy(src, dst):
     try:
         os.link(src, dst)
@@ -258,6 +295,8 @@ def main(argv):
         tiers = {t: [cid for cid in cids if cid in components] for t, cids in tiers.items()}
     if cmd == "plan":
         cmd_plan(components, tiers, notes, opts["files"])
+    elif cmd == "check":
+        cmd_check(opts["mo2"], components)
     elif cmd == "build" and len(args) == 3:
         cmd_build(components, tiers, args[1], args[2], opts["converter"], opts["sample"])
     else:
