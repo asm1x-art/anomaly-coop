@@ -4,7 +4,7 @@
 import os, subprocess, sys
 here = os.path.dirname(os.path.abspath(__file__))
 bad = 0
-for t in ('test_pulse.py', 'test_trader.py', 'test_weather.py', 'test_misc.py'):
+for t in ('test_pulse.py', 'test_trader.py', 'test_weather.py', 'test_misc.py', 'test_rocket.py'):
     print('==', t)
     bad += subprocess.call([sys.executable, os.path.join(here, t)])
 print('all passed' if bad == 0 else '%d file(s) failed' % bad)
