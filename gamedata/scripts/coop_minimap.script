@@ -1,0 +1,31 @@
+-- The minimap is on for every player unless he switches it off himself (options: video, HUD, "show minimap").
+-- Anomaly's own default for that option is off (ui_options.script: show_minimap def = false), and the first read of a
+-- missing option writes the default into axr_options.ltx, so nearly every install keeps "false" there without anyone
+-- having chosen it. Once per install we turn it on and leave a mark; from then on the player's own choice stands. It
+-- is his own interface, kept in his own axr_options.ltx: no difficulty, preset or world option touches it.
+-- Also: a resolution change (vid_restart) builds the HUD anew with the minimap on whatever the option says, and the
+-- game doesn't apply the option again; we do.
+
+local SECTION, MARK = "coop", "minimap_on_by_default"
+local OPTION = "video/hud/show_minimap"
+
+-- the option put on the HUD, as ui_options.func_hud_minimap does (that one, called outside the options window, reads the
+-- stored value as the string "false" and never hides the map)
+local function apply()
+	local hud = level.present() and ActorMenu.get_maingame()
+	if hud and hud.UIZoneMap then
+		hud.UIZoneMap.disabled = not ui_options.get(OPTION)
+		hud.UIMotionIcon:Show(not hud.UIZoneMap.disabled)
+	end
+end
+
+function on_game_start()
+	local config = axr_main.config
+	if not config:r_value(SECTION, MARK, 1, false) then
+		ui_options.set(OPTION, true)
+		config:w_value(SECTION, MARK, true)
+		config:save()
+		printf("[coop] minimap: on by default (once per install, the player can switch it off in the options)")
+	end
+	RegisterScriptCallback("on_screen_resolution_changed", apply)
+end
