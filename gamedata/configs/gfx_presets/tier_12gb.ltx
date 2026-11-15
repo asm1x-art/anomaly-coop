@@ -96,3 +96,7 @@ r2_aa                    = off
 ; --- textures in full (tier_4gb halves them: coming from it must put them back); in force for textures loaded after
 ; it is set, so in full from the next start of the game
 texture_lod              = 0
+; --- texture filtering, the same in every preset (GRA's user.ltx): anisotropy 16, mip bias -0.5. The bias counts at
+; full size only: with DLSS or r__render_scale < 1 the engine uses its automatic bias instead of r__tf_mipbias
+r__tf_aniso              = 16
+r__tf_mipbias            = -0.5
