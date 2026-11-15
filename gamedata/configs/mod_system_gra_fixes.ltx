@@ -5,6 +5,49 @@
 ![wpn_remington700_bas_archangel]
 visual = dynamics\weapons\wpn_remington700_bas\wpn_remington700_bas_archangel_world.ogf
 
+; World models in a stalker's or a player's hands (third person; CWeapon::UpdateXForm, the co-op puppet): these
+; sections kept the offsets of vanilla's models, whose origin is far under the grip, while their own models have it at
+; the grip, so the gun hung under the hands, apart from them. The offsets of the pack's guns of the same kind instead.
+; Skorpions: the height of Boomsticks' other submachine guns (wpn_kiparis_m1)
+![wpn_vz61_scorpion]
+position = -0.026, 0.0, -0.03
+![wpn_vz61_scorpion_m1]
+position = -0.026, 0.0, -0.03
+![wpn_vz61_scorpion_m2]
+position = -0.026, 0.0, -0.03
+; the short Kar98k: its hold (animation_slot 3) points the hand down, every other gun of that hold is turned up 30
+; degrees to make up for it (wpn_remington700_bas)
+![wpn_k98_mod]
+position = -0.026, 0, -0.01
+orientation = 0, 30, 0
+; these two PMs have the PMM's model, which lies 0.58 m ahead of its origin: the PMM's offsets (wpn_pmm_bas)
+![wpn_pm_bas_actor]
+position = -0.10, -0.067, -0.58
+![wpn_pm_bas_custom]
+position = -0.10, -0.067, -0.58
+; the gun held 3-7 cm above the left hand (the hand under the fore-end, not around it), or too far back for the hand
+; to reach it: moved down / along so the fore-end lies in the left palm at the height vanilla's rifles have it, the
+; grip staying in the right hand (tools\thirdperson\tpcheck.py solve, checked on its pictures). Pack's sections (the
+; FAL Aus, the Kar98k and the McMillan too, in mod_system_zzzzzzzzzzzz_gra_aim_fixes.ltx: files after this one set
+; their positions)
+![wpn_dvl10_m1]
+position = -0.08, 0.085, -0.19
+![wpn_toz106]
+position = -0.026, -0.117, -0.01
+![wpn_toz106_m1]
+position = -0.026, -0.102, 0
+; vanilla's own sections with the same fault
+![wpn_g3]
+position = -0.026, -0.142, -0.04
+![wpn_g3sg1]
+position = -0.026, -0.142, -0.021
+![wpn_lr300]
+position = -0.026, -0.195, 0
+![wpn_sr25]
+position = -0.026, -0.18, 0
+![wpn_sks]
+position = -0.026, -0.127, -0.01
+
 ; Grok's Ballistics moves the pistol ammo's icons to the cells Cr3pis Icons' atlas has them in (GRA has that atlas,
 ; this project vanilla's, where those cells are empty): vanilla's cells back. Cr3pis' atlas itself isn't taken: with it
 ; ~40 other items (repair kits, toolkits, artefact containers) lose theirs, other GRA mods move them
