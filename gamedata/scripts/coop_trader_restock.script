@@ -1,18 +1,26 @@
 -- Co-op: when a trader restocks is the world's, not each game's.
--- trade_manager.update restocks a trader once restock hours have passed since its resupply_time. In co-op only the
--- level's authority restocks (coop_sync: the others' buy_supplies comes out empty), but every game kept a timer of
--- its own: a game that became the authority restocked by its own, too soon or hours late. And trader_autoinject's
--- restock (WPO parts at mechanics, placeable items...) ran 0.1 s later in every game whose own timer was due, outside
--- the shared spawns: each game spawned its own parts and released the trader's.
--- Now the time of a trader's last restock is a fact of the server, "trader_restock:<trader id>" = "Y,M,D,h,m,s,ms"
--- (game time, as tm.resupply_time):
---   authority  takes it into the trader's profile before the update, publishes it when the update restocked (or
---              there is none yet)
---   the others keep their own timer as before (it only says when to look again): they restock nothing
---   autoinject only the level's authority runs it, shared.
--- Without co-op nothing changes.
+-- trade_manager.update restocks a trader once restock hours have passed since its resupply_time, a timer of each
+-- game: a game that became the level's authority restocked by its own timer, and a player whose game had no timer for
+-- the trader (one who came into the world: the host's saves have none, its traders are never online) got a fresh
+-- roll of the stock at once - reconnecting rerolled a trader. And trader_autoinject's restock (WPO parts at mechanics,
+-- placeable items...) ran 0.1 s later in every game whose own timer was due, outside the shared spawns: each game
+-- spawned its own parts and released the trader's.
+-- Now the world's clock decides: its game time (coop.clock) is cut into periods of interval_h, every trader restocks
+-- once in each, and the last period a trader restocked in is a fact of the server, "trader_restock:<trader id>".
+--   when   the first time a trader is looked at by the game that has it online in a new period (its level's
+--          authority: buy_supplies needs the trader online, and the host has none); a trader the world never
+--          restocked (a new world) restocks at once. A join, a level change, a reconnect, a reload restocks nothing:
+--          the fact says the period's restock is done
+--   how    Anomaly's own update: its timer is set to "due" or "just done" by the period before it runs; only the
+--          authority's restocks (coop_sync), shared
+--   autoinject only the level's authority runs it, shared
+-- Settings: [coop_trader_restock] in mod_system_coop_world.ltx. Without co-op nothing changes.
 
+local S = "coop_trader_restock"
 local FACT = "trader_restock:"
+
+local interval_ms = 72 * 3600 * 1000
+local in_autoinject = false -- the authority runs trader_autoinject's restock now (its addons force their own update)
 
 local function in_coop()
 	return coop and coop.connected and coop.connected()
@@ -24,32 +32,18 @@ local function dbg(fmt, ...)
 	end
 end
 
-local KEYS = { "Y", "M", "D", "h", "m", "s", "ms" }
-
-local function stamp(t)
-	if type(t) ~= "table" then
-		return ""
-	end
-	local out = {}
-	for i, k in ipairs(KEYS) do
-		out[i] = tostring(math.floor(tonumber(t[k]) or 0))
-	end
-	return table.concat(out, ",")
+local function now_table()
+	local Y, M, D, h, m, s, ms = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	return { Y = Y, M = M, D = D, h = h, m = m, s = s, ms = ms }
 end
 
-local function parse(text)
-	local v = {}
-	for n in string.gmatch(text or "", "%d+") do
-		v[#v + 1] = tonumber(n)
-	end
-	if #v ~= #KEYS then
+-- the world's period now, nil before the world's clock is known
+local function period_now()
+	local ms = coop.clock() or 0
+	if ms <= 0 then
 		return nil
 	end
-	local t = {}
-	for i, k in ipairs(KEYS) do
-		t[k] = v[i]
-	end
-	return t
+	return math.floor(ms / interval_ms)
 end
 
 local function shared(f, ...)
@@ -63,23 +57,26 @@ local function shared(f, ...)
 end
 
 local function wrapped_update(original, npc, force_refresh)
-	if not (in_coop() and npc and coop.is_authority(level.name())) then
+	if not (in_coop() and npc) then
 		return original(npc, force_refresh)
 	end
 	local id = npc:id()
 	local key = FACT .. id
-	local world = coop.fact(key)
 	local tm = trade_manager.get_trade_profile(id)
-	local t = parse(world)
-	if tm and t then
-		tm.resupply_time = t
+	local period = period_now()
+	local done = tonumber(coop.fact(key))
+	local authority = coop.is_authority(level.name())
+	local due = authority and period ~= nil and (done == nil or period > done)
+	if tm then
+		-- Anomaly's timer only says now or not yet: none (due), or just done
+		tm.resupply_time = not due and now_table() or nil
 	end
-	local res = { pcall(original, npc, force_refresh) }
+	-- forced: only an addon's within the authority's autoinject restock (placeable items), never a restock of its own
+	local res = { pcall(original, npc, authority and in_autoinject and force_refresh or nil) }
 	tm = trade_manager.get_trade_profile(id)
-	local now = tm and stamp(tm.resupply_time) or ""
-	if now ~= "" and now ~= world then
-		coop.report_fact(key, now)
-		dbg("%s (%s) restocked at %s", npc:name(), id, now)
+	if due and tm and tm.resupply_time then
+		coop.report_fact(key, tostring(period))
+		dbg("%s (%s) restocked in the world's period %s", npc:name(), id, period)
 	end
 	if not res[1] then
 		error(res[2], 0)
@@ -105,6 +102,7 @@ function on_game_start()
 	if not coop then
 		return -- not the co-op engine
 	end
+	interval_ms = (ini_sys:r_float_ex(S, "interval_h") or 72) * 3600 * 1000
 	local timed = trader_autoinject and trader_autoinject.timed_update
 	if type(timed) == "function" then
 		trader_autoinject.timed_update = function(npc)
@@ -114,7 +112,13 @@ function on_game_start()
 			if not (npc and coop.is_authority(level.name())) then
 				return true -- the authority's restock comes as its spawns and releases
 			end
-			return shared(timed, npc)
+			in_autoinject = true
+			local ok, res = pcall(shared, timed, npc)
+			in_autoinject = false
+			if not ok then
+				error(res, 0)
+			end
+			return res
 		end
 	end
 	RegisterScriptCallback("actor_on_first_update", wrap_update)

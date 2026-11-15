@@ -13,3 +13,9 @@ keep_s       = 30  ; real s: how long a pulse stays in the server's fact (its bl
 late_s       = 5   ; real s: a pulse older than this when it reaches us (a join, a level change) isn't struck
 peer_stale_s = 10  ; real s: a player not heard from for this long has no turn
 look_ms      = 250 ; real ms: how often the fact is looked at
+
+; when traders restock (coop_trader_restock.script): the world's game time is cut into periods, every trader restocks
+; once in each (fact trader_restock:<id>: the last period), when the game that has it online first looks at it then;
+; a join, a reconnect, a reload restocks nothing. Anomaly's own timer (the economy's "restock" hours) is not used in co-op
+[coop_trader_restock]
+interval_h = 72 ; game hours: a period (72 = every 3 game days; at x6 about 12 real hours)
