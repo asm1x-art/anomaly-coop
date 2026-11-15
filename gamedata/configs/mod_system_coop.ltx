@@ -525,15 +525,15 @@ base_blur            = 0     ; 0..0.9 (steps of 0.1): the blur of everything in 
 ; The Yantar bunker's airlock (configs\scripts\yantar\yan_smart_terrain_6_4_ph_door_outer.ltx, _inner.ltx: the doors and their
 ; timings; coop_airlock.script): the steam between the doors on the way in
 [coop_airlock]
-steam_particle       = static\zharka_static_steam ; a puff at each point of steam_paths
+steam_particle       = coop\airlock_decon_spray@2.3, coop\airlock_decon_fog ; effects at each point of steam_paths, name@dy: dy m above it (the spray from nozzles under the ceiling, the fog that fills and settles)
 steam_paths          = yan_smart_terrain_6_4_steam_1, yan_smart_terrain_6_4_steam_2
-steam_sound          = anomaly\steam_blowout ; the hiss, at the first point
+steam_sound          = interface\inv_repair_spray_oil ; the soft spray, at the first point
 steam_volume         = 1
 steam_s              = 5     ; real s the steam lasts (the inner door opens after its steam section: 5000 ms in its file)
-steam_repeat_s       = 1.2   ; real s between the puffs and hisses
+steam_repeat_s       = 1.2   ; real s between the effects' and the sound's starts (0: once)
 steam_fade_s         = 4     ; real s what is in the air settles and fades after steam_s
 outer_door           = yan_smart_terrain_6_4_ph_door_outer
 inner_door           = yan_smart_terrain_6_4_ph_door_inner
 zone                 = yan_smart_terrain_6_4_sr_steam ; the space between the doors
-stuck_s              = 10    ; real s: a player between the doors with both shut and nothing moving gets the inner door opened
+stuck_s              = 25    ; real s: a player between the doors with both shut and nothing moving gets the inner door opened
 npc_wait_s           = 4     ; real s: an NPC who wants a shut door of the airlock open (the engine's doors) this long gets his use again
