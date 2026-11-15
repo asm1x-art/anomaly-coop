@@ -1,7 +1,8 @@
 -- Co-op: the Zone's event "Ash front" (coop_zone_events.script, [zone_event_ash] in mod_system_zone_events.ltx). Fire
 -- hotspots in the Red Forest, the wind carries the ash to Yantar, Jupiter or Zaton; or the surge has shaken up the old
 -- machinery of the Truck Cemetery. For 3-4 real hours on one level:
---   ash        the level's weather is w_zev_ash over the world's, in each game on it (coop_time asks weather())
+--   ash        the level's weather is w_zev_ash over the world's, in each game on it (coop_time asks weather()),
+--              blended in at the front's start and back out at its end
 --   cover      the level's shelter itself: Anomaly's surge covers there (shelter_covers_<level>: space restrictors),
 --              or within cover_fallback_radius of its smart when none of them is on the level
 --   radiation  a player there without a sealed suit (sealed_suits: parts of the outfit's section; an exoskeleton is not
@@ -165,27 +166,90 @@ end
 
 -------------------------------------------------------------------------------
 -- the weather (every game on the level)
+-- The front's weather comes in over weather_blend_in_s real seconds from the front's start and the world's goes back
+-- over weather_blend_out_s from its end, the rain in weather_rain_in_s / weather_rain_out_s of them: the engine
+-- blends from the look on screen (level.set_weather_blend), no step at any moment, and the weather's own changes
+-- meanwhile only change what it ends into. Each blend ends at the front's start (end) + its length by the world's
+-- clock, in every game alike: one that comes later (a load, a join, a level change) takes what is left of it; past
+-- that, the weather at once
 
-local ash_on = false
+local shown, shown_lvl -- what this game put on its level's screen for the front: "ash", "world" (back again), nil: none
 
--- the weather over the world's while the front is on this level (coop_time's pick of the weather asks it)
-function weather()
-	if here() then
-		return ini_sys:r_string_ex(S, "weather") or "w_zev_ash"
-	end
+local function secs(key, default)
+	return math.max(0, num(key, default))
 end
 
-local function update_weather(on)
-	if on and not ash_on then
-		ash_on = true
-		level.set_weather(weather(), true) -- at once: the front's sky, and no rain, from its first second
-	elseif not on and ash_on then
-		ash_on = false
-		local wm = level_weathers.get_weather_manager()
-		if wm then
-			wm:select_weather(true) -- the world's weather again, now (forced_weather_change waits for the next game hour)
-		end
+local function ash_file()
+	return ini_sys:r_string_ex(S, "weather") or "w_zev_ash"
+end
+
+-- the ash's event of our level, going on or over (nil: none)
+local function front_here()
+	local ev = ZE and ZE.get(ini_sys:r_string_ex(S, "slot") or "world")
+	return ev and ev.id == ID and ev.level == level.name() and ev or nil
+end
+
+-- the weather over the world's on this level (coop_time's pick of the weather asks it): the front's, from when this
+-- game began its blend in till it began the one back. A game that has not shown the front yet (it has just come
+-- onto the level) starts from what the others show past the blends: to_sky() then takes the rest of one
+function weather()
+	if shown_lvl ~= level.name() then
+		shown = nil
 	end
+	if shown then
+		return shown == "ash" and ash_file() or nil
+	end
+	local ev = front_here()
+	if not ev then
+		return nil
+	end
+	if ev.stage == "on" then
+		return ZE.now() - ev.from >= secs("weather_blend_in_s", 180) and ash_file() or nil
+	end
+	return ZE.now() - ev.till < secs("weather_blend_out_s", 300) and ash_file() or nil
+end
+
+-- into the weather file over the blend begun since real s ago (a blend of blend_s, its rain in rain_s)
+local function to_sky(file, since, blend_s, rain_s)
+	since = math.max(0, since)
+	local left = blend_s - since
+	if left > 0 and level.set_weather_blend then
+		level.set_weather_blend(file, left, secs("weather_turn_s", 20), math.min(left, math.max(0.01, rain_s - since)))
+	elseif level.get_weather() ~= file then
+		level.set_weather(file, true)
+	end
+	ZE.dbg("ash weather: into %s, %s s of %s left", file, math.max(0, left), blend_s)
+end
+
+local function update_weather(ev)
+	local lvl = level.name()
+	if shown_lvl ~= lvl then
+		shown, shown_lvl = nil, lvl
+	end
+	local mine = ev and ev.level == lvl
+	local now = ZE.now()
+	if mine and ev.stage == "on" then
+		if shown ~= "ash" then
+			shown = "ash"
+			to_sky(ash_file(), now - ev.from, secs("weather_blend_in_s", 180), secs("weather_rain_in_s", 30))
+		end
+		return
+	end
+	local ended = mine and ev.stage == "end"
+	local out = secs("weather_blend_out_s", 300)
+	if not (shown == "ash" or shown == nil and ended and now - ev.till < out) then
+		return
+	end
+	shown = "world"
+	local wm = level_weathers.get_weather_manager()
+	if not (wm and wm.weather_file) then
+		if wm then
+			wm:select_weather(true) -- no world's weather known here: the manager's, at once
+		end
+		return
+	end
+	to_sky(wm.weather_file, ended and now - ev.till or 0, out, secs("weather_rain_out_s", 120))
+	wm:select_weather(false) -- the manager's own pick again (while the blend runs it only says what it ends into)
 end
 
 -------------------------------------------------------------------------------
@@ -201,8 +265,8 @@ end
 --           the front is on; after it goes at 1 / ground_linger_game_h a GAME hour (a sleep takes its share) and, while
 --           rain is on the level's screens, rain density / ground_rain_wash_min a real minute more. No rain while the
 --           front is on (its weather w_zev_ash has none); after it the rain washes only once it has been seen:
---           ground_rain_visible or more on screen (the world's weather as every game there shows it, world_rain())
---           for ground_rain_delay_s real seconds
+--           ground_rain_visible or more on screen (the world's weather as every game there shows it, world_rain(),
+--           coming back over the blend out of the ash, rain_after()) for ground_rain_delay_s real seconds
 -- The master looks each look of the events (check_s), sends a change of course at once and the rest each
 -- ground_publish_s real seconds. A game eases what it showed onto a new fact over ground_blend_s (a gap above
 -- ground_snap is taken at once) and goes on at the fact's rates for ground_extrapolate_s at most (no master: it stops).
@@ -349,6 +413,33 @@ local function world_rain()
 	return r0 + (r1 - r0) * clamp01((t - t0) / math.max(1, t1 - t0))
 end
 
+-- the rain on the screens of the level a front has left (ev: its event, over) while the engine blends out of the
+-- ash (to_sky): none at first, the rain of the world weather's frame nearest to the blend's end coming in over
+-- weather_rain_out_s, from that frame to the next one as the engine goes on, then the world's rain as usual (world)
+local function rain_after(ev, world)
+	local out = secs("weather_blend_out_s", 300)
+	local since = ZE.now() - ev.till
+	local file = string.match(in_coop() and coop.fact("weather") or "", "^%d+|[^|]*|[^|]*|%a|([^|]+)")
+	local list = file and frames_of(file)
+	if since < 0 or not (list and #list > 0) then
+		return world
+	end
+	local tf = level.get_time_factor()
+	local _, _, _, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	local te = (h * 3600 + m * 60 + s + (out - since) * tf) % 86400 -- the blend's end, the day's second
+	local t0, r0 = frame_at(list, te)
+	local t1, r1 = frame_after(list, te)
+	local to = te - t0 < t1 - te and r0 or r1
+	if since < out then
+		return to * clamp01(since / math.max(0.01, math.min(out, secs("weather_rain_out_s", 120))))
+	end
+	local x = (since - out) * tf -- game s since the blend's end
+	if x < t1 - te then
+		return to + (r1 - to) * clamp01(x / math.max(1, t1 - te))
+	end
+	return world
+end
+
 -- the master: each level's ash, as it last looked (level -> { c, cr, f, fr: cover, fall and their rates a real s;
 -- sent: time_global() it last sent them }), from the fact when it begins
 local ash_state = {}
@@ -380,7 +471,7 @@ local function ash_master(ev)
 	local gs = game_seconds()
 	local gdt = last_gs and math.max(0, gs - last_gs) or 0
 	last_look, last_gs = t, gs
-	local rain = world_rain()
+	local world = world_rain()
 	local visible, delay = num("ground_rain_visible", 0.1), num("ground_rain_delay_s", 10) * 1000
 	local full = math.max(1, num("ground_full_min", 3) * 60)
 	local linger = math.max(1, num("ground_linger_game_h", 60) * 3600)
@@ -397,6 +488,7 @@ local function ash_master(ev)
 		end
 		local on = ev and ev.stage == "on" and ev.level == lvl
 		local ground = listed(lvl, "ground_levels")
+		local rain = ev and ev.stage == "end" and ev.level == lvl and rain_after(ev, world) or world
 		-- the rain that washes: none under the front's weather; after it, once on screen for the delay (seen: since
 		-- when it is)
 		if on or rain < visible then
@@ -1324,7 +1416,7 @@ local function update(ev)
 	if service_lvl ~= (on and ev.level or nil) then
 		service_lvl, service_ids, service_out = on and ev.level or nil, {}, {}
 	end
-	update_weather(on_here)
+	update_weather(ev)
 	update_hide(ev, on_here)
 	if on_here then
 		keep_out(ev)

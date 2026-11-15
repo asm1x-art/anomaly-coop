@@ -64,6 +64,16 @@ real_hours_min      = 3         ; how long it lasts, real hours
 real_hours_max      = 4
 levels              = l10_red_forest, l08_yantar, jupiter, zaton, k02_trucks_cemetery
 weather             = w_zev_ash ; environment\weathers\w_zev_ash.ltx
+; the sky: w_zev_ash comes in over weather_blend_in_s real seconds from the front's start and the world's weather goes
+; back over weather_blend_out_s from its end, smoothly from whatever is on screen, in every game alike (one that comes
+; onto the level later takes what is left of the blend). The rain goes in weather_rain_in_s and comes back in
+; weather_rain_out_s of them (at most the blend). weather_turn_s: real s at most the sky first takes to the nearer of
+; the two weather frames it shows (the engine blends two at a time). A blend of 0: at once
+weather_blend_in_s  = 180
+weather_blend_out_s = 300
+weather_rain_in_s   = 30
+weather_rain_out_s  = 120
+weather_turn_s      = 20
 buy_medical         = 1.2       ; anti-rad in demand
 ; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
 sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit ; ecolog_guard_outfit is not one (no "ecolog_outfit" in it): add it here to count it
