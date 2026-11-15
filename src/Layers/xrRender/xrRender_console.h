@@ -100,8 +100,10 @@ extern ECORE_API float ps_r__render_scale;
 // (DLSS: one more), so they keep the screen's detail. r__upscale_mipbias 0 turns it off.
 extern ECORE_API int ps_r__upscale_mipbias;
 extern ECORE_API float r__upscale_mip_bias; // that bias for the frame's size now (set by CRenderTarget)
-float r_texture_mip_bias(); // r__tf_mipbias plus it
+bool r_texture_mip_bias_auto(); // that bias is in use (non-zero and r__upscale_mipbias on): r__tf_mipbias is not added
+float r_texture_mip_bias(); // that bias while in use, r__tf_mipbias otherwise
 void r_apply_texture_mip_bias(); // to the samplers
+void r_log_texture_mip_bias(); // "* textures' mip bias ...": the final value and which one applies
 extern ECORE_API int ps_r__taa_jitter; // test: jitter the camera (r4_taa.h) even without an upscaler
 extern ECORE_API int ps_r__dlss_mv_debug; // test: show DLSS's motion vectors (red/green: the motion, blue: a model's own)
 extern ECORE_API u32 ps_r__dlss_mode; // NVIDIA DLSS (dlss.h: dlss::mode), takes effect with vid_restart
