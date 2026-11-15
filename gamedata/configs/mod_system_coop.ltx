@@ -370,6 +370,15 @@ reselect_weather_s   = 600   ; game s: a step of the clock this big (coming into
 hold_ms              = 3000  ; real ms: after our own jump, how long older news from the server are ignored
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
+env_log_s            = 2     ; real s: how often the weather on screen goes to the log with coop_debug 1, at the same
+                             ; second of the server's clock in every game (compare two games' logs); 0 never
+
+; Co-op: thunderbolts are the world's (src/xrEngine/thunderbolt.cpp SharedFrame): every game has the same bolts at the
+; same second of the server's clock, with the same look, direction, distance and thunder; on average one per the
+; weather's thunderbolt_period, as before
+[coop_thunderbolt]
+shared               = true  ; false: each game has its own bolts again (Anomaly's chance)
+step_s               = 0.25  ; real s: the server clock's ticks a bolt may start on (each one with the chance step/period)
 
 ; Co-op: a psi storm's vortices are the world's (coop_psi_vortex.script). The level's authority rolls one stream of them
 ; by the world's storm, as Anomaly does for its one actor, each near the next player on the level in turn; every game

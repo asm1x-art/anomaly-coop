@@ -77,6 +77,11 @@ public:
 		VERIFY(palette.size() > 0);
 		return palette[Random.randI(palette.size())];
 	}
+	SThunderboltDesc* GetDesc(CRandom& rnd)
+	{
+		VERIFY(palette.size() > 0);
+		return palette[rnd.randI(palette.size())];
+	}
 };
 
 #define THUNDERBOLT_CACHE_SIZE 8
@@ -127,7 +132,17 @@ private:
 	// float p_fog_color;
 private:
 	BOOL RayPick(const Fvector& s, const Fvector& d, float& range);
-	void Bolt(shared_str id, float period, float life_time);
+	// rnd: the bolt's chances; elapsed: real s since it began (a shared one caught up late). True: a second bolt
+	// follows right after this one (no clap for this one then)
+	bool Bolt(shared_str id, float period, float life_time, CRandom& rnd, float elapsed = 0.f);
+	// Co-op: the bolts are the world's, not this game's chance: they come at the same seconds of the server's clock
+	// in every game (IGame_Persistent::SharedEventClock), each from its own seed: the same bolt, direction and
+	// thunder. Settings: [coop_thunderbolt] in system.ltx (mod_system_coop.ltx)
+	void SharedFrame(shared_str id, float period, float duration, double now, bool verbose);
+	u64 shared_tick; // the last tick of the server's clock looked at, 0: none yet
+	bool follow_pending; // the second bolt of the last one
+	double follow_at;
+	u32 follow_seed;
 public:
 	CEffect_Thunderbolt();
 	~CEffect_Thunderbolt();

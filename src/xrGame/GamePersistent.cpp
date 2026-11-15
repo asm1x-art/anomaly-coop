@@ -1,5 +1,7 @@
 #include "pch_script.h"
 #include "coop/coop_save.h"
+#include "coop/coop_net.h"
+#include "coop/coop_time.h"
 #include "gamepersistent.h"
 #include "../xrEngine/fmesh.h"
 #include "../xrEngine/xr_ioconsole.h"
@@ -299,6 +301,21 @@ float CGamePersistent::OnThunderboltSound(LPCSTR file, float distance)
 	if (ai().script_engine().functor("_G.COnThunderboltSound", funct))
 		return ambient_hook_volume_mult(funct(file, distance));
 	return 1.0f;
+}
+
+// Co-op: thunderbolts by the server's clock (CEffect_Thunderbolt::SharedFrame); [coop_thunderbolt] shared = false
+// gives each game its own again
+bool CGamePersistent::SharedEventClock(double& seconds, bool& verbose)
+{
+	static int shared = -1;
+	if (shared < 0)
+		shared = pSettings->section_exist("coop_thunderbolt")
+			? READ_IF_EXISTS(pSettings, r_bool, "coop_thunderbolt", "shared", true) : 1;
+	if (!shared || !coop::is_connected())
+		return false;
+	seconds = coop::server_utc_s();
+	verbose = coop::debug_mode != 0;
+	return seconds > 0.;
 }
 
 float CGamePersistent::OnRainSound(LPCSTR file)

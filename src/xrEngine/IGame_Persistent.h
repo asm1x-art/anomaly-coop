@@ -203,6 +203,9 @@ public:
 	virtual float OnThunderboltSound(LPCSTR file, float distance) { return 1.0f; }
 	// looped rain ambient volume gate, overridden by the game layer to ask Lua. Returns 1.0 for vanilla.
 	virtual float OnRainSound(LPCSTR file) { return 1.0f; }
+	// Co-op: the server's clock (real s, the same in every game) for what the world shows at once in every game, such as
+	// thunderbolts. False: no shared world, each game goes by its own chance. verbose: the co-op debug log is on
+	virtual bool SharedEventClock(double& seconds, bool& verbose) { return false; }
 
 	struct pda_data
 	{
