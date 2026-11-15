@@ -1,0 +1,220 @@
+-- Co-op: the vortices of a psi storm are the world's, not each game's.
+-- Anomaly's psi storm (psi_storm_manager) puts a vortex at a random point around its own actor every 8-16 s of the
+-- storm's main phase; 20 s later it strikes: a psi and shock hit to the actor by its distance, NPCs near it killed.
+-- In co-op the storm's timetable is the world's (coop_time), but each game rolled its own vortices: two players side
+-- by side saw different strikes, and NPCs fell where the other had seen nothing.
+-- Now a level's vortices are a fact of the server: "psi_vortex:<level>" = the vortices of the last keep_s seconds,
+-- "<world clock ms>,<n>,<x>,<y>,<z>;..." (coop.clock(): the world's game time, the same in every game).
+--   roll   the level's authority (its owner) rolls them, for every player on the level as vanilla does for its
+--          actor: around that player, one in period_min_s..period_max_s; a vortex within distance_max of a player
+--          counts as theirs, so players together get one storm, not one each.
+--   show   every game on the level (the authority too) plays each vortex of the fact once, at its point and at its
+--          age: the strike comes at the same second for all. Its own actor's hit and the detectors are as vanilla's,
+--          by the distance to that point; NPCs are killed by the level's authority only (coop_time).
+--   own    a game in co-op rolls no vortices of its own. Without co-op nothing changes.
+-- Settings: [coop_psi_vortex] in mod_system_coop.ltx.
+
+local S = "coop_psi_vortex"
+local FACT = "psi_vortex:"
+local MAIN_FROM, MAIN_TO = 40, 228 -- the storm's main phase, s since its start (psi_storm_manager's update)
+
+local cfg = {}
+local seq = 0        -- our vortices' numbers (the authority's)
+local next_at = {}   -- the authority's: player's name -> storm second of their next vortex
+local shown = {}     -- vortex id ("<clock>,<n>") -> true: played here
+local seen = nil     -- the fact's value as we looked at it last
+local next_look = 0
+local own_vortex     -- CPsiStormManager.vortex as it was
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] psi vortex: " .. fmt, ...)
+	end
+end
+
+local function storm_second(mgr)
+	return math.ceil(game.get_game_time():diffSec(mgr.inited_time) / level.get_time_factor())
+end
+
+-- real s since the world's clock said <at>
+local function age(at)
+	return (coop.clock() - at) / 1000 / level.get_time_factor()
+end
+
+local function decode(value)
+	local out = {}
+	for at, n, x, y, z in string.gmatch(value or "", "([%d%.]+),(%d+),([%-%d%.]+),([%-%d%.]+),([%-%d%.]+)") do
+		out[#out + 1] = { id = at .. "," .. n, at = tonumber(at), x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+	end
+	return out
+end
+
+local function encode(list)
+	local part = {}
+	for i, v in ipairs(list) do
+		part[i] = string.format("%.0f,%s,%.1f,%.1f,%.1f", v.at, string.match(v.id, ",(%d+)$"), v.x, v.y, v.z)
+	end
+	return table.concat(part, ";")
+end
+
+-------------------------------------------------------------------------------
+-- show: a vortex of the fact into our manager, as vanilla's vortex() but at its point and age
+
+local function play(mgr, v, since)
+	mgr.vortex_index = (mgr.vortex_index or 0) + 1
+	local particle_pos = vector():set(v.x, v.y + 20, v.z)
+	local sound_pos = vector():set(v.x, v.y + 60, v.z)
+	local vortex = {
+		effect = particles_object("crommcruac\\psi_storm_01"),
+		sound = sound_object("anomaly\\psi_storm_01"),
+		particle_pos = particle_pos,
+		sound_pos = sound_pos,
+		start_time = storm_second(mgr) - math.floor(since + 0.5),
+		hit = false,
+	}
+	mgr.vortexes[mgr.vortex_index] = vortex
+	vortex.effect:play_at_pos(particle_pos)
+	vortex.sound:play_at_pos(db.actor, sound_pos)
+	vortex.sound.volume = 1
+	dbg("vortex %s at [%.0f %.0f %.0f], %.1f s old, %.0f m from us", v.id, v.x, v.y, v.z, since,
+		distance_2d(db.actor:position(), particle_pos))
+end
+
+local function show(mgr, value)
+	for _, v in ipairs(decode(value)) do
+		if not shown[v.id] then
+			shown[v.id] = true
+			local since = age(v.at)
+			if since < cfg.late_s then
+				play(mgr, v, math.max(0, since))
+			else
+				dbg("vortex %s is %.1f s old: not shown", v.id, since)
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- roll: the level's authority
+
+local function players_here(lvl)
+	local out = { { name = coop.my_name(), pos = db.actor:position() } }
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lvl and p.age < cfg.peer_stale_ms then
+			out[#out + 1] = { name = p.name, pos = vector():set(p.position) }
+		end
+	end
+	return out
+end
+
+local function next_one(sec)
+	return sec + math.random(cfg.period_min_s, cfg.period_max_s)
+end
+
+local function roll(mgr, lvl, sec)
+	if sec < MAIN_FROM or sec > MAIN_TO then
+		return
+	end
+	local players = players_here(lvl)
+	local added = {}
+	for _, p in ipairs(players) do
+		if not next_at[p.name] then
+			next_at[p.name] = next_one(sec)
+		elseif sec >= next_at[p.name] then
+			local angle = math.rad(math.random(0, 359))
+			local distance = math.random(0, cfg.distance_max)
+			seq = seq + 1
+			local v = {
+				at = coop.clock(),
+				x = p.pos.x + math.cos(angle) * distance,
+				y = p.pos.y,
+				z = p.pos.z + math.sin(angle) * distance,
+			}
+			v.id = string.format("%.0f,%d", v.at, seq)
+			added[#added + 1] = v
+			-- whoever has it near counts it as theirs
+			local at = vector():set(v.x, v.y, v.z)
+			for _, q in ipairs(players) do
+				if distance_2d(q.pos, at) <= cfg.distance_max then
+					next_at[q.name] = next_one(sec)
+				end
+			end
+			dbg("rolled vortex %s near %s", v.id, p.name)
+		end
+	end
+	if #added == 0 then
+		return
+	end
+	-- the fact as it is (another authority's before us) without the old ones, and ours
+	local list = {}
+	for _, v in ipairs(decode(coop.fact(FACT .. lvl))) do
+		if age(v.at) < cfg.keep_s then
+			list[#list + 1] = v
+		end
+	end
+	for _, v in ipairs(added) do
+		list[#list + 1] = v
+	end
+	coop.report_fact(FACT .. lvl, encode(list))
+end
+
+-------------------------------------------------------------------------------
+
+local function update()
+	if not (db.actor and in_coop() and coop.clock() > 0) or time_global() < next_look then
+		return
+	end
+	next_look = time_global() + cfg.look_ms
+	local mgr = psi_storm_manager.get_psi_storm_manager()
+	local lvl = level.name()
+	if not (mgr and mgr.started and mgr.inited_time and mgr.vortexes) then
+		if next(shown) or next(next_at) then
+			-- the storm is over here: the authority's fact goes, ours start afresh with the next one
+			if coop.is_authority(lvl) and coop.fact(FACT .. lvl) ~= "" then
+				coop.report_fact(FACT .. lvl, "")
+			end
+			shown, next_at, seen = {}, {}, nil
+		end
+		return
+	end
+	if coop.is_authority(lvl) then
+		roll(mgr, lvl, storm_second(mgr))
+	elseif next(next_at) then
+		next_at = {} -- no longer ours to roll
+	end
+	local value = coop.fact(FACT .. lvl)
+	if value ~= seen then
+		seen = value
+		show(mgr, value)
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	cfg.period_min_s = ini_sys:r_float_ex(S, "period_min_s") or 8
+	cfg.period_max_s = math.max(cfg.period_min_s, ini_sys:r_float_ex(S, "period_max_s") or 16)
+	cfg.distance_max = ini_sys:r_float_ex(S, "distance_max") or 150
+	cfg.keep_s = ini_sys:r_float_ex(S, "keep_s") or 30
+	cfg.late_s = ini_sys:r_float_ex(S, "late_s") or 15
+	cfg.peer_stale_ms = (ini_sys:r_float_ex(S, "peer_stale_s") or 10) * 1000
+	cfg.look_ms = ini_sys:r_float_ex(S, "look_ms") or 250
+
+	own_vortex = psi_storm_manager.CPsiStormManager.vortex
+	psi_storm_manager.CPsiStormManager.vortex = function(self, ...)
+		if in_coop() then
+			return -- the world's come from the fact
+		end
+		return own_vortex(self, ...)
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		shown, next_at, seen, next_look = {}, {}, nil, 0
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+end
