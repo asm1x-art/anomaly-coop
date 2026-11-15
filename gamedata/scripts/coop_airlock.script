@@ -1,0 +1,96 @@
+-- Co-op: the Yantar bunker's airlock (configs\scripts\yantar\yan_smart_terrain_6_4_ph_door_outer.ltx, _inner.ltx): its
+-- doors' logic asks about the other door. coop_door_in(<door>:<section>:...): that door is in one of those sections, as
+-- this game has it - at the level's authority, which runs the doors' logic (coop_physics.script), at once after its own
+-- switch, so of two players asking at the two doors at the same moment only one gets his door open. A door that isn't
+-- online here: in none.
+
+local ids = {} -- door name -> its object id
+
+local function door(name)
+	local id = ids[name]
+	local obj = id and level.object_by_id(id)
+	if obj and obj:name() == name then
+		return obj
+	end
+	ids[name] = nil
+	for did in pairs(db.level_doors or {}) do
+		local o = level.object_by_id(did)
+		if o and o:name() == name then
+			ids[name] = did
+			return o
+		end
+	end
+	return nil
+end
+
+-- The steam between the doors ([coop_airlock]): a puff of the particle at each point of the paths and the hiss at the
+-- first one, again every steam_repeat_s for steam_s. An effect of the inner door's switch: the authority plays it, the
+-- others play it again (coop_physics replay_effects)
+local S = "coop_airlock"
+local steam_until, next_puff = 0, 0
+local puffs = {} -- the particles playing: { p = particles_object, till = time_global() }
+
+local function puff()
+	local name = ini_sys:r_string_ex(S, "steam_particle") or ("static" .. string.char(92) .. "zharka_static_steam")
+	local first
+	for path in string.gmatch(ini_sys:r_string_ex(S, "steam_paths") or "", "[^,%s]+") do
+		if level.patrol_path_exists(path) then
+			local pt = patrol(path)
+			for i = 0, pt:count() - 1 do
+				local p = particles_object(name)
+				p:play_at_pos(pt:point(i))
+				puffs[#puffs + 1] = { p = p, till = steam_until }
+				first = first or pt:point(i)
+			end
+		end
+	end
+	local snd = ini_sys:r_string_ex(S, "steam_sound")
+	if snd and first then
+		local so = sound_object(snd)
+		so:play_at_pos(db.actor, first, 0, sound_object.s3d)
+		so.volume = ini_sys:r_float_ex(S, "steam_volume") or 1
+	end
+end
+
+local function play_steam()
+	steam_until = time_global() + (ini_sys:r_float_ex(S, "steam_s") or 5) * 1000
+	next_puff = 0
+end
+
+local function update_steam()
+	local now = time_global()
+	if now < steam_until and now >= next_puff and db.actor then
+		next_puff = now + math.max(0.3, ini_sys:r_float_ex(S, "steam_repeat_s") or 1.2) * 1000
+		puff()
+	end
+	for i = #puffs, 1, -1 do
+		local e = puffs[i]
+		if now >= e.till or not e.p:playing() then
+			if e.p:playing() then
+				e.p:stop()
+			end
+			table.remove(puffs, i)
+		end
+	end
+end
+
+function on_game_start()
+	xr_effects.coop_airlock_steam = function()
+		play_steam()
+	end
+	RegisterScriptCallback("actor_on_update", update_steam)
+	xr_conditions.coop_door_in = function(actor, npc, p)
+		local obj = p and p[1] and door(p[1])
+		local st = obj and db.storage[obj:id()]
+		local section = st and st.active_section
+		if not section then
+			return false
+		end
+		for i = 2, #p do
+			if p[i] == section then
+				return true
+			end
+		end
+		return false
+	end
+end
