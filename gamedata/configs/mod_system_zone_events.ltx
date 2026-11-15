@@ -106,7 +106,8 @@ immune_communities  = zombied
 offline_shelter_radius = 40     ; metres: an offline squad of the shelter's smart this near it is in (online: only the covers)
 npc_walk_in_s       = 60        ; real s more for the shelter's people (its smart's, or on their way in) to get into a cover
                                 ; once a front: one who goes out again (to a fight) is hurt from npc_harm_after_s as anyone
-service_min_health  = 0.1       ; the front's story NPCs (home, cond, shelter below) out of the covers are hurt too, never below this
+service_min_health  = 0.4       ; the front's story NPCs (home, cond, shelter below) out of the covers are hurt too, never below this
+                                ; (above the wounded state: one lying wounded outside would never get in)
 ; mutants (the level's authority, online ones): each goes to the nearest covered spot - a roof within mutant_roof_m above
 ; it, or a tree trunk within mutant_tree_m beside it (a material with one of mutant_tree_materials in its name) - looked
 ; for in rings mutant_cover_step m apart up to mutant_cover_radius m, mutant_cover_dirs points a ring, and is kept there
@@ -127,6 +128,12 @@ mutant_per_look     = 4         ; searches a look (each costs up to ~800 rays)
 hide_jobs           = 12
 hide_paths_l10_red_forest      = red_smart_terrain_3_2_walker_1_walk, red_smart_terrain_3_2_collector_2_walk, red_smart_terrain_3_2_sleep_1
 hide_paths_l08_yantar          = yan_smart_terrain_6_4_surge_1_walk, yan_smart_terrain_6_4_surge_2_walk, yan_smart_terrain_6_4_surge_3_walk, yan_smart_terrain_6_4_1_1_walk, yan_smart_terrain_6_4_2_2_walk, yan_smart_terrain_6_4_3_3_walk, yan_smart_terrain_6_4_4_4_walk, yan_smart_terrain_6_4_povarhide_1_walk
+; the shelter's own places: hide_spots_<level> level vertices (a job on each, beh: there and wait), taken before the
+; hide paths; hide_beds_<level> its smart's job sections (beds) the shelter's people may take besides. With spots the rest
+; of the covers' jobs are only taken once every spot is (nobody stands about the rooms and passages)
+hide_spots_l08_yantar          = 77406, 77404, 77402, 77400, 77406, 77404 ; the side corridor south of Sakharov's lab, behind
+                                 ; the bed room's door: its four floor vertices, the far two twice (six people)
+hide_beds_l08_yantar           = logic@yan_smart_terrain_6_4_camp_work_1, logic@yan_smart_terrain_6_4_camp_work_2 ; the two beds
 hide_paths_jupiter             = jup_a6_duty_guard_walk, jup_a6_duty_leader_walk, jup_a6_freedom_leader_walk
 hide_paths_zaton               = zat_stalker_base_smart_garmata_4_walk, zat_stalker_base_smart_gonta_4_walk, zat_stalker_base_smart_zat_b33_stalker_snag_walk, zat_stalker_base_smart_b29_rival_leader_walk
 hide_paths_k02_trucks_cemetery = trc_sim_20_surge_1_walk, trc_sim_20_surge_2_walk, trc_sim_20_surge_3_walk, trc_sim_20_surge_4_walk, trc_sim_20_guard_2_walk
