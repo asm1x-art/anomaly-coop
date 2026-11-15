@@ -21,8 +21,8 @@
 --              to get in. Offline squads out of the shelter (farther than offline_shelter_radius from its smart) for
 --              offline_death_min real minutes are taken away. Story NPCs (the safety net: the story can't break),
 --              players' companions and stand-ins, immune_communities never
---              The shelter's people in its covers are kept in them for the front (out restrictions): they shoot from
---              inside, a fight doesn't take them out. One who is out again later (no walk-in time the second time) is hurt
+--              The shelter's people in its covers are kept in them for the front (out restrictions) and take no notice
+--              of anyone outside them (on_enemy_eval): no fight through the door; one who comes in is fought as ever. One who is out again later (no walk-in time the second time) is hurt
 --              as anyone; the front's story NPCs (home, cond, shelter) too, never below service_min_health
 --   mutants    the level's online mutants go to the nearest covered spot (a roof above, a tree trunk beside) and stay
 --              there (a monster home) till the front is over (the authority)
@@ -155,11 +155,13 @@ end
 -- when none of them is here
 local function in_cover(pos, lvl)
 	local found = false
+	-- at the feet and a metre up: the covers' shapes may start above the floor
+	local up = vector():set(pos.x, pos.y + 1, pos.z)
 	for _, name in ipairs(ZE.ini_list(S, "shelter_covers_" .. lvl)) do
 		local zone = db.zone_by_name[name]
 		if zone then
 			found = true
-			if zone:inside(pos) then
+			if zone:inside(pos) or zone:inside(up) then
 				return true
 			end
 		end
@@ -1028,7 +1030,7 @@ local function npc_dose(ev, rel_ids)
 	local death = math.max(after + 1, num("npc_death_s", 210))
 	local walk_in = num("npc_walk_in_s", 180) * 1000
 	local seen, hurt, killed, walking = {}, 0, 0, 0
-	local floor = num("service_min_health", 0.1)
+	local floor = num("service_min_health", 0.4)
 	local names = cover_names(lvl)
 	for i = 1, lvl == level.name() and #db.OnlineStalkers or 0 do
 		local id = db.OnlineStalkers[i]
@@ -1040,7 +1042,7 @@ local function npc_dose(ev, rel_ids)
 		-- covers (gone out to a fight) not
 		local e = get_object_story_id(id) and service_of(id)
 		local svc = e and e.how ~= "stay"
-		local on_hide = svc and string.find(db.storage[id].active_section or "", HIDE, 1, true) ~= nil
+		local on_hide = svc and string.find(db.storage[id].active_section or "", "@coop_ash_", 1, true) ~= nil -- a hide job or spot
 		if squad and squad.squad_members and IsStalker(npc) and npc:alive()
 			and not (in_coop() and coop.stand_in_peer(id) ~= 0)
 			and not listed(npc:character_community(), "immune_communities") and not npc_sealed(npc)
@@ -1279,7 +1281,8 @@ local function covered_job(job)
 	local now = time_global()
 	local c = job_covered[job]
 	if not (c and c[1] > now) then
-		c = { now + 30000, job.position and in_cover(job.position, hide.lvl) or false }
+		local pos = job.coop_lvid and level.vertex_position(job.coop_lvid) or job.position
+		c = { now + 30000, pos and in_cover(pos, hide.lvl) or false }
 		job_covered[job] = c
 	end
 	return c[2]
@@ -1288,6 +1291,29 @@ end
 -- the hide jobs: walkers on the shelter's in-cover paths, for those who must hide and found no other job in a cover
 local function hide_job_ok(se_obj, smart)
 	return hide ~= nil and smart.id == hide.smart and must_hide(se_obj)
+end
+
+-- The shelter's own places for those who must hide (hide_spots_<level>: level vertices, e.g. a side corridor out of
+-- everyone's way) and its beds (hide_beds_<level>: job sections of the smart). With spots, the shelter's people take
+-- a bed or a spot; only when every spot is taken the rest go to the other surge and hide jobs in its covers
+local SPOT = "coop_ash_spot_"
+
+local function hide_spots(lvl)
+	local t = {}
+	for _, v in ipairs(ZE.ini_list(S, "hide_spots_" .. lvl)) do
+		t[#t + 1] = tonumber(v)
+	end
+	return t
+end
+
+local function spot_free(smart, lvl)
+	local held = smart.npc_by_job_section or {}
+	for i = 1, #hide_spots(lvl) do
+		if held["logic@" .. SPOT .. i] == nil then
+			return true
+		end
+	end
+	return false
 end
 
 -- a job's precondition while hiding: for those who must hide, a job of the shelter out of its covers is not theirs, a
@@ -1299,11 +1325,23 @@ local function hide_precondition(pre)
 	if not f then
 		f = function(se_obj, smart, job, info, ...)
 			if hide and smart.id == hide.smart and (not info or info.stype == 0) and must_hide(se_obj) then
+				if job.coop_lvid then
+					return true -- a spot
+				end
 				if pre ~= hide_job_ok and service_hides(se_obj) then
 					return false
 				end
 				if not covered_job(job) then
 					return false
+				end
+				if #hide_spots(hide.lvl) > 0 then
+					if listed(job.section, "hide_beds_" .. hide.lvl) then
+						return true
+					end
+					-- the rest of the covers' jobs only once the spots are full
+					if spot_free(smart, hide.lvl) then
+						return false
+					end
 				end
 				if not job.exclusive and SURGE_JOBS[job.job_type_id] then
 					return true
@@ -1345,6 +1383,18 @@ def_state_moving = {=dist_to_job_point_ge(25)} sprint, {=dist_to_job_point_ge(5)
 invulnerable = {=coop_ash_service} true, false
 ]], HIDE, i, HIDE, i, HIDE, i, paths[(i - 1) % #paths + 1])
 	end
+	for i, lvid in ipairs(hide_spots(lvl)) do
+		text[#text + 1] = strformat([[
+[logic@%s%s]
+active = beh@%s%s
+
+[beh@%s%s]
+behavior_state = beh_cover
+target = lvid:%s
+wait_anim = guard
+invulnerable = {=coop_ash_service} true, false
+]], SPOT, i, SPOT, i, SPOT, i, lvid)
+	end
 	db.dynamic_ltx[name] = create_ini_file(table.concat(text, "\n"))
 	return db.dynamic_ltx[name]
 end
@@ -1377,6 +1427,14 @@ local function add_hide_jobs(smart)
 				prefix_name = "nil", exclusive = true, precondition_function = hide_job_ok,
 			})
 		end
+	end
+	for i, lvid in ipairs(hide_spots(lvl)) do
+		added = added + 1
+		rawset(smart.stalker_jobs, #smart.stalker_jobs + 1, {
+			section = "logic@" .. SPOT .. i, ini_path = "*" .. HIDE .. smart:name(), ltx = ltx, job_type = "point_job",
+			prior = 3, -- over the hide paths
+			prefix_name = "nil", exclusive = true, precondition_function = hide_job_ok, coop_lvid = lvid,
+		})
 	end
 	if added > 0 then
 		table.sort(smart.stalker_jobs, function(a, b) return gulag_general.get_job_prior(a) > gulag_general.get_job_prior(b) end)
@@ -1718,6 +1776,14 @@ function on_game_start()
 		dose(here() ~= nil)
 	end)
 	RegisterScriptCallback("actor_on_item_use", on_item_use)
+	-- the shelter's people kept in its covers take no notice of anyone outside them (no fight through the door, no
+	-- shots from inside): they sit the front out. One who has come into the covers is fought as ever
+	RegisterScriptCallback("on_enemy_eval", function(npc, enemy, flags)
+		if kept[npc:id()] and service_lvl and not in_cover(enemy:position(), service_lvl) then
+			flags.override = true
+			flags.result = false
+		end
+	end)
 	-- the level's smarts respawn nobody for the front
 	RegisterScriptCallback("on_try_respawn", function(smart, flags)
 		if ini_sys:r_bool_ex(S, "no_respawn", true) then

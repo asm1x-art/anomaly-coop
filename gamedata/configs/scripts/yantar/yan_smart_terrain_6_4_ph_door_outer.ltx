@@ -1,0 +1,95 @@
+; Co-op: the Yantar bunker's airlock, its outer door (the inner one: yan_smart_terrain_6_4_ph_door_inner.ltx; the
+; space between them is the restrictor yan_smart_terrain_6_4_sr_steam). Only one of the two doors is ever open. A door's logic runs at the
+; level's authority (coop_physics.script), so it is the authority that decides: a player's use only asks (ask_in from
+; outside, ask_out from between the doors), and the authority opens the door if the other one is shut (closed or
+; locked), else this one goes locked till the other one has shut. Players and their groups go through together while it
+; is open.
+;   in:  the outer door opens, shuts behind those who came in (entered) after OPEN_IN ms or a use from inside; the inner
+;        door steams them (its steam sections) and opens; nobody in between: no steam, the outer door is free again
+;   out: the inner door opens, shuts; the outer door opens for those in between; no steam
+; NPCs go through as before (unlock_for_npc: the engine's door handling), outside the cycle.
+; Timings (real ms, on_timer: counted from the world's clock in every game): OPEN_IN = OPEN_OUT = 6000 below; the
+; steam and the inner door's open time in the inner door's file. coop_door_in(<door>:<section>:...): that door is in
+; one of those sections (coop_airlock.script).
+
+[logic]
+active = ph_door@closed
+
+[ph_door@closed]
+closed = true
+locked = false
+on_use = {=actor_in_zone(yan_smart_terrain_6_4_sr_steam)} ph_door@ask_out, ph_door@ask_in
+on_info = {!coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@locked
+snd_open_start = trader_door_open_start
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@ask_in]
+closed = true
+locked = false
+on_info = {!coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@locked, ph_door@open_in
+snd_open_start = trader_door_open_start
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@ask_out]
+closed = true
+locked = false
+on_info = {!coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@locked, ph_door@open_out
+snd_open_start = trader_door_open_start
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@open_in]
+closed = false
+locked = false
+on_use = ph_door@entered
+on_timer = 6000 | ph_door@entered
+snd_open_start = trader_door_open_start
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@entered]
+closed = true
+locked = true
+unlock_for_npc = true
+snd_open_start = trader_door_locked
+tip_open = st_jup_b41_door_locked
+on_info = {!actor_in_zone(yan_smart_terrain_6_4_sr_steam)} ph_door@closed
+on_info2 = {!coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@locked
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@open_out]
+closed = false
+locked = false
+on_use = ph_door@closed
+on_timer = 6000 | ph_door@closed
+snd_open_start = trader_door_open_start
+snd_close_start = trader_door_close_start
+snd_close_stop = trader_door_close_stop
+
+[ph_door@locked]
+closed = true
+locked = true
+unlock_for_npc = true
+snd_open_start = trader_door_locked
+tip_open = st_jup_b41_door_locked
+on_info = {=coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@closed
+
+; Anomaly's own sections of this door (a save from before): the airlock's closed door
+[ph_door@open]
+closed = true
+on_info = ph_door@closed
+
+[ph_door@locked_alarm]
+closed = true
+on_info = ph_door@closed
+
+[ph_door@locked_base_alarm]
+closed = true
+on_info = ph_door@closed
+
+[ph_door@surge]
+closed = true
+on_info = ph_door@closed

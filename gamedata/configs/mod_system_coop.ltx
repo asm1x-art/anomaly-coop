@@ -521,3 +521,13 @@ fly_on_s      = 0.5  ; s: how long a puppet flies on with the last speed heard b
 near_blur            = 0     ; 0..1: the blur at 0 m, fading to base_blur by near_blur_m (0: none)
 near_blur_m          = 15    ; m, whole: how far the near blur reaches
 base_blur            = 0     ; 0..0.9 (steps of 0.1): the blur of everything in the goggles
+
+; The Yantar bunker's airlock (configs\scripts\yantar\yan_smart_terrain_6_4_ph_door_outer.ltx, _inner.ltx: the doors and their
+; timings; coop_airlock.script): the steam between the doors on the way in
+[coop_airlock]
+steam_particle       = static\zharka_static_steam ; a puff at each point of steam_paths
+steam_paths          = yan_smart_terrain_6_4_steam_1, yan_smart_terrain_6_4_steam_2
+steam_sound          = anomaly\steam_blowout ; the hiss, at the first point
+steam_volume         = 1
+steam_s              = 5     ; real s the steam lasts (the inner door opens after its steam section: 5000 ms in its file)
+steam_repeat_s       = 1.2   ; real s between the puffs and hisses
