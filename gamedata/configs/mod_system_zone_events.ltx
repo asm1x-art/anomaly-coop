@@ -122,9 +122,13 @@ mutant_tree_materials = tree
 mutant_home_radius  = 4
 mutant_check_s      = 5         ; real s between looks
 mutant_per_look     = 4         ; searches a look (each costs up to ~800 rays)
+mutant_avoid_m      = 30        ; m: never a spot within this of the front's shelter (its smart) or of a base (a smart with props base),
+                                ; nor in the shelter's covers: people's places
+mutant_avoid_door_m = 8         ; m: nor this near a door (rooms behind doors)
 mutant_ignore_enemies = true     ; the front's mutants go for nobody, players and NPCs alike, on their way to cover and in it,
 mutant_defend_m     = 5         ; but one hit from within this many metres goes for whoever hit it
 mutant_defend_s     = 20        ; for this many real seconds
+npc_ignore_mutants  = true      ; and the level's NPCs go for none of those mutants (but the one going for them: it was hit by them)
 ; going in: for the front the shelter's people who must hide (not sealed, not story) take only jobs of its smart that are
 ; in its covers (its surge jobs among them), as in an emission; those left over take hide_jobs walker jobs on the paths
 ; hide_paths_<level> (in the covers: checked against all.spawn). The front over: their own jobs again
