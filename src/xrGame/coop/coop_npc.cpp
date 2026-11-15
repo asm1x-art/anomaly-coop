@@ -882,12 +882,68 @@ namespace coop
 			weapon->coop_state_sound(state);
 	}
 
+	//------------------------------------------------------------------------------------------------
+	// Crows (CAI_Crow is no CCustomMonster, not in M_NPC_STATES): the level's authority's flight, from its coop_crows
+	// events (where each crow is and where it faces, every send_ms), in the others' games
+
+	struct SCrowTarget
+	{
+		Fvector position, direction, velocity;
+		u32 received = 0;
+		Fvector at;         // where it is shown
+		bool placed = false;
+	};
+	static xr_map<u16, SCrowTarget> g_crows;
+	static const u32 CROW_STALE_MS = 1500;   // no news for so long: it flies on by itself
+	static const float CROW_SNAP_DISTANCE = 20.f;
+	static const float CROW_AHEAD_S = 0.5f;  // a position is carried on by its speed at most so long
+
+	void follow_crow(u16 id, const Fvector& position, const Fvector& direction)
+	{
+		SCrowTarget& c = g_crows[id];
+		const u32 now = Device.dwTimeContinual;
+		if (c.received && now > c.received && now - c.received < CROW_STALE_MS)
+			c.velocity.sub(position, c.position).div(float(now - c.received) / 1000.f);
+		else
+			c.velocity.set(0.f, 0.f, 0.f);
+		c.position = position;
+		c.direction = direction;
+		c.received = now;
+	}
+
+	bool drive_crow(u16 id, float dt, Fvector& position, Fvector& hpb)
+	{
+		if (!is_connected() || !g_pGameLevel || is_authority(Level().name()))
+			return false;
+		auto it = g_crows.find(id);
+		if (it == g_crows.end())
+			return false;
+		SCrowTarget& c = it->second;
+		const u32 age = Device.dwTimeContinual - c.received;
+		if (age > CROW_STALE_MS)
+			return false;
+		Fvector target;
+		target.mad(c.position, c.velocity, _min(float(age) / 1000.f, CROW_AHEAD_S));
+		if (!c.placed || c.at.distance_to(target) > CROW_SNAP_DISTANCE)
+		{
+			c.at = target;
+			c.placed = true;
+		}
+		c.at.lerp(c.at, target, _min(1.f, dt * FOLLOW_RATE));
+		position = c.at;
+		float h, p;
+		c.direction.getHP(h, p);
+		hpb.set(h, p, 0.f);
+		return true;
+	}
+
 	void clear_npc_sync()
 	{
 		show_all();
 		g_states.clear();
 		g_puppets.clear();
 		g_brought.clear();
+		g_crows.clear();
 		g_puppet_level = false;
 	}
 }

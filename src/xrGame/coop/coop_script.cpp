@@ -179,6 +179,7 @@ namespace coop
 			def("admin_command", &admin_command),      // (tab-split command): _G.coop_on_admin_result, _admin_state
 			def("squad_online_elsewhere", &squad_online_elsewhere), // (squad id) the host: a player's game has it online
 			def("set_offline_health", &set_offline_health), // (id, health) an offline creature as the host has it
+			def("follow_crow", &follow_crow),            // (id, position, direction) a crow as the level's authority flies it
 			def("report_fact", &report_fact),          // (key, value) a change in our game; "" gone (coop_facts.h)
 			def("fact", &fact),                        // (key) as the server has it, "" none
 			def("facts_ready", &facts_ready),          // the actor's first update: facts onto the world, ours count

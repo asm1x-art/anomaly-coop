@@ -62,4 +62,10 @@ namespace coop
 	// streams); not the host's own, not online here, not dead. True when taken
 	bool set_offline_health(u16 id, float health);
 	void update_host_squads(); // per frame
+
+	// Crows: the level's authority sends where its crows fly (coop_crows.script); Lua here keeps it per crow
+	void follow_crow(u16 id, const Fvector& position, const Fvector& direction);
+	// CAI_Crow's flight, per frame: true with where it is and its heading/pitch/bank when it follows the authority's
+	// (not ours, news fresh), false: its own flight
+	bool drive_crow(u16 id, float dt, Fvector& position, Fvector& hpb);
 }

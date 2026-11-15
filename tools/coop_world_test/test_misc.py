@@ -49,6 +49,7 @@ coop.end_shared = function() shared_depth = shared_depth - 1 end
 function alife_create(sec, pos) spawned[#spawned + 1] = { sec = sec, shared = shared_depth, x = pos.x } end
 function patrol(name) local x = ({ p_near = 30, p_far = 500 })[name]
   return { point = function(self, i) return vector():set(x, 0, 0) end, level_vertex_id = function() return 1 end, game_vertex_id = function() return 2 end } end
+coop_sync = coop_sync or { send_event = function() end, on_event = function() end }
 sr_crow_spawner = { crowkiller = { check_for_spawn_new_crow = function(self) own = true end } }
 db = { actor = { position = function() return vector():set(0, 0, 0) end } }
 function make(paths) return setmetatable({ st = { path_table = paths }, spawn_points_idle = {} }, { __index = sr_crow_spawner.crowkiller }) end
@@ -67,6 +68,30 @@ g = crow_game(True, 480); g.run('k = make({ "p_far" }); r = k:check_for_spawn_ne
 check(len(list(g.lua.globals().spawned.values())) == 0, 'crows: none 20 m from another player')
 g = crow_game(True, 1000); g.run('k = make({ "p_near" }); r = k:check_for_spawn_new_crow()')
 check(len(list(g.lua.globals().spawned.values())) == 0, 'crows: none 30 m from our own actor')
+
+# --- crows' flight: the authority tells, the others follow
+FLY = CROWS + r'''
+outbox = {}
+coop_sync = { send_event = function(name, ...) outbox[#outbox + 1] = name .. "|" .. table.concat({ ... }, "	") end,
+              on_event = function(name, f) handlers = handlers or {}; handlers[name] = f end }
+bind_crow = { crow_storage = { [501] = 501 } }
+level.object_by_id = function(id) return { alive = function() return true end,
+  position = function() return vector():set(10, 30, -5) end, direction = function() return vector():set(0, 0, 1) end } end
+followed = {}
+coop.follow_crow = function(id, p, d) followed[#followed + 1] = string.format("%d:%.0f,%.0f,%.0f:%.0f", id, p.x, p.y, p.z, d.z) end
+'''
+def fly_game(auth):
+    g = Game('f', {}, None, 9); g.run(FLY); g.load('coop_crows'); g.run('coop_crows.on_game_start()'); g.authority = auth
+    return g
+FA, FB = fly_game(True), fly_game(False)
+FA.run('now_ms = 1000; fire("actor_on_update")'); FB.run('now_ms = 1000; fire("actor_on_update")')
+out = list(FA.lua.eval('outbox').values())
+check(len(out) == 1 and out[0].startswith('crow_fly|l01_escape'), 'crows: the authority sends where its crows fly (%s)' % out)
+check(len(list(FB.lua.eval('outbox').values())) == 0, 'crows: the other sends nothing')
+FB.lua.eval('handlers').crow_fly('artem', out[0].split('|', 1)[1])
+check(list(FB.lua.eval('followed').values()) == ['501:10,30,-5:1'], 'crows: the other follows them (%s)' % list(FB.lua.eval('followed').values()))
+FA.lua.eval('handlers').crow_fly('friend', out[0].split('|', 1)[1])
+check(len(list(FA.lua.eval('followed').values())) == 0, 'crows: the authority follows nobody')
 
 # --- offline squads' health: the host sends changes and the wounded each full round; the others take them
 SQUADS = r'''
