@@ -227,7 +227,11 @@ namespace coop
 		}
 
 		const u64 local = tm->game_time();
-		u64 want = u64(target());
+		// The A-Life clock counts on from the frame's start (Device.dwTimeGlobal), so it takes the world's time of
+		// that moment, not of now: the work of the frame before this point (seconds in the first frames after a
+		// load) would otherwise count twice, and the clock would run ahead each frame until the frames got short
+		const u32 into_frame = Device.TimerAsync() - Device.dwTimeGlobal; // wraps when the timers disagree: 0 then
+		u64 want = u64(target_at(real_ms() - (into_frame < 60000 ? double(into_frame) : 0.)));
 		// never back by a little: wait for the world. Not right after a load: the level's clock ran on by the
 		// loading time from the save's and nothing has seen it yet, so it simply takes the world's
 		if (g_applied && want < g_applied && double(g_applied - want) < settings().max_hold_s * 1000.)

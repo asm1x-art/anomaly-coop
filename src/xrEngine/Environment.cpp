@@ -62,6 +62,7 @@ CEnvironment::CEnvironment() :
 {
 	bNeed_re_create_env = FALSE;
 	bWFX = false;
+	WFX_last = 0;
 	Current[0] = 0;
 	Current[1] = 0;
 	CurrentWeather = 0;
@@ -399,6 +400,7 @@ bool CEnvironment::SetWeatherFX(shared_str name)
 		CT->copy(*WFX_end_desc[0]);
 		CT->exec_time = NormalizeTime(CE->exec_time + rewind_tm);
 		wfx_time = TimeDiff(fGameTime, CT->exec_time);
+		WFX_last = CT;
 		bWFX = true;
 
 		// sort wfx envs
@@ -438,8 +440,20 @@ void CEnvironment::StopWFX()
 	VERIFY(CurrentCycleName.size());
 	bWFX = false;
 	SetWeather(CurrentCycleName, false);
-	Current[0] = WFX_end_desc[0];
-	Current[1] = WFX_end_desc[1];
+	if (WFX_last && CurrentWeather && !CurrentWeather->empty())
+	{
+		// From the effect's last frame, now, to the next frame of the weather now. The frames of the weather before
+		// the effect (WFX_end_desc) may lie ahead of the clock: the sky stood on the first of them until the clock got
+		// there, up to a game hour, and the weather now came only after the second
+		WFX_last->exec_time = fGameTime;
+		Current[0] = WFX_last;
+		SelectEnv(CurrentWeather, Current[1], fGameTime);
+	}
+	else
+	{
+		Current[0] = WFX_end_desc[0];
+		Current[1] = WFX_end_desc[1];
+	}
 #ifdef WEATHER_LOGGING
     Msg("WFX - end. Weather: '%s' Desc: '%s'/'%s' GameTime: %3.2f", CurrentWeatherName.c_str(), Current[0]->m_identifier.c_str(), Current[1]->m_identifier.c_str(), fGameTime);
 #endif

@@ -2,15 +2,22 @@
 -- engine's (src/xrGame/coop/coop_time.h): every game runs the server's game time. Here the sim master's game
 -- decides what Anomaly leaves to chance - the weather cycle and preset each hour, when the next surge and psi
 -- storm come - and publishes it as facts the server keeps ("weather", "surge", "psi"); the other games take
--- them instead of rolling their own. Whether a surge reaches a player is still his level's business (indoor
--- levels, Generators...). NPCs a surge or psi storm kills on a level are killed by that level's authority only:
--- the deaths reach the others as any death does.
+-- them instead of rolling their own: the weather a game shows is the master's and nothing else, however and
+-- whenever it came into the world. A game that becomes the master (the host started again, a player's game took the
+-- world over) takes those facts into its own managers before it decides or publishes anything (they come with the
+-- world): its save, up to autosave_minutes old, would roll the world's weather and timetable back otherwise. Whether a
+-- surge reaches a player is still his level's business (indoor levels, Generators...). NPCs a surge or psi storm
+-- kills on a level are killed by that level's authority only: the deaths reach the others as any death does.
 -- Settings: [coop_time] in mod_system_coop.ltx.
 
 local SECTION = "coop_time"
 local check_every = 2000 -- ms between looks at the timetable (schedule_check_s)
 local next_check = 0
 local published = {} -- fact -> value we sent last
+local adopted = false -- the sim master's game has taken the world's weather from the facts: it leads
+local own = {} -- "surge"/"psi" -> the sim master's game has taken the world's timetable: it publishes ours
+local inherited -- the world's weather of the hour a new master came in (parsed "weather"): the hour is decided
+local take_state -- below: the world's state into our managers, once we are the master
 
 local function coop_on()
 	return coop and coop.connected()
@@ -18,6 +25,11 @@ end
 
 local function master()
 	return coop_on() and coop.is_sim_master()
+end
+
+-- the master that decides and publishes (it has taken the world's state, take_state)
+local function leading()
+	return adopted and master()
 end
 
 local function dbg(fmt, ...)
@@ -35,12 +47,14 @@ local function publish(fact, value)
 end
 
 ------------------------------------------------------------------------------------------------
--- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>": mode n (normal), t (the hour of a change of
--- cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors.
+-- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>|<before>": mode n (normal), t (the hour of a change
+-- of cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors; before
+-- the file of the hour before (none: the same file).
 
 local function parse_weather(value)
-	local hour, cycle, preset, mode, file = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|(.*)$")
-	return hour and { hour = tonumber(hour), cycle = cycle, preset = preset, mode = mode, file = file }
+	local hour, cycle, preset, mode, file, before = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|([^|]*)|?(.*)$")
+	return hour and { hour = tonumber(hour), cycle = cycle, preset = preset, mode = mode, file = file,
+		before = before ~= "" and before or file }
 end
 
 -- mode nil: as published this hour, else normal
@@ -51,7 +65,10 @@ local function publish_weather(wm, mode)
 		mode = w and w.hour == hour and w.mode or "n"
 	end
 	local file = wm.weatherType == "atmosfear" and wm.weather_file or ""
-	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "" }, "|"))
+	-- last_weather_file: the one before this pick (aaaa_script_fixes_mp), none when the pick began anew (a clock that
+	-- jumped, the admin's weather)
+	local before = file ~= "" and wm.last_weather_file or file
+	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "", before or "" }, "|"))
 end
 
 -- the master's weather onto ours, before the hour's pick (which then picks the same)
@@ -74,44 +91,128 @@ end
 
 local select_weather, change_period -- level_weathers.WeatherManager's own
 
-local function pick(wm, now)
-	if not coop_on() then
-		return select_weather(wm, now)
+-- the day's second of a weather file's first frame after the hour began (most come on the hour, some on the half)
+local frames = {} -- file -> its frames' seconds, sorted
+local function next_frame(file, hour)
+	local list = frames[file]
+	if not list then
+		list = {}
+		local ini = ini_file("environment\\weathers\\" .. file .. ".ltx")
+		if ini then
+			ini:section_for_each(function(section)
+				local h, m, s = string.match(section, "^(%d+):(%d+):(%d+)$")
+				if h then
+					list[#list + 1] = h * 3600 + m * 60 + s
+				end
+				return false
+			end)
+		end
+		table.sort(list)
+		frames[file] = list
 	end
-	if master() then
-		local mode = wm.transition_period and "t" or wm.pre_blowout_period and "p" or "n"
-		local res = select_weather(wm, now)
-		publish_weather(wm, mode)
-		return res
-	end
-	local w = take_weather(wm)
-	local res = select_weather(wm, now)
-	-- a pick of its own (the cloudy preset of a change of cycle) gives way to the master's
-	if w and w.file ~= "" and wm.weatherType == "atmosfear" and wm.weather_file ~= w.file then
-		wm.weather_file = w.file
-		if not (weather.is_paused() or level.is_wfx_playing()) then
-			level.set_weather(w.file, now and true or false)
+	for i = 1, #list do
+		if list[i] > hour * 3600 then
+			return list[i]
 		end
 	end
-	dbg("weather %s (master's %s)", tostring(wm.weather_file), tostring(w and w.file))
+	return 86400
+end
+
+-- The world's weather onto the screen, the same picture in every game whenever it came into the world: an hour goes
+-- from its own frame of the weather before to the next frame of the weather now, and on from there in the weather
+-- now. Each hour only the frame ahead is changed (set_weather_smooth), seconds into the hour, when it weighs nothing
+-- yet: no game sees a step. now: the whole picture is set at once, to what a game here all along shows - for a game
+-- that came, whose clock jumped, or the admin's weather.
+local function show(w, now)
+	if weather.is_paused() then
+		return
+	end
+	if level.is_wfx_playing() then
+		level.set_weather(w.file, false) -- a surge runs: the weather it gives way to
+		return
+	end
+	if now then
+		local Y, M, D, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+		-- the master's pick for this hour, and its first frame still ahead: we are between the two weathers. A pick
+		-- of the hour before (the master's new one is seconds away) is this hour's weather before
+		if w.hour == h and w.before ~= w.file and h * 3600 + m * 60 + s < next_frame(w.file, h) then
+			level.set_weather(w.before, true)
+		else
+			level.set_weather(w.file, true)
+			return
+		end
+	end
+	level.set_weather_smooth(w.file)
+end
+
+local shown_hour -- the hour our weather was set for last
+
+-- over: a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the
+-- master publishes stays the world's
+local function pick(wm, now, over)
+	-- select_weather itself takes a clock that jumped (forced_weather_change) for now; an hour that isn't the next
+	-- one is the same thing (the clock of a game that has just come settles)
+	local hour = level.get_time_hours()
+	local at_once = now or wm.forced_weather_change_on_time_change or
+		shown_hour ~= nil and hour ~= shown_hour and hour ~= (shown_hour + 1) % 24 or false
+	shown_hour = hour
+	local w, res
+	if leading() then
+		local mode = wm.transition_period and "t" or wm.pre_blowout_period and "p" or "n"
+		res = select_weather(wm, now)
+		-- the hour the world had decided when we came in: its pick stays (a pick of ours again is random), unless
+		-- the cycle was changed since (the admin's weather)
+		local was = inherited
+		if was and was.hour == hour and was.cycle == (wm.cycle or "") and was.preset == (wm.preset or "") then
+			if was.file ~= "" and wm.weatherType == "atmosfear" then
+				wm.weather_file = was.file
+				wm.last_weather_file = was.before
+			end
+			mode = was.mode
+		end
+		publish_weather(wm, mode)
+		w = parse_weather(published.weather)
+	else
+		w = take_weather(wm)
+		res = select_weather(wm, now) -- the manager's own fields; what it set gives way to the master's below
+	end
+	local world = w and w.file ~= "" and wm.weatherType == "atmosfear"
+	if world then
+		wm.weather_file = w.file
+	end
+	if over then
+		if not (weather.is_paused() or level.is_wfx_playing()) then
+			level.set_weather(over, at_once and true or false)
+		end
+	elseif world then
+		show(w, at_once)
+	end
+	dbg("weather %s after %s%s%s", tostring(wm.weather_file), tostring(w and w.before), at_once and ", at once" or "",
+		over and ", under " .. over or "")
 	return res
 end
 
--- a Zone's event's weather on this level over the world's (coop_zone_ash: the ash), this game's own: what the master
--- publishes stays the world's
 local function wrapped_select(wm, now)
-	local res = pick(wm, now)
 	local over = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
+	if coop_on() then
+		take_state()
+		return pick(wm, now, over)
+	end
+	local res = select_weather(wm, now)
 	if over and not (weather.is_paused() or level.is_wfx_playing()) then
 		level.set_weather(over, now and true or false)
 	end
 	return res
 end
 
--- the cycle changes in the master's game only
+-- the cycle changes in the master's game only, from the world's period; not in the hour the world had decided when
+-- we came in (our clock comes to it from the save's)
 local function wrapped_change_period(wm)
-	if coop_on() and not master() then
-		return
+	if coop_on() then
+		take_state()
+		if not leading() or inherited and inherited.hour == level.get_time_hours() then
+			return
+		end
 	end
 	return change_period(wm)
 end
@@ -123,6 +224,31 @@ local function patch_weather_manager()
 		wm.change_period = wrapped_change_period
 	end
 	return wm
+end
+
+-- A weather effect is over (a surge's, a psi storm's: its last frames or an early stop). The engine goes on from the
+-- effect's last frame to the next frame of the weather it has now (CEnvironment::StopWFX; it used to go back to the
+-- frames of the weather from before the effect, often still ahead of the clock: the sky stood on one until the clock
+-- got there, up to a game hour). That weather is made the world's here, in every game: the master's pick of the hour
+-- (its own published one in the master's game), or the ash's over it. No step: only the frame ahead is set
+local wfx_on = false
+
+local function after_wfx()
+	if weather.is_paused() then
+		return
+	end
+	local file = coop_zone_ash and coop_zone_ash.weather and coop_zone_ash.weather()
+	local wm = patch_weather_manager()
+	if not file then
+		local w = parse_weather(published.weather or coop.fact("weather"))
+		if not (wm and w and w.file ~= "" and wm.weatherType == "atmosfear") then
+			return
+		end
+		file = w.file
+		wm.weather_file = file
+	end
+	level.set_weather_smooth(file)
+	dbg("weather effect over: from its last frame to %s", file)
 end
 
 ------------------------------------------------------------------------------------------------
@@ -159,6 +285,7 @@ end
 local weather_now_until = 0
 function weather_now()
 	weather_now_until = time_global() + 15000
+	inherited = nil -- the master's: its pick of the hour is the admin's, not the world's from before
 end
 
 -- mgr: the manager, last: its field with the last one's time, duration: its field with how long one lasts (real s)
@@ -166,8 +293,8 @@ local function sync_timetable(fact, mgr, last, duration)
 	if not (mgr and mgr[last] and mgr._delta) then
 		return
 	end
-	if master() then
-		return publish(fact, stamp(mgr[last]) .. "|" .. mgr._delta)
+	if leading() then
+		return own[fact] and publish(fact, stamp(mgr[last]) .. "|" .. mgr._delta)
 	end
 	local value = coop.fact(fact)
 	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
@@ -214,14 +341,176 @@ local function sync_timetable(fact, mgr, last, duration)
 	end
 end
 
+------------------------------------------------------------------------------------------------
+-- A new master takes the world over before it decides anything: the weather of the hour, the weather cycle with its
+-- period ("weather_period" = "<Y,M,D,h,m,s,ms of the cycle's last change>|<the cycles of the period, ','>": when the
+-- next cycle comes and which were there) and the surge/psi storm timetables, from the facts into its managers. The
+-- facts come with the world, before it loads: this is done the first time the master's game touches any of it (its
+-- level's weather pick, a timetable look, an admin's event), and again after each load of the managers' state. No
+-- fact: ours stays (a new world)
+
+local function take_period(wm)
+	local when, cycles = string.match(coop.fact("weather_period") or "", "^([%d,]+)|(.*)$")
+	local t = when and ctime(when)
+	if not t then
+		return
+	end
+	wm.last_period_change_date = t
+	local list = {}
+	for cycle in string.gmatch(cycles, "[^,]+") do
+		list[#list + 1] = cycle
+	end
+	wm.weather_storage = list
+end
+
+local function period_of(wm)
+	return stamp(wm.last_period_change_date) .. "|" .. table.concat(wm.weather_storage or {}, ",")
+end
+
+-- quiet_end: ends ours with nobody killed and no news (a surge of the save that isn't the world's). True: done (the
+-- manager's state isn't loaded yet: not)
+local function take_timetable(fact, mgr, last, quiet_end)
+	if not (mgr and mgr._state_loaded) then
+		return false
+	end
+	local value = coop.fact(fact) or ""
+	local when, delta = string.match(value, "^([%d,]+)|(%d+)$")
+	local t = when and ctime(when)
+	if not t then
+		return true
+	end
+	delta = tonumber(delta)
+	local due = ctime(when)
+	local Y, M, D, h, m, s, ms = due:get(0, 0, 0, 0, 0, 0, 0)
+	due:set(Y, M, D, h, m, s + delta, ms)
+	if mgr.started then
+		if mgr.inited_time and math.abs(mgr.inited_time:diffSec(due)) < 1 then
+			return true -- the world's: ours runs on in it
+		end
+		mgr.started = false -- what ends it now passes the kills and the news by
+		quiet_end(mgr)
+		dbg("%s of our save is not the world's: over", fact)
+	end
+	mgr[last] = t
+	mgr._delta = delta
+	-- the manager's first update after a load skips one whose start lies far behind (the save's own time): not this
+	mgr.inited_time = due
+	published[fact] = value
+	dbg("%s timetable of the world taken: last %s, next in %s game s", fact, when, delta)
+	return true
+end
+
+local function take_weather_of_world(wm)
+	local w = take_weather(wm)
+	-- this hour's pick is the world's as it stands (inherited); the next one is ours, from the world's cycle
+	wm.transition_period, wm.pre_blowout_period = false, false
+	inherited = w
+	if w and w.file ~= "" and wm.weatherType == "atmosfear" then
+		wm.weather_file = w.file
+		wm.last_weather_file = w.before
+	end
+	published.weather = coop.fact("weather")
+	take_period(wm)
+	dbg("the world's weather taken: %s, cycle %s, preset %s, period %s", tostring(wm.weather_file), tostring(wm.cycle),
+		tostring(wm.preset), wm.last_period_change_date and period_of(wm) or "-")
+end
+
+local STORMS = {
+	surge = { mgr = function() return surge_manager.get_surge_manager() end, last = "last_surge_time",
+		quiet_end = function(mgr) mgr:end_surge(level.is_wfx_playing()) end },
+	psi = { mgr = function() return psi_storm_manager.get_psi_storm_manager() end, last = "last_psi_storm_time",
+		quiet_end = function(mgr) mgr:finish(level.is_wfx_playing()) end },
+}
+
+-- true: the world's weather was taken now
+take_state = function()
+	if not master() then
+		adopted, own, inherited = false, {}, nil
+		return false
+	end
+	-- a fact not ours while we lead: the word of the game that was the master a moment ago (the roles moved under
+	-- an admin's event to it), the world's: taken. A storm of ours that runs stays
+	if adopted and published.weather and coop.fact("weather") ~= published.weather then
+		adopted = false
+	end
+	local took = false
+	if not adopted then
+		local wm = level_weathers.get_weather_manager()
+		if wm then
+			adopted, took = true, true
+			take_weather_of_world(wm)
+		end
+	end
+	for fact, s in pairs(STORMS) do
+		local mgr = s.mgr()
+		if own[fact] and published[fact] and coop.fact(fact) ~= published[fact] and not (mgr and mgr.started) then
+			own[fact] = nil
+		end
+		if not own[fact] and take_timetable(fact, mgr, s.last, s.quiet_end) then
+			own[fact] = true
+		end
+	end
+	return took
+end
+-- coop_world_events: an admin's event to the master is done on the world's state, not on its save's
+function take_world()
+	if coop_on() then
+		take_state()
+	end
+end
+
+-- Our weather is set anew, at once, when a level has loaded (the load left the weather of the save:
+-- aaaa_script_fixes_mp keeps a save's own) and when the clock jumped: not before this frame (the sky takes a new
+-- time a frame after the clock does), and not before our clock is the world's (it becomes that after the load)
+local settle_frame
+local max_hold = 120 -- game s our clock may wait ahead of the world's (max_hold_s)
+
+local function settle()
+	settle_frame = device().frame + 2
+end
+
+local function clock_settled()
+	local world = coop.clock()
+	if world <= 0 then
+		return true -- a world with no clock
+	end
+	local Y, M, D, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	local off = math.abs(h * 3600 + m * 60 + s - math.floor(world / 1000) % 86400)
+	return math.min(off, 86400 - off) <= max_hold + 5
+end
+
 local function check()
-	if not (coop_on() and db.actor) or time_global() < next_check then
+	if not (coop_on() and db.actor) then
+		return
+	end
+	take_state()
+	if inherited and inherited.hour ~= level.get_time_hours() and clock_settled() then
+		inherited = nil -- our clock is the world's and past that hour
+	end
+	local wfx = level.is_wfx_playing()
+	if wfx_on and not wfx then
+		after_wfx()
+	end
+	wfx_on = wfx
+	if settle_frame and device().frame >= settle_frame and clock_settled() then
+		settle_frame = nil
+		local wm = patch_weather_manager()
+		if wm and not leading() then
+			wm:select_weather(true)
+		end
+	end
+	if time_global() < next_check then
 		return
 	end
 	next_check = time_global() + check_every
 	local wm = patch_weather_manager()
-	if master() and wm and wm.weather_file then
+	-- not between the hour's turn and the manager's pick for it (up to 3 s): the old weather under the new hour; not
+	-- under the hour of our save's clock, before the world's comes
+	if leading() and wm and wm.weather_file and wm.last_hour == level.get_time_hours() and clock_settled() then
 		publish_weather(wm)
+	end
+	if leading() and wm and wm.last_period_change_date then
+		publish("weather_period", period_of(wm))
 	end
 	sync_timetable("surge", surge_manager.get_surge_manager(), "last_surge_time", "surge_time")
 	sync_timetable("psi", psi_storm_manager.get_psi_storm_manager(), "last_psi_storm_time", "psi_storm_duration")
@@ -242,11 +531,45 @@ local function authority_only(tbl, name)
 	end
 end
 
+-- a new master's surge and psi storm go on from the world's timetable (its save's would start or skip one)
+local function world_first(tbl, name)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [coop] %s not found: a new master may go on from its save's timetable", name)
+		return
+	end
+	tbl[name] = function(self, ...)
+		if coop_on() then
+			take_state()
+		end
+		return original(self, ...)
+	end
+end
+
+-- a load puts a save's state into the managers: taken over again (fact: the timetable, none: the weather)
+local function after_load(tbl, name, fact)
+	local original = tbl and tbl[name]
+	if type(original) ~= "function" then
+		printf("! [coop] %s not found: a new master may go on from its save's state", name)
+		return
+	end
+	tbl[name] = function(...)
+		local res = original(...)
+		if fact then
+			own[fact] = nil
+		else
+			adopted, inherited = false, nil
+		end
+		return res
+	end
+end
+
 function on_game_start()
 	if not coop then
 		return -- not the co-op engine
 	end
 	check_every = (ini_sys:r_float_ex(SECTION, "schedule_check_s") or 2) * 1000
+	max_hold = ini_sys:r_float_ex(SECTION, "max_hold_s") or max_hold
 
 	local class = level_weathers.WeatherManager
 	select_weather, change_period = class.select_weather, class.change_period
@@ -255,10 +578,19 @@ function on_game_start()
 
 	authority_only(surge_manager.CSurgeManager, "kill_objects_at_pos")
 	authority_only(psi_storm_manager.CPsiStormManager, "kill_objects_at_pos")
+	world_first(surge_manager.CSurgeManager, "update")
+	world_first(psi_storm_manager.CPsiStormManager, "update")
+	after_load(class, "load_state")
+	after_load(surge_manager, "load_state", "surge")
+	after_load(psi_storm_manager, "load_state", "psi")
 
 	-- another game published: ours follows now, not at the next hour
 	coop_facts.on_fact("weather", function(fact, value)
-		if db.actor and not master() then
+		if fact ~= "weather" then
+			return -- weather_period: taken when a game becomes the master
+		end
+		local taken_now = take_state()
+		if db.actor and (taken_now or not leading()) then
 			local wm = patch_weather_manager()
 			if wm then
 				wm:select_weather(time_global() < weather_now_until)
@@ -266,12 +598,19 @@ function on_game_start()
 		end
 	end)
 
-	-- the engine moved our clock far (we came into the world, someone slept): the weather is picked again
+	-- the engine moved our clock far (we came into the world, someone slept): the weather is picked again. Ours is
+	-- the master's, set anew right away (settle): left to forced_weather_change, the next hour's would come all at
+	-- once, a step in the sky up to an hour after we came
 	_G.coop_on_time_jump = function(seconds)
-		dbg("clock moved %d game s", seconds)
+		dbg("clock moved %s game s", seconds)
+		take_state()
 		local wm = db.actor and level_weathers.get_weather_manager()
 		if wm then
-			wm:forced_weather_change()
+			if leading() then
+				wm:forced_weather_change()
+			else
+				settle()
+			end
 		end
 		published = {}
 	end
@@ -280,6 +619,9 @@ function on_game_start()
 		published = {}
 		taken = {}
 		next_check = 0
+		shown_hour = nil
+		wfx_on = false
+		settle()
 	end)
 	RegisterScriptCallback("actor_on_update", check)
 end
