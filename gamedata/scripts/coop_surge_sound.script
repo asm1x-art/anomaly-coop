@@ -1,0 +1,38 @@
+-- Co-op: a surge sounds the same in every game.
+-- CSurgeManager:update rolls math.random(1, 4) every second of a surge, and its start, its impact and its waves play
+-- one of two or four sounds by that roll: two players in the same surge heard different ones. In co-op the roll is a
+-- number counted from the surge's start second (inited_time: the world's timetable, the same in every game) as
+-- coop_event_news counts its variants, one for the whole surge. Every other random number of the update is Anomaly's
+-- own. Without co-op nothing changes.
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local class = surge_manager.CSurgeManager
+	local update = class.update
+	class.update = function(self, ...)
+		if not (in_coop() and self.started and self.inited_time) then
+			return update(self, ...)
+		end
+		local seed = math.floor(self.inited_time:diffSec(level.get_start_time()))
+		local sound = coop_event_news.index(4, seed, 4)
+		local random = math.random
+		math.random = function(...)
+			local a, b = ...
+			if a == 1 and b == 4 and select("#", ...) == 2 then
+				return sound
+			end
+			return random(...)
+		end
+		local ok, err = pcall(update, self, ...)
+		math.random = random
+		if not ok then
+			error(err, 0)
+		end
+	end
+end

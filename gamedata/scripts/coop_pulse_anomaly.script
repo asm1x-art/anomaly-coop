@@ -1,0 +1,161 @@
+-- Co-op: the pulse anomalies (lightning out of the sky that hits the ground with a psi and shock blow) are the world's.
+-- Anomaly (bind_anomaly_field: pulse_anomaly_*) rolls one every 2 min around its own actor, by the level's and the
+-- weather's chance: two players side by side saw different strikes, and each was hit only by his own.
+-- Now a level's pulses are a fact of the server: "pulse_anom:<level>" = the pulses of the last keep_s seconds,
+-- "<world clock ms>,<n>,<x>,<y>,<z>;..." (coop.clock(): the world's game time, the same in every game).
+--   roll   the level's authority rolls them for every player on the level as Anomaly does for its actor: around that
+--          player, every 2 min (Anomaly's delay) by the same chance; the roll counts for every player within
+--          distance_max of them too, so players together get Anomaly's pulses for one, not for each.
+--   show   every game on the level (the authority too) strikes each pulse of the fact once, at its point and at its
+--          age: the sound and the blow come at the same second for all; its own actor's blow is by the distance to
+--          that point, as Anomaly's.
+--   own    a game in co-op rolls none of its own. Without co-op nothing changes.
+-- Settings: [coop_pulse_anomaly] in mod_system_coop_world.ltx.
+
+local S = "coop_pulse_anomaly"
+local FACT = "pulse_anom:"
+
+local cfg = {}
+local seq = 0      -- our pulses' numbers (the authority's)
+local next_at = {} -- the authority's: player's name -> time_global() of their next roll
+local shown = {}   -- pulse id ("<clock>,<n>") -> true: struck here
+local seen = nil   -- the fact's value as we looked at it last
+local next_look = 0
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] pulse anomaly: " .. fmt, ...)
+	end
+end
+
+-- real s since the world's clock said <at>
+local function age(at)
+	return (coop.clock() - at) / 1000 / level.get_time_factor()
+end
+
+local function decode(value)
+	local out = {}
+	for at, n, x, y, z in string.gmatch(value or "", "([%d%.]+),(%d+),([%-%d%.]+),([%-%d%.]+),([%-%d%.]+)") do
+		out[#out + 1] = { id = at .. "," .. n, at = tonumber(at), x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+	end
+	return out
+end
+
+local function encode(list)
+	local part = {}
+	for i, v in ipairs(list) do
+		part[i] = string.format("%.0f,%s,%.1f,%.1f,%.1f", v.at, string.match(v.id, ",(%d+)$"), v.x, v.y, v.z)
+	end
+	return table.concat(part, ";")
+end
+
+local function show(value)
+	for _, v in ipairs(decode(value)) do
+		if not shown[v.id] then
+			shown[v.id] = true
+			local since = age(v.at)
+			if since < cfg.late_s then
+				bind_anomaly_field.pulse_anomaly_at(vector():set(v.x, v.y, v.z), math.max(0, since))
+				dbg("pulse %s at [%.0f %.0f %.0f], %.1f s old", v.id, v.x, v.y, v.z, since)
+			else
+				dbg("pulse %s is %.1f s old: not shown", v.id, since)
+			end
+		end
+	end
+end
+
+local function players_here(lvl)
+	local out = { { name = coop.my_name(), pos = db.actor:position() } }
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lvl and p.age < cfg.peer_stale_ms then
+			out[#out + 1] = { name = p.name, pos = vector():set(p.position) }
+		end
+	end
+	return out
+end
+
+local function roll(lvl)
+	local now = time_global()
+	local delay = bind_anomaly_field.pulse_anomaly_delay()
+	local players = players_here(lvl)
+	local added = {}
+	for _, p in ipairs(players) do
+		if not next_at[p.name] then
+			next_at[p.name] = now + delay -- as Anomaly's first look after a load: one delay on
+		elseif now >= next_at[p.name] then
+			-- one roll for players together, as for one: whoever is near counts it as theirs, struck or not
+			for _, q in ipairs(players) do
+				if q == p or distance_2d(q.pos, p.pos) <= cfg.distance_max then
+					next_at[q.name] = now + delay
+				end
+			end
+			local at = bind_anomaly_field.pulse_anomaly_roll(p.pos)
+			if at then
+				seq = seq + 1
+				local v = { at = coop.clock(), x = at.x, y = at.y, z = at.z }
+				v.id = string.format("%.0f,%d", v.at, seq)
+				added[#added + 1] = v
+				dbg("rolled pulse %s near %s", v.id, p.name)
+			end
+		end
+	end
+	if #added == 0 then
+		return
+	end
+	local list = {}
+	for _, v in ipairs(decode(coop.fact(FACT .. lvl))) do
+		if age(v.at) < cfg.keep_s then
+			list[#list + 1] = v
+		end
+	end
+	for _, v in ipairs(added) do
+		list[#list + 1] = v
+	end
+	coop.report_fact(FACT .. lvl, encode(list))
+end
+
+local function update()
+	if not (db.actor and in_coop() and coop.clock() > 0) or time_global() < next_look then
+		return
+	end
+	next_look = time_global() + cfg.look_ms
+	local lvl = level.name()
+	if coop.is_authority(lvl) then
+		roll(lvl)
+	elseif next(next_at) then
+		next_at = {} -- no longer ours to roll
+	end
+	local value = coop.fact(FACT .. lvl)
+	if value ~= seen then
+		seen = value
+		show(value)
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	cfg.distance_max = ini_sys:r_float_ex(S, "distance_max") or 150
+	cfg.keep_s = ini_sys:r_float_ex(S, "keep_s") or 30
+	cfg.late_s = ini_sys:r_float_ex(S, "late_s") or 5
+	cfg.peer_stale_ms = (ini_sys:r_float_ex(S, "peer_stale_s") or 10) * 1000
+	cfg.look_ms = ini_sys:r_float_ex(S, "look_ms") or 250
+
+	local own_spawn = bind_anomaly_field.pulse_anomaly_spawn
+	bind_anomaly_field.pulse_anomaly_spawn = function(...)
+		if in_coop() then
+			return -- the world's come from the fact
+		end
+		return own_spawn(...)
+	end
+
+	RegisterScriptCallback("actor_on_first_update", function()
+		next_at, seen, next_look = {}, nil, 0
+	end)
+	RegisterScriptCallback("actor_on_update", update)
+end
