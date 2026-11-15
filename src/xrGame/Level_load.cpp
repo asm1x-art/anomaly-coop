@@ -187,6 +187,7 @@ bool CLevel::Load_GameSpecific_After()
 
 	BlockCheatLoad();
 
+	g_pGamePersistent->Environment().StopBlend(); // co-op: a blend of the level before ends with it
 	g_pGamePersistent->Environment().SetGameTime(GetEnvironmentGameDayTimeSec(), game->GetEnvironmentGameTimeFactor());
 
 	HUD().SetRenderable(true);

@@ -69,6 +69,7 @@ CEnvironment::CEnvironment() :
 	eff_Rain = 0;
 	eff_LensFlare = 0;
 	eff_Thunderbolt = 0;
+	bBlend = false;
 	OnDeviceCreate();
 
 	bus_sun_los = ShaderBus::register_engine("engine_sun_los",
@@ -261,6 +262,7 @@ void CEnvironment::Invalidate()
 	bWFX = false;
 	Current[0] = 0;
 	Current[1] = 0;
+	bBlend = false;
 	if (eff_Rain)eff_Rain->InvalidateState();
 	if (eff_LensFlare) eff_LensFlare->Invalidate();
 }
@@ -332,6 +334,8 @@ void CEnvironment::SetWeather(shared_str name, bool forced)
 		}
 		// R_ASSERT3(it != WeatherCycles.end(), "Invalid weather name.", *name);
 		CurrentCycleName = it->first;
+		if (bBlend)
+			forced = false; // a blend runs: it ends into this weather (BlendSelect), no step now
 		if (forced) { Invalidate(); }
 		if (!bWFX)
 		{
@@ -381,6 +385,10 @@ bool CEnvironment::SetWeatherFX(shared_str name)
 			current_weight = (fGameTime - Current[0]->exec_time) / current_length;
 		}
 		clamp(current_weight, 0.f, 1.f);
+		// a blend runs (Current[] its leg, their times not): the effect goes on from the weight it shows
+		const bool blend = bBlend;
+		const float blend_w = _min(CurrentEnv->weight, 0.99f);
+		bBlend = false;
 
 		std::sort(CurrentWeather->begin(), CurrentWeather->end(), sort_env_etl_pred);
 		CEnvDescriptor* C0 = CurrentWeather->at(0);
@@ -388,7 +396,9 @@ bool CEnvironment::SetWeatherFX(shared_str name)
 		CEnvDescriptor* CE = CurrentWeather->at(CurrentWeather->size() - 2);
 		CEnvDescriptor* CT = CurrentWeather->at(CurrentWeather->size() - 1);
 		C0->copy(*Current[0]);
-		C0->exec_time = NormalizeTime(
+		C0->exec_time = blend
+			? NormalizeTime(fGameTime - blend_w / (1.f - blend_w) * rewind_tm)
+			: NormalizeTime(
 			fGameTime - ((rewind_tm / (Current[1]->exec_time - fGameTime)) * current_length - rewind_tm));
 		C1->copy(*Current[1]);
 		C1->exec_time = NormalizeTime(start_tm);
@@ -511,6 +521,97 @@ void CEnvironment::SelectEnvs(float gt)
 	}
 }
 
+void CEnvironment::SetWeatherBlend(shared_str name, float time, float turn_time, float rain_time)
+{
+	EnvsMapIt it = WeatherCycles.find(name);
+	if (it == WeatherCycles.end() || it->second.empty())
+	{
+		Msg("! Invalid weather name: %s", name.c_str());
+		return;
+	}
+	if (bWFX)
+	{
+		SetWeather(name, false); // an effect runs: it ends into the weather
+		return;
+	}
+	if (!Current[0] || !Current[1] || time <= 0.f)
+	{
+		bBlend = false;
+		SetWeather(name, true); // nothing shown yet, or no time for it: at once
+		return;
+	}
+	clamp(time, 1.f, DAY_LENGTH / 2.f);
+	// the look now: the pair shown and the weight between them; the nearer of the two is turned to first
+	float w = bBlend ? CurrentEnv->weight : TimeWeight(fGameTime, Current[0]->exec_time, Current[1]->exec_time);
+	clamp(w, 0.f, 1.f);
+	const bool back = w < 0.5f;
+	Blend_from[0] = back ? Current[1] : Current[0];
+	Blend_from[1] = back ? Current[0] : Current[1];
+	Blend_w0 = back ? 1.f - w : w;
+	Blend_turn = _max(0.f, _min(turn_time * 2.f * (1.f - Blend_w0), time / 3.f));
+	Blend_rain0 = CurrentEnv->rain_density;
+	Blend_rain = _min(_max(rain_time, 0.f), time);
+
+	CurrentCycleName = it->first;
+	CurrentWeather = &it->second;
+	CurrentWeatherName = it->first;
+
+	// the weather's frames about the end: the nearer one is reached then, the next after it is gone on to
+	const float te = NormalizeTime(fGameTime + time);
+	CEnvDescriptor *e0, *e1;
+	SelectEnvs(CurrentWeather, e0, e1, te);
+	Blend_to = TimeWeight(te, e0->exec_time, e1->exec_time) < 0.5f ? e0 : e1;
+	Blend_next = e1;
+	Blend_start = fGameTime;
+	Blend_end = time;
+	Blend_next_tm = time + TimeDiff(te, e1->exec_time);
+	Blend_elapsed = 0.f;
+	bBlend = true;
+	Msg("[coop] weather blend into %s: %.0f game s (to the frame shown %.0f, the rain %.0f), from weight %.2f",
+		name.c_str(), time, Blend_turn, Blend_rain, w);
+}
+
+bool CEnvironment::BlendSelect(float& current_weight)
+{
+	float e = TimeDiff(Blend_start, fGameTime);
+	if (e > DAY_LENGTH - 3600.f)
+		e = 0.f; // the clock went back a little: still at the start
+	Blend_elapsed = e;
+	if (e < Blend_turn)
+	{
+		Current[0] = Blend_from[0];
+		Current[1] = Blend_from[1];
+		current_weight = Blend_w0 + (1.f - Blend_w0) * e / Blend_turn;
+	}
+	else if (e < Blend_end)
+	{
+		Current[0] = Blend_from[1];
+		Current[1] = Blend_to;
+		current_weight = (e - Blend_turn) / (Blend_end - Blend_turn);
+	}
+	else if (e < Blend_next_tm)
+	{
+		Current[0] = Blend_to;
+		Current[1] = Blend_next;
+		current_weight = (e - Blend_end) / (Blend_next_tm - Blend_end);
+	}
+	else
+	{
+		// over: the weather now (it may have changed meanwhile) from the frame reached; long past (the clock
+		// jumped): picked anew
+		bBlend = false;
+		if (e - Blend_next_tm < 600.f)
+		{
+			Current[0] = Blend_next;
+			SelectEnv(CurrentWeather, Current[1], fGameTime);
+		}
+		else
+			Current[0] = Current[1] = 0;
+		return false;
+	}
+	return true;
+}
+
 int get_ref_count(IUnknown* ii)
 {
 	if (ii)
@@ -526,10 +627,13 @@ void CEnvironment::lerp(float& current_weight)
 {
 	if (bWFX && (wfx_time <= 0.f)) StopWFX();
 
-	SelectEnvs(fGameTime);
-	VERIFY(Current[0] && Current[1]);
+	if (!(bBlend && BlendSelect(current_weight)))
+	{
+		SelectEnvs(fGameTime);
+		VERIFY(Current[0] && Current[1]);
 
-	current_weight = TimeWeight(fGameTime, Current[0]->exec_time, Current[1]->exec_time);
+		current_weight = TimeWeight(fGameTime, Current[0]->exec_time, Current[1]->exec_time);
+	}
 	// modifiers
 	CEnvModifier EM;
 	EM.far_plane = 0;
@@ -547,14 +651,20 @@ void CEnvironment::lerp(float& current_weight)
 
 	// final lerp
 	if (!m_paused)
+	{
 		CurrentEnv->lerp(this, *Current[0], *Current[1], current_weight, EM, mpower);
+		// a blend's rain: to the weather's sooner than the sky (none under the ash a moment after it began)
+		if (bBlend && Blend_rain > 0.f && Blend_elapsed < Blend_end)
+			CurrentEnv->rain_density = Blend_rain0 + (Blend_to->rain_density - Blend_rain0) *
+				_min(1.f, Blend_elapsed / Blend_rain);
+	}
 
 	//Msg("Puddles amount: %f", wetness_factor);
 }
 
 void CEnvironment::set_lerp(float current_weight)
 {
-    if (!Current[0] || !Current[1])
+    if (!Current[0] || !Current[1] || bBlend) // a blend's frames are not to be moved
         return;
 
     float t0 = Current[0]->exec_time;
