@@ -2,36 +2,42 @@
 	<!-- Co-op: what to do with another player (coop_wheel.script), in the look of the game's own companion wheel: its
 	     backing and plate are the game's textures, the buttons' discs and the icons ours (tools/coop/wheel_ui.py,
 	     gamedata/textures/ui/coop/wheel_*.dds; the icons white, tinted grey or amber by the script). Laid out in
-	     square units, as on a 4:3 screen: the script narrows it for a wider one. The hint in the middle names what
-	     the button under the cursor does -->
+	     square units, as on a 4:3 screen: the script narrows it for a wider one. Each button is a bare click area over
+	     its own disc: a 3t button's face keeps the width it was made with when the script narrows the button, so on a
+	     wide screen it slid off its icon. The hint in the middle names what the button under the cursor does -->
 	<wheel x="317" y="169" width="390" height="373" stretch="1">
 		<background x="10" y="10" width="370" height="353" stretch="1">
 			<texture a="242">ui_hud2_wheel_ammo</texture>
 		</background>
 
-		<btn_trade x="149" y="6" width="91" height="91" stretch="1">
-			<texture>ui\coop\wheel_btn</texture>
-		</btn_trade>
+		<disc_trade x="149" y="6" width="91" height="91" stretch="1">
+			<texture>ui\coop\wheel_btn_e</texture>
+		</disc_trade>
+		<btn_trade x="149" y="6" width="91" height="91" stretch="1"/>
 		<icon_trade x="179" y="36" width="31" height="31" stretch="1"/>
 
-		<btn_group x="278" y="99" width="91" height="91" stretch="1">
-			<texture>ui\coop\wheel_btn</texture>
-		</btn_group>
+		<disc_group x="278" y="99" width="91" height="91" stretch="1">
+			<texture>ui\coop\wheel_btn_e</texture>
+		</disc_group>
+		<btn_group x="278" y="99" width="91" height="91" stretch="1"/>
 		<icon_group x="308" y="129" width="31" height="31" stretch="1"/>
 
-		<btn_routes x="229" y="250" width="91" height="91" stretch="1">
-			<texture>ui\coop\wheel_btn</texture>
-		</btn_routes>
+		<disc_routes x="229" y="250" width="91" height="91" stretch="1">
+			<texture>ui\coop\wheel_btn_e</texture>
+		</disc_routes>
+		<btn_routes x="229" y="250" width="91" height="91" stretch="1"/>
 		<icon_routes x="259" y="280" width="31" height="31" stretch="1"/>
 
-		<btn_notes x="70" y="250" width="91" height="91" stretch="1">
-			<texture>ui\coop\wheel_btn</texture>
-		</btn_notes>
+		<disc_notes x="70" y="250" width="91" height="91" stretch="1">
+			<texture>ui\coop\wheel_btn_e</texture>
+		</disc_notes>
+		<btn_notes x="70" y="250" width="91" height="91" stretch="1"/>
 		<icon_notes x="100" y="280" width="31" height="31" stretch="1"/>
 
-		<btn_story x="21" y="99" width="91" height="91" stretch="1">
-			<texture>ui\coop\wheel_btn</texture>
-		</btn_story>
+		<disc_story x="21" y="99" width="91" height="91" stretch="1">
+			<texture>ui\coop\wheel_btn_e</texture>
+		</disc_story>
+		<btn_story x="21" y="99" width="91" height="91" stretch="1"/>
 		<icon_story x="51" y="129" width="31" height="31" stretch="1"/>
 
 		<hint x="95" y="155" width="200" height="26" stretch="1">
