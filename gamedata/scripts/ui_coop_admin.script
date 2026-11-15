@@ -117,6 +117,9 @@ local function parse(text)
 				x = tonumber(f[14]), y = tonumber(f[15]), z = tonumber(f[16]) })
 		elseif k == "setting" then
 			local s = { group = f[2], key = f[3], value = tonumber(f[4]), min = tonumber(f[5]), max = tonumber(f[6]), title = f[7] }
+			if f[8] and f[8] ~= "" then
+				s.choices = str_explode(f[8], "|") -- a choice: its values' names, the first is 1
+			end
 			table.insert(f[2] == "world" and d.world or d.rules, s)
 			d.settings[s.key] = s
 		elseif k == "faction" then
@@ -146,7 +149,8 @@ end
 local SECTIONS = {
 	{ id = "overview", group = "server" }, { id = "players", group = "server" }, { id = "rules", group = "server" },
 	{ id = "world", group = "server" }, { id = "saves", group = "server" }, { id = "journal", group = "server" },
-	{ id = "events", group = "host" }, { id = "mechanics", group = "host" }, { id = "tests", group = "host" },
+	{ id = "events", group = "host" }, { id = "mechanics", group = "host" }, { id = "zone", group = "host" },
+	{ id = "disguise", group = "host" }, { id = "silent", group = "host" }, { id = "tests", group = "host" },
 	{ id = "debug", group = "mine" }, { id = "map", group = "mine" }, { id = "render", group = "mine" },
 }
 local GROUP_OF = {}
@@ -167,6 +171,47 @@ local EVENT_TITLES -- the world's events' ids, for the search (set with the sect
 local IS_MECHANIC = {}
 for _, k in ipairs(MECHANICS) do
 	IS_MECHANIC[k] = true
+end
+-- "Зона": Anomaly's own options of the world, the server's (coop_world_options.script), in their groups
+local ZONE_GROUPS = {
+	{ "surge", { "surge", "surge_hours", "surge_fate", "surge_warning", "surge_task" } },
+	{ "psi", { "psi_storm", "psi_hours", "psi_fate", "psi_siren", "psi_task" } },
+	{ "alife", { "stalker_pop", "mutant_pop", "offline_combat", "excl_dist", "dynamic_relations", "war_goodwill_reset",
+		"heli_spawn" } },
+	{ "npc", { "hardcore_ai_aim", "npc_loot_distance", "corpse_max_count", "corpse_min_dist", "release_dropped_items" } },
+}
+-- disguise and silent kills: theirs too, each a section of its own
+local DISGUISE_GROUPS = {
+	{ "dg_on", { "disguise", "disguise_active_item", "disguise_weapon", "disguise_outfit", "disguise_helmet",
+		"disguise_backpack", "disguise_inventory", "disguise_speed", "disguise_distance", "disguise_stay_time" } },
+	{ "dg_factors", { "disguise_active_item_pct", "disguise_weapon_pct", "disguise_outfit_pct", "disguise_helmet_pct",
+		"disguise_backpack_pct", "disguise_inventory_pct", "disguise_speed_pct", "disguise_distance_factor",
+		"disguise_stay_time_factor" } },
+}
+local SILENT_GROUPS = {
+	{ "sk", { "sk_enabled", "sk_melee_enabled", "sk_all_melee_ok", "sk_gun_enabled", "sk_headshot_only", "sk_fresh_time",
+		"sk_suspect_dist", "sk_melee_hear_dist", "sk_gun_hear_dist" } },
+}
+local SECTION_GROUPS = { zone = ZONE_GROUPS, disguise = DISGUISE_GROUPS, silent = SILENT_GROUPS }
+local IS_ZONE = {} -- key -> its section
+for section, groups in pairs(SECTION_GROUPS) do
+	for _, g in ipairs(groups) do
+		for _, k in ipairs(g[2]) do
+			IS_ZONE[k] = section
+		end
+	end
+end
+-- a rule's section
+local function rule_section(key)
+	return IS_MECHANIC[key] and "mechanics" or IS_ZONE[key] or "rules"
+end
+-- a setting's value as shown: a choice by its name
+local function shown_value(s, value)
+	value = value or s.value
+	if not s.min then
+		return tr(value == 1 and "st_coop_adm_yes" or "st_coop_adm_no")
+	end
+	return s.choices and s.choices[value] or tostring(value)
 end
 
 local function con_int(name)
@@ -873,11 +918,18 @@ function UICoopAdmin:setting_row(s, x, y, w, box, X, Y, L)
 	end
 	local hb = self:hover_of(x - 6, y, w + 12, 34, box, 6)
 	L[#L + 1] = { X + x - 6, Y + y, w - 120, 34, function() self:pick({ kind = "rule", id = s.key }) end, hover = hb }
-	self:text(x, y, w - 130, 34, s.title, C.text, box, nil, "s")
+	self:text(x, y, w - (s.choices and 210 or 130), 34, s.title, C.text, box, nil, "s")
 	if not s.min then
 		local on = s.value == 1
 		self:switch(x + w - 40, y + 7, on, box)
 		L[#L + 1] = { X + x + w - 48, Y + y, 52, 34, function() self:set_rule(s, on and "0" or "1") end }
+	elseif s.choices then
+		-- a choice: the one before or after it, by name
+		self:btn(x + w - 200, y + 4, 26, 26, "<", function() self:set_rule(s, tostring(math.max(s.min, s.value - 1))) end, L, box, X, Y,
+			s.value > s.min and "normal" or "off")
+		self:text(x + w - 172, y, 144, 34, shown_value(s), C.text, box, CGameFont.alCenter, "s")
+		self:btn(x + w - 26, y + 4, 26, 26, ">", function() self:set_rule(s, tostring(math.min(s.max, s.value + 1))) end, L, box, X, Y,
+			s.value < s.max and "normal" or "off")
 	else
 		local step = s.max - s.min <= 20 and 1 or s.max - s.min <= 100 and 5 or s.max - s.min <= 600 and 10 or 50
 		self:btn(x + w - 120, y + 4, 26, 26, "-", function() self:set_rule(s, tostring(math.max(s.min, s.value - step))) end, L, box, X, Y,
@@ -889,9 +941,9 @@ function UICoopAdmin:setting_row(s, x, y, w, box, X, Y, L)
 end
 
 function UICoopAdmin:set_rule(s, value)
-	if IS_MECHANIC[s.key] or s.key == "max_players" then
-		-- the world's mechanics and the player limit are asked first: they change the world for everyone
-		local shown = s.min and value or tr(value == "1" and "st_coop_adm_yes" or "st_coop_adm_no")
+	if IS_MECHANIC[s.key] or IS_ZONE[s.key] or s.key == "max_players" then
+		-- the world's mechanics, the Zone and the player limit are asked first: they change the world for everyone
+		local shown = shown_value(s, tonumber(value))
 		return self:confirm(s.title, tr("st_coop_adm_rule_ask", s.title, shown), tr("st_coop_adm_apply"),
 			function() command("set", s.key, value) end)
 	end
@@ -915,7 +967,7 @@ function UICoopAdmin:main_rules(box, X, Y, W, H, L)
 	end
 	local other = {}
 	for _, s in ipairs(d.rules) do
-		if not seen[s.key] and not IS_MECHANIC[s.key] then
+		if not seen[s.key] and not IS_MECHANIC[s.key] and not IS_ZONE[s.key] then
 			other[#other + 1] = s.key
 		end
 	end
@@ -1022,6 +1074,39 @@ function UICoopAdmin:main_journal(box, X, Y, W, H, L)
 	y = math.max(y + 10, H - 120)
 	self:text(24, y, W - 48, 24, tr("st_coop_adm_logs_title"), C.text, box, nil, "m")
 	self:text(24, y + 26, W - 48, 40, tr("st_coop_adm_logs_hint"), C.dim, box, nil, "s")
+end
+
+-- Зона, Маскировка, Тихие убийства: Anomaly's own options of the world, the server's; two columns of groups
+function UICoopAdmin:zone_groups(section, box, X, Y, W, H, L)
+	local d = data
+	self:heading(24, 14, W - 48, tr("st_coop_adm_sec_" .. section), box, tr("st_coop_adm_zone_sub"))
+	local cw = math.floor((W - 48 - 24) / 2)
+	local ys = { 72, 72 }
+	for _, g in ipairs(SECTION_GROUPS[section]) do
+		local col = ys[1] <= ys[2] and 1 or 2
+		local x = 24 + (col - 1) * (cw + 24)
+		local y = ys[col]
+		self:text(x, y, cw, 24, tr("st_coop_adm_zg_" .. g[1]), C.faint, box, nil, "s")
+		y = y + 26
+		for _, k in ipairs(g[2]) do
+			local s = d.settings[k]
+			if s then
+				self:setting_row(s, x + 6, y, cw - 12, box, X, Y, L)
+				y = y + 36
+			end
+		end
+		ys[col] = y + 12
+	end
+end
+
+function UICoopAdmin:main_zone(...)
+	return self:zone_groups("zone", ...)
+end
+function UICoopAdmin:main_disguise(...)
+	return self:zone_groups("disguise", ...)
+end
+function UICoopAdmin:main_silent(...)
+	return self:zone_groups("silent", ...)
 end
 
 -- Механики мира: the server's rules for the whole world
@@ -1356,7 +1441,7 @@ function UICoopAdmin:search_hits(q)
 	end
 	if logged_in and data then
 		for _, s in ipairs(data.rules) do
-			try(s.title, IS_MECHANIC[s.key] and "mechanics" or "rules", { kind = "rule", id = s.key })
+			try(s.title, rule_section(s.key), { kind = "rule", id = s.key })
 		end
 		for _, s in ipairs(data.world) do
 			try(s.title, "world", { kind = "rule", id = s.key })
@@ -1616,11 +1701,19 @@ function UICoopAdmin:card_rule(box, X, Y, W, H, L)
 	if hint ~= "st_coop_adm_h_" .. s.key then
 		y = self:card_field(tr("st_coop_adm_f_what"), hint, y, box, W)
 	end
-	y = self:card_field(tr("st_coop_adm_f_where"), tr(IS_MECHANIC[s.key] and "st_coop_adm_scope_world" or s.group == "world"
-		and "st_coop_adm_scope_new_world" or "st_coop_adm_scope_rule"), y, box, W)
-	y = self:card_field(tr("st_coop_adm_f_now"), s.min and tostring(s.value) or tr(s.value == 1 and "st_coop_adm_yes" or "st_coop_adm_no"), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_where"), tr((IS_MECHANIC[s.key] or IS_ZONE[s.key]) and "st_coop_adm_scope_world"
+		or s.group == "world" and "st_coop_adm_scope_new_world" or "st_coop_adm_scope_rule"), y, box, W)
+	y = self:card_field(tr("st_coop_adm_f_now"), shown_value(s), y, box, W)
 	if s.min then
-		y = self:card_field(tr("st_coop_adm_f_range"), s.min .. " - " .. s.max, y, box, W)
+		local range = s.min .. " - " .. s.max
+		if s.choices then
+			local names = {}
+			for i, c in ipairs(s.choices) do
+				names[i] = i .. " - " .. c
+			end
+			range = table.concat(names, ", ")
+		end
+		y = self:card_field(tr("st_coop_adm_f_range"), range, y, box, W)
 		self:field("value", 16, y + 4, W - 32 - 98, 30, box, X, Y, L, tostring(s.value))
 		self:btn(W - 16 - 90, y + 4, 90, 30, tr("st_coop_adm_apply"), function()
 			local v = tonumber(self:value("value"))

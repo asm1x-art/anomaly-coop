@@ -1054,4 +1054,50 @@
 	<string id="st_coop_ev_news_stopped">
 		<text>%s остановил событие: %s.</text>
 	</string>
+	<!-- the Zone: Anomaly's own options of the world, the server's (coop_world_options.script) -->
+	<string id="st_coop_adm_sec_zone">
+		<text>Зона</text>
+	</string>
+	<string id="st_coop_adm_zone_sub">
+		<text>Настройки Anomaly, одни на весь мир: у игроков их нет в меню опций. Сразу; частота выброса - со следующего, меткость NPC - с загрузки локации.</text>
+	</string>
+	<string id="st_coop_adm_zg_surge">
+		<text>Выбросы</text>
+	</string>
+	<string id="st_coop_adm_zg_psi">
+		<text>Пси-штормы</text>
+	</string>
+	<string id="st_coop_adm_zg_alife">
+		<text>Население и отряды</text>
+	</string>
+	<string id="st_coop_adm_zg_npc">
+		<text>NPC, трупы и брошенные вещи</text>
+	</string>
+	<string id="st_coop_adm_h_surge_hours">
+		<text>Следующий выброс - через случайное время от половины этого до всего (опция Anomaly «частота выброса»).</text>
+	</string>
+	<string id="st_coop_adm_h_excl_dist">
+		<text>Офлайн-отряд ближе этого к игроку не выходит в онлайн (не появляется на глазах). 0 - без проверки.</text>
+	</string>
+	<string id="st_coop_adm_h_corpse_max_count">
+		<text>Сверх этого числа трупов на локации игра её хозяина убирает старые трупы дальше «Труп не убирается ближе к игроку» от всех игроков. При уходе с локации трупы больше не убираются.</text>
+	</string>
+	<string id="st_coop_adm_h_release_dropped_items">
+		<text>Брошенную вещь, которую никто не поднял, убирает мастер мира (хост) через 4 игровых часа (выключено - через 12), и только на локации, где нет игроков.</text>
+	</string>
+	<string id="st_coop_adm_sec_disguise">
+		<text>Маскировка</text>
+	</string>
+	<string id="st_coop_adm_sec_silent">
+		<text>Тихие убийства</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_on">
+		<text>Что выдаёт игрока в чужой форме</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_factors">
+		<text>Насколько сильно, % (дистанция и время - как в Anomaly)</text>
+	</string>
+	<string id="st_coop_adm_zg_sk">
+		<text>Убийство, которого никто не заметил, не ставят в вину</text>
+	</string>
 </string_table>

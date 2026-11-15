@@ -605,7 +605,9 @@ tests=1` : ''));
         i.god ?? '', i.money ?? '', at ? at.x.toFixed(1) : '', at ? at.y.toFixed(1) : '', at ? at.z.toFixed(1) : '']);
     }
     for (const [group, list] of [['world', WORLD], ['rules', RULES]])
-      for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
+      for (const [key, title, min, max, choices] of list) {
+        lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title, choices ? choices.join('|') : '']);
+      }
     for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
     const offset = Math.max(0, Math.min(client?.adminSaves ?? 0, Math.max(0, st.saves.length - 1)));
     lines.push(['saves', st.saves.length, offset]);

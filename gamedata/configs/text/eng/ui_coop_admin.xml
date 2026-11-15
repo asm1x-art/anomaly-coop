@@ -1054,4 +1054,50 @@
 	<string id="st_coop_ev_news_stopped">
 		<text>%s stopped an event: %s.</text>
 	</string>
+	<!-- the Zone: Anomaly's own options of the world, the server's (coop_world_options.script) -->
+	<string id="st_coop_adm_sec_zone">
+		<text>Zone</text>
+	</string>
+	<string id="st_coop_adm_zone_sub">
+		<text>Anomaly's options of the world, one for everyone: the players' options menu doesn't have them. At once; surge frequency from the next one, NPC aim from a level load.</text>
+	</string>
+	<string id="st_coop_adm_zg_surge">
+		<text>Surges</text>
+	</string>
+	<string id="st_coop_adm_zg_psi">
+		<text>Psi storms</text>
+	</string>
+	<string id="st_coop_adm_zg_alife">
+		<text>Population and squads</text>
+	</string>
+	<string id="st_coop_adm_zg_npc">
+		<text>NPCs, bodies and dropped things</text>
+	</string>
+	<string id="st_coop_adm_h_surge_hours">
+		<text>The next surge comes after a random time from half of this to all of it (Anomaly's "emission frequency").</text>
+	</string>
+	<string id="st_coop_adm_h_excl_dist">
+		<text>An offline squad this close to a player doesn't come online (doesn't appear in front of him). 0: no such check.</text>
+	</string>
+	<string id="st_coop_adm_h_corpse_max_count">
+		<text>Over this many bodies on a level, its authority's game releases old ones farther than the minimum distance from every player. Leaving a level releases no bodies any more.</text>
+	</string>
+	<string id="st_coop_adm_h_release_dropped_items">
+		<text>A dropped thing nobody took is released by the world's master (the host) after 4 game hours (off: 12), and only on a level with no player on it.</text>
+	</string>
+	<string id="st_coop_adm_sec_disguise">
+		<text>Disguise</text>
+	</string>
+	<string id="st_coop_adm_sec_silent">
+		<text>Silent kills</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_on">
+		<text>What gives a disguised player away</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_factors">
+		<text>How much, % (distance and time as in Anomaly)</text>
+	</string>
+	<string id="st_coop_adm_zg_sk">
+		<text>A kill nobody noticed is not put on the killer</text>
+	</string>
 </string_table>

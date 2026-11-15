@@ -10,7 +10,8 @@ import { startServer } from '../src/server.js';
 import { openStorage } from '../src/storage.js';
 import { startAdmin, CRASH_MAGIC } from '../src/admin.js';
 import { M, PROTOCOL_VERSION, encode, encodeText, createDecoder } from '../src/protocol.js';
-import { normalizeSettings, DEFAULT_SETTINGS, settingsText } from '../src/settings.js';
+import { normalizeSettings, DEFAULT_SETTINGS, settingsText, RULE_LIMITS, RULE_CHOICES } from '../src/settings.js';
+import { setSetting } from '../src/admin_commands.js';
 
 // seed(dataDir): files the server finds when it starts
 async function start(seed = () => {}, adminOptions = {}) {
@@ -56,6 +57,46 @@ test('the help tasks reward rule: off by default, kept when set, sent to the gam
   assert.equal(normalizeSettings({ rules: { help_rewards_all: 'yes' } }).rules.help_rewards_all, false);
   assert.match(settingsText(s), /^help_rewards_all=1$/m);
   assert.match(settingsText(normalizeSettings()), /^help_rewards_all=0$/m);
+});
+
+test('the Zone: Anomaly\'s own defaults, kept in range, sent to the games as numbers; the admins set a choice by name', () => {
+  const r = DEFAULT_SETTINGS.rules;
+  assert.deepEqual([r.surge, r.surge_hours, r.surge_fate, r.psi_storm, r.psi_fate, r.stalker_pop, r.mutant_pop, r.offline_combat],
+    [true, 24, 2, true, 1, 50, 75, 1]);
+  const s = normalizeSettings({ rules: { surge: false, surge_fate: 9, stalker_pop: 10, corpse_min_dist: 150, psi_fate: 'unhurt' } });
+  assert.equal(s.rules.surge, false);
+  assert.equal(s.rules.surge_fate, 4); // clamped
+  assert.equal(s.rules.stalker_pop, 25);
+  assert.equal(s.rules.corpse_min_dist, 150);
+  assert.equal(s.rules.psi_fate, 1); // not a number: the default
+  const text = settingsText(s);
+  assert.match(text, /^surge=0$/m);
+  assert.match(text, /^surge_fate=4$/m);
+  assert.match(text, /^release_dropped_items=1$/m);
+  // every number has its limits, every choice its names for each value
+  for (const [key, value] of Object.entries(r)) {
+    if (typeof value === 'number') assert.ok(RULE_LIMITS[key], key);
+  }
+  for (const [key, names] of Object.entries(RULE_CHOICES)) assert.equal(names.length, RULE_LIMITS[key][1], key);
+  let saved = normalizeSettings();
+  const coop = { settings: () => saved, saveSettings: (x) => { saved = normalizeSettings(x); } };
+  assert.equal(setSetting(coop, 'offline_combat', 'только в смартах'), 'Офлайн-бой отрядов: только в смартах (2)');
+  assert.equal(saved.rules.offline_combat, 2);
+  assert.equal(setSetting(coop, 'offline_combat', '3'), 'Офлайн-бой отрядов: нет (3)');
+  assert.match(setSetting(coop, 'offline_combat', 'никогда'), /^offline_combat: нужно число от 1 до 3: 1 — везде/);
+  assert.equal(saved.rules.offline_combat, 3);
+  assert.equal(setSetting(coop, 'surge', 'нет'), 'Выбросы: нет');
+  // disguise and silent kills: Anomaly's defaults too, the factors in %
+  assert.deepEqual([r.sk_enabled, r.sk_fresh_time, r.disguise, r.disguise_outfit_pct, r.disguise_distance_factor,
+    r.disguise_stay_time_factor], [false, 300, true, 100, 5, 20]);
+  assert.equal(normalizeSettings({ rules: { disguise_outfit_pct: 500 } }).rules.disguise_outfit_pct, 200);
+  assert.equal(setSetting(coop, 'disguise_helmet_pct', '150'), 'Маскировка: шлем, %: 150');
+});
+
+test('the admin page has a field for every rule of the Zone, disguise and silent kills', () => {
+  const page = fs.readFileSync(new URL('../src/admin.html', import.meta.url), 'utf8');
+  const keys = Object.keys(DEFAULT_SETTINGS.rules);
+  for (const key of keys.slice(keys.indexOf('surge'))) assert.match(page, new RegExp(`\\['${key}', `), key);
 });
 
 test('admin: password required, settings saved and kept, players listed', async () => {
