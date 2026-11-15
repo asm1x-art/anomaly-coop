@@ -193,6 +193,7 @@ function run(name, action, admin, lvl)
 	if not db.actor then
 		return
 	end
+	coop_time.take_world() -- a master that has just become it: the event goes onto the world's state, not its save's
 	local is_master = master()
 	local result
 	local ok, err = pcall(function()
@@ -200,10 +201,9 @@ function run(name, action, admin, lvl)
 		local bar_id = string.match(name or "", "^bar_(%a+)$")
 		local cycle = string.match(name or "", "^weather_(%a+)$")
 		if cycle then
+			coop_time.weather_now() -- the master's pick, when it comes, at once (in the master's game: the hour's is it)
 			if is_master then
 				result = weather(cycle, name)
-			else
-				coop_time.weather_now() -- the master's pick, when it comes, at once
 			end
 		elseif storm and action == "stop" then
 			result = storm_stop(name)

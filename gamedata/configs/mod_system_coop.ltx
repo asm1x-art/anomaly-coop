@@ -333,9 +333,6 @@ max_hold_s           = 120   ; game s: ahead of the world by less, our clock wai
 reselect_weather_s   = 600   ; game s: a step of the clock this big (coming into the world, a jump) picks the weather again
 hold_ms              = 3000  ; real ms: after our own jump, how long older news from the server are ignored
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
-adopt_wait_s         = 30    ; real s: a game that has just become the sim master (the host started again) takes the
-                             ; world's weather and timetables from the server once its clock is the world's, at the
-                             ; latest this long after; until then it publishes nothing and holds its surges
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
 
 ; Co-op: what a player leaves behind (coop_cleanup.script). As a player leaves the world or saves, bodies and boxes
