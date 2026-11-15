@@ -1186,8 +1186,9 @@ function UICoopAdmin:main_events(box, X, Y, W, H, L)
 	end
 end
 
--- Тест-режимы: a test server's only
-local TEST_MODES = { "shelter", "base", "ai" }
+-- Тест-режимы: a test server's only. The modes in three columns (TEST_COLUMN), the ash front's under the AI's
+local TEST_MODES = { "shelter", "base", "ai", "ash" }
+local TEST_COLUMN = { shelter = 1, base = 2, ai = 3, ash = 3 }
 
 function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 	local d = data
@@ -1198,26 +1199,30 @@ function UICoopAdmin:main_tests(box, X, Y, W, H, L)
 	-- the cheats on oneself under the tests: their heading and buttons on one row, the hint under it
 	local hint = tr("st_coop_adm_cheats_hint")
 	local bottom = H - (14 + 38 + self:lines(hint, W - 48) * self.line)
-	-- a mode a column; when the longest doesn't fit over the cheats (a 600-line screen), the modes flow down the
+	-- a column per TEST_COLUMN; when the longest doesn't fit over the cheats (a 600-line screen), the modes flow down the
 	-- columns one after another, what doesn't fit in one going on in the next
-	local count = {}
+	local count, heads = {}, {} -- a column's buttons and modes
 	for _, a in ipairs(coop_admin_tests.LIST) do
-		count[a[2]] = (count[a[2]] or 0) + 1
+		local c = TEST_COLUMN[a[2]]
+		count[c] = (count[c] or 0) + 1
+	end
+	for _, mode in ipairs(TEST_MODES) do
+		heads[TEST_COLUMN[mode]] = (heads[TEST_COLUMN[mode]] or 0) + 1
 	end
 	local flow = false
-	for _, mode in ipairs(TEST_MODES) do
-		flow = flow or top + 30 + (count[mode] or 0) * (bh + 4) > bottom
+	for c, n in pairs(heads) do
+		flow = flow or top + n * 40 - 10 + (count[c] or 0) * (bh + 4) > bottom
 	end
 	local col, y, low = 0, top, top
 	local function room(h) -- the column's x, the next column's when h doesn't fit under what is in this one
-		if col == 0 or flow and y + h > bottom and y > top and col < #TEST_MODES then
+		if col == 0 or flow and y + h > bottom and y > top and col < 3 then
 			col, y = col + 1, top
 		end
 		return 24 + (col - 1) * (cw + 12)
 	end
-	for i, mode in ipairs(TEST_MODES) do
-		if not flow then
-			col, y = i, top
+	for _, mode in ipairs(TEST_MODES) do
+		if not flow and col ~= TEST_COLUMN[mode] then
+			col, y = TEST_COLUMN[mode], top
 		elseif y > top then
 			y = y + 10
 		end

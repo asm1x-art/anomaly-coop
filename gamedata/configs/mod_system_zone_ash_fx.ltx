@@ -17,7 +17,12 @@ ramp_stop_s         = 30
 ; its ash_snow_<ring>_<tone>.pe (colour, alpha, how many, how fast, how big there: plain text files) - moved with the
 ; camera
 fall_levels         = l10_red_forest, l08_yantar, jupiter, zaton    ; the front's levels with falling ash (not the Truck Cemetery: its radiation is the machinery's)
-fall_particle       = coop\ash_snow    ; + _day, _dusk, _night by the hour (the flakes' shader is unlit)
+; the falling ash's particles: sets of the snow, each with its own flakes' size near the player (the two rings within
+; 9 m: ring 0 / ring 1, the far rings the same in all); fall_size picks one (1 the first). + _day, _dusk, _night by the
+; hour (the flakes' shader is unlit). To compare them in game: the admin window's Тест-режимы > "Пепел: размер хлопьев"
+; goes round them for every game (a fact over fall_size till "Пепел: как в конфиге")
+fall_sizes          = coop\ash_snow_small, coop\ash_snow, coop\ash_snow_large ; near flakes 0.08/0.10 m, 0.12/0.15 m, 0.18/0.22 m
+fall_size           = 2
 ; how much ash: the player's option (Options > Co-op > "Ash": off, low, medium, high, max; fall_default till he sets
 ; it): that many copies of the snow at once (about 4400 flakes each, most of them within 15 m). While the front gathers
 ; or fades (its strength under 1) the ash is that much thinner: strength x the player's choice, at least low

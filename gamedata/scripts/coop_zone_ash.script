@@ -178,7 +178,7 @@ end
 local function update_weather(on)
 	if on and not ash_on then
 		ash_on = true
-		level.set_weather(weather(), false)
+		level.set_weather(weather(), true) -- at once: the front's sky, and no rain, from its first second
 	elseif not on and ash_on then
 		ash_on = false
 		local wm = level_weathers.get_weather_manager()
@@ -199,8 +199,10 @@ end
 --           otherwise (an admin's stop) ([zone_event_ash_fx])
 --   cover   the ash on the ground 0..1, on ground_levels only: settles at fall / ground_full_min a real minute while
 --           the front is on; after it goes at 1 / ground_linger_game_h a GAME hour (a sleep takes its share) and, while
---           the world's weather rains (the weather the master publishes), rain density / ground_rain_wash_min a real
---           minute more
+--           rain is on the level's screens, rain density / ground_rain_wash_min a real minute more. No rain while the
+--           front is on (its weather w_zev_ash has none); after it the rain washes only once it has been seen:
+--           ground_rain_visible or more on screen (the world's weather as every game there shows it, world_rain())
+--           for ground_rain_delay_s real seconds
 -- The master looks each look of the events (check_s), sends a change of course at once and the rest each
 -- ground_publish_s real seconds. A game eases what it showed onto a new fact over ground_blend_s (a gap above
 -- ground_snap is taken at once) and goes on at the fact's rates for ground_extrapolate_s at most (no master: it stops).
@@ -282,24 +284,69 @@ local function parse_now(text)
 	return c, cr, f, fr
 end
 
--- the world's rain now (master): the weather the master publishes (coop_time: "weather" = hour|cycle|preset|mode|file),
--- its file's rain_density at the hour; its own weather when there is no file (single player, the master indoors)
-local weather_ini = {}
-local function world_rain()
-	local hour, file = string.match(in_coop() and coop.fact("weather") or "", "^(%d+)|[^|]*|[^|]*|%a|(.+)$")
-	if file then
-		local ini = weather_ini[file]
-		if ini == nil then
-			ini = ini_file("environment\\weathers\\" .. file .. ".ltx") or false
-			weather_ini[file] = ini
-		end
-		local section = string.format("%02d:00:00", tonumber(hour))
-		local v = ini and ini:section_exist(section) and ini:r_float_ex(section, "rain_density")
-		if v then
-			return v
+-- a weather file's frames: { { t = the day's second, rain = rain_density }, ... } by time ({}: no such file)
+local weather_frames = {}
+local function frames_of(file)
+	local list = weather_frames[file]
+	if list then
+		return list
+	end
+	list = {}
+	local ini = ini_file("environment\\weathers\\" .. file .. ".ltx")
+	if ini then
+		ini:section_for_each(function(section)
+			local h, m, s = string.match(section, "^(%d+):(%d+):(%d+)$")
+			if h then
+				list[#list + 1] = { t = h * 3600 + m * 60 + s, rain = ini:r_float_ex(section, "rain_density") or 0 }
+			end
+			return false
+		end)
+	end
+	table.sort(list, function(a, b) return a.t < b.t end)
+	weather_frames[file] = list
+	return list
+end
+
+-- the last frame at or before the day's second t (a day back when none) and the first one after it (a day on)
+local function frame_at(list, t)
+	for i = #list, 1, -1 do
+		if list[i].t <= t then
+			return list[i].t, list[i].rain
 		end
 	end
-	return level.rain_factor()
+	return list[#list].t - 86400, list[#list].rain
+end
+
+local function frame_after(list, t)
+	for i = 1, #list do
+		if list[i].t > t then
+			return list[i].t, list[i].rain
+		end
+	end
+	return list[1].t + 86400, list[1].rain
+end
+
+-- the rain on screen now in a game out of the front (master): the world's weather as the engine shows it, from the
+-- weather the master publishes (coop_time: "weather" = hour|cycle|preset|mode|file[|before]) - between the frame at or
+-- before the game time and the next one, as the engine blends them; up to the hour's weather's first frame after the
+-- hour began, from the frame of the weather before (the engine goes on from the frame it showed when the weather
+-- changed). Its own weather when there is no file (single player, the master indoors)
+local function world_rain()
+	local hour, file, before = string.match(in_coop() and coop.fact("weather") or "", "^(%d+)|[^|]*|[^|]*|%a|([^|]+)|?(.*)$")
+	local list = file and frames_of(file)
+	if not (list and #list > 0) then
+		return level.rain_factor()
+	end
+	local _, _, _, h, m, s = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	local t = h * 3600 + m * 60 + s
+	local t0, r0 = frame_at(list, t)
+	local start = tonumber(hour) * 3600
+	local old = before ~= "" and before ~= file and frames_of(before)
+	if t >= start and t0 <= start and old and #old > 0 then
+		t0, r0 = frame_at(old, t)
+	end
+	local t1, r1 = frame_after(list, t)
+	return r0 + (r1 - r0) * clamp01((t - t0) / math.max(1, t1 - t0))
 end
 
 -- the master: each level's ash, as it last looked (level -> { c, cr, f, fr: cover, fall and their rates a real s;
@@ -334,6 +381,7 @@ local function ash_master(ev)
 	local gdt = last_gs and math.max(0, gs - last_gs) or 0
 	last_look, last_gs = t, gs
 	local rain = world_rain()
+	local visible, delay = num("ground_rain_visible", 0.1), num("ground_rain_delay_s", 10) * 1000
 	local full = math.max(1, num("ground_full_min", 3) * 60)
 	local linger = math.max(1, num("ground_linger_game_h", 60) * 3600)
 	local wash = math.max(1, num("ground_rain_wash_min", 5) * 60)
@@ -349,6 +397,14 @@ local function ash_master(ev)
 		end
 		local on = ev and ev.stage == "on" and ev.level == lvl
 		local ground = listed(lvl, "ground_levels")
+		-- the rain that washes: none under the front's weather; after it, once on screen for the delay (seen: since
+		-- when it is)
+		if on or rain < visible then
+			s.seen = nil
+		elseif not s.seen then
+			s.seen = t
+		end
+		local wet = s.seen and t - s.seen >= delay and rain or 0
 		-- since the last look
 		s.f = clamp01(s.f + s.fr * dt)
 		if not ground then
@@ -356,7 +412,7 @@ local function ash_master(ev)
 		elseif on then
 			s.c = clamp01(s.c + s.cr * dt)
 		else
-			s.c = clamp01(s.c - gdt / linger - rain * dt / wash) -- the game's time: a sleep takes its share
+			s.c = clamp01(s.c - gdt / linger - (s.wet or 0) * dt / wash) -- the game's time: a sleep takes its share
 		end
 		-- from now
 		local fr, cr = 0, 0
@@ -373,10 +429,10 @@ local function ash_master(ev)
 		if ground and on then
 			cr = s.c < 1 and s.f / full or 0
 		elseif ground and s.c > 0 then
-			cr = -(level.get_time_factor() / linger + rain / wash)
+			cr = -(level.get_time_factor() / linger + wet / wash)
 		end
-		local turned = sign(fr) ~= sign(s.fr) or sign(cr) ~= sign(s.cr)
-		s.fr, s.cr = fr, cr
+		local turned = sign(fr) ~= sign(s.fr) or sign(cr) ~= sign(s.cr) or sign(wet) ~= sign(s.wet or 0)
+		s.fr, s.cr, s.wet = fr, cr, wet
 		if turned or not s.sent or t - s.sent >= num("ground_publish_s", 5) * 1000 then
 			s.sent = t
 			local text = ""
@@ -385,7 +441,7 @@ local function ash_master(ev)
 			end
 			if text ~= ZE.mark_of(now_key(lvl)) then
 				ZE.mark(now_key(lvl), text)
-				ZE.dbg("ash on %s: %s (rain %s)", lvl, text, string.format("%.2f", rain))
+				ZE.dbg("ash on %s: %s (rain %s, washing %s)", lvl, text, string.format("%.2f", rain), string.format("%.2f", wet))
 			end
 		end
 	end
@@ -428,20 +484,40 @@ function ash_now()
 	return shown(t)
 end
 
+-- the comparison of looks (the admin window's test buttons, coop_admin_tests.script): the fact "zone_event:ash_test" =
+-- "<fall size>|<patchiness>", each empty: the config's (fall_size of [zone_event_ash_fx], ground_patchiness here). A
+-- fact: every game shows the same
+function test_look()
+	local size, patch = string.match(ZE.mark_of("ash_test") or "", "^(%d*)|([%d%.]*)$")
+	return tonumber(size), tonumber(patch)
+end
+
+-- size, patch: nil each for the config's (both nil: the fact goes)
+function set_test_look(size, patch)
+	ZE.mark("ash_test", (size or patch) and (tostring(size or "") .. "|" .. tostring(patch or "")) or "")
+end
+
+-- how patchy the ash settles and goes, 0 even .. 1 in patches first
+function patchiness()
+	local _, patch = test_look()
+	return patch or num("ground_patchiness", 0)
+end
+
+local ground_patch = -1
+
 local function ground_update()
 	if not ground_tokens then
 		return
 	end
-	local cover = ash_now()
-	if math.abs(cover - ground_last) < 0.0005 then
+	local cover, patch = ash_now(), patchiness()
+	if math.abs(cover - ground_last) < 0.0005 and patch == ground_patch then
 		return
 	end
-	if math.floor(cover * 50) ~= math.floor(ground_last * 50) then
-		ZE.dbg("%s", string.format("ash on the ground %.3f", cover))
+	if math.floor(cover * 50) ~= math.floor(ground_last * 50) or patch ~= ground_patch then
+		ZE.dbg("%s", string.format("ash on the ground %.3f, patchiness %s", cover, patch))
 	end
-	ground_last = cover
-	shader_bus.set(ground_tokens.cover, cover, num("ground_opacity", 0.85), num("ground_gloss_keep", 0.15),
-		num("ground_patchiness", 1))
+	ground_last, ground_patch = cover, patch
+	shader_bus.set(ground_tokens.cover, cover, num("ground_opacity", 0.85), num("ground_gloss_keep", 0.15), patch)
 end
 
 -------------------------------------------------------------------------------

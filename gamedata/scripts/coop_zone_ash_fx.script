@@ -2,7 +2,8 @@
 -- mod_system_zone_ash_fx.ltx). Particles are each game's own, so every game with a player makes them for its player
 -- from the front's strength the master decides (coop_zone_ash.ash_now(): the fact ash_now_<level>); the headless host
 -- makes none.
---   falling ash  on fall_levels: Anomaly's snow made grey (fall_particle, rings of flakes round the emitter) moved
+--   falling ash  on fall_levels: Anomaly's snow made grey (fall_sizes: rings of flakes round the emitter; which set:
+--                fall_size, or the admin window's test button over it, coop_zone_ash.test_look()) moved
 --                with the camera, a little ahead of a moving player and upwind; the flakes drift with the weather's
 --                wind (the emitter's motion: Parent Motion in the .pe). How much: the player's option "Ash" (Options >
 --                Co-op, ash_level()) - copies of it (fall_copies) - times the front's strength, in the hour's tone
@@ -205,7 +206,9 @@ local function actor_on_update()
 			if ember ~= "" and k >= num("ember_from", 0.3) then
 				list[1] = ember
 			end
-			local effect = str("fall_particle", "coop\\ash_snow") .. "_" .. tone()
+			local sizes = coop_zone_events.ini_list(S, "fall_sizes")
+			local size = coop_zone_ash.test_look() or num("fall_size", 2)
+			local effect = (sizes[size] or sizes[1] or "coop\\ash_snow") .. "_" .. tone()
 			for i = 1, math.max(1, math.floor(tonumber(copies[n]) or 1)) do
 				list[#list + 1] = effect
 			end
