@@ -19,6 +19,7 @@
 #include "game_object_space.h"
 #include "script_game_object.h"
 #include "hit.h"
+#include "../../coop/coop_npc.h"
 #ifdef	DEBUG
 //#include "../xrphysics/phvalide.h"
 #endif
@@ -332,8 +333,20 @@ void CAI_Crow::UpdateWorkload(float fdt)
 	{
 	case eFlyIdle:
 	case eFlyUp:
+	{
+		// co-op: in a game that isn't the level's authority it flies as there (coop_npc.h)
+		Fvector position, hpb;
+		if (coop::drive_crow(ID(), fdt, position, hpb))
+		{
+			vOldPosition.set(Position());
+			vHPB.set(hpb);
+			XFORM().setHPB(vHPB.x, vHPB.y, vHPB.z);
+			Position().set(position);
+			break;
+		}
 		state_Flying(fdt);
 		break;
+	}
 	case eDeathFall:
 		state_DeathFall();
 		break;

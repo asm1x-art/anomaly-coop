@@ -5,6 +5,7 @@
 #include "coop_npc.h"
 #include "coop_combat.h"
 #include "coop_projectiles.h"
+#include "coop_props.h"
 #include "coop_heli.h"
 #include "Level.h"
 #include "Actor.h"
@@ -763,6 +764,10 @@ namespace coop
 			return play_bullets(sender, P);
 		if (action == eBodyRest)
 			return apply_body_rest(P);
+		if (action == ePropRest)
+			return apply_prop_rest(sender, P);
+		if (action == eGlassBreak)
+			return apply_glass_break(P);
 		if (action == eHeliShot)
 			return play_heli_shot(sender, P);
 		auto it = g_puppets.find(sender);

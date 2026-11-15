@@ -11,6 +11,7 @@
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "coop_puppet.h"
+#include "coop_props.h"
 #include "coop_combat.h"
 #include "Helicopter.h"
 #include "PhysicsShellHolder.h"
@@ -20,6 +21,9 @@
 #include "ai_object_location.h"
 #include "Inventory.h"
 #include "inventory_item.h"
+#include "Weapon.h"
+#include "WeaponAmmo.h"
+#include "xrServer_Objects_ALife_Items.h"
 #include "script_engine.h"
 
 namespace coop
@@ -417,6 +421,16 @@ namespace coop
 		return local_objects().count(id) > 0;
 	}
 
+	bool share_local(u16 id)
+	{
+		CSE_ALifeDynamicObject* object = level_running() ? ai().alife().objects().object(id, true) : nullptr;
+		if (!object || !local_objects().count(id) || !is_connected())
+			return false;
+		share_object(object);
+		note_moved(id); // where it falls, for the others too
+		return true;
+	}
+
 	// The last holder each thing left (not our actor, not a shadow), to tell the server where our actor took it from
 	struct STakenFrom
 	{
@@ -509,13 +523,43 @@ namespace coop
 			Msg("[coop] took %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 	}
 
+	// The server entity of an item online here as its object is now. CLevel::net_Update brings the object's update over
+	// only next frame, and an item's condition never (the update has none but a weapon's, quantized; the save's client
+	// data has it): the state that goes out is what this game shows, and a game that has the item online takes it from
+	// here (take_state_online).
+	static void refresh_entity(CSE_ALifeDynamicObject* object, CGameObject* game_object)
+	{
+		CSE_ALifeInventoryItem* se_item = smart_cast<CSE_ALifeInventoryItem*>(object);
+		CInventoryItem* item = smart_cast<CInventoryItem*>(game_object);
+		if (se_item && item)
+			se_item->m_fCondition = item->GetCondition();
+		CSE_ALifeItemWeapon* se_weapon = smart_cast<CSE_ALifeItemWeapon*>(object);
+		if (CWeapon* weapon = se_weapon ? smart_cast<CWeapon*>(game_object) : nullptr)
+		{
+			se_weapon->a_elapsed = u16(weapon->GetAmmoElapsed());
+			se_weapon->ammo_type = weapon->m_ammoType;
+			se_weapon->m_addon_flags.assign(weapon->GetAddonsState());
+			// the modular scope's index is only in the client data, which an item offline anywhere loses: it goes with
+			// the item's Lua data, which the others take with it and every save keeps
+			::luabind::functor<void> set_scope;
+			if (weapon->m_modular_attachments && ai().script_engine().functor("coop_items.set_weapon_scope", set_scope))
+				set_scope(object->ID, weapon->IsScopeAttached() ? int(weapon->m_cur_scope) : 0);
+		}
+		CSE_ALifeItemAmmo* se_ammo = smart_cast<CSE_ALifeItemAmmo*>(object);
+		if (CWeaponAmmo* ammo = se_ammo ? smart_cast<CWeaponAmmo*>(game_object) : nullptr)
+			se_ammo->a_elapsed = ammo->m_boxCurr;
+	}
+
 	void write_item_state(NET_Packet& P, CSE_ALifeDynamicObject* object)
 	{
+		CGameObject* game_object = smart_cast<CGameObject*>(Level().Objects.net_Find(object->ID));
+		if (game_object)
+			refresh_entity(object, game_object);
 		NET_Packet spawn;
 		object->Spawn_Write(spawn, FALSE);
 		NET_Packet client;
 		client.write_start();
-		if (CGameObject* game_object = smart_cast<CGameObject*>(Level().Objects.net_Find(object->ID)))
+		if (game_object)
 			game_object->net_Save(client); // u16 size, then the data, as a save keeps it
 		const u32 client_size = client.B.count > sizeof(u16) ? client.B.count - sizeof(u16) : 0;
 		// what scripts keep by its id (coop_sync.script)
@@ -582,14 +626,83 @@ namespace coop
 		state->UPDATE_Write(packet);
 		packet.r_pos = 0;
 		object->UPDATE_Read(packet);
+		// a weapon's update has its condition in 8 bits: the state's own, or the games differ in the last digits
+		CSE_ALifeInventoryItem* item = smart_cast<CSE_ALifeInventoryItem*>(object);
+		if (CSE_ALifeInventoryItem* from = item ? smart_cast<CSE_ALifeInventoryItem*>(state) : nullptr)
+			item->m_fCondition = from->m_fCondition;
 		object->m_tGraphID = game_vertex; // where it is stays ours
 		object->m_tNodeID = level_vertex;
 		object->m_fDistance = distance;
-		if (!client.empty())
-			object->client_data = client;
+		// Written where the thing was offline (the host, for an exit save: out of our shadow there), its client data
+		// is in the spawn packet only. Without it a weapon forgot which modular scope was on it (CWeapon::save,
+		// m_cur_scope) and CWeapon::net_Spawn picked a random one on every load.
+		const xr_vector<u8>& data = client.empty() ? state->client_data : client;
+		if (!data.empty())
+			object->client_data = data;
 		::luabind::functor<void> take_lua;
 		if (!lua.empty() && ai().script_engine().functor("coop_sync.take_item_lua", take_lua))
 			take_lua(object->ID, lua.c_str());
+	}
+
+	// An item online here (a body's loot next to us): its object takes the state, and so does its server entity, which is
+	// what it has once offline. What our actor carries is ours: it goes out from us with its state when it leaves us.
+	static void take_state_online(CSE_ALifeDynamicObject* object, CSE_Abstract* state, const xr_string& lua)
+	{
+		CGameObject* game_object = smart_cast<CGameObject*>(Level().Objects.net_Find(object->ID));
+		if (!game_object || game_object->getDestroy())
+			return; // not made on our side yet: it comes as its spawn packet has it
+		for (CObject* holder = game_object->H_Parent(); holder; holder = holder->H_Parent())
+			if (holder == g_actor)
+				return;
+		const Fvector position = object->o_Position;
+		const xr_vector<u8> client = object->client_data; // an online object's: the next save writes it anew
+		take_state(object, state, client, lua);
+		object->o_Position = position;
+		object->client_data = client;
+
+		CSE_ALifeInventoryItem* se_item = smart_cast<CSE_ALifeInventoryItem*>(object);
+		if (CInventoryItem* item = se_item ? smart_cast<CInventoryItem*>(game_object) : nullptr)
+			item->ChangeCondition(se_item->m_fCondition - item->GetCondition()); // as Lua's set_condition
+		CSE_ALifeItemWeapon* se_weapon = smart_cast<CSE_ALifeItemWeapon*>(object);
+		if (CWeapon* weapon = se_weapon ? smart_cast<CWeapon*>(game_object) : nullptr)
+			weapon->coop_take_state(se_weapon->m_addon_flags.get(), se_weapon->ammo_type, se_weapon->a_elapsed);
+		CSE_ALifeItemAmmo* se_ammo = smart_cast<CSE_ALifeItemAmmo*>(object);
+		if (CWeaponAmmo* ammo = se_ammo ? smart_cast<CWeaponAmmo*>(game_object) : nullptr)
+			ammo->m_boxCurr = se_ammo->a_elapsed;
+		if (debug_mode)
+			Msg("[coop dbg] %s (id=%u), online here, took another game's state: condition %.3f", object->name_replace(),
+			    object->ID, se_item ? se_item->m_fCondition : -1.f);
+	}
+
+	bool send_world_item_state(u16 id)
+	{
+		if (!should_send() || local_objects().count(id))
+			return false;
+		CSE_ALifeDynamicObject* object = ai().alife().objects().object(id, true);
+		if (!object || !smart_cast<CSE_ALifeInventoryItem*>(object))
+			return false;
+		send_item_state(object);
+		return true;
+	}
+
+	u8 weapon_scope(u16 id, LPCSTR section, u32 count)
+	{
+		if (count < 2)
+			return 0;
+		::luabind::functor<int> kept;
+		if (ai().script_engine().functor("coop_items.weapon_scope", kept))
+		{
+			const int index = kept(id);
+			if (index > 0 && u32(index) < count)
+				return u8(index);
+		}
+		// FNV-1a of the section and the id
+		u32 hash = 2166136261u;
+		for (LPCSTR c = section; *c; ++c)
+			hash = (hash ^ u8(*c)) * 16777619u;
+		hash = (hash ^ u8(id & 0xff)) * 16777619u;
+		hash = (hash ^ u8(id >> 8)) * 16777619u;
+		return u8(1 + hash % (count - 1));
 	}
 
 	void apply_object_state(NET_Packet& P)
@@ -619,9 +732,11 @@ namespace coop
 			return;
 		state->Spawn_Read(spawn);
 		CSE_ALifeDynamicObject* object = local_object(state->ID, section);
-		// online here, its game object has the state; an offline copy (a shadow's) takes it
+		// an offline copy (a shadow's) takes it, client data and all; an online one through its object
 		if (object && !object->m_bOnline)
 			take_state(object, state, client, lua);
+		else if (object && level_running())
+			take_state_online(object, state, lua);
 		F_entity_Destroy(state);
 	}
 
@@ -663,6 +778,7 @@ namespace coop
 		if (is_actor(&parent))
 		{
 			g_left_actor.insert(item->base()->ID);
+			note_moved(item->base()->ID); // where it comes to rest, for the others (coop_props.cpp)
 			Msg("[coop] dropped %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 		}
 	}
@@ -670,6 +786,8 @@ namespace coop
 	void on_object_released(CSE_Abstract* object)
 	{
 		if (g_remote_releases.erase(object->ID))
+			return;
+		if (is_release_theirs(object->ID)) // another game broke it, and sends its release (a box, a pane)
 			return;
 		if (!should_send() || is_shadow(object) || local_objects().erase(object->ID))
 			return;

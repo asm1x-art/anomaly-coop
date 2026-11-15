@@ -10,6 +10,43 @@ local NO_TARGET = 65535
 local next_send = 0
 local next_full = 0
 local sent = {} -- squad id -> what was sent of it last, "gvid,lvid,target"
+local hp_sent = {} -- member id -> its health sent last (thousandths)
+
+-- The squads' health: a member wounded in a player's game stays wounded in the host's world (coop_npc.cpp takes it
+-- from that game's stream), but in the other players' games only the stream's level had it: one who came there later
+-- found them whole again. The host tells every game its members' health (changes; all the wounded ones each FULL_MS),
+-- each game takes it onto its offline copies (coop.set_offline_health). Deaths go as deaths.
+local function send_health(full)
+	local part = {}
+	local function flush()
+		if #part > 0 then
+			coop_sync.send_event("squad_hp", table.concat(part, ";"))
+			part = {}
+		end
+	end
+	local sim = alife()
+	for id in pairs(SIMBOARD.squads) do
+		local squad = sim:object(id)
+		if squad then
+			for member in squad:squad_members() do
+				local se = sim:object(member.id)
+				local hp = se and se:alive() and se:health() or 0
+				if hp > 0 then
+					local h = math.min(1000, math.floor(hp * 1000 + 0.5))
+					local last = hp_sent[member.id]
+					if (last and last ~= h) or (h < 1000 and (full or not last)) then
+						part[#part + 1] = string.format("%d,%d", member.id, h)
+						if #part >= PER_EVENT then
+							flush()
+						end
+					end
+					hp_sent[member.id] = h
+				end
+			end
+		end
+	end
+	flush()
+end
 
 local function send_squads()
 	local now = time_global()
@@ -46,6 +83,22 @@ local function send_squads()
 		end
 	end
 	flush()
+	send_health(full)
+end
+
+local function on_squad_hp(sender, payload)
+	if coop.is_host() or not coop.set_offline_health then
+		return
+	end
+	local taken = 0
+	for id, h in string.gmatch(payload, "(%d+),(%d+)") do
+		if coop.set_offline_health(tonumber(id), tonumber(h) / 1000) then
+			taken = taken + 1
+		end
+	end
+	if taken > 0 and get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] %s offline NPC(s) as wounded as the host has them", taken)
+	end
 end
 
 local function on_squads(sender, payload)
@@ -80,4 +133,5 @@ function on_game_start()
 	end
 	RegisterScriptCallback("actor_on_update", send_squads)
 	coop_sync.on_event("squads", on_squads)
+	coop_sync.on_event("squad_hp", on_squad_hp)
 end

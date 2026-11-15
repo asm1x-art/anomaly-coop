@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "coop/coop_puppet.h"
 #include "coop/coop_npc.h"
+#include "coop/coop_world.h"
 #include "Weapon.h"
 #include "ParticlesObject.h"
 #include "entity_alive.h"
@@ -434,11 +435,29 @@ void CWeapon::SetUIScope(LPCSTR scope_texture)
 BOOL useSeparateUBGLKeybind = TRUE;
 // a MAS weapon with a built-in sight (the 3D scopes' variants, wpn_dvl10_marchf...) has the sight permanent and no
 // sight section: GetScopeName() is empty there, and reading it crashed on the wpn_func key (V, or Alt while aiming)
+bool CWeapon::ScopeHasAltAim()
+{
+	return m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false);
+}
+
+// a MAS weapon's own alternative aim only when its model has a second sight of its own (the RD-74M ISG's canted red
+// dot): the weapon's section then sets that sight's zoom, scope_zoom_factor_alt. The other MAS weapons keep the
+// alternative aim of the pack's configs without MAS, made for other sights: it moved the gun aside with nothing at the
+// screen's centre, so with a MAS sight that has no second aim either the alternative aim is not taken at all
+bool CWeapon::AltAimAllowed()
+{
+	if (g_player_hud->m_adjust_mode || ScopeHasAltAim())
+		return true;
+	if (!m_altAimPos)
+		return false;
+	return !(m_modular_attachments && m_scopes.size()) || pSettings->line_exist(cNameSect(), "scope_zoom_factor_alt");
+}
+
 void CWeapon::SwitchZoomType()
 {
 	if (!useSeparateUBGLKeybind)
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && AltAimAllowed())
 		{
             SetZoomTypeAndParams(1);
 		}
@@ -456,7 +475,7 @@ void CWeapon::SwitchZoomType()
 	}
     else
     {
-		if (m_zoomtype == 0 && (m_altAimPos || g_player_hud->m_adjust_mode || (m_modular_attachments && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false))))
+		if (m_zoomtype == 0 && AltAimAllowed())
 		{
 			SetZoomTypeAndParams(1);
 		}
@@ -1009,7 +1028,9 @@ BOOL CWeapon::net_Spawn(CSE_Abstract* DC)
 	
 	if (m_modular_attachments && m_cur_scope == 0 && (m_flagsAddOnState & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
 	{
-		m_cur_scope = ::Random.randI(1, m_scopes.size());
+		// No index in the client data (a new weapon, or one that was offline): the one kept with it, else one by its id
+		// and section - the same in every game and on every load. ::Random here gave another scope each time.
+		m_cur_scope = coop::weapon_scope(ID(), cNameSect().c_str(), m_scopes.size());
 		CWeaponMagazined* wm = smart_cast<CWeaponMagazined*>(this);
 		if (wm)
 		{
@@ -1166,6 +1187,42 @@ void CWeapon::load(IReader& input_packet)
 		OnZoomOut();
 
 	load_data(m_bRememberActorNVisnStatus, input_packet);
+}
+
+void CWeapon::coop_take_state(u8 addons, u8 ammo_type, u16 ammo_elapsed)
+{
+	if (ammo_type < m_ammoTypes.size() && (ammo_type != m_ammoType || int(ammo_elapsed) != iAmmoElapsed))
+	{
+		if (ammo_type != m_ammoType)
+		{
+			m_ammoType = ammo_type;
+			m_magazine.clear(); // the rounds of the other type go, SetAmmoElapsed loads ours
+			m_DefaultCartridge.Load(m_ammoTypes[m_ammoType].c_str(), m_ammoType, m_APk);
+		}
+		SetAmmoElapsed(ammo_elapsed);
+	}
+	u8 scope = m_cur_scope;
+	if (m_modular_attachments && (addons & CSE_ALifeItemWeapon::eWeaponAddonScope) != 0 && m_scopes.size() > 1)
+		scope = coop::weapon_scope(ID(), cNameSect().c_str(), m_scopes.size());
+	if (addons == m_flagsAddOnState && scope == m_cur_scope)
+		return;
+	m_flagsAddOnState = addons;
+	m_cur_scope = scope;
+	// a modular scope's numbers and model, as net_Spawn makes them
+	CWeaponMagazined* wm = smart_cast<CWeaponMagazined*>(this);
+	if (m_scopeItem)
+	{
+		g_player_hud->detach_item(m_scopeItem);
+		xr_delete(m_scopeItem);
+	}
+	if (wm && m_modular_attachments && IsScopeAttached() && m_scopes.size() > 1)
+	{
+		wm->LoadScopeKoeffs();
+		m_scopeItem = xr_new<CAnonHudItem>();
+		m_scopeItem->Load(m_scopes[m_cur_scope].c_str());
+	}
+	InitAddons();
+	UpdateAddonsVisibility();
 }
 
 void CWeapon::OnEvent(NET_Packet& P, u16 type)
@@ -2473,7 +2530,7 @@ void CWeapon::UpdateHudAdditional(Fmatrix& trans)
 		// its own (MAS's placeholder for none has none), the alternative aim takes the weapon's aim_hud_offset_alt_* the
 		// way a weapon without MAS does. It used the sight's (zero) or the main aim, and looked the same as the main one
 		const bool weapon_alt_aim = idx == 3 && mas_aim && hi->alt_aim_offset_pos().square_magnitude() > 0.f
-			&& !(si && IsScopeAttached() && GetScopeName().size() && READ_IF_EXISTS(pSettings, r_bool, GetScopeName(), "use_alt_aim_hud", false));
+			&& !(si && ScopeHasAltAim());
 		if (weapon_alt_aim)
 		{
 			curr_offs = hi->alt_aim_offset_pos();

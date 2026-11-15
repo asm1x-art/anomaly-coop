@@ -426,6 +426,22 @@ function pulse_anomaly_update()
 	end
 	pAno_tg = tg + pAno_delay
 	
+	pulse_anomaly_spawn()
+end
+
+-- Co-op: the roll (pulse_anomaly_roll) and the strike (pulse_anomaly_at) apart, so coop_pulse_anomaly.script can
+-- have the level's authority roll for every player and every game strike at the same point. Without co-op as before.
+
+-- every pAno_delay: maybe one around our actor
+function pulse_anomaly_spawn()
+	local particle_pos = pulse_anomaly_roll(db.actor:position())
+	if particle_pos then
+		pulse_anomaly_at(particle_pos)
+	end
+end
+
+-- the point of a pulse around pos, by the level's and the weather's chance; nil: none this time
+function pulse_anomaly_roll(pos)
 	local lvl_factor = pAno_maps[level.name()] or 0
 	local wthr = level_weathers.get_weather_manager():get_curr_weather()
 	local weather_chance = pAno_chance[wthr] or 1
@@ -433,14 +449,23 @@ function pulse_anomaly_update()
 		return
 	end
 	
-	local pos = db.actor:position()
 	local angle_dec    = math.random(0,359)
 	local angle_rad    = math.rad(angle_dec)
 	local ano_distance = math.random(0,pAno_max_distance)
 	local pos_x        = math.cos(angle_rad)*ano_distance
 	local pos_z        = math.sin(angle_rad)*ano_distance
-	local particle_pos = vector():set(pos.x+pos_x, pos.y+60, pos.z+pos_z)
-	
+	return vector():set(pos.x+pos_x, pos.y+60, pos.z+pos_z)
+end
+
+-- the delay between two rolls, ms
+function pulse_anomaly_delay()
+	return pAno_delay
+end
+
+-- a pulse strikes at particle_pos; since: s it is old already (it came from another game), its sound and hit that
+-- much sooner
+function pulse_anomaly_at(particle_pos, since)
+	since = since or 0
 	pAno_pfx:play_at_pos(particle_pos)
 	
 	if (not pAno_light) then
@@ -461,11 +486,11 @@ function pulse_anomaly_update()
 		--pAno_light.color = color
 	end
 
-	CreateTimeEvent(0, "pulse_anomaly_sound", pAno_snd_delay, pulse_anomaly_sound, particle_pos)
+	CreateTimeEvent(0, "pulse_anomaly_sound", math.max(0, pAno_snd_delay - since), pulse_anomaly_sound, particle_pos)
 	
-	CreateTimeEvent(0, "pulse_anomaly_hit", pAno_hit_delay, pulse_anomaly_hit, particle_pos)
+	CreateTimeEvent(0, "pulse_anomaly_hit", math.max(0, pAno_hit_delay - since), pulse_anomaly_hit, particle_pos)
 	
-	CreateTimeEvent(0, "pulse_anomaly_light", pAno_hit_delay + 0.5, pulse_anomaly_light)
+	CreateTimeEvent(0, "pulse_anomaly_light", math.max(0, pAno_hit_delay + 0.5 - since), pulse_anomaly_light)
 end
 
 

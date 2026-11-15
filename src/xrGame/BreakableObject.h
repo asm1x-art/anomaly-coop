@@ -53,7 +53,10 @@ public:
 	virtual void net_Export(NET_Packet& P);
 	virtual void net_Import(NET_Packet& P);
 	virtual BOOL UsedAI_Locations();
+	// co-op: another game broke this pane (coop_props.cpp): it breaks here the same way, and isn't told back
+	void CoopBreak();
 private:
+	bool m_coop_remote = false;
 	void Init();
 	void CreateUnbroken();
 	void CreateBroken();

@@ -1,0 +1,480 @@
+-- Co-op: the state of items no player holds is one game's word, the same in every game (Notion "Аудит: что ещё
+-- решается у игрока, а не на сервере", items 4, 5 and 10). Settings: mod_system_coop_items.ltx [coop_items].
+--
+-- A body's loot. death_manager.decide_items_to_keep (xr_motivator: at the death, and on a body's first update every
+-- time it comes online) decides what a body keeps: its weapons' condition, the rounds in their magazines and a box of
+-- ammo spawned next to each, WPO parts, its armour's condition; its grenades, big ammo stacks and spare copies go.
+-- Every game the body was online in did it its own way, and each spawned its own ammo box: one for every player to
+-- take. Now it is decided once for the world, by the authority of the body's level (coop.is_authority): what it
+-- spawns is shared, what it releases goes to all, and the state of every item on the body goes to the others after
+-- states_delay_s (coop.send_item_state; they take it on the online objects too, coop_world.cpp take_state_online).
+-- The body is marked (se var "coop_kept", event "loot_kept") and never decided again, by anyone. A game that has the
+-- body online while its level's authority doesn't asks the authority ("loot_ask"): it decides if it has the body
+-- online, else lets the first one who asked decide ("loot_grant").
+-- The loot made at a body's first search (death_manager.create_release_item, shared by coop_sync.script) has its
+-- ammo boxes merged a moment later in the searcher's game: the state of the body's items goes from there too.
+--
+-- Scopes. A modular weapon (MAS) with a scope on keeps which scope only in its client data, which an item loses when
+-- it goes offline anywhere; CWeapon::net_Spawn then picked a random one, another in every game and on every load. It
+-- picks the one kept with the weapon (se var "scope": the index a game had when the weapon left it, which goes with
+-- the item's Lua data, coop_sync.item_lua), else one by the weapon's id and section, the same everywhere
+-- (coop_world.cpp weapon_scope).
+--
+-- Things made with their condition, uses or rounds set a moment later. itms_manager's ItemProcessor (alife_create_item
+-- with cond, cond_r, uses or ammo: a stash's things, a mutant's parts, box loot...) sets them on the game object frames
+-- after the thing was made, in the game that made it; the others kept it as its spawn said (condition 1, every use).
+-- Once it is set, the thing's state goes to the others (and the host, and the journal).
+--
+-- WPO parts. item_parts.evaluate_parts rolls a weapon's (an outfit's) parts the first time anyone looks at it (a
+-- tooltip, a trade window, a take) and again once its condition moved: every game rolled its own for a trader's gun, a
+-- stash's, one on the ground. In co-op the roll goes by the thing's id, section and condition: the same in every game.
+--
+-- Live NPCs' weapons. Only the level's authority runs its NPCs: the wear of their shots (CWeapon::FireTrace) is its
+-- game's alone, the others' puppets fire blanks, and the host's offline copy, which goes into the world's save, never
+-- fired either. The authority tells the others the state of its NPCs' guns once their condition moved by
+-- npc_weapon_step or their ammo type or addons changed, and the last of it when such an NPC goes offline there and when
+-- it leaves the level. A new authority, the world's save and a player coming in have the gun as it was shot.
+
+local S = "coop_items"
+
+local function num(key, def)
+	return ini_sys:r_float_ex(S, key) or def
+end
+
+local function coop_on()
+	return coop and coop.connected and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf(fmt, ...)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Scopes (called by the engine)
+
+function weapon_scope(id)
+	local ok, index = pcall(se_load_var, id, nil, "scope")
+	return ok and tonumber(index) or 0
+end
+
+function set_weapon_scope(id, index)
+	pcall(se_save_var, id, nil, "scope", index and index > 0 and index or nil)
+end
+
+------------------------------------------------------------------------------------------------
+-- A body's loot
+
+local original_decide -- death_manager.decide_items_to_keep as it was
+local asked = {}      -- body id -> time_global() we asked its level's authority, this session
+local granted = {}    -- body id -> true: the authority here let another game decide it
+
+local function kept(id)
+	return se_load_var(id, nil, "coop_kept")
+end
+
+local function level_of(se_obj)
+	return alife():level_name(game_graph():vertex(se_obj.m_game_vertex_id):level_id())
+end
+
+-- the server object of a body by id and name, nil when this game's is another one
+local function body(id, name)
+	local se_obj = id and alife_object(id)
+	return se_obj and se_obj:name() == name and se_obj or nil
+end
+
+local function items_of(npc, into)
+	into = into or {}
+	npc:iterate_inventory(function(_, item)
+		into[#into + 1] = item:id()
+	end, npc)
+	return into
+end
+
+-- the state of a body's items to the others: those on it now and those it had when decided (a weapon falls out of the
+-- hands; wherever it lies, it goes by its id)
+local function send_states(body_id, ids)
+	local npc = level.object_by_id(body_id)
+	if npc then
+		items_of(npc, ids)
+	end
+	local seen, sent = {}, 0
+	for _, id in ipairs(ids) do
+		if not seen[id] then
+			seen[id] = true
+			if coop.send_item_state(id) then
+				sent = sent + 1
+			end
+		end
+	end
+	dbg("[coop dbg] the state of %s item(s) of body %s sent", sent, body_id)
+end
+
+-- once the scripts are done with the body (ItemProcessor sets an outfit's condition frames later, the ammo boxes of a
+-- search are merged on the next update)
+local function send_states_later(body_id, ids)
+	CreateTimeEvent(S, "states_" .. body_id, num("states_delay_s", 2), function()
+		if coop_on() then
+			send_states(body_id, ids)
+		end
+		return true
+	end)
+end
+
+-- what the body keeps, decided here for the world
+local function decide(npc)
+	local id, name = npc:id(), npc:name()
+	local ids = items_of(npc)
+	se_save_var(id, name, "coop_kept", true) -- first: a call from inside doesn't decide it again
+	coop.begin_shared()
+	local ok, err = pcall(original_decide, npc)
+	coop.end_shared()
+	coop_sync.send_event("loot_kept", id, name)
+	send_states_later(id, ids)
+	printf("[coop] the loot of %s (%s) decided here, for everyone", name, id)
+	if not ok then
+		error(err, 0)
+	end
+end
+
+-- the level's authority doesn't have the body online, or hasn't decided it yet: ask it, a moment later (its "loot_kept"
+-- for a death it sent may be on the way)
+local function ask(id, name)
+	local now = time_global()
+	if asked[id] and now - asked[id] < num("ask_again_s", 30) * 1000 then
+		return
+	end
+	asked[id] = now
+	CreateTimeEvent(S, "ask_" .. id, num("ask_delay_s", 1), function()
+		local npc = level.object_by_id(id)
+		if coop_on() and npc and not npc:alive() and not kept(id) then
+			asked[id] = time_global()
+			coop_sync.send_event("loot_ask", id, name)
+			dbg("[coop dbg] the loot of %s (%s) not decided: asked the level's authority", name, id)
+		end
+		return true
+	end)
+end
+
+local function on_decide(npc, npc_id, npc_name)
+	-- single player; and death_manager's own call at a body's first search, after it marked the body (a no-op there)
+	if not coop_on() or npc_id ~= nil then
+		return original_decide(npc, npc_id, npc_name)
+	end
+	local id = npc:id()
+	if kept(id) then
+		return
+	end
+	if coop.is_authority(level.name()) then
+		return decide(npc)
+	end
+	ask(id, npc:name())
+end
+
+local function on_kept(sender, payload)
+	local f = str_explode(payload, "\t")
+	local id, name = tonumber(f[1]), f[2]
+	if body(id, name) then
+		se_save_var(id, name, "coop_kept", true)
+	end
+	if id then
+		asked[id] = nil
+	end
+end
+
+local function on_ask(sender, payload)
+	local f = str_explode(payload, "\t")
+	local id, name = tonumber(f[1]), f[2]
+	local se_obj = body(id, name)
+	if not (se_obj and sender ~= "" and level_of(se_obj) == level.name() and coop.is_authority(level.name())) then
+		return
+	end
+	if kept(id) then
+		coop_sync.send_event("loot_kept", id, name) -- decided: again, for the one who missed it
+		return
+	end
+	local npc = level.object_by_id(id)
+	if npc and not npc:alive() then
+		return decide(npc)
+	end
+	if granted[id] then
+		return -- another one decides it: its "loot_kept" comes to everyone
+	end
+	granted[id] = true
+	coop_sync.send_event("loot_grant", id, name, sender)
+	dbg("[coop dbg] the loot of %s (%s) is %s's to decide: not online here", name, id, sender)
+end
+
+local function on_grant(sender, payload)
+	local f = str_explode(payload, "\t")
+	local id, name, to = tonumber(f[1]), f[2], f[3]
+	if not (id and to == coop.my_name() and asked[id]) then
+		return -- not ours, or an old one (the journal's)
+	end
+	asked[id] = nil
+	local npc = level.object_by_id(id)
+	if npc and npc:name() == name and not npc:alive() and not kept(id) then
+		decide(npc)
+	end
+end
+
+-- after death_manager.create_release_item made a body's loot here (coop_sync.script)
+function after_loot(id)
+	if coop_on() then
+		send_states_later(id, {})
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Things made with their condition, uses or rounds set a moment later (itms_manager's ItemProcessor)
+
+local wrapped_processor = false
+
+local function in_shadow(id)
+	local se_obj = alife_object(id)
+	local holder = se_obj and se_obj.parent_id ~= 65535 and alife_object(se_obj.parent_id)
+	return holder and holder:section_name() == "coop_shadow_box"
+end
+
+-- As this game has it, to the others, made_delay_s later: the thing went to them the moment it was made, and one made
+-- in an online box or trader there takes a frame or two to come into being, which the state must not overtake.
+-- Another player took it meanwhile: theirs to tell.
+function send_made_later(id)
+	CreateTimeEvent(S, "made_" .. id, num("made_delay_s", 1), function()
+		local obj = coop_on() and level.object_by_id(id)
+		if obj and not in_shadow(id) and coop.send_item_state(id) then
+			dbg("[coop dbg] the state of %s (%s), set after it was made, sent", obj:section(), id)
+		end
+		return true
+	end)
+end
+
+local function wrap_item_processor()
+	local cls = itms_manager and itms_manager.ItemProcessor
+	local original = cls and cls.update
+	if type(original) ~= "function" then
+		printf("! [coop] itms_manager.ItemProcessor.update not found, not wrapped")
+		return
+	end
+	wrapped_processor = true
+	cls.update = function(self)
+		if not coop_on() then
+			return original(self)
+		end
+		local pending = {}
+		for _, t in ipairs({ self.Cond, self.Uses, self.Ammo }) do
+			for id in pairs(t or {}) do
+				pending[id] = true
+			end
+		end
+		original(self)
+		for id in pairs(pending) do
+			-- set (or given up on) this time
+			if not (self.Cond[id] or self.Uses[id] or self.Ammo[id]) and level.object_by_id(id) then
+				send_made_later(id)
+			end
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- WPO parts: rolled by the thing's id, section and condition
+
+local function seed_of(id, section, condition)
+	local text = tostring(section) .. ":" .. tostring(id) .. ":" .. tostring(condition)
+	local h = 5381
+	for i = 1, #text do
+		h = (h * 33 + text:byte(i)) % 2147483647
+	end
+	return h
+end
+
+-- math.random's three forms, from a seed (Park-Miller)
+function seeded_random(seed)
+	local s = seed % 2147483646 + 1
+	return function(m, n)
+		s = (s * 16807) % 2147483647
+		local r = (s - 1) / 2147483646
+		if not m then
+			return r
+		end
+		if not n then
+			m, n = 1, m
+		end
+		return m + math.floor(r * (n - m + 1))
+	end
+end
+
+-- f(...) with math.random rolling by the thing's id, section and condition (in hundredths), errors passed through
+function seeded(id, section, condition, f, ...)
+	local random = math.random
+	math.random = seeded_random(seed_of(id, section, condition))
+	local res = { pcall(f, ...) }
+	math.random = random
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
+end
+
+local wrapped_parts = false
+
+-- outermost, once every script has put its own in (zzzz_arti_jamming_repairs replaces it when it loads)
+local function wrap_parts()
+	if wrapped_parts then
+		return
+	end
+	local original = item_parts and item_parts.evaluate_parts
+	if type(original) ~= "function" then
+		printf("! [coop] item_parts.evaluate_parts not found, not wrapped")
+		return
+	end
+	wrapped_parts = true
+	item_parts.evaluate_parts = function(obj, ...)
+		if not (coop_on() and obj) then
+			return original(obj, ...)
+		end
+		return seeded(obj:id(), obj:section(), math.floor(obj:condition() * 100 + 0.5), original, obj, ...)
+	end
+end
+
+------------------------------------------------------------------------------------------------
+-- Live NPCs' weapons: the authority's wear to the others
+
+local npc_weapons = {} -- weapon id -> { npc = holder id, cond = condition sent, sig = ammo type and addons sent, now = condition seen }
+local next_look = 0
+
+local function weapons_of(npc)
+	local out = {}
+	for _, slot in ipairs({ 2, 3 }) do
+		local item = npc:item_in_slot(slot)
+		if item and IsWeapon(item) then
+			out[item:id()] = item
+		end
+	end
+	local active = npc:active_item()
+	if active and IsWeapon(active) then
+		out[active:id()] = active
+	end
+	return out
+end
+
+local function signature(wpn)
+	local addons = (wpn:weapon_is_scope() and 1 or 0) + (wpn:weapon_is_grenadelauncher() and 2 or 0) +
+		(wpn:weapon_is_silencer() and 4 or 0)
+	return tostring(wpn:get_ammo_type()) .. ":" .. addons
+end
+
+local function send_weapon(id, w)
+	local wpn = level.object_by_id(id)
+	w.now = wpn and wpn:condition() or w.now
+	w.cond = w.now
+	if coop.send_item_state(id) then
+		dbg("[coop dbg] the state of NPC %s's weapon %s sent: condition %s", w.npc, id, string.format("%.3f", w.now))
+	end
+end
+
+local function authority_here()
+	return coop_on() and coop.is_authority(level.name())
+end
+
+-- what changed since it was sent goes now when it is enough, else once its NPC goes (flush)
+local function look_at_npc_weapons()
+	local step = num("npc_weapon_step", 0.02)
+	local seen = {}
+	for _, npc_id in ipairs(db.OnlineStalkers or {}) do
+		local npc = level.object_by_id(npc_id)
+		if npc and npc:alive() then
+			for id, wpn in pairs(weapons_of(npc)) do
+				seen[id] = true
+				local cond, sig = wpn:condition(), signature(wpn)
+				local w = npc_weapons[id]
+				if not w then
+					-- first seen here: as the others have it (its last state came, or it is as it was made)
+					npc_weapons[id] = { npc = npc_id, cond = cond, sig = sig, now = cond }
+				else
+					w.npc, w.now = npc_id, cond
+					if sig ~= w.sig or math.abs(cond - w.cond) >= step then
+						w.sig = sig
+						send_weapon(id, w)
+					end
+				end
+			end
+		end
+	end
+	-- out of an NPC's hands (dropped, its NPC dead or gone): from now on its state goes the way any item's does
+	for id, w in pairs(npc_weapons) do
+		if not seen[id] then
+			local wpn = level.object_by_id(id)
+			if (wpn and wpn:condition() or w.now) ~= w.cond then
+				send_weapon(id, w)
+			end
+			npc_weapons[id] = nil
+		end
+	end
+end
+
+-- the last of the wear: of one NPC going offline here, or of all as we leave the level
+local function flush(npc_id)
+	for id, w in pairs(npc_weapons) do
+		if npc_id == nil or w.npc == npc_id then
+			local wpn = level.object_by_id(id)
+			if (wpn and wpn:condition() or w.now) ~= w.cond then
+				send_weapon(id, w)
+			end
+			npc_weapons[id] = nil
+		end
+	end
+end
+
+local function on_update()
+	local now = time_global()
+	if now < next_look then
+		return
+	end
+	next_look = now + num("npc_weapons_look_s", 5) * 1000
+	if not authority_here() then
+		npc_weapons = {} -- not ours to tell: a fresh look once we are the authority
+		return
+	end
+	look_at_npc_weapons()
+end
+
+local function on_npc_net_destroy(npc)
+	if npc and authority_here() then
+		flush(npc:id())
+	end
+end
+
+local function on_level_leave()
+	if authority_here() then
+		flush(nil)
+	end
+end
+
+local function on_first_update()
+	wrap_parts()
+end
+
+function on_game_start()
+	if not (coop and death_manager) then
+		return -- not the co-op engine
+	end
+	original_decide = death_manager.decide_items_to_keep
+	if type(original_decide) ~= "function" then
+		printf("! [coop] death_manager.decide_items_to_keep not found, not wrapped")
+		return
+	end
+	death_manager.decide_items_to_keep = on_decide
+	coop_sync.on_event("loot_kept", on_kept)
+	coop_sync.on_event("loot_ask", on_ask)
+	coop_sync.on_event("loot_grant", on_grant)
+	if not wrapped_processor then
+		wrap_item_processor()
+	end
+	RegisterScriptCallback("actor_on_first_update", on_first_update)
+	RegisterScriptCallback("actor_on_update", on_update)
+	RegisterScriptCallback("npc_on_net_destroy", on_npc_net_destroy)
+	RegisterScriptCallback("on_before_level_changing", on_level_leave)
+end

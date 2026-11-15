@@ -5,9 +5,18 @@
 -- kept from the game's own cleanup (release_body_manager and the rest, which go through safe_release_manager or
 -- alife_release) for protect_hours of the world's time. The kept ids and until when are a fact on the server
 -- ("coop_keep"), so every game knows them.
--- Cleaning: the host, every clean_interval_s, releases bodies with nothing worth taking (no things, or junk only:
+-- Cleaning: the sim master (the host; with no host, the player's game that runs the world), every clean_interval_s,
+-- releases bodies with nothing worth taking (no things, or junk only:
 -- cheaper than junk_price, a section matching junk_sections, worn below junk_condition) that are not kept, not
 -- a story's, not on a level with a player (nor near one), beyond keep_bodies_per_level on their level, at most max_per_pass per level each time.
+-- The game's own cleanup, in co-op: every game ran it for itself, and its releases reach everyone, so one player
+-- leaving a level made the bodies and things there vanish in front of another still on it. Now:
+-- - release_body_manager: leaving a level releases nothing; a level's bodies over corpse_max_count go by its
+--   authority's game alone, and only those corpse_min_dist from every player on it (and dead body_stay_s);
+-- - release_item_manager: a thing dropped on the ground (by our actor, or an NPC on a level we run) is told to every
+--   game (event "coop_dropped"); the sim master alone releases one nobody took after dropped_hours of the world's
+--   time (dropped_hours_off with release_dropped_items off), and only on a level with no player on it.
+-- corpse_max_count, corpse_min_dist and release_dropped_items are the server's (coop_world_options.script).
 
 local S = "coop_cleanup"
 local FACT = "coop_keep"
@@ -174,9 +183,23 @@ local function protect_near(sender, payload)
 end
 
 ----------------------------------------------------------------------------------------------------
--- The host's cleaner
+-- The sim master's cleaner: the host's, or with no host the game of the player who runs the world (only on levels
+-- with no player on them, its own included)
 
 local next_clean = 0
+
+-- a player stands on the level: one of the others, or we (a player's game)
+local function level_has_player(lname)
+	if db.actor and not coop.is_host() and level.name() == lname then
+		return true
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lname then
+			return true
+		end
+	end
+	return false
+end
 
 local function near_player(se, lname, distance)
 	for _, p in ipairs(coop.peers()) do
@@ -203,8 +226,8 @@ local function clean()
 	local keep_n, max_n, distance = num("keep_bodies_per_level", 5), num("max_per_pass", 10), num("min_player_distance", 200)
 	local released = 0
 	for lname, l in pairs(per_level) do
-		-- a level with a player on it is theirs (its authority's), not the host's
-		local n = coop.is_authority(lname) and math.min(#l.junk, l.count - keep_n, max_n) or 0
+		-- a level with a player on it is theirs (its authority's), not the cleaner's
+		local n = not level_has_player(lname) and coop.is_authority(lname) and math.min(#l.junk, l.count - keep_n, max_n) or 0
 		for i = 1, #l.junk do
 			if n <= 0 then
 				break
@@ -234,8 +257,133 @@ local function clean()
 	end
 end
 
+----------------------------------------------------------------------------------------------------
+-- The game's own cleanup in co-op: one game decides, by where every player is
+
+-- where the players on a level stand: ours (a player's game on it) and the others'
+local function players_on(lname)
+	local list = {}
+	if db.actor and not coop.is_host() and level.name() == lname then
+		list[#list + 1] = db.actor:position()
+	end
+	for _, p in ipairs(coop.peers()) do
+		if p.level == lname then
+			list[#list + 1] = p.position
+		end
+	end
+	return list
+end
+
+local function far_from_all(pos, list, distance)
+	for _, p in ipairs(list) do
+		if p:distance_to(pos) < distance then
+			return false
+		end
+	end
+	return true
+end
+
+-- Crelease_body:clear(all, dist) in co-op: all (leaving the level) releases nothing; over the limit, the level's
+-- authority releases the far ones, as vanilla does around its actor, but far from every player
+local function body_clear(self, all)
+	if all then
+		dbg("leaving the level: its %s body(ies) stay for whoever is still there", self.size)
+		return
+	end
+	local lname = level.name()
+	if not (db.actor and coop.is_authority(lname)) then
+		return
+	end
+	local max = tonumber(ui_options.get("gameplay/general/corpse_max_count")) or 5
+	local distance = tonumber(ui_options.get("gameplay/general/corpse_min_dist")) or 75
+	local stay = num("body_stay_s", 180) * 1000
+	local players = players_on(lname)
+	local sim = alife()
+	local function drop(id)
+		self.release_objects_table[id] = nil
+		self.size = self.size - 1
+	end
+	for id in pairs(self.release_objects_table) do
+		if self.size < max then
+			return
+		end
+		local se = id ~= 0 and id ~= NO_PARENT and sim:object(id)
+		local cls = se and se:clsid()
+		if cls and (IsStalker(nil, cls) or IsMonster(nil, cls)) and not se:alive() then
+			local obj = db.storage[id] and db.storage[id].object or level.object_by_id(id)
+			if obj and utils_item.has_quest_item(obj) then
+				drop(id)
+			elseif obj and time_global() - obj:death_time() > stay and far_from_all(se.position, players, distance) then
+				dbg("over %s bodies on %s: releases %s (%s), %s m or more from every player", max, lname,
+					se:section_name(), id, distance)
+				safe_release_manager.release(se)
+				drop(id)
+			end
+		else
+			drop(id)
+		end
+	end
+end
+
+-- things dropped on the ground: id -> { name, the world's hour }; every game keeps them, the sim master releases
+local dropped = {}
+local next_dropped = 0
+
+local function on_drop(npc, item)
+	if not (in_coop() and npc and item) or (item:parent() and item:parent():id() ~= npc:id()) then
+		return
+	end
+	-- the game where it happened says it: our actor's drop, or an NPC's on a level we run (not a puppet's)
+	if npc:id() ~= AC_ID and not coop.is_authority(level.name()) then
+		return
+	end
+	local h = hours()
+	dropped[item:id()] = { item:name(), h }
+	coop_sync.send_event("coop_dropped", item:id(), item:name(), string.format("%.2f", h))
+end
+
+local function on_take(npc, item)
+	if item then
+		dropped[item:id()] = nil
+	end
+end
+
+local function release_dropped()
+	local wait = ui_options.get("gameplay/general/release_dropped_items") and num("dropped_hours", 4)
+		or num("dropped_hours_off", 12)
+	local busy = {}
+	if db.actor and not coop.is_host() then
+		busy[level.name()] = true
+	end
+	for _, p in ipairs(coop.peers()) do
+		busy[p.level] = true
+	end
+	local sim, now, released = alife(), hours(), 0
+	for id, t in pairs(dropped) do
+		local se = sim:object(id)
+		if not (se and se.parent_id == NO_PARENT and se:name() == t[1]) then
+			dropped[id] = nil -- taken, or gone
+		elseif now - t[2] >= wait and not se.online and not busy[level_of(se)] then
+			dbg("releases %s (%s) dropped %.1f h ago on %s", t[1], id, now - t[2], level_of(se))
+			alife_release(se)
+			dropped[id] = nil
+			released = released + 1
+		end
+	end
+	if released > 0 then
+		printf("[coop] cleanup: %s dropped thing(s) nobody took released", released)
+	end
+end
+
 local function update()
-	if not (in_coop() and coop.is_host() and coop.is_sim_master()) then
+	if not in_coop() then
+		return
+	end
+	if coop.is_sim_master() and time_global() >= next_dropped then
+		next_dropped = time_global() + num("dropped_check_s", 60) * 1000
+		release_dropped()
+	end
+	if not coop.is_sim_master() then
 		return
 	end
 	local now = time_global()
@@ -274,4 +422,49 @@ function on_game_start()
 	end
 	coop_sync.on_event("coop_protect", protect_near)
 	RegisterScriptCallback("actor_on_update", update)
+
+	-- the game's own body cleanup: one game decides, by every player (body_clear)
+	local class = release_body_manager.Crelease_body
+	local clear = class.clear
+	local function wrapped_clear(self, all, dist)
+		if in_coop() then
+			return body_clear(self, all)
+		end
+		return clear(self, all, dist)
+	end
+	class.clear = wrapped_clear
+	RegisterScriptCallback("actor_on_first_update", function()
+		local rbm = release_body_manager.get_release_body_manager()
+		if rbm and rbm.clear ~= wrapped_clear then
+			rbm.clear = wrapped_clear -- made before the class was wrapped
+		end
+	end)
+
+	-- dropped things: the sim master's (release_dropped); the game's own pass, each game's for itself, is off
+	local item_clear = release_item_manager.clear
+	release_item_manager.clear = function(...)
+		if in_coop() then
+			return true -- its time event goes
+		end
+		return item_clear(...)
+	end
+	RegisterScriptCallback("npc_on_item_drop", on_drop)
+	RegisterScriptCallback("actor_on_item_drop", function(item) on_drop(db.actor, item) end)
+	RegisterScriptCallback("npc_on_item_take", on_take)
+	RegisterScriptCallback("actor_on_item_take", function(item) on_take(db.actor, item) end)
+	coop_sync.on_event("coop_dropped", function(sender, payload)
+		local f = str_explode(payload, "\t")
+		local id, h = tonumber(f[1]), tonumber(f[3])
+		if id and f[2] and h then
+			dropped[id] = { f[2], h }
+		end
+	end)
+	-- kept with the world's save: the host's is the world
+	RegisterScriptCallback("save_state", function(m_data)
+		m_data.coop_dropped = in_coop() and dropped or nil
+	end)
+	RegisterScriptCallback("load_state", function(m_data)
+		dropped = m_data.coop_dropped or {}
+		m_data.coop_dropped = nil
+	end)
 end

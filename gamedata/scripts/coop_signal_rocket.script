@@ -1,0 +1,68 @@
+-- Co-op: a scene's signal rockets are the level's authority's: every player sees the same one go up.
+-- Scene logic launches a rocket by name with xr_effects.launch_signal_rocket (a condlist's %=launch_signal_rocket(name)%);
+-- each game ran its own logic and launched its own, or none. In co-op the level's authority launches it and tells the
+-- others (event signal_rocket), who launch theirs at once; a game whose own logic would launch one asks the authority
+-- (signal_rocket_ask), which launches it unless it is in the air already. A surge's or psi storm's rockets go by the
+-- world's timetable and aren't touched. Without co-op nothing changes.
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] signal rocket: " .. fmt, ...)
+	end
+end
+
+local function launch_here(name)
+	local rocket = db.signal_light and db.signal_light[name]
+	if rocket and not rocket:is_flying() then
+		rocket:launch()
+		return true
+	end
+	return false
+end
+
+-- the authority's: up here, and for everyone on the level
+local function launch(name, lvl)
+	if launch_here(name) then
+		coop_sync.send_event("signal_rocket", lvl, name)
+		dbg("%s launched on %s", name, lvl)
+	end
+end
+
+local function split(payload)
+	return string.match(payload or "", "^([^\t]*)\t(.*)$")
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local own = xr_effects.launch_signal_rocket
+	xr_effects.launch_signal_rocket = function(actor, obj, p)
+		local name = p and p[1]
+		if not (in_coop() and name) then
+			return own(actor, obj, p)
+		end
+		local lvl = level.name()
+		if coop.is_authority(lvl) then
+			launch(name, lvl)
+		else
+			coop_sync.send_event("signal_rocket_ask", lvl, name)
+		end
+	end
+	coop_sync.on_event("signal_rocket_ask", function(sender, payload)
+		local lvl, name = split(payload)
+		if lvl and db.actor and level.name() == lvl and coop.is_authority(lvl) then
+			launch(name, lvl)
+		end
+	end)
+	coop_sync.on_event("signal_rocket", function(sender, payload)
+		local lvl, name = split(payload)
+		if lvl and db.actor and level.name() == lvl and not coop.is_authority(lvl) and launch_here(name) then
+			dbg("%s launched by %s", name, sender)
+		end
+	end)
+end

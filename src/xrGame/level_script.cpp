@@ -195,7 +195,9 @@ void set_weather_smooth(LPCSTR weather_name)
     if (!Device.editor())
 #endif // #ifdef INGAME_EDITOR
     g_pGamePersistent->Environment().SetWeather(weather_name, false);
-    if (g_pGamePersistent->Environment().Current[1] && g_pGamePersistent->Environment().CurrentWeather)
+    // co-op: a blend runs: its frames stay, it ends into this weather
+    if (g_pGamePersistent->Environment().Current[1] && g_pGamePersistent->Environment().CurrentWeather &&
+        !g_pGamePersistent->Environment().IsBlending())
     {
         g_pGamePersistent->Environment().SelectEnv(
             g_pGamePersistent->Environment().CurrentWeather,
@@ -203,6 +205,25 @@ void set_weather_smooth(LPCSTR weather_name)
             g_pGamePersistent->Environment().GetGameTime());
     }
     
+}
+
+// co-op: into the weather from what is shown now over seconds (real), turn_seconds of them at most to the nearer
+// frame shown, the rain in rain_seconds; no step at any moment (CEnvironment::SetWeatherBlend)
+void set_weather_blend(LPCSTR weather_name, float seconds, float turn_seconds, float rain_seconds)
+{
+#ifdef INGAME_EDITOR
+	if (!Device.editor())
+#endif // #ifdef INGAME_EDITOR
+	{
+		CEnvironment& env = g_pGamePersistent->Environment();
+		const float factor = _max(env.fTimeFactor, 0.f);
+		env.SetWeatherBlend(weather_name, seconds * factor, turn_seconds * factor, rain_seconds * factor);
+	}
+}
+
+bool is_weather_blending()
+{
+	return g_pGamePersistent->Environment().IsBlending();
 }
 
 bool set_weather_fx(LPCSTR weather_name)
@@ -2770,6 +2791,8 @@ void CLevel::script_register(lua_State* L)
             def("get_weather_weight", get_weather_weight),
             def("set_weather_weight", set_weather_weight),
             def("set_weather_smooth", set_weather_smooth),
+			def("set_weather_blend", set_weather_blend),
+			def("is_weather_blending", is_weather_blending),
 
 			def("environment", environment),
 

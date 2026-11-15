@@ -87,6 +87,9 @@ namespace coop
 	static float g_hold_factor = 0.f;
 	static double g_hold_until = 0;
 	static u64 g_applied = 0;      // what we set last; 0: not yet in this level
+	// the server's own clock (UTC, ms) at g_utc_real: real time for the Zone's events, the same in every game
+	static bool g_utc_known = false;
+	static double g_utc_anchor = 0, g_utc_real = 0;
 	static u32 g_last_init = 0, g_last_log = 0;
 
 	static double target_at(double real)
@@ -138,6 +141,13 @@ namespace coop
 		const u8 flags = P.r_u8();
 		const u32 epoch = P.r_u32();
 		g_known = true;
+		// a server that sends its UTC time (older ones don't): half a round trip old when it came
+		if (P.r_elapsed() >= sizeof(u64))
+		{
+			g_utc_anchor = double(P.r_u64()) + ping_ms() / 2.;
+			g_utc_real = received;
+			g_utc_known = true;
+		}
 
 		if (!(flags & eTimeSet))
 		{
@@ -175,7 +185,7 @@ namespace coop
 			std::lock_guard<std::mutex> lock(g_inbox_lock);
 			g_inbox_new = false;
 		}
-		g_known = g_set = g_running = false;
+		g_known = g_set = g_running = g_utc_known = false;
 		g_epoch = g_hold_epoch = 0;
 		g_hold_until = 0;
 		g_applied = 0;
@@ -227,7 +237,11 @@ namespace coop
 		}
 
 		const u64 local = tm->game_time();
-		u64 want = u64(target());
+		// The A-Life clock counts on from the frame's start (Device.dwTimeGlobal), so it takes the world's time of
+		// that moment, not of now: the work of the frame before this point (seconds in the first frames after a
+		// load) would otherwise count twice, and the clock would run ahead each frame until the frames got short
+		const u32 into_frame = Device.TimerAsync() - Device.dwTimeGlobal; // wraps when the timers disagree: 0 then
+		u64 want = u64(target_at(real_ms() - (into_frame < 60000 ? double(into_frame) : 0.)));
 		// never back by a little: wait for the world. Not right after a load: the level's clock ran on by the
 		// loading time from the save's and nothing has seen it yet, so it simply takes the world's
 		if (g_applied && want < g_applied && double(g_applied - want) < settings().max_hold_s * 1000.)
@@ -329,5 +343,10 @@ namespace coop
 	double clock_ms()
 	{
 		return g_set ? target() : 0.;
+	}
+
+	double server_utc_s()
+	{
+		return g_utc_known ? (g_utc_anchor + (real_ms() - g_utc_real)) / 1000. : 0.;
 	}
 }

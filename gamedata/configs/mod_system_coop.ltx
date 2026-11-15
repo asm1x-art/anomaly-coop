@@ -335,6 +335,18 @@ hold_ms              = 3000  ; real ms: after our own jump, how long older news 
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
 
+; Co-op: a psi storm's vortices are the world's (coop_psi_vortex.script). The level's authority rolls one stream of them
+; by the world's storm, as Anomaly does for its one actor, each near the next player on the level in turn; every game
+; shows the same ones at the same points and seconds.
+[coop_psi_vortex]
+period_min_s         = 8     ; real s: shortest time from one vortex on the level to the next (Anomaly's 8)
+period_max_s         = 16    ; real s: longest (Anomaly's 16)
+distance_max         = 150   ; m: how far from the player whose turn it is a vortex may come down (Anomaly's 150)
+keep_s               = 30    ; real s: how long a vortex stays in the server's fact (it strikes at 20 s, ends at 25)
+late_s               = 15    ; real s: a vortex older than this when it reaches us (a join, a level change) isn't shown
+peer_stale_s         = 10    ; real s: a player not heard from for this long has no turn
+look_ms              = 250   ; real ms: how often the fact is looked at
+
 ; Co-op: what a player leaves behind (coop_cleanup.script). As a player leaves the world or saves, bodies and boxes
 ; near them with good things are kept from the game's cleanup for a while; the host releases bodies with nothing
 ; worth taking. Times are the world's game hours; prices are the items' "cost".
@@ -352,6 +364,12 @@ clean_interval_s      = 300   ; real s between the host's cleaner passes
 keep_bodies_per_level = 5     ; a level keeps this many bodies even with nothing on them
 max_per_pass          = 10    ; at most this many released per level each pass
 min_player_distance   = 200   ; m: no body this close to a player goes (on a player's level none go at all)
+; the game's own cleanup in co-op (the limits are the server's rules corpse_max_count, corpse_min_dist and
+; release_dropped_items, the admin window's "Зона")
+body_stay_s           = 180   ; real s a body lies before the level's authority may release it over the limit
+dropped_check_s       = 60    ; real s between the sim master's looks at the dropped things
+dropped_hours         = 4     ; game hours a dropped thing nobody took lies (on a level with no player) before it goes
+dropped_hours_off     = 12    ; the same with the rule release_dropped_items off
 
 ; Co-op: a player of these factions isn't hurt by the Brain Scorcher and the Miracle Machine (coop_psi.script). In
 ; story mode Anomaly turns both off for the whole game when one starts as one of them (ui_mm_faction_select,
@@ -437,6 +455,12 @@ escape_distance     = 150 ; m: "away" is farther than this from every living one
                           ; out of the game count as away too)
 contact_refresh_min = 10  ; game min: while the player stays near, the time of the last contact is noted this often
 check_s             = 5   ; real s between checks
+
+; Co-op: which layer of an artefact zone's anomalies is on (coop_anom_layers.script): a hash of the zone's name and its
+; level's seed, the server's fact "anom_layer:<level>", rolled by the level's authority after a surge, a psi storm or a
+; Dead calm
+[coop_anom_layers]
+min_gap_s = 60 ; real s: a level's seed is rolled again by the same game no sooner (a surge's end comes more than once)
 
 ; Co-op: helicopters (src/xrGame/coop/coop_heli.h, gamedata/scripts/coop_heli.script). The level's authority flies
 ; them; the others' are puppets that follow it.

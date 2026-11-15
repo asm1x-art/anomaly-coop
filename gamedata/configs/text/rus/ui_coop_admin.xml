@@ -336,6 +336,9 @@
 	<string id="st_coop_adm_tm_ai">
 		<text>Зрение ИИ</text>
 	</string>
+	<string id="st_coop_adm_tm_ash">
+		<text>Пепельный фронт: сравнение</text>
+	</string>
 	<string id="st_coop_adm_test_ask">
 		<text>Это меняет общий мир у всех игроков. Вернуть - только откатом мира.</text>
 	</string>
@@ -783,6 +786,15 @@
 	<string id="st_coop_tests_ai_grass">
 		<text>Трава прячет: вкл/выкл</text>
 	</string>
+	<string id="st_coop_tests_ash_size">
+		<text>Пепел: размер хлопьев вблизи</text>
+	</string>
+	<string id="st_coop_tests_ash_patch">
+		<text>Пепел на земле: ровно/пятнами</text>
+	</string>
+	<string id="st_coop_tests_ash_config">
+		<text>Пепел: как в конфиге</text>
+	</string>
 	<string id="st_coop_tests_no_bunker">
 		<text>Бункер не найден в графе: пакет локации не подключился.</text>
 	</string>
@@ -851,6 +863,18 @@
 	</string>
 	<string id="st_coop_tests_grass_off">
 		<text>Трава больше не прячет.</text>
+	</string>
+	<string id="st_coop_tests_ash_size_done">
+		<text>Хлопья пепла вблизи: вариант %s из %s (%s), у всех игроков. Старые хлопья долетают ещё несколько секунд.</text>
+	</string>
+	<string id="st_coop_tests_ash_even">
+		<text>Пепел на земле ложится и сходит ровно, у всех игроков.</text>
+	</string>
+	<string id="st_coop_tests_ash_patchy">
+		<text>Пепел на земле ложится и сходит пятнами, у всех игроков.</text>
+	</string>
+	<string id="st_coop_tests_ash_config_done">
+		<text>Пепел: снова как в конфиге (fall_size, ground_patchiness), у всех игроков.</text>
 	</string>
 	<string id="st_coop_tests_sees">
 		<text>ВИДИТ</text>
@@ -1053,5 +1077,51 @@
 	</string>
 	<string id="st_coop_ev_news_stopped">
 		<text>%s остановил событие: %s.</text>
+	</string>
+	<!-- the Zone: Anomaly's own options of the world, the server's (coop_world_options.script) -->
+	<string id="st_coop_adm_sec_zone">
+		<text>Зона</text>
+	</string>
+	<string id="st_coop_adm_zone_sub">
+		<text>Настройки Anomaly, одни на весь мир: у игроков их нет в меню опций. Сразу; частота выброса - со следующего, меткость NPC - с загрузки локации.</text>
+	</string>
+	<string id="st_coop_adm_zg_surge">
+		<text>Выбросы</text>
+	</string>
+	<string id="st_coop_adm_zg_psi">
+		<text>Пси-штормы</text>
+	</string>
+	<string id="st_coop_adm_zg_alife">
+		<text>Население и отряды</text>
+	</string>
+	<string id="st_coop_adm_zg_npc">
+		<text>NPC, трупы и брошенные вещи</text>
+	</string>
+	<string id="st_coop_adm_h_surge_hours">
+		<text>Следующий выброс - через случайное время от половины этого до всего (опция Anomaly «частота выброса»).</text>
+	</string>
+	<string id="st_coop_adm_h_excl_dist">
+		<text>Офлайн-отряд ближе этого к игроку не выходит в онлайн (не появляется на глазах). 0 - без проверки.</text>
+	</string>
+	<string id="st_coop_adm_h_corpse_max_count">
+		<text>Сверх этого числа трупов на локации игра её хозяина убирает старые трупы дальше «Труп не убирается ближе к игроку» от всех игроков. При уходе с локации трупы больше не убираются.</text>
+	</string>
+	<string id="st_coop_adm_h_release_dropped_items">
+		<text>Брошенную вещь, которую никто не поднял, убирает мастер мира (хост) через 4 игровых часа (выключено - через 12), и только на локации, где нет игроков.</text>
+	</string>
+	<string id="st_coop_adm_sec_disguise">
+		<text>Маскировка</text>
+	</string>
+	<string id="st_coop_adm_sec_silent">
+		<text>Тихие убийства</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_on">
+		<text>Что выдаёт игрока в чужой форме</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_factors">
+		<text>Насколько сильно, % (дистанция и время - как в Anomaly)</text>
+	</string>
+	<string id="st_coop_adm_zg_sk">
+		<text>Убийство, которого никто не заметил, не ставят в вину</text>
 	</string>
 </string_table>

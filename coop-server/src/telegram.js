@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { FACTIONS } from './settings.js';
-import { WORLD, RULES, FACTION_NAMES, yesNo, setSetting, setFaction, saveLabel, WORLD_EVENTS, worldEventOf, eventsText, eventActions, zoneLevels } from './admin_commands.js';
+import { WORLD, RULES, FACTION_NAMES, yesNo, shownValue, setSetting, setFaction, saveLabel, WORLD_EVENTS, worldEventOf, eventsText, eventActions, zoneLevels } from './admin_commands.js';
 
 // The Telegram bot: what the admin page does, for the admins listed in server.cfg, and news for them (a player
 // joined or left, the host went down, a save failed). Long polling (getUpdates), so no port has to be open;
@@ -144,9 +144,11 @@ export function startTelegram({ token, admins, coop, log = console.log, fetch = 
 
   const settingsText = () => {
     const s = coop.settings();
-    const line = (values) => ([key, title, min, max]) => min === undefined
-      ? `${key} = ${yesNo(values[key])} · ${title}`
-      : `${key} = ${values[key]} · ${title} (${min}–${max})`;
+    const line = (values) => (entry) => {
+      const [key, title, min, max, choices] = entry;
+      const range = min === undefined ? '' : choices ? ` (${choices.map((c, i) => `${i + 1} — ${c}`).join(', ')})` : ` (${min}–${max})`;
+      return `${key} = ${shownValue(entry, values[key])} · ${title}${range}`;
+    };
     return ['Мир (при создании нового мира; сложность и экономика — со следующей загрузки):', ...WORLD.map(line(s.world)),
       '', 'Правила (действуют сразу):', ...RULES.map(line(s.rules)),
       '', `Фракции: ${s.factions.map((f) => FACTION_NAMES[f] ?? f).join(', ')} — /factions`,

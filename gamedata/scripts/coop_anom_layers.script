@@ -1,0 +1,285 @@
+-- Co-op: which layer of an artefact zone's anomalies is on is the world's, not each game's.
+-- An Anomaly artefact zone (bind_anomaly_zone, layers_count > 1) has several sets of fields and mines, its layers,
+-- one of them on. Anomaly rolls it with math.random when the binder is made and again after every surge and psi
+-- storm (force_spawn_artefacts -> respawn_artefacts_and_replace_anomaly_zone). In co-op only a level's authority made
+-- the second roll and nobody told the others: a friend walked through an anomaly that wasn't there for you.
+-- Now each level has a seed, a fact of the server: "anom_layer:<level>" = a number (none yet: 0). A zone's layer is a
+-- hash of its name and its level's seed, the same in every game.
+--   roll       the level's authority (its owner; the sim master - the host - for a level nobody is on) rolls a new
+--              seed where Anomaly would roll the layers: a surge's or psi storm's end (every level it is the authority
+--              of: levels nobody is on too), the end of a Dead calm on it (coop_zone_calm). Not twice in min_gap_s.
+--   apply      every game puts its zones on their seed's layer when a zone comes online (a load, a join, a level
+--              change, the host's restart), when a field comes online after its zone, when the seed changes.
+--   artefacts  the authority spawns them on the paths of that layer (force_spawn_artefacts takes the seed's layer,
+--              not math.random); which artefact and where on the path stay its own rolls, shared (coop_sync, af_quality).
+-- Settings: [coop_anom_layers] in mod_system_coop.ltx. Without co-op nothing changes.
+
+local S = "coop_anom_layers"
+local FACT = "anom_layer:"
+
+local rolled_at = {} -- level -> time_global() of our last roll
+local owner_of = {}  -- field or mine name -> name of the zone whose layers list it
+local pending = {}   -- field binders come online after their zone: put right on the next update
+
+local function in_coop()
+	return coop and coop.connected and coop.connected()
+end
+
+local function dbg(fmt, ...)
+	if get_console():get_integer("coop_debug") == 1 then
+		printf("[coop dbg] anomaly layers: " .. fmt, ...)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the layer a seed gives
+
+local TWO32 = 4294967296
+
+-- (h xor c) * 1000003 mod 2^32: exact in doubles (h < 2^32, the factor < 2^20)
+local function mix(h, c)
+	return (bit.bxor(h, c) % TWO32) * 1000003 % TWO32
+end
+
+-- a 32-bit hash of the zone's name and the seed, the same in every game
+function hash(name, n)
+	local s = tostring(name) .. ":" .. tostring(n)
+	local h = 2166136261
+	for i = 1, #s do
+		h = mix(h, string.byte(s, i))
+	end
+	h = mix(h, bit.rshift(h, 16))
+	return bit.bxor(h, bit.rshift(h, 13)) % TWO32
+end
+
+function seed(lvl)
+	return tonumber(coop.fact(FACT .. lvl)) or 0
+end
+
+-- "layer_<n>" for the zone on its level as the world's seed has it
+local function layer_for(zone, lvl)
+	local n = math.floor(tonumber(zone.layers_count) or 1)
+	if n <= 1 then
+		return "layer_1"
+	end
+	return "layer_" .. (1 + hash(zone.object:name(), seed(lvl)) % n)
+end
+
+local function set_layer(zone, layer)
+	if not (zone.respawn_tries_table and zone.respawn_tries_table[layer] and zone.forces_table[layer]) then
+		return false
+	end
+	zone.cur_layer = layer
+	zone.respawn_tries = zone.respawn_tries_table[layer]
+	zone.max_artefacts = zone.max_artefacts_table[layer]
+	zone.applying_force_xz = zone.forces_table[layer].xz
+	zone.applying_force_y = zone.forces_table[layer].y
+	return true
+end
+
+local function on_now(zone)
+	local on = {}
+	for _, t in ipairs({ zone.fields_table, zone.mines_table }) do
+		for _, name in ipairs(t and t[zone.cur_layer] or {}) do
+			on[name] = true
+		end
+	end
+	return on
+end
+
+-- a field of the zone as its layer has it; on only if the zone isn't turned off (as disable_anomaly_fields), and
+-- through set_enable, so a Dead calm keeps it out (coop_zone_calm)
+local function put_field(zone, field, want)
+	if not (field and field.object) then
+		return
+	end
+	local is_on = field.object:is_enabled_anomaly()
+	if want and not is_on and not zone.turned_off then
+		field:set_enable(true)
+	elseif not want and is_on then
+		field:set_enable(false)
+	end
+end
+
+local function put_fields(zone)
+	local on = on_now(zone)
+	local fields = bind_anomaly_field.fields_by_names
+	for _, t in ipairs({ zone.fields_table, zone.mines_table }) do
+		for _, list in pairs(t or {}) do
+			for _, name in ipairs(list) do
+				put_field(zone, fields[name], on[name])
+			end
+		end
+	end
+end
+
+-- the zones of our level onto its seed's layers (another game rolled, or we did)
+local function switch_level(lvl)
+	if not db.actor or level.name() ~= lvl then
+		return
+	end
+	local n = 0
+	for _, zone in pairs(db.anomaly_by_name or {}) do
+		if zone.custom_placement and zone.object then
+			local layer = layer_for(zone, lvl)
+			if layer ~= zone.cur_layer and set_layer(zone, layer) then
+				put_fields(zone)
+				n = n + 1
+			end
+		end
+	end
+	if n > 0 then
+		printf("[coop] anomaly layers on %s: %s zone(s) onto the world's layers (seed %s)", lvl, n, seed(lvl))
+	end
+end
+
+-------------------------------------------------------------------------------
+-- the roll (the level's authority)
+
+function roll(lvl)
+	if not (in_coop() and lvl and lvl ~= "") then
+		return false
+	end
+	local now = time_global()
+	local gap = (ini_sys:r_float_ex(S, "min_gap_s") or 60) * 1000
+	if rolled_at[lvl] and now - rolled_at[lvl] < gap then
+		return false
+	end
+	rolled_at[lvl] = now
+	local value = tostring(math.random(1, 2147483646))
+	coop.report_fact(FACT .. lvl, value)
+	dbg("%s rolled, seed %s", lvl, value)
+	switch_level(lvl)
+	return true
+end
+
+-- a surge or psi storm is over: the levels we are the authority of (ours, as the server's levels say; the sim master
+-- has the ones nobody is on), as Anomaly would: every outdoor level, and the one we stand on
+local function roll_after_storm()
+	local here = level.name()
+	local gg, gini, sim = game_graph(), game_ini(), alife()
+	local n = 0
+	for l in gg:levels() do
+		local lvl = sim:level_name(l.id)
+		local weather = lvl and gini:r_string_ex(lvl, "weathers")
+		if lvl and (lvl == here or (weather and weather ~= "indoor")) and coop.is_authority(lvl) and roll(lvl) then
+			n = n + 1
+		end
+	end
+	if n > 0 then
+		printf("[coop] anomaly layers: new seeds for %s level(s), ours to roll", n)
+	end
+end
+
+-------------------------------------------------------------------------------
+
+local function upvalue(fn, wanted)
+	for i = 1, 255 do
+		local name, value = debug.getupvalue(fn, i)
+		if not name then
+			return
+		end
+		if name == wanted then
+			return value
+		end
+	end
+end
+
+local function on_update()
+	if next(pending) == nil then
+		return
+	end
+	local fields = bind_anomaly_field.fields_by_names
+	for name in pairs(pending) do
+		pending[name] = nil
+		local zone = owner_of[name] and db.anomaly_by_name[owner_of[name]]
+		if zone and zone.object and zone.custom_placement then
+			put_field(zone, fields[name], on_now(zone)[name])
+		end
+	end
+end
+
+function on_game_start()
+	if not coop then
+		return -- not the co-op engine
+	end
+	local zone_class = bind_anomaly_zone.anomaly_zone_binder
+	local field_class = bind_anomaly_field.anomaly_field_binder
+
+	-- a zone coming online takes its level's layer before Anomaly puts its fields (refresh -> disable_anomaly_fields)
+	local zone_spawn = zone_class.net_spawn
+	zone_class.net_spawn = function(self, se_abstract)
+		if in_coop() and self.custom_placement and self.object then
+			set_layer(self, layer_for(self, level.name()))
+			local name = self.object:name()
+			for _, t in ipairs({ self.fields_table, self.mines_table }) do
+				for _, list in pairs(t or {}) do
+					for _, field in ipairs(list) do
+						owner_of[field] = name
+					end
+				end
+			end
+		end
+		return zone_spawn(self, se_abstract)
+	end
+
+	-- a field coming online after its zone: as the zone's layer has it (on the next update, once it is all in)
+	local field_spawn = field_class.net_spawn
+	field_class.net_spawn = function(self, se_abstract)
+		if not field_spawn(self, se_abstract) then
+			return false
+		end
+		local name = in_coop() and self.object and self.object:name()
+		if name and owner_of[name] then
+			pending[name] = true
+		end
+		return true
+	end
+
+	-- the authority's respawn after a surge or a calm: the layer its level's seed gives, not a roll of its own
+	local respawn = zone_class.respawn_artefacts_and_replace_anomaly_zone
+	zone_class.respawn_artefacts_and_replace_anomaly_zone = function(self, ...)
+		if not (in_coop() and self.custom_placement and self.object) then
+			return respawn(self, ...)
+		end
+		local n = self.layers_count
+		local want = tonumber(string.match(layer_for(self, level.name()), "%d+"))
+		local random = math.random
+		math.random = function(a, b, ...)
+			if a == 1 and b == n then -- Anomaly's roll of the layer, the first math.random in there
+				math.random = random
+				return want
+			end
+			return random(a, b, ...)
+		end
+		local res = { pcall(respawn, self, ...) }
+		math.random = random
+		if not res[1] then
+			error(res[2], 0)
+		end
+		return unpack(res, 2)
+	end
+
+	-- the seeds are rolled before Anomaly's own end of a surge spawns the artefacts on our level
+	local interaction = upvalue(bind_anomaly_zone.on_game_start, "actor_on_interaction")
+	local function on_interaction(typ, obj, name)
+		if in_coop() and typ == "anomalies" and (name == "emission_end" or name == "psi_storm_end") then
+			roll_after_storm()
+		end
+		if interaction then
+			return interaction(typ, obj, name)
+		end
+	end
+	if type(interaction) == "function" then
+		UnregisterScriptCallback("actor_on_interaction", interaction)
+	else
+		interaction = nil
+		printf("! [coop] bind_anomaly_zone's actor_on_interaction not found: anomaly layers rolled after its artefacts")
+	end
+	RegisterScriptCallback("actor_on_interaction", on_interaction)
+
+	coop_facts.on_fact(FACT, function(fact, value)
+		switch_level(string.sub(fact, #FACT + 1))
+	end)
+	RegisterScriptCallback("actor_on_update", on_update)
+end

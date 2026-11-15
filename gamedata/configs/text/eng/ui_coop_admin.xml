@@ -336,6 +336,9 @@
 	<string id="st_coop_adm_tm_ai">
 		<text>AI sight</text>
 	</string>
+	<string id="st_coop_adm_tm_ash">
+		<text>Ash front: comparison</text>
+	</string>
 	<string id="st_coop_adm_test_ask">
 		<text>This changes the shared world for everyone. Only a rollback takes it back.</text>
 	</string>
@@ -783,6 +786,15 @@
 	<string id="st_coop_tests_ai_grass">
 		<text>Grass hides: on/off</text>
 	</string>
+	<string id="st_coop_tests_ash_size">
+		<text>Ash: near flakes' size</text>
+	</string>
+	<string id="st_coop_tests_ash_patch">
+		<text>Ash on the ground: even/patchy</text>
+	</string>
+	<string id="st_coop_tests_ash_config">
+		<text>Ash: as in the config</text>
+	</string>
 	<string id="st_coop_tests_no_bunker">
 		<text>No bunker in the graph: the level pack is missing.</text>
 	</string>
@@ -851,6 +863,18 @@
 	</string>
 	<string id="st_coop_tests_grass_off">
 		<text>Grass no longer hides.</text>
+	</string>
+	<string id="st_coop_tests_ash_size_done">
+		<text>Near ash flakes: set %s of %s (%s), for every player. The old flakes still fall for a few seconds.</text>
+	</string>
+	<string id="st_coop_tests_ash_even">
+		<text>The ash on the ground settles and goes evenly, for every player.</text>
+	</string>
+	<string id="st_coop_tests_ash_patchy">
+		<text>The ash on the ground settles and goes in patches, for every player.</text>
+	</string>
+	<string id="st_coop_tests_ash_config_done">
+		<text>Ash: as in the config again (fall_size, ground_patchiness), for every player.</text>
 	</string>
 	<string id="st_coop_tests_sees">
 		<text>SEES</text>
@@ -1053,5 +1077,51 @@
 	</string>
 	<string id="st_coop_ev_news_stopped">
 		<text>%s stopped an event: %s.</text>
+	</string>
+	<!-- the Zone: Anomaly's own options of the world, the server's (coop_world_options.script) -->
+	<string id="st_coop_adm_sec_zone">
+		<text>Zone</text>
+	</string>
+	<string id="st_coop_adm_zone_sub">
+		<text>Anomaly's options of the world, one for everyone: the players' options menu doesn't have them. At once; surge frequency from the next one, NPC aim from a level load.</text>
+	</string>
+	<string id="st_coop_adm_zg_surge">
+		<text>Surges</text>
+	</string>
+	<string id="st_coop_adm_zg_psi">
+		<text>Psi storms</text>
+	</string>
+	<string id="st_coop_adm_zg_alife">
+		<text>Population and squads</text>
+	</string>
+	<string id="st_coop_adm_zg_npc">
+		<text>NPCs, bodies and dropped things</text>
+	</string>
+	<string id="st_coop_adm_h_surge_hours">
+		<text>The next surge comes after a random time from half of this to all of it (Anomaly's "emission frequency").</text>
+	</string>
+	<string id="st_coop_adm_h_excl_dist">
+		<text>An offline squad this close to a player doesn't come online (doesn't appear in front of him). 0: no such check.</text>
+	</string>
+	<string id="st_coop_adm_h_corpse_max_count">
+		<text>Over this many bodies on a level, its authority's game releases old ones farther than the minimum distance from every player. Leaving a level releases no bodies any more.</text>
+	</string>
+	<string id="st_coop_adm_h_release_dropped_items">
+		<text>A dropped thing nobody took is released by the world's master (the host) after 4 game hours (off: 12), and only on a level with no player on it.</text>
+	</string>
+	<string id="st_coop_adm_sec_disguise">
+		<text>Disguise</text>
+	</string>
+	<string id="st_coop_adm_sec_silent">
+		<text>Silent kills</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_on">
+		<text>What gives a disguised player away</text>
+	</string>
+	<string id="st_coop_adm_zg_dg_factors">
+		<text>How much, % (distance and time as in Anomaly)</text>
+	</string>
+	<string id="st_coop_adm_zg_sk">
+		<text>A kill nobody noticed is not put on the killer</text>
 	</string>
 </string_table>

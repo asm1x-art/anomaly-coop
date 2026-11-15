@@ -31,6 +31,12 @@ namespace coop
 	void send_inventory_states(); // all we carry: with our progress, at every save and on the way out
 	void apply_object_state(NET_Packet& P); // M_OBJECT_STATE
 	void write_item_state(NET_Packet& P, CSE_ALifeDynamicObject* object); // as M_OBJECT_STATE carries it
+	// An item no player holds, as our game has it (a body's loot this game decided, coop_items.script): to the others,
+	// who take it whether the item is online there or not. False for one only we have, or none.
+	bool send_world_item_state(u16 id);
+	// The modular scope on a weapon with a scope and no index for it (CWeapon::net_Spawn): the one kept with it (se var
+	// "scope", coop_items.script), else one of 1..count-1 by its id and section: the same in every game, every load.
+	u8 weapon_scope(u16 id, LPCSTR section, u32 count);
 	// The things of a save our character went back to (M_SNAPSHOT_THINGS: u16 count, u16 size and the state of each),
 	// once the world is loaded and its journal replayed: one on us gets its state back; one somewhere else in the
 	// world now (with a player, on the ground, in a box) stays there, never twice; one the world doesn't have any more
@@ -56,8 +62,11 @@ namespace coop
 
 	// sends an object to the others as a whole, as when our actor takes something new
 	void share_object(CSE_ALifeDynamicObject* object);
-	// made here this session and not the others' yet (shared once our actor takes it)
+	// made here this session and not the others' yet (shared once our actor takes it, or share_local)
 	bool is_local_object(u16 id);
+	// Lua: one of ours goes to the others now (a box's loot the world gave us, coop_physics.script); false when it is
+	// gone or theirs already
+	bool share_local(u16 id);
 	// Lua: a shared object's state as our A-Life has it now goes to the others (M_OBJECT_STATE), for the copies offline
 	// there: data a script sets after the spawn went (a helicopter's, utils_stpk.set_heli_data). False: none, or ours only
 	bool send_object_state(u16 id);

@@ -238,7 +238,17 @@ tests=1` : ''));
   const ADMIN_EVENT = 'coop_admin';
   const ADMIN_INFO = 'coop_admin_info';
   const EVENTS_INFO = 'coop_admin_events'; // the world's game on its events (coop_world_events.script)
-  const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  const JOURNAL_EVENTS = new Set(['loot_created', 'loot_kept', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  // facts two games may change at the same moment (a door two players use at once, coop_physics.script): the sender
+  // is told the server's word too, so the last change the server took is the one every game ends with
+  const ECHOED_FACTS = ['door:'];
+  // Two players taking one thing at once (an item on the ground both picked up before hearing of the other): each
+  // game moved it into the other's shadow when the other's take came, and nobody had it. The first take the server
+  // hears is the world's; a second one this soon, of a thing the first one holds, isn't passed on (the second game has
+  // the first one's take, which moves the thing out of its hands)
+  const PLACE_SENDER_ACTOR = 2; // M_ITEM_PARENT's place: the sender's actor took it (coop_world.cpp EPlace)
+  const TAKE_RACE_MS = 10000;
+  const takes = new Map(); // item id -> { by: client id, at }: its last take, until it moves again
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
     if (!storage.worldInfo()) return;
@@ -393,11 +403,12 @@ tests=1` : ''));
   // The world's clock (clock.js): every game in the world runs its game time. It runs while someone is in the
   // world and the world isn't paused, and stands still otherwise.
   const timePayload = () => {
-    const p = Buffer.alloc(17);
+    const p = Buffer.alloc(25);
     p.writeBigUInt64LE(BigInt(clock.now()), 0);
     p.writeFloatLE(clock.factor(), 8);
     p[12] = (clock.running() ? TIME_FLAG.RUNNING : 0) | (clock.isSet() ? TIME_FLAG.SET : 0);
     p.writeUInt32LE(clock.epoch(), 13);
+    p.writeBigUInt64LE(BigInt(Date.now()), 17); // real time (UTC ms): the Zone's events' clock, the same in every game
     return p;
   };
   const announceTime = () => {
@@ -605,7 +616,9 @@ tests=1` : ''));
         i.god ?? '', i.money ?? '', at ? at.x.toFixed(1) : '', at ? at.y.toFixed(1) : '', at ? at.z.toFixed(1) : '']);
     }
     for (const [group, list] of [['world', WORLD], ['rules', RULES]])
-      for (const [key, title, min, max] of list) lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title]);
+      for (const [key, title, min, max, choices] of list) {
+        lines.push(['setting', group, key, Number(s[group][key]), min ?? '', max ?? '', title, choices ? choices.join('|') : '']);
+      }
     for (const f of FACTIONS) lines.push(['faction', f, s.factions.includes(f) ? 1 : 0, FACTION_NAMES[f] ?? f]);
     const offset = Math.max(0, Math.min(client?.adminSaves ?? 0, Math.max(0, st.saves.length - 1)));
     lines.push(['saves', st.saves.length, offset]);
@@ -895,7 +908,10 @@ tests=1` : ''));
             send(M.FACT, Buffer.concat([stringZ(key), stringZ(kept || value)]));
             break;
           }
-          if (key && storage.setFact(key, value)) broadcast(id, M.FACT, Buffer.from(payload));
+          if (key && storage.setFact(key, value)) {
+            broadcast(id, M.FACT, Buffer.from(payload));
+            if (ECHOED_FACTS.some((prefix) => key.startsWith(prefix))) send(M.FACT, Buffer.from(payload));
+          }
           break;
         }
         case M.LOG: {
@@ -1145,6 +1161,20 @@ tests=1` : ''));
         case M.OBJECT_SPAWN:
         case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
+          if ((type === M.ITEM_PARENT || type === M.OBJECT_RELEASE) && payload.length >= 3) {
+            const item = payload.readUInt16LE(0);
+            const at = payload.indexOf(0, 2) + 1;
+            const taken = takes.get(item);
+            if (type === M.ITEM_PARENT && at > 0 && payload[at] === PLACE_SENDER_ACTOR) {
+              const now = Date.now();
+              if (taken && taken.by !== id && clients.has(taken.by) && now - taken.at < TAKE_RACE_MS) {
+                log(`[${id}] '${client.name}' took item ${item} that '${clients.get(taken.by).name}' took ${now - taken.at} ms before: not passed on`);
+                break;
+              }
+              takes.set(item, { by: id, at: now });
+              if (takes.size > 4096) for (const [k, t] of takes) if (now - t.at >= TAKE_RACE_MS) takes.delete(k);
+            } else takes.delete(item);
+          }
           if (type === M.SCRIPT_EVENT) {
             const name = readStringZ(payload, 0);
             if (name === ADMIN_EVENT) break; // the server's own: a game may not send it

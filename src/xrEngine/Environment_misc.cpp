@@ -911,6 +911,7 @@ void CEnvironment::unload()
 
 void CEnvironment::Reload()
 {
+	bBlend = false; // its frames go
 	EnvsMapIt _I, _E;
 	// clear weathers
 	_I = WeatherCycles.begin();

@@ -39,7 +39,7 @@ function connect(port) {
 // the world's clock as a TIME message tells it
 function timeOf(p) {
   return { game: Number(p.readBigUInt64LE(0)), factor: p.readFloatLE(8), running: (p[12] & 1) !== 0, set: (p[12] & 2) !== 0,
-    epoch: p.readUInt32LE(13) };
+    epoch: p.readUInt32LE(13), utc: p.length >= 25 ? Number(p.readBigUInt64LE(17)) : null };
 }
 
 function hello(name, version = PROTOCOL_VERSION, build = 'dev') {
@@ -533,6 +533,19 @@ test('the admin window: the admin password, then the admin page commands; the st
     assert.match(text(await until(a, M.ADMIN_RESULT)), /3$/);
     assert.equal(server.coop.settings().rules.group_max, 3);
     assert.match(text(await until(a, M.ADMIN_STATE)), /setting\trules\tgroup_max\t3/);
+    // a Zone's choice: its values' names in the state, set by name or number, every game told at once
+    assert.deepEqual(state.find((l) => l[2] === 'surge_fate'), ['setting', 'rules', 'surge_fate', '2', '1', '4',
+      'Выброс: NPC вне укрытия', 'гибнут в конце|гибнут на волне|становятся зомби|их разрывает']);
+    assert.equal(state.find((l) => l[2] === 'surge')[4], '');
+    a.send(M.ADMIN_COMMAND, line('set\tsurge_fate\tстановятся зомби'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /: становятся зомби \(3\)$/);
+    for (let i = 0; i < 100 && !/^surge_fate=3$/m.test(b.settings.at(-1)); i++) await new Promise((r) => setTimeout(r, 10));
+    assert.match(b.settings.at(-1), /^surge_fate=3$/m);
+    await until(a, M.ADMIN_STATE);
+    a.send(M.ADMIN_COMMAND, line('set\tsurge_fate\t9'));
+    assert.match(text(await until(a, M.ADMIN_RESULT)), /от 1 до 4: 1 — гибнут в конце/);
+    assert.equal(server.coop.settings().rules.surge_fate, 3);
+    await until(a, M.ADMIN_STATE);
     a.send(M.ADMIN_COMMAND, line('faction\tmonolith\toff'));
     assert.match(text(await until(a, M.ADMIN_RESULT)), /Монолит: нет/);
     assert.ok(!server.coop.settings().factions.includes('monolith'));
@@ -1036,6 +1049,8 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     master.send(M.ITEM_PARENT, Buffer.from('item 1'));
     master.send(M.SCRIPT_EVENT, event('news', 'hello'));
     master.send(M.SCRIPT_EVENT, event('stash_opened', '77'));
+    master.send(M.SCRIPT_EVENT, event('loot_ask', '78\tbody'));
+    master.send(M.SCRIPT_EVENT, event('loot_kept', '78\tbody'));
     master.send(M.ENTITY_DEATH, Buffer.from('death'));
     master.send(M.NPC_STATES, Buffer.from('npcs'));
     await roundTrip(master);
@@ -1055,7 +1070,7 @@ test('saves: the master saves when asked; a player coming in gets the last save 
     }
     const by = (type, payload, id = 2) => Buffer.concat([u16le(type), ...(id ? [u32le(id)] : []), payload]);
     assert.deepEqual(journal, [by(M.ITEM_PARENT, Buffer.from('item 1')), by(M.SCRIPT_EVENT, event('stash_opened', '77')),
-      by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
+      by(M.SCRIPT_EVENT, event('loot_kept', '78\tbody')), by(M.ENTITY_DEATH, Buffer.from('death'), 0)]);
     assert.equal(names.readUInt16LE(0), 3);
     assert.deepEqual(readStringsZ(names, 2 + 4, 1), ['menu']);
     assert.ok(!(await drain(master)).includes(M.SAVE_NOW));
@@ -1441,6 +1456,108 @@ test('facts: kept by the server, passed on when they change, given with the worl
   }
 });
 
+// the facts that came before a round trip's PONG, as [key, value]
+async function factsBefore(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const got = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return got;
+    if (msg.type === M.FACT) got.push(readStringsZ(msg.payload, 0, 2));
+  }
+}
+
+test('facts: a door two games change at once ends the same in both (its fact goes back to the sender too)', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@open'));
+    assert.deepEqual(await factsBefore(a), [['door:bar_door_1', 'ph_door@open']]); // the server's word, to us too
+    assert.deepEqual(await factsBefore(b), [['door:bar_door_1', 'ph_door@open']]);
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@open')); // no change: nobody is told
+    assert.deepEqual(await factsBefore(a), []);
+
+    // both at once: whichever the server takes last, both games hear it last
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@close'));
+    b.send(M.FACT, fact('door:bar_door_1', 'ph_door@free'));
+    const gotA = await factsBefore(a), gotB = await factsBefore(b);
+    gotA.push(...await factsBefore(a));
+    gotB.push(...await factsBefore(b));
+    const last = server.coop.facts()['door:bar_door_1'];
+    assert.ok(last === 'ph_door@close' || last === 'ph_door@free');
+    assert.deepEqual(gotA.at(-1), ['door:bar_door_1', last]);
+    assert.deepEqual(gotB.at(-1), ['door:bar_door_1', last]);
+
+    // other facts are not echoed
+    a.send(M.FACT, fact('box:esc_box_wood_0001', '1'));
+    assert.deepEqual(await factsBefore(a), []);
+    assert.deepEqual(await factsBefore(b), [['box:esc_box_wood_0001', '1']]);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
+// M_ITEM_PARENT as a game sends it: u16 id, stringZ section, u8 place (0 ground + its place, 2 the sender's actor)
+function itemParent(id, place) {
+  const head = Buffer.alloc(2);
+  head.writeUInt16LE(id, 0);
+  const tail = place === 0 ? Buffer.alloc(18) : Buffer.alloc(0);
+  return Buffer.concat([head, encodeText('medkit'), Buffer.from([0, place]), tail]);
+}
+
+// the M_ITEM_PARENT messages that came before a round trip's PONG, as [sender id, item id, place]
+async function movesBefore(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const got = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return got;
+    if (msg.type === M.ITEM_PARENT) {
+      const at = msg.payload.indexOf(0, 6) + 1;
+      got.push([msg.payload.readUInt32LE(0), msg.payload.readUInt16LE(4), msg.payload[at]]);
+    }
+  }
+}
+
+test('items: two players taking one thing at once, the first take the server hears wins', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    const idB = (await b.next()).payload.readUInt32LE(0);
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    a.send(M.ITEM_PARENT, itemParent(500, 2));
+    await roundTrip(a);
+    b.send(M.ITEM_PARENT, itemParent(500, 2)); // b took it before hearing of a's take
+    assert.deepEqual(await movesBefore(b), [[idA, 500, 2]]); // a's take comes to b: it leaves b's hands
+    assert.deepEqual(await movesBefore(a), []);               // b's never comes to a
+
+    a.send(M.ITEM_PARENT, itemParent(500, 0)); // a drops it: b takes it, as anyone may
+    await roundTrip(a);
+    assert.deepEqual(await movesBefore(b), [[idA, 500, 0]]);
+    b.send(M.ITEM_PARENT, itemParent(500, 2));
+    assert.deepEqual(await movesBefore(b), []);
+    assert.deepEqual(await movesBefore(a), [[idB, 500, 2]]);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 function timeSet(kind, ...values) {
   const parts = [Buffer.from([kind])];
   for (const [type, v] of values) {
@@ -1461,6 +1578,7 @@ test('clock: set by the first game in the world, runs only while someone is in i
     const a = await player(port, 'artem');
     await settle(a);
     assert.equal(a.time.at(-1).set, false); // told after WELCOME: no clock yet
+    assert.ok(Math.abs(a.time.at(-1).utc - Date.now()) < 5000); // the server's real time, for the Zone's events
 
     // not in the world: not taken
     a.send(M.TIME_SET, timeSet(0, ['u64', 7_000_000], ['f32', 6]));

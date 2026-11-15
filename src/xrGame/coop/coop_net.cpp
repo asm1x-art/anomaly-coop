@@ -12,6 +12,7 @@
 #include "coop_npc.h"
 #include "coop_combat.h"
 #include "coop_projectiles.h"
+#include "coop_props.h"
 #include "coop_time.h"
 #include "ai_space.h"
 #include "script_engine.h"
@@ -26,12 +27,20 @@
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <chrono>
 
 #pragma comment(lib, "ws2_32.lib")
 
 namespace coop
 {
 	const u32 PING_INTERVAL_MS = 1000;
+
+	// the stamp a ping carries and its pong brings back: real time, read on both threads, running through loading
+	static u32 ping_stamp()
+	{
+		using namespace std::chrono;
+		return u32(duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
+	}
 	const u32 LOG_FLUSH_INTERVAL_MS = 5000; // the log is kept in memory and written out on exit or "flush"
 	const u32 ACTOR_STATE_INTERVAL_MS = 100;
 
@@ -56,7 +65,7 @@ namespace coop
 		bool welcomed() const { return m_welcomed; }
 		u32 id() const { return m_client_id; }
 		u32 master() const { return m_master_id; }
-		u32 rtt() const { return m_rtt; }
+		u32 rtt() const { return m_rtt.load(); }
 		const xr_string& refusal() const { return m_refusal; }
 		const xr_string& name() const { return m_name; }
 		const xr_string& server_host() const { return m_host; }
@@ -97,7 +106,10 @@ namespace coop
 		u32 m_last_ping = 0;
 		u32 m_last_log_flush = 0;
 		u32 m_last_actor_state = 0;
-		u32 m_rtt = 0;
+		// set on the socket's thread when a pong comes: a pong left in the queue while a level loads (no frames)
+		// would count the whole load as the way there and back, and the world's clock (coop_time.cpp) adds half
+		// of it to the server's time
+		std::atomic<u32> m_rtt = 0;
 
 		peers_t m_peers;
 		xr_set<u32> m_left; // client ids are never reused
@@ -278,7 +290,7 @@ namespace coop
 		case eIdle: Msg("[coop] status: idle"); break;
 		case eConnecting: Msg("[coop] status: connecting to %s:%u", m_host.c_str(), m_port); break;
 		case eConnected:
-			Msg("[coop] status: connected to %s:%u, id=%u, rtt=%u ms", m_host.c_str(), m_port, m_client_id, m_rtt);
+			Msg("[coop] status: connected to %s:%u, id=%u, rtt=%u ms", m_host.c_str(), m_port, m_client_id, rtt());
 			for (const auto& [id, peer] : m_peers)
 				Msg("[coop]   peer %u '%s' on %s at [%.1f %.1f %.1f]", id, peer.name.c_str(), peer.level.c_str(),
 				    VPUSH(peer.position));
@@ -342,6 +354,11 @@ namespace coop
 				receive_time(msg.data(), size); // the newest only, with the moment it came (coop_time.h)
 				continue;
 			}
+			if (*(const u16*)msg.data() == M_PONG && size >= sizeof(u16) + sizeof(u32))
+			{
+				m_rtt = ping_stamp() - *(const u32*)(msg.data() + sizeof(u16)); // the moment it came, frames or not
+				continue;
+			}
 			std::lock_guard<std::mutex> lock(m_inbox_lock);
 			m_inbox.push_back(std::move(msg));
 		}
@@ -402,9 +419,6 @@ namespace coop
 			m_client_id = P.r_u32();
 			m_welcomed = true;
 			Msg("[coop] connected to %s:%u, id=%u", m_host.c_str(), m_port, m_client_id);
-			break;
-		case M_PONG:
-			m_rtt = Device.dwTimeContinual - P.r_u32();
 			break;
 		case M_REFUSED:
 		{
@@ -756,7 +770,7 @@ namespace coop
 			// holds the connection). 10054: reset from the other side
 			if (debug_mode)
 				Msg("[coop dbg] the connection ended with socket error %d, %u ms after our last ping, rtt %u ms",
-				    m_socket_error, Device.dwTimeContinual - m_last_ping, m_rtt);
+				    m_socket_error, Device.dwTimeContinual - m_last_ping, rtt());
 			FlushLog(); // the log is flushed from OnFrame, which ends here
 			Device.seqFrame.Remove(this);
 			close();
@@ -841,6 +855,7 @@ namespace coop
 		update_id_blocks();
 		update_shadows();
 		update_bodies();
+		update_props();
 		update_releases();
 		update_world_sync();
 		update_time();
@@ -856,8 +871,8 @@ namespace coop
 			m_last_ping = now;
 			NET_Packet P;
 			P.w_begin(M_PING);
-			P.w_u32(now);
-			P.w_u32(m_rtt);
+			P.w_u32(ping_stamp());
+			P.w_u32(rtt());
 			send(P);
 		}
 		if (now - m_last_actor_state >= ACTOR_STATE_INTERVAL_MS)
