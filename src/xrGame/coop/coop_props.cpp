@@ -27,8 +27,8 @@ namespace coop
 
 		struct SSettings
 		{
-			float move = 0.25f;   // m an element moved from where the world has it, to be told
-			float turn = 10.f;    // degrees it turned
+			float move = 0.10f;   // m an element moved from where the world has it, to be told
+			float turn = 5.f;     // degrees it turned
 			u32 check_ms = 500;   // how often things are looked at
 			u32 min_gap_ms = 1000; // the least time between two rests of one thing sent
 		};

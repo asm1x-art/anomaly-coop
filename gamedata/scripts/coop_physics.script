@@ -23,11 +23,15 @@
 --
 -- Doors (ph_door). Whether a door is open, closed, locked or free is its active logic section, which each game
 -- switched on its own: a door a player opened stayed closed for the others, and one game's NPCs opened and closed
--- doors in every game. Now the section is a fact of the server, "door:<name>" = section: set when a player uses a
--- door or shoots its lock (in that player's game) and when the level's authority switches it by its logic (its NPCs
--- open doors only there); every game puts its door on that section when the fact changes and when the door comes
--- online (a load, a join, a level change). The server tells the sender too (coop-server: echoed facts), so two
--- players using a door at once end up with the same door. A door with a motor (open, closed) is where its section
+-- doors in every game, and counted its timers (on_game_timer, on_timer: a door closing by itself) from its own
+-- moment. Now the section is a fact of the server, "door:<name>" = "section|moment", the moment on the world's clock
+-- (coop.clock): set when a player uses a door or shoots its lock (in that player's game), when the level's authority
+-- switches it by its logic (its NPCs open doors only there), and when any game switches it by logic that asks only
+-- the world (its infos, its timers, its rolls from the world's random: world_logic), so a door with no authority near
+-- doesn't wait for one. Every game puts its door on that section and counts its timers from that moment when the fact
+-- changes and when the door comes online (a load, a join, a level change). The server tells the sender too
+-- (coop-server: echoed facts), so two players using a door at once, or two games closing it at once, end up with the
+-- same door. A door with a motor (open, closed) is where its section
 -- puts it; one swinging free (no_force) is where the world's physics has it (the engine's rests, coop.prop_by_logic).
 
 local S = "coop_physics"
@@ -289,9 +293,44 @@ local function update_by_logic(obj)
 	coop.prop_by_logic(obj:id(), door and not door.no_force or false)
 end
 
-local function put_door(obj, section, quiet)
+-- The world's clock for a door's timers. xr_logic counts on_game_timer from the section's activation_game_time and
+-- on_timer from its activation_time, both set by the game that switched it, when it switched it. The fact carries the
+-- moment as the world's clock has it (coop.clock), and every game counts from there: the door closes at the same moment
+-- in all of them, a game the door comes online in later (a join, a level change) counts on from where the world is.
+function set_activation(obj, act)
 	local st = db.storage[obj:id()]
-	if not (st and st.ini and st.active_section and section ~= "" and section ~= st.active_section) then
+	local now = coop.clock()
+	act = tonumber(act)
+	if not (st and act and now and now > 0) then
+		return
+	end
+	local elapsed = math.max(0, now - act)
+	local ago = game.CTime()
+	ago:setHMSms(0, 0, math.floor(elapsed / 1000), math.floor(elapsed % 1000))
+	local at = game.get_game_time()
+	at:sub(ago)
+	st.activation_game_time = at
+	local factor = level.get_time_factor and level.get_time_factor() or 1
+	st.activation_time = time_global() - math.min(math.floor(elapsed / math.max(factor, 1)), 1000000000)
+	st.coop_act = act
+end
+
+-- "section|world ms": what a door is and since when, the world's clock
+local function door_value(value)
+	local section, act = string.match(value or "", "^([^|]*)|?(%d*)$")
+	return section or "", tonumber(act)
+end
+
+local function put_door(obj, value, quiet)
+	local section, act = door_value(value)
+	local st = db.storage[obj:id()]
+	if not (st and st.ini and st.active_section and section ~= "") then
+		return
+	end
+	if section == st.active_section then
+		if act and st.coop_act ~= act then
+			set_activation(obj, act) -- the same door, timed from the world's moment
+		end
 		return
 	end
 	if not st.ini:section_exist(section) then
@@ -309,22 +348,75 @@ local function put_door(obj, section, quiet)
 		printf("! [coop] door %s onto %s: %s", obj:name(), section, err)
 		return
 	end
+	set_activation(obj, act)
 	update_by_logic(obj)
 	dbg("door %s: %s -> %s, as the world has it", obj:name(), was, section)
+end
+
+-- xr_logic's ways out of a section that ask only the world: its infos, its timers (on the world's clock), a signal
+local WORLD_CONDITIONS = { on_info = true, on_timer = true, on_game_timer = true, on_signal = true }
+
+-- A door section every game leaves alike, so any game may tell the world it did (the server takes the last one and
+-- tells everyone, the sender too): its conditions are the world's infos and timers, and its rolls the world's random
+-- (in_door_logic). One that asks about the player (how near, in a zone, what he carries) is the level's authority's
+-- to tell; the others go along with it, and on their own while it doesn't have the door online.
+function world_logic(door_st)
+	for _, c in ipairs(door_st and door_st.logic or {}) do
+		if not WORLD_CONDITIONS[c.name] then
+			return false
+		end
+		for _, cond in ipairs(c.condlist or {}) do
+			for _, check in ipairs(cond[2] or {}) do
+				if check[2] == 3 or check[2] == 4 then -- =function, !function
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
+
+local function report_door(obj, st)
+	local now = coop.clock()
+	local act = now and now > 0 and math.floor(now) or nil
+	st.coop_act = act
+	coop.report_fact(DOOR .. obj:name(), act and (st.active_section .. "|" .. act) or st.active_section)
+	dbg("door %s now %s, sent", obj:name(), st.active_section)
 end
 
 local function on_switch(obj, ini, section)
 	local st = obj and db.storage[obj:id()]
 	local before = st and st.active_scheme
+	local world = before == "ph_door" and world_logic(st.ph_door)
 	local switched = original_switch(obj, ini, section)
 	if switched and coop_on() and (before == "ph_door" or st.active_scheme == "ph_door") then
 		update_by_logic(obj)
-		if not applying and (acting > 0 or coop.is_authority(level.name())) and st.active_section then
-			coop.report_fact(DOOR .. obj:name(), st.active_section)
-			dbg("door %s now %s, sent", obj:name(), st.active_section)
+		-- a door just online here waits for the world's word (update_fresh) before its own counts
+		if not applying and not fresh[obj:id()] and st.active_section and
+			(acting > 0 or world or coop.is_authority(level.name())) then
+			report_door(obj, st)
 		end
 	end
 	return switched
+end
+
+-- a door's logic rolls (~50 in its condlists) from the world's random: the door, its section, since when, the second
+-- of the world's clock; every game that has it online rolls the same
+local function in_door_logic(original, npc, st, actor)
+	local root = coop_on() and npc and db.storage[npc:id()]
+	if not (root and root.active_scheme == "ph_door") then
+		return original(npc, st, actor)
+	end
+	local now = coop.clock() or 0
+	local random = math.random
+	math.random = seeded_random(hash(npc:name() .. ":" .. tostring(root.active_section) .. ":" ..
+		tostring(root.coop_act or 0) .. ":" .. math.floor(now / 1000)))
+	local res = { pcall(original, npc, st, actor) }
+	math.random = random
+	if not res[1] then
+		error(res[2], 0)
+	end
+	return unpack(res, 2)
 end
 
 -- another game changed a door: ours, if it is online here
@@ -437,6 +529,10 @@ function on_game_start()
 
 	original_switch = xr_logic.switch_to_section
 	xr_logic.switch_to_section = on_switch
+	local try_switch = xr_logic.try_switch_to_another_section
+	xr_logic.try_switch_to_another_section = function(npc, st, actor)
+		return in_door_logic(try_switch, npc, st, actor)
+	end
 
 	coop_sync.on_event("box_broken", on_box_broken)
 	coop_facts.on_fact(BOX, on_claim)

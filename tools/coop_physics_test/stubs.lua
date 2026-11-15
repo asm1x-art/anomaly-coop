@@ -47,6 +47,15 @@ function coop.report_fact(key, value)
 	G.facts[key] = value
 	net_send("fact", key, value)
 end
+G.clock = 5000000   -- the world's clock, ms (coop.clock)
+G.game_ms = 9000000 -- this game's game time, ms (game.get_game_time)
+function coop.clock() return G.clock end
+local T = {}
+T.__index = T
+function T:setHMSms(h, m, s, ms) self.ms = ((h * 60 + m) * 60 + s) * 1000 + ms end
+function T:sub(o) self.ms = self.ms - o.ms end
+game = { CTime = function() return setmetatable({ ms = 0 }, T) end,
+	get_game_time = function() return setmetatable({ ms = G.game_ms }, T) end }
 function coop.begin_shared() G.shared = G.shared + 1 end
 function coop.end_shared() if G.shared > 0 then G.shared = G.shared - 1 end end
 
@@ -147,6 +156,7 @@ function xr_box.get_box_manager() return manager end
 db = { storage = {}, level_doors = {}, actor = {} }
 level = {}
 function level.name() return G.level end
+function level.get_time_factor() return 10 end
 function level.object_by_id(id)
 	local o = G.objects[id]
 	return o and o.online and o or nil
@@ -205,6 +215,13 @@ function xr_logic.switch_to_section(obj, ini, section)
 	return true
 end
 
+-- the door's logic as xr_logic runs it each update: rolls math.random(100) (a ~prob of its condlist)
+function xr_logic.try_switch_to_another_section(npc, st, actor)
+	G.rolls = G.rolls or {}
+	G.rolls[#G.rolls + 1] = math.random(100)
+	return false
+end
+
 ph_door = { action_door = {} }
 function ph_door.action_door.use_callback(self)
 	local st = db.storage[self.object:id()]
@@ -223,7 +240,7 @@ function make_door(id, name, section, online)
 	local o = setmetatable({ _id = id, _name = name, _pos = vector():set(0, 0, 0), _visual = "door", online = online }, O)
 	o.binder = setmetatable({ object = o, initialized = false }, { __index = binder })
 	G.objects[id] = o
-	db.storage[id] = { ini = INI, active_section = section, active_scheme = "ph_door", ph_door = { no_force = false } }
+	db.storage[id] = { ini = INI, active_section = section, active_scheme = "ph_door", ph_door = { no_force = false, logic = {} } }
 	db.level_doors[id] = o._pos
 	return o
 end

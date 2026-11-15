@@ -166,7 +166,7 @@ w.tick(100)
 w.lua('B', 'use_door(700)')
 w.pump()
 check('5: B opened it: A has it open', w.lua('A', 'return section_of(700)') == 'ph_door@open')
-check('5: the fact is on the server', w.server_facts.get('door:bar_door_1') == 'ph_door@open')
+check('5: the fact is on the server', w.server_facts.get('door:bar_door_1', '').split('|')[0] == 'ph_door@open')
 check('5: C has it offline: not touched yet', w.lua('C', 'return section_of(700)') == 'ph_door@close')
 w.lua('C', 'door_online(700)')
 w.tick(100)
@@ -178,15 +178,50 @@ w.lua('B', 'use_door(700)')
 w.pump()
 w.tick(100)
 sa, sb, sc = (w.lua(n, 'return section_of(700)') for n in 'ABC')
-check(f'5: used at once by two: the same door everywhere ({sa}, {sb}, {sc})', sa == sb == sc == w.server_facts['door:bar_door_1'])
+check(f'5: used at once by two: the same door everywhere ({sa}, {sb}, {sc})', sa == sb == sc == w.server_facts['door:bar_door_1'].split('|')[0])
+# the world's clock: the fact says since when, and every game counts its timers from there
+v = w.server_facts['door:bar_door_1']
+sec, act = v.split('|')
+check(f"6: the fact carries the moment on the world's clock ({v})", act.isdigit())
+w.lua('C', 'G.clock = G.clock + 20000') # C's clock 20 s on (its fact applied late)
+w.lua('C', 'db.storage[700].coop_act = nil; coop_physics_mod.set_activation(G.objects[700], ' + act + ')')
+ago = w.lua('C', 'return G.game_ms - db.storage[700].activation_game_time.ms')
+check(f"6: a game counts the timer from the world's moment ({ago} ms ago)", ago == 20000)
+w.lua('C', 'G.clock = G.clock - 20000')
+# rolls of a door's logic: the world's random, the same in every game
+for n in 'AB':
+    w.lua(n, 'G.rolls = {}; xr_logic.try_switch_to_another_section(G.objects[700], db.storage[700].ph_door, db.actor)')
+ra, rb = w.G('A').rolls[1], w.G('B').rolls[1]
+check(f"6: a door's ~prob rolls the same in two games ({ra}, {rb})", ra == rb)
+# a world section's logic (infos, timers): any game tells; one asking about the player: the authority only
+w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_game_timer", condlist = { { "ph_door@open", {} } } } }')
+w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")')
+w.pump()
+check('6: a timer closing/opening a door off the authority is told (the authority may be far)', w.lua('A', 'return section_of(700)') == 'ph_door@open')
+w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_info", condlist = { { "ph_door@close", { { "dist_to_actor_le", 3, {} } } } } } }')
+w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@close")')
+w.pump()
+check('6: a switch asking about the player off the authority is not told', w.lua('A', 'return section_of(700)') == 'ph_door@open')
+w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")') # back, as A has it
+w.lua('B', 'db.storage[700].ph_door.logic = {}')
+
+# a door just online: its own logic (from its save) isn't told before the world's word is put on it
+w.lua('B', 'make_door(701, "bar_door_2", "ph_door@close", false); local o = G.objects[701]; o.online = true; o.binder.net_spawn(o.binder, {})')
+w.lua('B', 'xr_logic.switch_to_section(G.objects[701], db.storage[701].ini, "ph_door@open")')
+w.pump()
+check("6: a door just online, before the world's word: its switch is not told", 'door:bar_door_2' not in w.server_facts)
+
 # NPCs: the authority's only
 w.lua('B', 'ph_door.try_to_open_door({}, {})')
 w.lua('A', 'ph_door.try_to_open_door({}, {})')
 check('5: an NPC opens doors in the authority\'s game only', not w.G('B').npc_door_calls and w.G('A').npc_door_calls == 1)
-# a logic switch in a non-authority game is its own; the authority's goes to all
+# a logic switch asking about the player in a non-authority game is its own; the authority's goes to all
+w.pump()
+before = w.lua('A', 'return section_of(700)')
+w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_actor_dist_le", condlist = {} } }')
 w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@close")')
 w.pump()
-check('5: a logic switch off the authority is not sent', w.lua('A', 'return section_of(700)') == sa)
+check('5: a logic switch asking about the player off the authority is not sent', before == 'ph_door@open' and w.lua('A', 'return section_of(700)') == before)
 w.lua('A', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@close")')
 w.pump()
 check('5: the authority\'s logic switch reaches everyone', all(w.lua(n, 'return section_of(700)') == 'ph_door@close' for n in 'ABC'))
