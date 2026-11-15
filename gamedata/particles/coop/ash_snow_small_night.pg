@@ -1,0 +1,54 @@
+; Co-op: the ash front's falling ash, night tone, the small near flakes (fall_sizes in mod_system_zone_ash_fx.ltx):
+; ash_snow_night.pg with its own rings 0 and 1 (ash_snow_small_<ring>_night.pe: Source Size 0.08 / 0.1 m), the far rings the
+; medium set's.
+[_group]
+version = 3
+flags = 0
+effects_count = 5
+timelimit = 0
+
+[effect_0000]
+effect_name = coop\ash_snow_small_0_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0001]
+effect_name = coop\ash_snow_small_1_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0002]
+effect_name = coop\ash_snow_2_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0003]
+effect_name = coop\ash_snow_3_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+
+[effect_0004]
+effect_name = coop\ash_snow_4_night
+on_play_child = 
+on_birth_child = 
+on_death_child = 
+time0 = 0
+time1 = 0
+flags = 4
+

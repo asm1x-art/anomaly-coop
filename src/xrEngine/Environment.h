@@ -326,6 +326,19 @@ public:
 	shared_str CurrentWeatherName;
 	shared_str CurrentCycleName;
 
+	// Co-op: a blend from the look on screen into a weather over a set game time (SetWeatherBlend). The mixer blends
+	// two frames at a time, so it goes in three legs: from the pair shown to the nearer of the two (Blend_from[1]) by
+	// Blend_turn, from there to the weather's frame nearest to the end (Blend_to) by Blend_end, from that to the
+	// weather's next frame (Blend_next) by Blend_next_tm; then the weather goes on as usual. Times are game seconds
+	// since Blend_start (a day's second). The rain goes from Blend_rain0 (shown at the start) to Blend_to's over
+	// Blend_rain, sooner than the rest
+	bool bBlend;
+	CEnvDescriptor* Blend_from[2];
+	CEnvDescriptor* Blend_to;
+	CEnvDescriptor* Blend_next;
+	float Blend_start, Blend_w0, Blend_turn, Blend_end, Blend_next_tm, Blend_rain, Blend_rain0, Blend_elapsed;
+	bool BlendSelect(float& current_weight);
+
 	EnvsMap WeatherCycles;
 	EnvsMap WeatherFXs;
 	xr_vector<CEnvModifier> Modifiers;
@@ -370,6 +383,11 @@ public:
 	void StopWFX();
 
 	void SetWeather(shared_str name, bool forced = false);
+	// Co-op: into the weather from what is shown now, in time game seconds (turn_time of them at most to the nearer
+	// frame shown, the rain in rain_time); SetWeather meanwhile changes only the weather it ends into
+	void SetWeatherBlend(shared_str name, float time, float turn_time, float rain_time);
+	bool IsBlending() { return bBlend; }
+	void StopBlend() { bBlend = false; }
 	shared_str GetWeather() { return CurrentWeatherName; }
 	void ChangeGameTime(float game_time);
 	void SetGameTime(float game_time, float time_factor);

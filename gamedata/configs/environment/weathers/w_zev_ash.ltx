@@ -1,5 +1,7 @@
 ; Co-op: the ash of the Zone's event "Пепельный фронт" (coop_zone_ash.script): Anomaly's w_foggy2, browner, darker,
-; the sun dimmed, the view shorter. A config variant, no assets of its own.
+; the sun dimmed, the view shorter (fog_distance 80, far_plane 130). A config variant, no assets of its own. A steady
+; wind (wind_velocity 250 by day, 300 by night, towards wind_direction 45): the falling ash drifts with it
+; (coop_zone_ash_fx.script, fall_wind).
 ; sky_color is written blue, green, red: the engine hands it to the sky shader with red and blue swapped (a grey-brown
 ; sky here is "0.62, 0.7, 0.74"). The fog colour is the usual red, green, blue.
 [00:00:00]
@@ -7,10 +9,10 @@
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -25,18 +27,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [01:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -51,18 +53,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [02:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -77,18 +79,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [03:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -103,18 +105,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [04:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.055, 0.05, 0.0425, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -129,18 +131,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [05:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.207, 0.18, 0.216
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.165, 0.15, 0.1615, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -155,18 +157,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [06:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.207, 0.18, 0.216
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.165, 0.15, 0.1615, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -181,18 +183,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [07:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.207, 0.18, 0.216
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.22, 0.2, 0.187, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -207,18 +209,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [08:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.414, 0.36, 0.2888
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.33, 0.3, 0.255, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -233,18 +235,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [09:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3685, 0.335, 0.289, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -259,18 +261,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [10:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3795, 0.345, 0.2975, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -285,18 +287,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [11:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3795, 0.345, 0.2975, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -311,18 +313,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [12:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3245, 0.295, 0.255, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -337,18 +339,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [13:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.2695, 0.245, 0.2125, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -363,18 +365,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [14:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3025, 0.275, 0.238, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -389,18 +391,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [15:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3025, 0.275, 0.238, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -415,18 +417,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [16:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3025, 0.275, 0.238, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -441,18 +443,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [17:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3025, 0.275, 0.238, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -467,18 +469,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [18:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.022, 0.02, 0.017
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.46, 0.4, 0.36
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.3025, 0.275, 0.238, 0
         rain_color                       = 0.6, 0.6, 0.62
         rain_density                     = 0
@@ -493,18 +495,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [19:00:00]
         ambient                          = zev_ash
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.304313, 0.26385, 0.294768
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.4631, 0.4, 0.40035, 1
         rain_color                       = 0.4, 0.4, 0.42
         rain_density                     = 0
@@ -519,18 +521,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [19:30:00]
         ambient                          = zev_ash
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.304313, 0.26385, 0.294768
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.4631, 0.4, 0.40035, 1
         rain_color                       = 0.4, 0.4, 0.42
         rain_density                     = 0
@@ -545,18 +547,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [19:59:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.207, 0.18, 0.216
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.165, 0.15, 0.1615, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -571,18 +573,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [20:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.207, 0.18, 0.216
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.165, 0.15, 0.1615, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -597,18 +599,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [21:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0345, 0.03, 0.056
         fog_density                      = 1
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.132, 0.12, 0.136, 1
         rain_color                       = 0.68, 0.64, 0.6
         rain_density                     = 0
@@ -623,18 +625,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 0
+        wind_direction                   = 45
+        wind_velocity                    = 250
  
 [22:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -649,18 +651,18 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  
 [23:00:00]
         ambient                          = zev_ash_night
         ambient_color                    = 0.011, 0.01, 0.0085
         clouds_color                     = 0, 0, 0, 0
         clouds_texture                   =
-        far_plane                        = 150
+        far_plane                        = 130
         fog_color                        = 0.0115, 0.01, 0.008
         fog_density                      = 0.85
-        fog_distance                     = 100
+        fog_distance                     = 80
         hemisphere_color                 = 0.011, 0.01, 0.0085, 1
         rain_color                       = 0.263, 0.267, 0.271
         rain_density                     = 0
@@ -675,6 +677,6 @@
         thunderbolt_period               = 0
         tree_amplitude_intensity         = 0
         water_intensity                  = 0.1
-        wind_direction                   = 0
-        wind_velocity                    = 50
+        wind_direction                   = 45
+        wind_velocity                    = 300
  

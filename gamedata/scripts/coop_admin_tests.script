@@ -445,6 +445,33 @@ local function update()
 end
 
 -------------------------------------------------------------------------------
+-- the ash front's looks side by side (coop_zone_ash.test_look(): a fact over the config, every game shows the same)
+
+local ASH_FX = "zone_event_ash_fx"
+
+-- the near flakes' size: the next set of fall_sizes
+local function ash_size()
+	local sizes = coop_zone_events.ini_list(ASH_FX, "fall_sizes")
+	local size, patch = coop_zone_ash.test_look()
+	size = math.floor(size or ini_sys:r_float_ex(ASH_FX, "fall_size") or 2) % math.max(1, #sizes) + 1
+	coop_zone_ash.set_test_look(size, patch)
+	msg(tr("st_coop_tests_ash_size_done", size, #sizes, tostring(sizes[size])))
+end
+
+-- the ash on the ground: evenly or in patches
+local function ash_patch()
+	local size = coop_zone_ash.test_look()
+	local patch = coop_zone_ash.patchiness() > 0 and 0 or 1
+	coop_zone_ash.set_test_look(size, patch)
+	msg(game.translate_string(patch > 0 and "st_coop_tests_ash_patchy" or "st_coop_tests_ash_even"))
+end
+
+local function ash_config()
+	coop_zone_ash.set_test_look(nil, nil)
+	msg(game.translate_string("st_coop_tests_ash_config_done"))
+end
+
+-------------------------------------------------------------------------------
 
 -- in the window's order: { id, mode, old key, f, confirm }; the captions are st_coop_tests_<id>
 LIST = {
@@ -471,6 +498,9 @@ LIST = {
 	{ "ai_obs40", "ai", "PgDn", function() observe(40) end },
 	{ "ai_clear", "ai", "Del", ai_clear },
 	{ "ai_grass", "ai", "ScrLk", ai_grass },
+	{ "ash_size", "ash", "", ash_size },
+	{ "ash_patch", "ash", "", ash_patch },
+	{ "ash_config", "ash", "", ash_config },
 }
 local BY_ID = {}
 for _, a in ipairs(LIST) do

@@ -336,6 +336,9 @@
 	<string id="st_coop_adm_tm_ai">
 		<text>AI sight</text>
 	</string>
+	<string id="st_coop_adm_tm_ash">
+		<text>Ash front: comparison</text>
+	</string>
 	<string id="st_coop_adm_test_ask">
 		<text>This changes the shared world for everyone. Only a rollback takes it back.</text>
 	</string>
@@ -783,6 +786,15 @@
 	<string id="st_coop_tests_ai_grass">
 		<text>Grass hides: on/off</text>
 	</string>
+	<string id="st_coop_tests_ash_size">
+		<text>Ash: near flakes' size</text>
+	</string>
+	<string id="st_coop_tests_ash_patch">
+		<text>Ash on the ground: even/patchy</text>
+	</string>
+	<string id="st_coop_tests_ash_config">
+		<text>Ash: as in the config</text>
+	</string>
 	<string id="st_coop_tests_no_bunker">
 		<text>No bunker in the graph: the level pack is missing.</text>
 	</string>
@@ -851,6 +863,18 @@
 	</string>
 	<string id="st_coop_tests_grass_off">
 		<text>Grass no longer hides.</text>
+	</string>
+	<string id="st_coop_tests_ash_size_done">
+		<text>Near ash flakes: set %s of %s (%s), for every player. The old flakes still fall for a few seconds.</text>
+	</string>
+	<string id="st_coop_tests_ash_even">
+		<text>The ash on the ground settles and goes evenly, for every player.</text>
+	</string>
+	<string id="st_coop_tests_ash_patchy">
+		<text>The ash on the ground settles and goes in patches, for every player.</text>
+	</string>
+	<string id="st_coop_tests_ash_config_done">
+		<text>Ash: as in the config again (fall_size, ground_patchiness), for every player.</text>
 	</string>
 	<string id="st_coop_tests_sees">
 		<text>SEES</text>

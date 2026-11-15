@@ -64,6 +64,16 @@ real_hours_min      = 3         ; how long it lasts, real hours
 real_hours_max      = 4
 levels              = l10_red_forest, l08_yantar, jupiter, zaton, k02_trucks_cemetery
 weather             = w_zev_ash ; environment\weathers\w_zev_ash.ltx
+; the sky: w_zev_ash comes in over weather_blend_in_s real seconds from the front's start and the world's weather goes
+; back over weather_blend_out_s from its end, smoothly from whatever is on screen, in every game alike (one that comes
+; onto the level later takes what is left of the blend). The rain goes in weather_rain_in_s and comes back in
+; weather_rain_out_s of them (at most the blend). weather_turn_s: real s at most the sky first takes to the nearer of
+; the two weather frames it shows (the engine blends two at a time). A blend of 0: at once
+weather_blend_in_s  = 180
+weather_blend_out_s = 300
+weather_rain_in_s   = 10
+weather_rain_out_s  = 120
+weather_turn_s      = 20
 buy_medical         = 1.2       ; anti-rad in demand
 ; the suits that keep the ash out: parts of the outfit's section (all SEVAs, SSP, the Base chemist's; not an exoskeleton)
 sealed_suits        = scientific, ecolog_outfit, shelter_chemist_outfit ; ecolog_guard_outfit is not one (no "ecolog_outfit" in it): add it here to count it
@@ -140,20 +150,23 @@ leave_zaton                 = jupiter
 leave_k02_trucks_cemetery   = l04_darkvalley, l05_bar, l07_military
 return_real_hours   = 2         ; real hours after the end the squads may take to get back to their smarts
 albino_squads       =           ; albino mutant squads put on the level for the front (none yet: assets later)
-; the ash settling on the ground (each game its own picture: the engine's ash pass, shaders/r3/ash_ground.h; DX11, not
-; with MSAA). Its cover grows from 0 to 1 over ground_ramp_up_min real minutes of the front; after the front what has
-; settled lies on for ground_linger_game_h game hours, fading as (1 - t) ^ ground_linger_curve. Under a roof it stays
-; clean: near the camera (r3_dynamic_wet_surfaces_far) by the rain's view from above, farther by the surface's open
-; sky (hemi)
+; the ash settling on the ground (the engine's ash pass, shaders/r3/ash_ground.h; DX11, not with MSAA). The master
+; decides how much lies on each level and sends it to every game (the fact ash_now_<level>, coop_zone_ash.script); the
+; games only show it, so all players on a level see the same. Under a roof it stays clean: near the camera
+; (r3_dynamic_wet_surfaces_far) by the rain's view from above, farther by the surface's open sky (hemi)
 ground_levels        = l10_red_forest, l08_yantar, jupiter, zaton ; not the Truck Cemetery (its front is machinery, no fire)
-ground_ramp_up_min   = 20          ; real minutes from no ash to full
-ground_linger_game_h = 60          ; game hours the ash lies on after the front (2.5 game days)
-ground_linger_curve  = 1.5         ; how it fades: 1 evenly, above 1 quicker at first and a thin layer longer
-ground_rain_wash     = 4           ; rain washes it off: a game second of rain (density 1) counts as this many of lying
-ground_rain_sample_s = 30          ; real seconds between the master's looks at the rain (it adds it to the shared fact)
+ground_full_min      = 3           ; real minutes of full fall from no ash to a full coat; it settles as fast as it falls (the fall rises over ramp_in_min of [zone_event_ash_fx] first: a full coat ~3.5 min after the front's start)
+ground_linger_game_h = 60          ; game hours the ash lies on after the front without rain (2.5 game days; a sleep counts)
+ground_rain_wash_min = 5           ; rain washes it off: real minutes of rain (density 1, the world's weather) that take off a full coat; a lighter rain takes longer
+ground_rain_visible  = 0.1         ; the rain on screen (rain_density as the world's weather blends it) from which it counts; none while the front is on (w_zev_ash has no rain)
+ground_rain_delay_s  = 10          ; real seconds the rain is on screen before it starts washing: first it is seen, then the ash goes
+ground_publish_s     = 5           ; real seconds between the master's sendings while the ash changes (a change of course goes at once)
+ground_blend_s       = 2           ; real seconds a game eases what it shows onto the master's new value
+ground_snap          = 0.2         ; a gap above this between what a game shows and the master's value is taken at once
+ground_extrapolate_s = 20          ; a game goes on at the master's last rate this long at most (no master: the ash stays as it is)
 ground_opacity       = 0.85        ; the most the ash hides of a surface, 0..1
 ground_gloss_keep    = 0.15        ; the surface's gloss left under full ash, 0..1
-ground_patchiness    = 1           ; 0: everywhere at once; 1: in patches first (ground_patch_m), the rest later
+ground_patchiness    = 0           ; 0: evenly everywhere at once; 1: in patches first (ground_patch_m), the rest later; full cover looks the same either way (the admin window's Тест-режимы > "Пепел на земле: ровно/пятнами" switches it for every game)
 ground_patch_m       = 6           ; the patches' size, metres
 ground_color         = 0.42, 0.41, 0.40 ; the ash's albedo, r, g, b
 ground_up            = 0.35, 0.8   ; how much a surface faces up (world normal.y): no ash at the first, full at the second
