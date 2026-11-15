@@ -23,29 +23,40 @@ local function door(name)
 	return nil
 end
 
--- The steam between the doors ([coop_airlock]): a puff of the particle at each point of the paths and the hiss at the
--- first one, again every steam_repeat_s for steam_s. An effect of the inner door's switch: the authority plays it, the
--- others play it again (coop_physics replay_effects)
+-- The decontamination between the doors ([coop_airlock]): steam_particle, a list of particle effects, each "name" or
+-- "name@dy" (played dy metres above each point of steam_paths: nozzles in the ceiling), and steam_sound at the first
+-- point; again every steam_repeat_s (0: once, for effects that go on by themselves) for steam_s, then let fade out.
+-- An effect of the inner door's switch: the authority plays it, the others play it again (coop_physics replay_effects)
 local S = "coop_airlock"
 local steam_until, next_puff = 0, 0
 local puffs = {} -- the particles playing: { p = particles_object, till = time_global() }
+local look -- a look tried from the console (test_look): { particles =, sound = }, nil: [coop_airlock]'s
+
+local function setting(key)
+	return look and look[key] or ini_sys:r_string_ex(S, key == "particles" and "steam_particle" or "steam_sound")
+end
 
 local function puff()
-	local name = ini_sys:r_string_ex(S, "steam_particle") or ("static" .. string.char(92) .. "zharka_static_steam")
 	local first
 	for path in string.gmatch(ini_sys:r_string_ex(S, "steam_paths") or "", "[^,%s]+") do
 		if level.patrol_path_exists(path) then
 			local pt = patrol(path)
 			for i = 0, pt:count() - 1 do
-				local p = particles_object(name)
-				p:play_at_pos(pt:point(i))
-				puffs[#puffs + 1] = { p = p, till = steam_until }
-				first = first or pt:point(i)
+				local at = pt:point(i)
+				first = first or at
+				for item in string.gmatch(setting("particles") or "", "[^,]+") do
+					local name, dy = string.match(item, "^%s*([^@%s]+)%s*@?%s*([%-%d%.]*)%s*$")
+					if name then
+						local p = particles_object(name)
+						p:play_at_pos(vector():set(at.x, at.y + (tonumber(dy) or 0), at.z))
+						puffs[#puffs + 1] = { p = p, till = steam_until }
+					end
+				end
 			end
 		end
 	end
-	local snd = ini_sys:r_string_ex(S, "steam_sound")
-	if snd and first then
+	local snd = setting("sound")
+	if snd and snd ~= "" and first then
 		local so = sound_object(snd)
 		so:play_at_pos(db.actor, first, 0, sound_object.s3d)
 		so.volume = ini_sys:r_float_ex(S, "steam_volume") or 1
@@ -57,17 +68,25 @@ local function play_steam()
 	next_puff = 0
 end
 
+-- the console's try of a look: coop_airlock.test_look("name@dy, name", "sound path", every) then the steam at once;
+-- nil: [coop_airlock]'s again
+function test_look(particles, sound, every)
+	look = particles and { particles = particles, sound = sound or "", every = every } or nil
+	play_steam()
+end
+
 local function update_steam()
 	local now = time_global()
+	local every = look and look.every or ini_sys:r_float_ex(S, "steam_repeat_s") or 0
 	if now < steam_until and now >= next_puff and db.actor then
-		next_puff = now + math.max(0.3, ini_sys:r_float_ex(S, "steam_repeat_s") or 1.2) * 1000
+		next_puff = every > 0 and now + math.max(0.3, every) * 1000 or steam_until
 		puff()
 	end
 	for i = #puffs, 1, -1 do
 		local e = puffs[i]
 		if now >= e.till or not e.p:playing() then
 			if e.p:playing() then
-				e.p:stop()
+				e.p:stop_deffered() -- what is in the air settles and fades
 			end
 			table.remove(puffs, i)
 		end

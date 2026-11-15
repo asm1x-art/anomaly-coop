@@ -1,0 +1,115 @@
+; Co-op: the Yantar airlock's decontamination: fine mist sprayed down from a nozzle in the ceiling (coop_airlock.script,
+; [coop_airlock]). A plain text file: rate (Source Rate), how long a droplet cloud lives (Age Limit), its spread
+; (Velocity box), size and whiteness can be changed here; the game reads it at start.
+[_effect]
+version = 1
+max_particles = 200
+flags = 1
+action_count = 7
+
+[sprite]
+shader = particles\blend
+texture = pfx\pfx_smoke_b
+
+; KillOld
+[action_0000]
+action_type = 10
+version = 1
+action_name = killold
+flags = 1
+flt_0000 = 2.4 ; Age Limit
+bool_0000 = off ; Kill Less Than
+
+; Source
+[action_0001]
+action_type = 21
+version = 1
+action_name = source
+flags = 1
+flt_0000 = 0 ; Age Sigma
+flt_0001 = 0 ; Color\Alpha
+flt_0002 = 0 ; Parent Motion
+flt_0003 = 45 ; Rate
+flt_0004 = 0 ; Starting Age
+bool_0000 = off ; Allow Rotate
+bool_0001 = on ; Single Size
+
+[domain_action_0001_0000] ; Color: line
+type = 1
+v0 = 0.85, 0.87, 0.9
+v1 = 0.95, 0.96, 0.98
+v2 = 0, 0, 0
+
+[domain_action_0001_0001] ; Domain
+type = 5
+v0 = 0, 0, 0
+v1 = 0.08, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0002] ; Rotation: line
+type = 1
+v0 = -3.14, 0, 0
+v1 = 3.14, 0, 0
+v2 = 0, 0, 0
+
+[domain_action_0001_0003] ; Size: line
+type = 1
+v0 = 0.12, 0.12, 0.12
+v1 = 0.25, 0.25, 0.25
+v2 = 0, 0, 0
+
+[domain_action_0001_0004] ; Velocity: box
+type = 4
+v0 = -0.7, -1.7, -0.7
+v1 = 0.7, -0.9, 0.7
+v2 = 0, 0, 0
+
+; TargetVelocity: slows down
+[action_0002]
+action_type = 27
+version = 1
+action_name = targetvelocity
+flags = 1
+flt_0000 = 0.9 ; Scale
+vec_0000 = 0, -0.15, 0 ; Velocity
+bool_0000 = off ; Allow Rotate
+
+; TargetSize: spreads
+[action_0003]
+action_type = 24
+version = 1
+action_name = targetsize
+flags = 1
+vec_0000 = 0.7, 0.7, 0.7 ; Scale
+vec_0001 = 1.4, 1.4, 1.4 ; Size
+
+; TargetColor: fades in
+[action_0004]
+action_type = 23
+version = 1
+action_name = targetcolor
+flags = 1
+flt_0000 = 0.35 ; Alpha
+flt_0001 = 4 ; Scale
+flt_0002 = 0 ; TimeFrom
+flt_0003 = 0.12 ; TimeTo
+vec_0000 = 0.92, 0.94, 0.96 ; Color
+
+; TargetColor: settles and fades out
+[action_0005]
+action_type = 23
+version = 1
+action_name = targetcolor
+flags = 1
+flt_0000 = 0 ; Alpha
+flt_0001 = 0.9 ; Scale
+flt_0002 = 0.45 ; TimeFrom
+flt_0003 = 1 ; TimeTo
+vec_0000 = 0.92, 0.94, 0.96 ; Color
+
+; Move
+[action_0006]
+action_type = 12
+version = 1
+action_name = move
+flags = 1
