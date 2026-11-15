@@ -230,6 +230,10 @@ function create_item_on_npc(se_npc, squad_name, comm, rank, visual, player_id, s
 				data.addon_flags = flag
 				data.ammo_type = ammo_type
 				utils_stpk.set_weapon_data(data,se_wpn)
+				-- co-op: the weapon went to the other games when it was made, before these addons and ammo type: its state too
+				if coop and coop.send_item_state and coop.connected and coop.connected() then
+					coop.send_item_state(se_wpn.id)
+				end
 			end
 		end
 	end
