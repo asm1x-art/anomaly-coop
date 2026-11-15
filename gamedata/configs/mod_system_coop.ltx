@@ -335,6 +335,18 @@ hold_ms              = 3000  ; real ms: after our own jump, how long older news 
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
 
+; Co-op: a psi storm's vortices are the world's (coop_psi_vortex.script). The level's authority rolls one stream of them
+; by the world's storm, as Anomaly does for its one actor, each near the next player on the level in turn; every game
+; shows the same ones at the same points and seconds.
+[coop_psi_vortex]
+period_min_s         = 8     ; real s: shortest time from one vortex on the level to the next (Anomaly's 8)
+period_max_s         = 16    ; real s: longest (Anomaly's 16)
+distance_max         = 150   ; m: how far from the player whose turn it is a vortex may come down (Anomaly's 150)
+keep_s               = 30    ; real s: how long a vortex stays in the server's fact (it strikes at 20 s, ends at 25)
+late_s               = 15    ; real s: a vortex older than this when it reaches us (a join, a level change) isn't shown
+peer_stale_s         = 10    ; real s: a player not heard from for this long has no turn
+look_ms              = 250   ; real ms: how often the fact is looked at
+
 ; Co-op: what a player leaves behind (coop_cleanup.script). As a player leaves the world or saves, bodies and boxes
 ; near them with good things are kept from the game's cleanup for a while; the host releases bodies with nothing
 ; worth taking. Times are the world's game hours; prices are the items' "cost".
