@@ -82,13 +82,18 @@ local function update_steam()
 		next_puff = every > 0 and now + math.max(0.3, every) * 1000 or steam_until
 		puff()
 	end
+	-- at the end the effects stop giving off more and what is in the air settles and fades for steam_fade_s: kept
+	-- till then (an effect no longer referenced here is gone at once with all it gave off)
 	for i = #puffs, 1, -1 do
 		local e = puffs[i]
-		if now >= e.till or not e.p:playing() then
+		if not e.p:playing() or e.fading and now >= e.fading then
 			if e.p:playing() then
-				e.p:stop_deffered() -- what is in the air settles and fades
+				e.p:stop()
 			end
 			table.remove(puffs, i)
+		elseif not e.fading and now >= e.till then
+			e.p:stop_deffered()
+			e.fading = now + (ini_sys:r_float_ex(S, "steam_fade_s") or 4) * 1000
 		end
 	end
 end
