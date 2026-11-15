@@ -217,7 +217,7 @@ function xr_logic.switch_to_section(obj, ini, section)
 	G.switches = (G.switches or 0) + 1
 	local per = G.section_logic and G.section_logic[obj:id()]
 	if per and per[section] then
-		st.ph_door = { no_force = false, logic = per[section]() } -- xr_logic makes a section's logic anew
+		st.ph_door = per[section]() -- xr_logic makes a section's storage and logic anew
 	end
 	return true
 end
@@ -251,8 +251,8 @@ function xr_logic.pick_section_from_condlist(actor, npc, condlist)
 	for i = 1, #condlist do
 		local cond, met = condlist[i], true
 		for _, infop in ipairs(cond[2] or {}) do
-			if infop[2] == 1 then if not G.infos[infop[1]] then met = false break end
-			elseif infop[2] == 2 then if G.infos[infop[1]] then met = false break end
+			if infop[2] == 1 then if not db.actor:has_info(infop[1]) then met = false break end
+			elseif infop[2] == 2 then if db.actor:has_info(infop[1]) then met = false break end
 			elseif infop[2] == 3 then if not xr_conditions[infop[1]](actor, npc, infop[3]) then met = false break end
 			elseif infop[2] == 4 then if xr_conditions[infop[1]](actor, npc, infop[3]) then met = false break end
 			elseif infop[2] == 5 then if infop[3] and infop[3] < math.random(100) then met = false break end
@@ -260,7 +260,9 @@ function xr_logic.pick_section_from_condlist(actor, npc, condlist)
 		end
 		if met then
 			for _, e in ipairs(cond[3] or {}) do
-				if e[2] == 3 or e[2] == 4 then xr_effects[e[1]](actor, npc, e[3]) end
+				if e[2] == 1 then if not db.actor:has_info(e[1]) then db.actor:give_info_portion(e[1]) end
+				elseif e[2] == 2 then if db.actor:has_info(e[1]) then db.actor:disable_info_portion(e[1]) end
+				elseif e[2] == 3 or e[2] == 4 then xr_effects[e[1]](actor, npc, e[3]) end
 			end
 			return cond[1] or ""
 		end
@@ -309,6 +311,14 @@ end
 ph_door = { action_door = {} }
 function ph_door.action_door.use_callback(self)
 	local st = db.storage[self.object:id()]
+	if self.st and self.st.has_use then -- a door with its sections' logic: vanilla's try_switch on on_use
+		G.uses = (G.uses or 0) + 1
+		if self.st.on_use then
+			xr_logic.switch_to_section(self.object, st.ini,
+				xr_logic.pick_section_from_condlist(db.actor, self.object, self.st.on_use.condlist))
+		end
+		return
+	end
 	local to = st.active_section == "ph_door@open" and "ph_door@close" or "ph_door@open"
 	xr_logic.switch_to_section(self.object, st.ini, to)
 end
@@ -338,7 +348,7 @@ end
 
 function use_door(id)
 	local o = G.objects[id]
-	ph_door.action_door.use_callback({ object = o })
+	ph_door.action_door.use_callback({ object = o, st = db.storage[id].ph_door })
 end
 
 function section_of(id) return db.storage[id].active_section end
@@ -355,6 +365,9 @@ db.actor = {
 	id = function() return 0 end,
 	position = function() return vector():set(G.actor_pos) end,
 	object = function(self, sec) return G.inv[sec] end,
+	has_info = function(self, info) return G.infos[info] == true end,
+	give_info_portion = function(self, info) G.infos[info] = true; G.given = (G.given or "") .. "+" .. info end,
+	disable_info_portion = function(self, info) G.infos[info] = nil; G.given = (G.given or "") .. "-" .. info end,
 }
 db.zone_by_name = {}
 db.actor_inside_zones = {}
@@ -382,10 +395,15 @@ function xr_conditions.actor_in_zone(actor, npc, p)
 end
 function xr_conditions.actor_out_zone(actor, npc, p) return not utils_obj.npc_in_zone(db.actor, p[1]) end
 function xr_conditions.actor_has_item(actor, npc, p) return p[1] ~= nil and db.actor:object(p[1]) ~= nil end
+function xr_conditions.is_door_blocked_by_npc(actor, npc, p) return G.blocked == true end
 
 xr_effects = {}
 for _, name in ipairs({ "play_sound", "play_particle_on_path", "spawn_thing" }) do
 	xr_effects[name] = function(actor, obj, p) G.fx[#G.fx + 1] = name .. ":" .. obj:name() end
+end
+function xr_effects.remove_item(actor, obj, p)
+	G.fx[#G.fx + 1] = "remove_item:" .. p[1]
+	G.inv[p[1]] = nil
 end
 function xr_effects.hit_npc(actor, obj, p)
 	G.fx[#G.fx + 1] = "hit_npc:" .. obj:name()
@@ -406,19 +424,21 @@ function make_logic_door(id, name, section, sections)
 	local per = {}
 	for sec, list in pairs(sections) do
 		per[sec] = function()
-			local logic = {}
+			local logic, on_use = {}, nil
 			for _, c in ipairs(list) do
-				if c[3] then
+				if c[1] == "on_use" then
+					on_use = { condlist = parse_condlist(c[2]) }
+				elseif c[3] then
 					logic[#logic + 1] = { name = c[1], v1 = c[2], condlist = parse_condlist(c[3]) }
 				else
 					logic[#logic + 1] = { name = c[1], condlist = parse_condlist(c[2]) }
 				end
 			end
-			return logic
+			return { no_force = false, logic = logic, on_use = on_use, has_use = true }
 		end
 	end
 	G.section_logic[id] = per
-	db.storage[id].ph_door = { no_force = false, logic = per[section]() }
+	db.storage[id].ph_door = per[section]()
 	door_online(id)
 end
 

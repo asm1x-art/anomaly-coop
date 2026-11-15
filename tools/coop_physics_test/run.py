@@ -395,14 +395,21 @@ place(w, {'A': (50, 0, 0), 'B': (20, 0, 0), 'C': (-150, 0, 0)})
 w.lua('A', 'door_update(722)')
 check('8: ... C out: locked', sec(w, 'A', 722) == 'ph_door@locked')
 
-# 9. items: each game tells what its player carries of what doors ask about; any player carrying it counts
+# 9. keys: each game tells what its player carries of what doors ask about; a key counts for its holder at the door
 w = setup(['A', 'B', 'C'])
 for n in 'ABC':
     w.lua(n, '''make_logic_door(730, "warlab_pod_room_door", "ph_door@locked", {
         ["ph_door@locked"] = { { "on_info", "{=actor_has_item(decoder)} ph_door@coded" } },
-        ["ph_door@coded"] = { { "on_info", "{!actor_has_item(decoder)} ph_door@locked" } } })
+        ["ph_door@coded"] = { { "on_info", "{!actor_has_item(decoder)} ph_door@locked" },
+            { "on_use", "ph_door@decoding %+warlab_access_decoding =play_sound(warlab_decoder)%" } },
+        ["ph_door@decoding"] = {} })
     make_logic_door(731, "lab_door", "ph_door@closed", {
         ["ph_door@closed"] = { { "on_info", "{=actor_has_item(lab_key)} ph_door@open" } },
+        ["ph_door@open"] = {} })
+    make_logic_door(732, "lx8_transformer_door", "ph_door@no_key", {
+        ["ph_door@no_key"] = { { "on_info", "{=actor_has_item(lx8_key)} ph_door@closed" } },
+        ["ph_door@closed"] = { { "on_info", "{!actor_has_item(lx8_key)} ph_door@no_key" },
+            { "on_use", "ph_door@open %=remove_item(lx8_key)%" } },
         ["ph_door@open"] = {} })''')
 w.tick(100)
 place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)})
@@ -411,41 +418,119 @@ w.tick(1000)
 check('9: B tells it carries a decoder (carry_items)', w.server_facts.get('carry:B') == 'decoder' and w.lua('A', 'return coop.fact("carry:B")') == 'decoder')
 w.lua('A', 'door_update(730)')
 w.pump()
-check('9: B, far on the level, has the decoder: coded for everyone', all(sec(w, n, 730) == 'ph_door@coded' for n in 'ABC'))
+check('9: B has the decoder but is elsewhere on the level: the door stays locked', all(sec(w, n, 730) == 'ph_door@locked' for n in 'ABC'))
+place(w, {'A': (50, 0, 0), 'B': (3, 0, 0), 'C': (40, 0, 0)})
 w.lua('A', 'door_update(730)')
-check('9: !actor_has_item: it stays coded while B has it', sec(w, 'A', 730) == 'ph_door@coded')
+w.pump()
+check('9: B with the decoder at the door (within key_reach_m): coded for everyone', all(sec(w, n, 730) == 'ph_door@coded' for n in 'ABC'))
+w.lua('A', 'door_update(730)')
+check('9: !actor_has_item: it stays coded while B is there with it', sec(w, 'A', 730) == 'ph_door@coded')
+place(w, {'A': (50, 0, 0), 'B': (3, 0, 0), 'C': (1, 0, 0)})
+w.lua('C', 'use_door(730)')
+w.pump()
+check("9: C, at the door without the decoder, can't use it (B is right there)",
+      all(sec(w, n, 730) == 'ph_door@coded' for n in 'ABC') and w.G('C').uses == 1 and not w.G('C').given)
+w.lua('B', 'use_door(730)')
+w.pump()
+check("9: B uses it: decoding for everyone, the use's info is B's (his game gives it)",
+      all(sec(w, n, 730) == 'ph_door@decoding' for n in 'ABC') and w.G('B').given == '+warlab_access_decoding'
+      and not w.G('A').given and not w.G('C').given)
+w.lua('A', 'xr_logic.switch_to_section(G.objects[730], db.storage[730].ini, "ph_door@coded")')
+w.pump()
+place(w, {'A': (50, 0, 0), 'B': (30, 0, 0), 'C': (1, 0, 0)})
+w.lua('A', 'door_update(730)')
+w.pump()
+check('9: B walks away with the decoder (C still at the door): locked again', all(sec(w, n, 730) == 'ph_door@locked' for n in 'ABC'))
+place(w, {'A': (50, 0, 0), 'B': (3, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(730)')
 w.lua('B', 'G.inv.decoder = nil')
 w.tick(1000)
 w.lua('A', 'door_update(730)')
 w.pump()
-check('9: B drops it: locked again', w.server_facts.get('carry:B', 'x') == '' and all(sec(w, n, 730) == 'ph_door@locked' for n in 'ABC'))
+check('9: B drops it at the door: locked again', w.server_facts.get('carry:B', 'x') == '' and all(sec(w, n, 730) == 'ph_door@locked' for n in 'ABC'))
+place(w, {'A': (2, 0, 0), 'B': (30, 0, 0), 'C': (40, 0, 0)})
 w.lua('A', 'G.inv.decoder = {}')
 w.lua('A', 'door_update(730)')
-check("9: the authority's own player's decoder counts from its inventory", sec(w, 'A', 730) == 'ph_door@coded')
+check("9: the authority's own player at the door: its decoder counts from its inventory", sec(w, 'A', 730) == 'ph_door@coded')
 w.lua('A', 'G.inv.decoder = nil; xr_logic.switch_to_section(G.objects[730], db.storage[730].ini, "ph_door@locked")')
 w.lua('C', 'G.inv.decoder = {}')
 w.tick(1000)
-place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)}, levels={'C': 'l02_garbage'})
+place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (1, 0, 0)}, levels={'C': 'l02_garbage'})
 w.lua('A', 'door_update(730)')
 check('9: a decoder on another level opens nothing here', sec(w, 'A', 730) == 'ph_door@locked')
 w.lua('C', 'G.inv.decoder = nil')
 w.tick(1000)
-# an item not in carry_items: the logic of a door online in a game adds it to what that game tells
-w.lua('B', 'G.inv.lab_key = {}')
-w.tick(1000)
-check('9: an item no door here asked about yet is not told', w.server_facts.get('carry:B', '') == '')
-w.lua('B', 'door_update(731)')
-w.tick(1000)
-check('9: once a door online in B asks about it, B tells it', w.server_facts.get('carry:B') == 'lab_key')
-place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)})
-w.lua('A', 'door_update(731)')
+# the key used: the door takes it from its holder's game, nobody else's
 w.pump()
-check("9: and the authority opens the door by B's key", all(sec(w, n, 731) == 'ph_door@open' for n in 'ABC'))
+place(w, {'A': (50, 0, 0), 'B': (2, 0, 0), 'C': (1, 0, 0)})
+w.lua('B', 'G.inv.lx8_key = {}')
+w.lua('B', 'door_update(732)') # B's game hasn't the door's logic yet: lx8_key isn't in carry_items
+w.tick(1000)
+w.lua('A', 'door_update(732)')
+w.pump()
+check('9: an item no list has: B tells it once a door online in B asks about it, the door is usable', w.server_facts.get('carry:B') == 'lx8_key'
+      and all(sec(w, n, 732) == 'ph_door@closed' for n in 'ABC'))
+w.lua('C', 'G.inv.lx8_key = nil; use_door(732)')
+w.pump()
+check("9: C without the key can't open it", all(sec(w, n, 732) == 'ph_door@closed' for n in 'ABC'))
+w.lua('B', 'use_door(732)')
+w.pump()
+check("9: B opens it with his key, the key goes from B's game", all(sec(w, n, 732) == 'ph_door@open' for n in 'ABC')
+      and w.lua('B', 'return G.inv.lx8_key') is None and 'remove_item:lx8_key' in fx(w, 'B') and 'remove_item:lx8_key' not in fx(w, 'A') + fx(w, 'C'))
 # the headless host has no player: its own actor counts for nothing, and it tells nothing it carries
+place(w, {'A': (1, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)})
 w.lua('A', 'coop.is_host = function() return true end; G.inv.decoder = {}; G.now = G.now + 1')
 w.lua('A', 'door_update(730)')
 w.tick(1000)
-check('9: the headless host: its own actor is no player', sec(w, 'A', 730) == 'ph_door@locked' and 'carry:A' not in w.server_facts)
+check('9: the headless host: its own actor is no player', sec(w, 'A', 730) == 'ph_door@locked' and w.server_facts.get('carry:A', '') == '')
+
+# 11. infos a switch the authority made gives: to the player it was for, his game gives them (coop_story takes them
+# along his group); taking a door's flag away: from every player of the level who has it
+w = setup(['A', 'B', 'C'])
+for n in 'ABC':
+    w.lua(n, '''make_zone("b303_rest", 0, 0, 0, 3)
+    make_logic_door(750, "pri_b303_one_side_door", "ph_door@closed_out", {
+        ["ph_door@closed_out"] = { { "on_info", "{=actor_in_zone(b303_rest)} ph_door@closed_in %+pri_b303_door_is_open%" } },
+        ["ph_door@closed_in"] = {} })
+    make_logic_door(751, "pri_a16_ph_door", "ph_door@close", {
+        ["ph_door@close"] = { { "on_use", "ph_door@open %+pri_a16_door_open%" },
+            { "on_info", "{+pri_a16_door_open !is_door_blocked_by_npc} ph_door@open" } },
+        ["ph_door@open"] = { { "on_use", "ph_door@close %-pri_a16_door_open%" },
+            { "on_info", "{-pri_a16_door_open !is_door_blocked_by_npc} ph_door@close" },
+            { "on_info", "{+shut_now} ph_door@close %-pri_a16_door_open%" } } })''')
+w.tick(100)
+place(w, {'A': (50, 0, 0), 'B': (1, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(750)')
+w.pump()
+check("11: B in the zone: the door goes, its info goes to B's game, not the authority's",
+      all(sec(w, n, 750) == 'ph_door@closed_in' for n in 'ABC') and w.G('B').given == '+pri_b303_door_is_open'
+      and not w.G('A').given and not w.G('C').given)
+w.lua('A', 'xr_logic.switch_to_section(G.objects[750], db.storage[750].ini, "ph_door@closed_out")')
+w.pump()
+w.lua('B', 'G.given = nil; G.infos = {}')
+place(w, {'A': (1, 0, 0), 'B': (30, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'db.actor_inside_zones["b303_rest"] = db.zone_by_name["b303_rest"]; door_update(750)')
+w.pump()
+check("11: the authority's own player in the zone: its own game gives it", w.G('A').given == '+pri_b303_door_is_open' and not w.G('B').given)
+# a door's own flag: B (not the authority) opens it; the authority reads B's flag and leaves it open
+place(w, {'A': (50, 0, 0), 'B': (1, 0, 0), 'C': (40, 0, 0)})
+w.lua('B', 'use_door(751)')
+w.pump()
+w.lua('A', 'door_update(751)')
+w.pump()
+check("11: B opens a door that keeps its flag in an info: B has the flag, the authority sees it and leaves the door open",
+      all(sec(w, n, 751) == 'ph_door@open' for n in 'ABC') and w.server_facts.get('knows:B') == 'pri_a16_door_open')
+w.lua('C', 'G.infos.pri_a16_door_open = true; door_update(751)')
+w.tick(1000)
+w.lua('A', 'G.infos.shut_now = true; door_update(751)')
+w.pump()
+w.tick(1000)
+check('11: the authority shuts it by its logic: the flag goes from every player of the level holding it (B, C)',
+      all(sec(w, n, 751) == 'ph_door@close' for n in 'ABC') and not w.lua('B', 'return G.infos.pri_a16_door_open')
+      and not w.lua('C', 'return G.infos.pri_a16_door_open') and w.server_facts.get('knows:B') == '' and w.server_facts.get('knows:C') == '')
+w.lua('A', 'G.infos.shut_now = nil; door_update(751)')
+w.pump()
+check('11: ... and it stays shut (no player keeps the flag)', all(sec(w, n, 751) == 'ph_door@close' for n in 'ABC'))
 
 # 10. single player: Anomaly's own, its own actor only
 w = setup(['A'])
