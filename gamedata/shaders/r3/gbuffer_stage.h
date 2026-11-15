@@ -134,6 +134,10 @@ f_deffer pack_gbuffer( float4 norm, float4 pos, float4 col, uint imask )
     if (L_hotness.x <= 0.0)
         res.H.w = 0.25;
 #endif
+    // the HUD (the deffer_base_hud_* shaders: any hands and weapon model drawn as the HUD): the ash on them
+#ifdef ASH_HUD
+    res.H.w = 0.125;
+#endif
 
 #ifdef EXTEND_F_DEFFER
    res.mask = imask;

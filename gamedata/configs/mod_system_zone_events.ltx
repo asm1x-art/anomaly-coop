@@ -214,6 +214,24 @@ ground_bark_up        = 0.0, 0.7   ; world normal.y of the bark: no ash at the f
 ground_bark_strength  = 0.8        ; the most ash on bark (x ground_opacity), 0..1
 ground_grass_strength = 0.5        ; the most ash on grass (x the ground's), 0..1
 ground_aref_strength  = 0.8        ; the most on alpha tested surfaces: willows' hanging foliage, nets, fences, 0..1
+; the ash on the player's hands and weapon (each game its own player): while he is out in the front on a ground_levels
+; level (not in the shelter's cover, no roof within hud_roof_m over his head) it settles on their upper sides (whatever
+; the HUD's shaders draw: any hands and weapon model); the mask wipe's key (T) shakes it off, a gas mask is wiped after it
+hud_full_s            = 90         ; real s out in the front from clean to a full coat
+hud_fade_min          = 10         ; real minutes it takes to go by itself after the front (not shaken off)
+hud_roof_m            = 30         ; m: a roof this near over the player's head keeps it off
+hud_opacity           = 0.8        ; the most it hides of the hands and the weapon, 0..1
+hud_up                = 0.0, 0.6   ; world normal.y: no ash at the first, full at the second (the upper sides)
+hud_grain_per_m       = 40         ; its patches' fineness on the HUD (per metre in view space)
+hud_patchiness        = 0.6        ; 0: an even coat; 1: in patches first, the rest later
+hud_shake_from        = 0.05       ; T shakes it off from this much (less: T wipes the mask as ever)
+hud_shake_s           = 0.8        ; real s the shake takes the ash off in
+hud_shake_jolts       = 2          ; jolts of the hands
+hud_shake_gap_s       = 0.3        ; real s between the jolts
+hud_shake_anm         = script\misfire.anm ; the jolt (a HUD animation: game.play_hud_anm)
+hud_shake_speed       = 1.5
+hud_shake_power       = 1.6
+hud_shake_sound       = interface\inv_mask_clean_3 ; with the shake (empty: none)
 
 ; ---------------------------------------------------------------------------------------------------------------
 ; The ash front's service and story NPCs, a section per level: <story id> = <how>

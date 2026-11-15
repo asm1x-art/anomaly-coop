@@ -639,6 +639,129 @@ local function ground_update()
 end
 
 -------------------------------------------------------------------------------
+-- the ash on the HUD (each game its own player). While he is out in the front on its level (a level with ash on the
+-- ground, not in the shelter's cover, nothing over his head within hud_roof_m) the ash settles on his hands and
+-- weapon: hud_ash goes 0..1 in hud_full_s real seconds and the ash pass greys their upper sides by it (ash_ground.h,
+-- the lanes ash_hud and ash_hud_look: the pixels the HUD's shaders tag, by their G-buffer normals, so any hands and
+-- weapon model). Under a roof it stays;
+-- after the front it goes in hud_fade_min real minutes. The mask wipe's key (T, actor_effects.Hit_MaskCleaning) with
+-- ash on the HUD (hud_shake_from or more) shakes it off first: the hands jolt (hud_shake_anm, hud_shake_jolts times)
+-- and the ash is gone in hud_shake_s; a gas mask is wiped after it as ever. Without ash the key is the wipe as before
+local hud_tokens
+local hud_ash, hud_shown, hud_last = 0, -1, nil
+local shake -- the shake under way: { at = time_global() it began, from = the ash then, jolts = done, after = the wipe }
+
+local function hud_register(owner)
+	local amount = shader_bus.register("ash_hud", owner, "Ash front: ash on the player's hands and weapon, x amount 0..1, y opacity, z..w world normal.y from..to")
+	local look = shader_bus.register("ash_hud_look", owner, "Ash front: ash on the player's hands and weapon, x grain per metre (view space), y patchiness")
+	if amount and look then
+		hud_tokens = { amount = amount, look = look }
+		shader_bus.set(look, num("hud_grain_per_m", 40), num("hud_patchiness", 0.6), 0, 0)
+	end
+end
+
+local function hud_show()
+	if hud_tokens and (math.abs(hud_ash - hud_shown) >= 0.003 or (hud_ash == 0 and hud_shown ~= 0)) then
+		hud_shown = hud_ash
+		local up = nums("hud_up", { 0.0, 0.6 })
+		shader_bus.set(hud_tokens.amount, hud_ash, num("hud_opacity", 0.8), up[1], up[2])
+	end
+end
+
+local function roof_over(pos)
+	local rp = ray_pick(vector():set(pos.x, pos.y + 1.9, pos.z), vector():set(0, 1, 0), num("hud_roof_m", 30),
+		rq_target.rqtStatic, nil)
+	return rp:query()
+end
+
+-- each second: settles while out in the front, goes after it
+local function hud_update(on)
+	if not hud_tokens or ghost() then
+		return
+	end
+	local now = time_global()
+	local dt = hud_last and math.min(5, (now - hud_last) / 1000) or 0
+	hud_last = now
+	if shake then
+		return
+	end
+	local lvl = level.name()
+	if on and listed(lvl, "ground_levels") then
+		local pos = db.actor:position()
+		if not in_cover(pos, lvl) and not roof_over(pos) then
+			hud_ash = math.min(1, hud_ash + dt / math.max(1, num("hud_full_s", 90)))
+		end
+	elseif hud_ash > 0 then
+		hud_ash = math.max(0, hud_ash - dt / math.max(1, num("hud_fade_min", 10) * 60))
+	end
+	if ash_now() < 0.01 then
+		hud_ash = 0 -- no ash pass without ash on the ground (the engine runs it for the ground's cover)
+	end
+	hud_show()
+end
+
+-- each frame while a shake is under way
+local function hud_tick()
+	if not shake then
+		return
+	end
+	local now = time_global()
+	local t = (now - shake.at) / 1000
+	local gap = num("hud_shake_gap_s", 0.3)
+	local jolts = math.max(1, num("hud_shake_jolts", 2))
+	if shake.jolts < jolts and t >= shake.jolts * gap then
+		shake.jolts = shake.jolts + 1
+		game.play_hud_anm(ini_sys:r_string_ex(S, "hud_shake_anm") or ("script" .. string.char(92) .. "misfire.anm"), 0,
+			num("hud_shake_speed", 1.5), num("hud_shake_power", 1.6), false)
+	end
+	local len = math.max(0.1, num("hud_shake_s", 0.8))
+	hud_ash = shake.from * math.max(0, 1 - t / len)
+	hud_show()
+	if t >= len and shake.jolts >= jolts then
+		local after = shake.after
+		shake = nil
+		hud_ash = 0
+		hud_show()
+		ZE.dbg("ash: the ash on the HUD shaken off%s", after and ", the mask wipe after it" or "")
+		if after then
+			after()
+		end
+	end
+end
+
+-- the mask wipe's key: with ash on the HUD the shake first, then the wipe (actor_effects' own, which does nothing
+-- without a gas mask on)
+local function hud_key(wipe)
+	return function(...)
+		if shake then
+			return
+		end
+		if hud_ash < num("hud_shake_from", 0.05) or ghost()
+			or (actor_effects.allow_animation and not actor_effects.allow_animation()) then
+			return wipe(...)
+		end
+		local args = { ... }
+		shake = { at = time_global(), from = hud_ash, jolts = 0, after = function() wipe(unpack(args)) end }
+		local snd = ini_sys:r_string_ex(S, "hud_shake_sound")
+		if snd and snd ~= "" then
+			local so = sound_object(snd)
+			so:play(db.actor, 0, sound_object.s2d)
+		end
+	end
+end
+
+-- the HUD's ash now 0..1 (tests)
+function hud_ash_now()
+	return hud_ash
+end
+
+-- set it (tests: no need to stand in the front for minutes)
+function set_hud_ash(v)
+	hud_ash = math.max(0, math.min(1, tonumber(v) or 0))
+	hud_show()
+end
+
+-------------------------------------------------------------------------------
 -- the radiation (each game its own player)
 
 local last_dose, last_health, warned, next_dbg = nil, nil, false, 0
@@ -1843,8 +1966,12 @@ function on_game_start()
 		return pre
 	end
 	ground_register()
+	if ground_tokens then
+		hud_register("Anomaly co-op")
+	end
 	RegisterScriptCallback("actor_on_update", function()
 		local now = time_global()
+		hud_tick()
 		if now >= next_ground then
 			next_ground = now + 250
 			ground_update()
@@ -1854,7 +1981,11 @@ function on_game_start()
 		end
 		next_dose = now + 1000
 		dose(here() ~= nil)
+		hud_update(here() ~= nil)
 	end)
+	if actor_effects and actor_effects.Hit_MaskCleaning then
+		actor_effects.Hit_MaskCleaning = hud_key(actor_effects.Hit_MaskCleaning)
+	end
 	RegisterScriptCallback("actor_on_item_use", on_item_use)
 	RegisterScriptCallback("monster_on_hit_callback", on_mutant_hit)
 	-- the shelter's people kept in its covers take no notice of anyone outside them (no fight through the door, no
