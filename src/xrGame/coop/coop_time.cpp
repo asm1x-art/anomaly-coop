@@ -10,6 +10,8 @@
 #include "date_time.h"
 #include "Level.h"
 #include "Actor.h"
+#include "../xrEngine/IGame_Persistent.h"
+#include "../xrEngine/Environment.h"
 
 #include <chrono>
 #include <mutex>
@@ -37,6 +39,7 @@ namespace coop
 		float reselect_weather_s = 600.f; // game s: a step this big re-picks the weather (_G.coop_on_time_jump)
 		u32 hold_ms = 3000;               // real ms: after our own jump or factor, older news wait at most this long
 		u32 debug_log_ms = 10000;         // coop_debug: how often the clock is logged
+		float env_log_s = 2.f;            // coop_debug: how often the weather on screen is logged (0: never)
 	};
 
 	static const STimeSettings& settings()
@@ -57,6 +60,7 @@ namespace coop
 				s.reselect_weather_s = READ_IF_EXISTS(pSettings, r_float, SECTION, "reselect_weather_s", s.reselect_weather_s);
 				s.hold_ms = READ_IF_EXISTS(pSettings, r_u32, SECTION, "hold_ms", s.hold_ms);
 				s.debug_log_ms = READ_IF_EXISTS(pSettings, r_u32, SECTION, "debug_log_s", s.debug_log_ms / 1000) * 1000;
+				s.env_log_s = READ_IF_EXISTS(pSettings, r_float, SECTION, "env_log_s", s.env_log_s);
 			}
 		}
 		return s;
@@ -91,6 +95,7 @@ namespace coop
 	static bool g_utc_known = false;
 	static double g_utc_anchor = 0, g_utc_real = 0;
 	static u32 g_last_init = 0, g_last_log = 0;
+	static s64 g_env_logged = 0;
 
 	static double target_at(double real)
 	{
@@ -266,6 +271,28 @@ namespace coop
 			Msg("[coop dbg] clock: game %llu (%s) server %.0f (%+.0f ms) x%.2f %s epoch %u wall %llu", want,
 			    day_time(want, a), target(), target() - double(want), g_factor, g_running ? "running" : "standing",
 			    g_epoch, wall_ms());
+		}
+
+		// the weather on screen at the same second of the server's clock in every game: two games' logs side by side
+		// show how far apart their skies are
+		if (debug_mode && settings().env_log_s > 0.f && g_utc_known && g_pGamePersistent)
+		{
+			const double utc = (g_utc_anchor + (real_ms() - g_utc_real)) / 1000.;
+			const s64 slot = s64(utc / settings().env_log_s);
+			if (slot != g_env_logged)
+			{
+				g_env_logged = slot;
+				CEnvironment& env = g_pGamePersistent->Environment();
+				const CEnvDescriptorMixer* e = env.CurrentEnv;
+				string64 a;
+				Msg("[coop dbg] env: utc %.2f game %s %s %s -> %s w %.3f fog %.4f rain %.3f sky %.3f,%.3f,%.3f sun %.3f,%.3f,%.3f%s",
+				    utc, day_time(want, a), env.CurrentWeatherName.c_str(),
+				    env.Current[0] ? env.Current[0]->m_identifier.c_str() : "-",
+				    env.Current[1] ? env.Current[1]->m_identifier.c_str() : "-", e ? e->weight : 0.f,
+				    e ? e->fog_density : 0.f, e ? e->rain_density : 0.f, e ? e->sky_color.x : 0.f, e ? e->sky_color.y : 0.f,
+				    e ? e->sky_color.z : 0.f, e ? e->sun_color.x : 0.f, e ? e->sun_color.y : 0.f, e ? e->sun_color.z : 0.f,
+				    env.IsWFXPlaying() ? " wfx" : "");
+			}
 		}
 	}
 

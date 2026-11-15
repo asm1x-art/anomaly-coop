@@ -370,6 +370,15 @@ reselect_weather_s   = 600   ; game s: a step of the clock this big (coming into
 hold_ms              = 3000  ; real ms: after our own jump, how long older news from the server are ignored
 schedule_check_s     = 2     ; real s: how often weather and the surge/psi storm timetable are compared with the master's
 debug_log_s          = 10    ; real s: how often the clock goes to the log with coop_debug 1
+env_log_s            = 2     ; real s: how often the weather on screen goes to the log with coop_debug 1, at the same
+                             ; second of the server's clock in every game (compare two games' logs); 0 never
+
+; Co-op: thunderbolts are the world's (src/xrEngine/thunderbolt.cpp SharedFrame): every game has the same bolts at the
+; same second of the server's clock, with the same look, direction, distance and thunder; on average one per the
+; weather's thunderbolt_period, as before
+[coop_thunderbolt]
+shared               = true  ; false: each game has its own bolts again (Anomaly's chance)
+step_s               = 0.25  ; real s: the server clock's ticks a bolt may start on (each one with the chance step/period)
 
 ; Co-op: a psi storm's vortices are the world's (coop_psi_vortex.script). The level's authority rolls one stream of them
 ; by the world's storm, as Anomaly does for its one actor, each near the next player on the level in turn; every game
@@ -504,3 +513,11 @@ min_gap_s = 60 ; real s: a level's seed is rolled again by the same game no soon
 follow_rate   = 6    ; 1/s: how fast a puppet closes in on where the authority's helicopter is
 snap_distance = 30   ; m: a puppet farther off than this is put there at once
 fly_on_s      = 0.5  ; s: how long a puppet flies on with the last speed heard before it waits for the next state
+
+; Night vision goggles (Beef's shaders nightvision_gen_1..3.ps, set by z_beefs_nvgs.script): their blur of what is near.
+; Beef's own look: near_blur 1, near_blur_m 15, base_blur 0.4 (gen 3: 0.2): NPCs and the weapon within a few metres
+; were a smear and grass tufts in the first 15 m dark blots, while the distance stayed sharp
+[coop_nvg]
+near_blur            = 0     ; 0..1: the blur at 0 m, fading to base_blur by near_blur_m (0: none)
+near_blur_m          = 15    ; m, whole: how far the near blur reaches
+base_blur            = 0     ; 0..0.9 (steps of 0.1): the blur of everything in the goggles

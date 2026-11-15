@@ -120,6 +120,10 @@ CEffect_Thunderbolt::CEffect_Thunderbolt()
 	state = stIdle;
 	next_lightning_time = 0.f;
 	bEnabled = FALSE;
+	shared_tick = 0;
+	follow_pending = false;
+	follow_at = 0;
+	follow_seed = 0;
 
 	base_sky_color.set(0.f, 0.f, 0.f);
 	base_sun_color.set(0.f, 0.f, 0.f);
@@ -204,14 +208,14 @@ static inline void undo_flash_value(Fvector3& value, const Fvector3& written, co
 		value = before;
 }
 
-void CEffect_Thunderbolt::Bolt(shared_str id, float period, float lt)
+bool CEffect_Thunderbolt::Bolt(shared_str id, float period, float lt, CRandom& rnd, float elapsed)
 {
 	VERIFY(id.size());
 	state = stWorking;
-	life_time = lt + Random.randF(-lt * 0.5f, lt * 0.5f);
-	current_time = 0.f;
+	life_time = lt + rnd.randF(-lt * 0.5f, lt * 0.5f);
+	current_time = elapsed;
 
-	current = g_pGamePersistent->Environment().thunderbolt_collection(collection, id)->GetRandomDesc();
+	current = g_pGamePersistent->Environment().thunderbolt_collection(collection, id)->GetDesc(rnd);
 	VERIFY(current);
 
 	Fmatrix XF, S;
@@ -220,13 +224,13 @@ void CEffect_Thunderbolt::Bolt(shared_str id, float period, float lt)
 	CEnvironment& environment = g_pGamePersistent->Environment();
 	environment.CurrentEnv->sun_dir.getHP(sun_h, sun_p);
 	float alt = environment.p_var_alt; //Random.randF(environment.p_var_alt.x,environment.p_var_alt.y);
-	float lng = Random.randF(sun_h - environment.p_var_long + PI, sun_h + environment.p_var_long + PI);
-	float dist = Random.randF(FAR_DIST * environment.p_min_dist, FAR_DIST * .95f);
+	float lng = rnd.randF(sun_h - environment.p_var_long + PI, sun_h + environment.p_var_long + PI);
+	float dist = rnd.randF(FAR_DIST * environment.p_min_dist, FAR_DIST * .95f);
 	current_direction.setHP(lng, alt);
 	pos.mad(Device.vCameraPosition, current_direction, dist);
-	dev.x = Random.randF(-environment.p_tilt, environment.p_tilt);
-	dev.y = Random.randF(0, PI_MUL_2);
-	dev.z = Random.randF(-environment.p_tilt, environment.p_tilt);
+	dev.x = rnd.randF(-environment.p_tilt, environment.p_tilt);
+	dev.y = rnd.randF(0, PI_MUL_2);
+	dev.z = rnd.randF(-environment.p_tilt, environment.p_tilt);
 	XF.setXYZi(dev);
 
 	Fvector light_dir = {0.f, -1.f, 0.f};
@@ -240,27 +244,113 @@ void CEffect_Thunderbolt::Bolt(shared_str id, float period, float lt)
 	XF.translate_over(pos);
 	current_xform.mul_43(XF, S);
 
-	float next_v = Random.randF();
+	float next_v = rnd.randF();
+	const bool second = next_v < environment.p_second_prop;
 
-	if (next_v < environment.p_second_prop)
+	// the thunder of each bolt, as far behind its flash as the bolt is away (a shared bolt caught up late: less)
+	const float delay = dist / 300.f - elapsed;
+	if (!second && delay > -1.f)
 	{
-		next_lightning_time = Device.fTimeGlobal + lt + EPS_L;
-	}
-	else
-	{
-		next_lightning_time = Device.fTimeGlobal + period + Random.randF(-period * 0.3f, period * 0.3f);
-
 		// clap volume gate through the game layer (no script-engine reach from xrEngine). 0 skips the clap.
 		float clap_volume_mult = g_pGamePersistent
 			? g_pGamePersistent->OnThunderboltSound(current->snd._handle() ? current->snd._handle()->file_name() : "", dist)
 			: 1.0f;
 		if (clap_volume_mult > EPS_S)
-			current->snd.play_no_feedback(0, 0, dist / 300.f, &pos, (clap_volume_mult < 1.0f) ? &clap_volume_mult : 0, 0,
+			current->snd.play_no_feedback(0, 0, _max(delay, 0.f), &pos, (clap_volume_mult < 1.0f) ? &clap_volume_mult : 0, 0,
 			                              &Fvector2().set(dist / 2, dist * 2.f));
 	}
 
 
 	current_direction.invert(); // for env-sun
+	return second;
+}
+
+// splitmix64: a tick's own number, the same in every game
+static u64 tick_hash(u64 x)
+{
+	x += 0x9E3779B97F4A7C15ull;
+	x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
+	x = (x ^ (x >> 27)) * 0x94D049BB133111EBull;
+	return x ^ (x >> 31);
+}
+
+static float shared_step_s()
+{
+	static float step = -1.f;
+	if (step < 0.f)
+	{
+		step = 0.25f;
+		if (pSettings && pSettings->section_exist("coop_thunderbolt") && pSettings->line_exist("coop_thunderbolt", "step_s"))
+			step = pSettings->r_float("coop_thunderbolt", "step_s");
+		clamp(step, 0.05f, 5.f);
+	}
+	return step;
+}
+
+// Each tick of the server's clock (step_s) is a bolt with the chance step/period: on average one in a period, as
+// Anomaly's own, but the same ticks in every game. A bolt keeps its tick's seed: life, look, direction, distance and
+// whether a second one follows. A game that comes to a tick late (a long frame, the storm's frames just came) goes into
+// the bolt at its age, so all of them flash at once
+void CEffect_Thunderbolt::SharedFrame(shared_str id, float period, float duration, double now, bool verbose)
+{
+	const double step = shared_step_s();
+	const u64 cur = u64(now / step);
+	if (!id.size() || period < EPS_L)
+	{
+		shared_tick = cur;
+		follow_pending = false;
+		return;
+	}
+	// a bolt lives at most 1.5 durations: older ticks are over
+	const u64 back = u64(duration * 1.5f / step) + 1;
+	u64 from = shared_tick ? shared_tick + 1 : cur;
+	if (cur > back && from + back < cur)
+		from = cur - back;
+	shared_tick = cur;
+
+	if (state != stIdle)
+		return;
+	u64 seed = 0;
+	double began = 0;
+	if (follow_pending && now >= follow_at)
+	{
+		follow_pending = false;
+		if (now - follow_at < duration * 1.5)
+		{
+			seed = follow_seed;
+			began = follow_at;
+		}
+	}
+	if (!seed)
+	{
+		const double chance = step / period;
+		for (u64 k = cur; k >= from && k > 0; --k) // the newest bolt of the ticks not looked at yet
+		{
+			const u64 h = tick_hash(k);
+			if (double(h >> 11) * (1.0 / 9007199254740992.0) < chance)
+			{
+				seed = tick_hash(h);
+				began = double(k) * step;
+				break;
+			}
+		}
+	}
+	if (!seed)
+		return;
+	CRandom rnd(s32(seed & 0x7fffffff));
+	const float elapsed = float(now - began);
+	const bool second = Bolt(id, period, duration, rnd, elapsed);
+	if (current_time > life_time)
+		state = stIdle; // over before we came to it
+	if (second)
+	{
+		follow_pending = true;
+		follow_at = began + duration + EPS_L;
+		follow_seed = u32(tick_hash(seed) & 0x7fffffff) | 1;
+	}
+	if (verbose)
+		Msg("[coop dbg] thunderbolt: tick %.2f s (utc), %.2f s late, life %.2f s, dir %.0f deg%s", began, elapsed,
+		    life_time, rad2deg(current_direction.getH()), second ? ", a second one follows" : "");
 }
 
 void CEffect_Thunderbolt::OnFrame(shared_str id, float period, float duration)
@@ -278,15 +368,28 @@ void CEffect_Thunderbolt::OnFrame(shared_str id, float period, float duration)
 	}
 	flash_applied = false;
 
+	double now = 0;
+	bool verbose = false;
 	BOOL enabled = !!(id.size());
-	if (bEnabled != enabled)
+	if (g_pGamePersistent->SharedEventClock(now, verbose))
+	{
+		bEnabled = enabled;
+		SharedFrame(id, period, duration, now, verbose);
+	}
+	else if (bEnabled != enabled)
 	{
 		bEnabled = enabled;
 		next_lightning_time = Device.fTimeGlobal + period + Random.randF(-period * 0.5f, period * 0.5f);
 	}
 	else if (bEnabled && (Device.fTimeGlobal > next_lightning_time))
 	{
-		if (state == stIdle && !!(id.size())) Bolt(id, period, duration);
+		if (state == stIdle && !!(id.size()))
+		{
+			if (Bolt(id, period, duration, Random))
+				next_lightning_time = Device.fTimeGlobal + duration + EPS_L;
+			else
+				next_lightning_time = Device.fTimeGlobal + period + Random.randF(-period * 0.3f, period * 0.3f);
+		}
 	}
 	if (state == stWorking)
 	{
