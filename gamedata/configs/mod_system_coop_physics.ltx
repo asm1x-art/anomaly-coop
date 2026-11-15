@@ -10,3 +10,12 @@ rest_min_turn   = 5         ; degrees any of them turned (a thing put where the 
                             ; being sent back, so low numbers don't make things go back and forth)
 rest_check_ms   = 500       ; real ms between two looks at the things online here
 rest_min_gap_ms = 1000      ; real ms at least between two rests of one thing sent
+; doors whose logic asks about the player (how near, in a zone, what he carries): the level's authority runs it for
+; all the level's players (the nearest, any in the zone, none out of it, any carrying it), the others take the door
+peer_stale_s    = 10        ; real s: a player not heard from for this long doesn't count for a door's logic
+carry_items     = decoder, pri_b35_lab_x8_key ; items each game tells it carries (fact carry:<player>), for door logic
+                            ; asking actor_has_item; ones the logic of a door online here asks about are added
+carry_check_ms  = 1000      ; real ms between two looks at what our player carries of them
+replay_effects  = play_sound, play_sound_looped, stop_sound_looped, play_particle_on_path, hit_npc
+                            ; effects of a door's switch the authority made that the other games play too (only seen
+                            ; and heard: an effect that changes the world stays the authority's)
