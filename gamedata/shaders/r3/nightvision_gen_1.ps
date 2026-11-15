@@ -72,7 +72,11 @@ float4 main(p_screen I) : SV_Target
 			//image.r = lerp(half_res_blur.r,image.r,0.6f);
 			//image = pow(image,0.75);
 
-			image = lerp(image,half_res_blur,clamp(1-smoothstep(0,15,depth),0.4,1)); // NEAR BLUR
+			// NEAR BLUR. Co-op: as much as the game sets ([coop_nvg] in mod_system_coop.ltx via z_beefs_nvgs): shader_param_7.z
+			// the blur at 0 m (0..1), shader_param_7.w the metres it fades over (whole part) and the blur everywhere (fraction).
+			// Beef's own look was 1 and 15.4 (gen 3: 15.2): near NPCs and the weapon were a smear
+			float near_blur_m = max(floor(shader_param_7.w), 1.0);
+			image = lerp(image,half_res_blur,max(saturate(shader_param_7.z)*(1-smoothstep(0,near_blur_m,depth)),frac(shader_param_7.w)));
 				
 			if (depth < 1000)
 			{

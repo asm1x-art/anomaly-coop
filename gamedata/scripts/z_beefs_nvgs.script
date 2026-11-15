@@ -101,12 +101,15 @@ function pack_nvg_data_2()
 	local x_2 = tostring(0)								
 	local y_1 = tostring(0)
 	local y_2 = tostring(math.floor(nvg_radius*10))								-- Radius for NVG effect - outputs 0.0 to 0.9
-	local z_1 = tostring(0)
-	local z_2 = tostring(0)
-	local w_1 = tostring(0)
-	local w_2 = tostring(0)
+	-- Co-op: the shaders' near blur ([coop_nvg] in mod_system_coop.ltx): z its strength at 0 m, w the metres it fades
+	-- over (whole part) and the blur everywhere (fraction, 0.0 - 0.9)
+	local near = clamp(ini_sys:r_float_ex("coop_nvg", "near_blur") or 0, 0, 1)
+	local near_m = clamp(math.floor(ini_sys:r_float_ex("coop_nvg", "near_blur_m") or 15), 1, 999)
+	local base = clamp(math.floor((ini_sys:r_float_ex("coop_nvg", "base_blur") or 0) * 10 + 0.5), 0, 9)
+	local z = string.format("%.2f", near)
+	local w = near_m .. "." .. base
 
-	return "(" .. x_1 .. "." .. x_2 .. "," .. y_1 .. "." .. y_2 .. "," .. z_1 .. "." .. z_2 .. "," .. w_1 .. "." .. w_2 .. ")"
+	return "(" .. x_1 .. "." .. x_2 .. "," .. y_1 .. "." .. y_2 .. "," .. z .. "," .. w .. ")"
 end
 
 function update_nvgs()
