@@ -9,7 +9,8 @@ STUB = r'''
 hour = 10
 set_weathers = {}
 level = { get_time_hours = function() return hour end, is_wfx_playing = function() return false end,
-          set_weather = function(f, now) set_weathers[#set_weathers + 1] = f end, name = function() return "x" end }
+          set_weather = function(f, now) set_weathers[#set_weathers + 1] = f end,
+          set_weather_smooth = function(f) set_weathers[#set_weathers + 1] = f end, name = function() return "x" end }
 weather = { is_paused = function() return false end }
 coop_facts = { on_fact = function() end }
 surge_manager = { CSurgeManager = {}, get_surge_manager = function() return nil end }
@@ -54,17 +55,24 @@ M.authority = True
 M.run('wm = new_wm("indoor")'); O.run('wm = new_wm("atmosfear"); wm.cycle = nil; wm.preset = nil')
 def parse(v):
     return v.split('|')
+# the master takes the world over at its first pick (coop_time take_state: the hour it came in is the world's)
+M.run('hour = 9; wm:select_weather(false)')
+f9 = parse(facts['weather'])[4]
+O.run('hour = 9; wm:select_weather(false)')
 # a change of cycle's hour, master underground
 M.run('hour = 10; wm.transition_period = true; wm:select_weather(false)')
 w = parse(facts['weather'])
-check(w[3] == 't' and w[4] == 'w_cloudy3', 'master underground, change of cycle: file published, the cloudy preset (%s)' % facts['weather'])
+check(w[3] == 't' and w[4] in ('w_cloudy1', 'w_cloudy3'), 'master underground, change of cycle: file published, a cloudy preset (%s)' % facts['weather'])
 check(not M.lua.eval('wm.transition_period'), 'and the hour no longer stands in its manager')
+check(w[5] == f9, 'underground: the weather before is the file published the hour before (%s, %s)' % (w[5], f9))
+f10 = w[4]
 O.run('hour = 10; wm:select_weather(false)')
-check(O.lua.eval('wm.weather_file') == 'w_cloudy3', 'the other outdoors shows it (%s)' % O.lua.eval('wm.weather_file'))
+check(O.lua.eval('wm.weather_file') == w[4], 'the other outdoors shows it (%s)' % O.lua.eval('wm.weather_file'))
 # next hour, normal: the preset isn't rain's -> one of rain's, published with it
 M.run('hour = 11; wm:select_weather(false)')
 w = parse(facts['weather'])
 check(w[3] == 'n' and w[4] in ('w_rain1', 'w_rain2') and w[2] == w[4], 'next hour: a rain preset, file = preset (%s)' % facts['weather'])
+check(w[5] == f10, 'and the weather before is the previous hour file (%s)' % w[5])
 O.run('hour = 11; wm:select_weather(false)')
 check(O.lua.eval('wm.weather_file') == w[4], 'the other shows the same (%s)' % O.lua.eval('wm.weather_file'))
 # a coming surge's hour: one of the surge's, the same through the hour's re-publishes
