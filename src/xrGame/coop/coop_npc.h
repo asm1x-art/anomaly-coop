@@ -58,5 +58,8 @@ namespace coop
 	// last seen once it is gone from the stream.
 	bool moves_offline_squad(const CSE_ALifeDynamicObject* squad); // CSE_ALifeOnlineOfflineGroup::update
 	bool squad_online_elsewhere(u16 squad_id); // the host: a player's game has it online
+	// Lua (coop_squads.script): an offline creature's health as the host has it (it takes it from the players'
+	// streams); not the host's own, not online here, not dead. True when taken
+	bool set_offline_health(u16 id, float health);
 	void update_host_squads(); // per frame
 }

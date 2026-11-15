@@ -472,6 +472,16 @@ namespace coop
 	static xr_map<u16, SStreamedSquad> g_streamed;
 	static const u32 STREAM_GONE_MS = 3000;
 
+	// an offline creature's health as another game has it; not a dead one's (deaths come as deaths)
+	static bool take_health(CSE_ALifeCreatureAbstract* creature, float health)
+	{
+		if (!creature || creature->m_bOnline || !creature->g_Alive() || creature->get_killer_id() != u16(-1) ||
+		    !(health > 0.f))
+			return false;
+		creature->set_health(_min(health, 1.f));
+		return true;
+	}
+
 	static void note_streamed(const shared_str& level, NET_Packet& P)
 	{
 		SNpcState state;
@@ -479,10 +489,20 @@ namespace coop
 		{
 			const u16 id = P.r_u16();
 			read_state(P, state);
-			const CSE_ALifeMonsterAbstract* npc = smart_cast<const CSE_ALifeMonsterAbstract*>(ai().alife().objects().object(id, true));
+			CSE_ALifeMonsterAbstract* npc = smart_cast<CSE_ALifeMonsterAbstract*>(ai().alife().objects().object(id, true));
 			if (npc && npc->m_group_id != u16(-1))
 				g_streamed[npc->m_group_id] = {Device.dwTimeContinual, level, state.position};
+			// as wounded as it is there: the host's world (its saves, a player who comes in) and the squads' health it
+			// tells the others (coop_squads.script) have it so
+			take_health(npc, state.health);
 		}
+	}
+
+	bool set_offline_health(u16 id, float health)
+	{
+		if (!ai().get_alife() || is_host())
+			return false;
+		return take_health(smart_cast<CSE_ALifeCreatureAbstract*>(ai().alife().objects().object(id, true)), health);
 	}
 
 	bool squad_online_elsewhere(u16 squad_id)
