@@ -1,0 +1,8 @@
+; Co-op: doors and breakable boxes are the world's, not each game's (coop_physics.script).
+[coop_physics]
+plain_box_loot_chance = 0.5 ; chance a plain wooden or metal box (no drop_box in its spawn) has loot when broken,
+                            ; rolled once for the world by the level's authority; Anomaly's own is 0.5
+break_hit_power = 100       ; power of the hit (fire wound) that breaks our copy of a box another player broke
+confirm_s       = 5         ; real s the game that broke a box waits for the level's authority to decide its loot
+                            ; before telling it again
+confirm_tries   = 2         ; times it tells it; then it decides the loot itself (the authority left meanwhile)

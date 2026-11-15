@@ -239,6 +239,9 @@ tests=1` : ''));
   const ADMIN_INFO = 'coop_admin_info';
   const EVENTS_INFO = 'coop_admin_events'; // the world's game on its events (coop_world_events.script)
   const JOURNAL_EVENTS = new Set(['loot_created', 'mutant_loot', 'stash_revealed', 'stash_opened', 'logic_assign']);
+  // facts two games may change at the same moment (a door two players use at once, coop_physics.script): the sender
+  // is told the server's word too, so the last change the server took is the one every game ends with
+  const ECHOED_FACTS = ['door:'];
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
     if (!storage.worldInfo()) return;
@@ -895,7 +898,10 @@ tests=1` : ''));
             send(M.FACT, Buffer.concat([stringZ(key), stringZ(kept || value)]));
             break;
           }
-          if (key && storage.setFact(key, value)) broadcast(id, M.FACT, Buffer.from(payload));
+          if (key && storage.setFact(key, value)) {
+            broadcast(id, M.FACT, Buffer.from(payload));
+            if (ECHOED_FACTS.some((prefix) => key.startsWith(prefix))) send(M.FACT, Buffer.from(payload));
+          }
           break;
         }
         case M.LOG: {

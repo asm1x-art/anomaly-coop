@@ -1441,6 +1441,54 @@ test('facts: kept by the server, passed on when they change, given with the worl
   }
 });
 
+// the facts that came before a round trip's PONG, as [key, value]
+async function factsBefore(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const got = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return got;
+    if (msg.type === M.FACT) got.push(readStringsZ(msg.payload, 0, 2));
+  }
+}
+
+test('facts: a door two games change at once ends the same in both (its fact goes back to the sender too)', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await player(port, 'artem');
+    const b = await player(port, 'друг');
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@open'));
+    assert.deepEqual(await factsBefore(a), [['door:bar_door_1', 'ph_door@open']]); // the server's word, to us too
+    assert.deepEqual(await factsBefore(b), [['door:bar_door_1', 'ph_door@open']]);
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@open')); // no change: nobody is told
+    assert.deepEqual(await factsBefore(a), []);
+
+    // both at once: whichever the server takes last, both games hear it last
+    a.send(M.FACT, fact('door:bar_door_1', 'ph_door@close'));
+    b.send(M.FACT, fact('door:bar_door_1', 'ph_door@free'));
+    const gotA = await factsBefore(a), gotB = await factsBefore(b);
+    gotA.push(...await factsBefore(a));
+    gotB.push(...await factsBefore(b));
+    const last = server.coop.facts()['door:bar_door_1'];
+    assert.ok(last === 'ph_door@close' || last === 'ph_door@free');
+    assert.deepEqual(gotA.at(-1), ['door:bar_door_1', last]);
+    assert.deepEqual(gotB.at(-1), ['door:bar_door_1', last]);
+
+    // other facts are not echoed
+    a.send(M.FACT, fact('box:esc_box_wood_0001', '1'));
+    assert.deepEqual(await factsBefore(a), []);
+    assert.deepEqual(await factsBefore(b), [['box:esc_box_wood_0001', '1']]);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 function timeSet(kind, ...values) {
   const parts = [Buffer.from([kind])];
   for (const [type, v] of values) {
