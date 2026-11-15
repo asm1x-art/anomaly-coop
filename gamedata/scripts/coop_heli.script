@@ -159,7 +159,18 @@ local function patch_altitude(combat)
 end
 
 -- The pilots' voice (hit, damaged, going down: bind_heli, xr_sound) is the authority's: what its helicopter says goes to
--- the others (event heli_voice), whose puppet says nothing of its own
+-- the others (event heli_voice), whose puppet says nothing of its own. The line of the theme (sound_theme picks one by
+-- math.random) is the same everywhere: it is picked from a seed that goes with the event.
+local SEED_MAX = 1000000000
+
+local function play_seeded(play, seed, ...)
+	local after = math.random(1, SEED_MAX) -- the game's randomness goes on from a draw of its own
+	math.randomseed(seed)
+	local r = play(...)
+	math.randomseed(after)
+	return r
+end
+
 local function patch_voice()
 	local play = xr_sound.set_sound_play
 	xr_sound.set_sound_play = function(npc_id, sound, ...)
@@ -169,14 +180,19 @@ local function patch_voice()
 		if coop.heli_puppet(npc_id) then
 			return -- heard from the authority's game
 		end
-		coop_sync.send_event("heli_voice", level.name(), npc_id, sound)
-		return play(npc_id, sound, ...)
+		local seed = math.random(1, SEED_MAX)
+		coop_sync.send_event("heli_voice", level.name(), npc_id, sound, seed)
+		return play_seeded(play, seed, npc_id, sound, ...)
 	end
 	coop_sync.on_event("heli_voice", function(sender, payload)
 		local f = str_explode(payload or "", "	")
-		local id = tonumber(f[2])
+		local id, seed = tonumber(f[2]), tonumber(f[4])
 		if db.actor and f[1] == level.name() and id and f[3] and coop.heli_puppet(id) then
-			play(id, f[3])
+			if seed then
+				play_seeded(play, seed, id, f[3])
+			else
+				play(id, f[3])
+			end
 		end
 	end)
 end

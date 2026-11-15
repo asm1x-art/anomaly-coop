@@ -56,7 +56,9 @@ local callbacks = {}
 function SendScriptCallback(name, ...) callbacks[#callbacks + 1] = { name = name, args = { ... } } end
 xr_combat_ignore = { ignore_enemy_by_overrides = function() return false end, safe_zone_npcs = {} }
 local voices = {}
-xr_sound = { update = function() end, set_sound_play = function(id, snd) voices[#voices + 1] = id .. ":" .. snd end }
+-- a theme's line as sound_theme picks it: math.random
+xr_sound = { update = function() end,
+	set_sound_play = function(id, snd) voices[#voices + 1] = id .. ":" .. snd .. "#" .. math.random(1, 1000) end }
 local sent_events, event_handlers = {}, {}
 coop_sync = {
 	send_event = function(name, ...) sent_events[#sent_events + 1] = { name = name, args = { ... } } end,
@@ -217,16 +219,19 @@ function run(load)
 	voices = {}
 	xr_sound.set_sound_play(500, "heli_hit")
 	local ev = sent_events[#sent_events]
-	check("voice: the authority plays it and sends it", voices[1] == "500:heli_hit" and ev and ev.name == "heli_voice"
-		and ev.args[2] == 500 and ev.args[3] == "heli_hit")
+	check("voice: the authority plays it and sends it", voices[1] and voices[1]:find("^500:heli_hit#") and ev
+		and ev.name == "heli_voice" and ev.args[2] == 500 and ev.args[3] == "heli_hit" and ev.args[4])
+	local authority_line = voices[1]
 	puppet = true
 	voices = {}
 	xr_sound.set_sound_play(500, "heli_down")
 	check("voice: a puppet's own is not played", #voices == 0)
-	event_handlers["heli_voice"]("Friend", "l01_escape	500	heli_down")
-	check("voice: the authority's is played on the puppet", voices[1] == "500:heli_down")
+	math.random(1, 1000) -- another game's randomness is elsewhere
+	event_handlers["heli_voice"]("Friend", "l01_escape	500	heli_hit	" .. ev.args[4])
+	check("voice: the authority's line is played on the puppet, the same one", voices[1] == authority_line,
+		tostring(voices[1]) .. " vs " .. tostring(authority_line))
 	xr_sound.set_sound_play(42, "some_npc")
-	check("voice: an NPC's is not touched", voices[2] == "42:some_npc")
+	check("voice: an NPC's is not touched", voices[2] and voices[2]:find("^42:some_npc#"))
 	puppet = false
 
 	-- 7. combat altitude: the level's top once, not twice
