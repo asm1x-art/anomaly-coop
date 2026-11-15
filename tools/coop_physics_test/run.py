@@ -188,16 +188,30 @@ w.lua('C', 'db.storage[700].coop_act = nil; coop_physics_mod.set_activation(G.ob
 ago = w.lua('C', 'return G.game_ms - db.storage[700].activation_game_time.ms')
 check(f"6: a game counts the timer from the world's moment ({ago} ms ago)", ago == 20000)
 w.lua('C', 'G.clock = G.clock - 20000')
-# rolls of a door's logic: the world's random, the same in every game
-for n in 'AB':
-    w.lua(n, 'G.rolls = {}; xr_logic.try_switch_to_another_section(G.objects[700], db.storage[700].ph_door, db.actor)')
-ra, rb = w.G('A').rolls[1], w.G('B').rolls[1]
-check(f"6: a door's ~prob rolls the same in two games ({ra}, {rb})", ra == rb)
-# a world section's logic (infos, timers): any game tells; one asking about the player: the authority only
-w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_game_timer", condlist = { { "ph_door@open", {} } } } }')
-w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")')
+# rolls of a door's logic: the world's random, so a new authority rolls on as the last one would have
+w.lua('A', 'G.rolls = {}; door_update(700)')
+w.lua('B', 'G.rolls = {}; door_update(700)')
+ra = w.G('A').rolls[1]
+check('6: a non-authority runs no door logic of its own, rolls nothing', ra is not None and w.G('B').rolls[1] is None)
+w.lua('A', 'G.authority["l01_escape"] = false')
+w.lua('B', 'G.authority["l01_escape"] = true; door_update(700)')
+rb = w.G('B').rolls[1]
+check(f"6: a door's ~prob: the next authority rolls the same at the same moment ({ra}, {rb})", ra == rb)
+w.lua('A', 'G.authority["l01_escape"] = true')
+w.lua('B', 'G.authority["l01_escape"] = false')
+# a section asking only infos and timers is the authority's too (players' groups know other infos)
+before = w.lua('A', 'return section_of(700)')
+other = 'ph_door@open' if before == 'ph_door@close' else 'ph_door@close'
+w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_game_timer", condlist = { { "' + other + '", {} } } } }')
+w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "' + other + '")')
 w.pump()
-check('6: a timer closing/opening a door off the authority is told (the authority may be far)', w.lua('A', 'return section_of(700)') == 'ph_door@open')
+check('6: a timer switch off the authority is not told', w.lua('A', 'return section_of(700)') == before)
+w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "' + before + '")')
+w.lua('A', 'db.storage[700].ph_door.logic = { { name = "on_game_timer", condlist = { { "ph_door@open", {} } } } }')
+w.lua('A', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")')
+w.pump()
+check("6: the authority's timer switch reaches everyone", w.lua('B', 'return section_of(700)') == 'ph_door@open')
+w.lua('A', 'db.storage[700].ph_door.logic = {}')
 w.lua('B', 'db.storage[700].ph_door.logic = { { name = "on_info", condlist = { { "ph_door@close", { { "dist_to_actor_le", 3, {} } } } } } }')
 w.lua('B', 'xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@close")')
 w.pump()
@@ -430,8 +444,11 @@ w.lua('C', 'use_door(730)')
 w.pump()
 check("9: C, at the door without the decoder, can't use it (B is right there)",
       all(sec(w, n, 730) == 'ph_door@coded' for n in 'ABC') and w.G('C').uses == 1 and not w.G('C').given)
+clear_fx(w)
 w.lua('B', 'use_door(730)')
 w.pump()
+check("9: the sound of B's use (the decoder's) plays for the others too",
+      all(fx(w, n) == ['play_sound:warlab_pod_room_door'] for n in 'ABC'))
 check("9: B uses it: decoding for everyone, the use's info is B's (his game gives it)",
       all(sec(w, n, 730) == 'ph_door@decoding' for n in 'ABC') and w.G('B').given == '+warlab_access_decoding'
       and not w.G('A').given and not w.G('C').given)
@@ -497,7 +514,10 @@ for n in 'ABC':
             { "on_info", "{+pri_a16_door_open !is_door_blocked_by_npc} ph_door@open" } },
         ["ph_door@open"] = { { "on_use", "ph_door@close %-pri_a16_door_open%" },
             { "on_info", "{-pri_a16_door_open !is_door_blocked_by_npc} ph_door@close" },
-            { "on_info", "{+shut_now} ph_door@close %-pri_a16_door_open%" } } })''')
+            { "on_info", "{+shut_now} ph_door@close %-pri_a16_door_open%" } } })
+    make_logic_door(752, "warlab_door_1", "ph_door@horror_knock", {
+        ["ph_door@horror_knock"] = { { "on_info", "{+warlab_main_polter_dead} ph_door@open %+warlab_open_door_1 =play_sound(trader_door_unlock)%" } },
+        ["ph_door@open"] = {} })''')
 w.tick(100)
 place(w, {'A': (50, 0, 0), 'B': (1, 0, 0), 'C': (40, 0, 0)})
 w.lua('A', 'door_update(750)')
@@ -531,6 +551,22 @@ check('11: the authority shuts it by its logic: the flag goes from every player 
 w.lua('A', 'G.infos.shut_now = nil; door_update(751)')
 w.pump()
 check('11: ... and it stays shut (no player keeps the flag)', all(sec(w, n, 751) == 'ph_door@close' for n in 'ABC'))
+# a section asking only infos: the authority asks all the players; the info its way out gives goes to the one it was for
+place(w, {'A': (50, 0, 0), 'B': (30, 0, 0), 'C': (2, 0, 0)})
+for n in 'ABC':
+    w.lua(n, 'G.given = nil')
+w.lua('B', 'G.infos.warlab_main_polter_dead = true; door_update(752)')
+w.tick(1000)
+w.lua('C', 'door_update(752)')
+w.lua('A', 'door_update(752)')
+check("11: B's group killed the poltergeist, the authority's didn't: the door opens by B's info",
+      w.server_facts.get('knows:B') and 'warlab_main_polter_dead' in w.server_facts['knows:B'] and sec(w, 'A', 752) == 'ph_door@open')
+clear_fx(w)
+w.pump()
+check("11: its info goes to B (the one who knew), the others play its sound",
+      w.G('B').given == '+warlab_open_door_1' and not w.G('A').given and not w.G('C').given
+      and all(sec(w, n, 752) == 'ph_door@open' for n in 'BC') and fx(w, 'B') == fx(w, 'C') == ['play_sound:warlab_door_1'])
+
 
 # 10. single player: Anomaly's own, its own actor only
 w = setup(['A'])
