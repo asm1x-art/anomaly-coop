@@ -12,6 +12,7 @@
 #include "coop_npc.h"
 #include "coop_combat.h"
 #include "coop_projectiles.h"
+#include "coop_props.h"
 #include "coop_time.h"
 #include "ai_space.h"
 #include "script_engine.h"
@@ -841,6 +842,7 @@ namespace coop
 		update_id_blocks();
 		update_shadows();
 		update_bodies();
+		update_props();
 		update_releases();
 		update_world_sync();
 		update_time();

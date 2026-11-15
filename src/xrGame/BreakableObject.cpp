@@ -8,6 +8,8 @@
 //#include "Physics.h"
 #include "../xrEngine/xr_collide_form.h"
 #include "../Include/xrRender/Kinematics.h"
+#include "coop/coop_net.h"
+#include "coop/coop_props.h"
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -224,17 +226,29 @@ void CBreakableObject::Break()
 	DestroyUnbroken();
 	CreateBroken();
 	ActivateBroken();
+	// co-op: the shards fly by a seed of the pane's id, the same in every game
+	CRandom coop_rng(s32(ID()) + 1);
+	CRandom& rng = coop::is_connected() ? coop_rng : Random;
 	u16 el_num = m_pPhysicsShell->get_ElementsNumber();
 	for (u16 i = 0; i < el_num; i++)
 	{
 		Fvector pos, dir;
-		pos.set(Random.randF(-0.3f, 0.3f), Random.randF(-0.3f, 0.3f), Random.randF(-0.3f, 0.3f));
-		dir.set(Random.randF(-0.3f, 0.3f), Random.randF(-0.3f, 0.3f), Random.randF(-0.3f, 0.3f));
+		pos.set(rng.randF(-0.3f, 0.3f), rng.randF(-0.3f, 0.3f), rng.randF(-0.3f, 0.3f));
+		dir.set(rng.randF(-0.3f, 0.3f), rng.randF(-0.3f, 0.3f), rng.randF(-0.3f, 0.3f));
 		dir.normalize();
-		m_pPhysicsShell->get_ElementByStoreOrder(i)->applyImpulseTrace(pos, dir, Random.randF(0.5f, 3.f), 0);
+		m_pPhysicsShell->get_ElementByStoreOrder(i)->applyImpulseTrace(pos, dir, rng.randF(0.5f, 3.f), 0);
 	}
 	m_break_time = Device.dwTimeGlobal;
 	SheduleRegister();
+	if (!m_coop_remote)
+		coop::on_glass_broken(*this); // the others break theirs
+}
+
+void CBreakableObject::CoopBreak()
+{
+	m_coop_remote = true;
+	Break();
+	m_coop_remote = false;
 }
 
 void CBreakableObject::SendDestroy()

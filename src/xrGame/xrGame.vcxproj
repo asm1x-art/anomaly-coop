@@ -2014,6 +2014,7 @@
     <ClInclude Include="coop\coop_facts.h" />
     <ClInclude Include="coop\coop_combat.h" />
     <ClInclude Include="coop\coop_projectiles.h" />
+    <ClInclude Include="coop\coop_props.h" />
     <ClInclude Include="coop\coop_map.h" />
     <ClInclude Include="coop\coop_net.h" />
     <ClInclude Include="coop\coop_save.h" />
@@ -3125,6 +3126,7 @@
     <ClCompile Include="coop\coop_facts.cpp" />
     <ClCompile Include="coop\coop_combat.cpp" />
     <ClCompile Include="coop\coop_projectiles.cpp" />
+    <ClCompile Include="coop\coop_props.cpp" />
     <ClCompile Include="coop\coop_map.cpp" />
     <ClCompile Include="coop\coop_net.cpp" />
     <ClCompile Include="coop\coop_world.cpp" />

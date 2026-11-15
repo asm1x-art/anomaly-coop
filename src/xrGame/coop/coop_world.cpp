@@ -11,6 +11,7 @@
 #include "alife_graph_registry.h"
 #include "xrServer_Objects_ALife_Monsters.h"
 #include "coop_puppet.h"
+#include "coop_props.h"
 #include "coop_combat.h"
 #include "Helicopter.h"
 #include "PhysicsShellHolder.h"
@@ -412,6 +413,21 @@ namespace coop
 		send_spawn(object);
 	}
 
+	bool is_local_object(u16 id)
+	{
+		return local_objects().count(id) > 0;
+	}
+
+	bool share_local(u16 id)
+	{
+		CSE_ALifeDynamicObject* object = level_running() ? ai().alife().objects().object(id, true) : nullptr;
+		if (!object || !local_objects().count(id) || !is_connected())
+			return false;
+		share_object(object);
+		note_moved(id); // where it falls, for the others too
+		return true;
+	}
+
 	// The last holder each thing left (not our actor, not a shadow), to tell the server where our actor took it from
 	struct STakenFrom
 	{
@@ -649,6 +665,7 @@ namespace coop
 		if (is_actor(&parent))
 		{
 			g_left_actor.insert(item->base()->ID);
+			note_moved(item->base()->ID); // where it comes to rest, for the others (coop_props.cpp)
 			Msg("[coop] dropped %s (id=%u), sent", item->base()->name_replace(), item->base()->ID);
 		}
 	}
@@ -656,6 +673,8 @@ namespace coop
 	void on_object_released(CSE_Abstract* object)
 	{
 		if (g_remote_releases.erase(object->ID))
+			return;
+		if (is_release_theirs(object->ID)) // another game broke it, and sends its release (a box, a pane)
 			return;
 		if (!should_send() || is_shadow(object) || local_objects().erase(object->ID))
 			return;
