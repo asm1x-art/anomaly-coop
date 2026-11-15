@@ -209,7 +209,8 @@ public:
 	{
 		//AVO: fixed crash due to original GSC assumption that CWeaponMagazined will always have firemodes specified in configs.
 		//return m_aFireModes[m_iCurFireMode];
-		if (HasFireModes())
+		// Co-op: the index may come from elsewhere (a save, another game's weapon state) out of this weapon's modes
+		if (HasFireModes() && m_iCurFireMode >= 0 && m_iCurFireMode < (int)m_aFireModes.size())
 			return m_aFireModes[m_iCurFireMode];
 		else
 			return 1;
