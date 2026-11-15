@@ -1489,6 +1489,60 @@ test('facts: a door two games change at once ends the same in both (its fact goe
   }
 });
 
+// M_ITEM_PARENT as a game sends it: u16 id, stringZ section, u8 place (0 ground + its place, 2 the sender's actor)
+function itemParent(id, place) {
+  const head = Buffer.alloc(2);
+  head.writeUInt16LE(id, 0);
+  const tail = place === 0 ? Buffer.alloc(18) : Buffer.alloc(0);
+  return Buffer.concat([head, encodeText('medkit'), Buffer.from([0, place]), tail]);
+}
+
+// the M_ITEM_PARENT messages that came before a round trip's PONG, as [sender id, item id, place]
+async function movesBefore(c) {
+  c.send(M.PING, Buffer.alloc(4));
+  const got = [];
+  for (;;) {
+    const msg = await c.next();
+    if (msg.type === M.PONG) return got;
+    if (msg.type === M.ITEM_PARENT) {
+      const at = msg.payload.indexOf(0, 6) + 1;
+      got.push([msg.payload.readUInt32LE(0), msg.payload.readUInt16LE(4), msg.payload[at]]);
+    }
+  }
+}
+
+test('items: two players taking one thing at once, the first take the server hears wins', async () => {
+  const server = await startServer(options());
+  const { port } = server.address();
+  try {
+    const a = await connect(port);
+    a.send(M.HELLO, hello('artem'));
+    const idA = (await a.next()).payload.readUInt32LE(0);
+    const b = await connect(port);
+    b.send(M.HELLO, hello('друг'));
+    const idB = (await b.next()).payload.readUInt32LE(0);
+    await uploadSave(a, [Buffer.from('w1'), Buffer.from('l1')], 0, '', 'new', 'artem');
+    await roundTrip(a);
+
+    a.send(M.ITEM_PARENT, itemParent(500, 2));
+    await roundTrip(a);
+    b.send(M.ITEM_PARENT, itemParent(500, 2)); // b took it before hearing of a's take
+    assert.deepEqual(await movesBefore(b), [[idA, 500, 2]]); // a's take comes to b: it leaves b's hands
+    assert.deepEqual(await movesBefore(a), []);               // b's never comes to a
+
+    a.send(M.ITEM_PARENT, itemParent(500, 0)); // a drops it: b takes it, as anyone may
+    await roundTrip(a);
+    assert.deepEqual(await movesBefore(b), [[idA, 500, 0]]);
+    b.send(M.ITEM_PARENT, itemParent(500, 2));
+    assert.deepEqual(await movesBefore(b), []);
+    assert.deepEqual(await movesBefore(a), [[idB, 500, 2]]);
+    a.socket.destroy();
+    b.socket.destroy();
+  } finally {
+    server.close();
+  }
+});
+
 function timeSet(kind, ...values) {
   const parts = [Buffer.from([kind])];
   for (const [type, v] of values) {

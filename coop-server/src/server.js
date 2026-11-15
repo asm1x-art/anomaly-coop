@@ -242,6 +242,13 @@ tests=1` : ''));
   // facts two games may change at the same moment (a door two players use at once, coop_physics.script): the sender
   // is told the server's word too, so the last change the server took is the one every game ends with
   const ECHOED_FACTS = ['door:'];
+  // Two players taking one thing at once (an item on the ground both picked up before hearing of the other): each
+  // game moved it into the other's shadow when the other's take came, and nobody had it. The first take the server
+  // hears is the world's; a second one this soon, of a thing the first one holds, isn't passed on (the second game has
+  // the first one's take, which moves the thing out of its hands)
+  const PLACE_SENDER_ACTOR = 2; // M_ITEM_PARENT's place: the sender's actor took it (coop_world.cpp EPlace)
+  const TAKE_RACE_MS = 10000;
+  const takes = new Map(); // item id -> { by: client id, at }: its last take, until it moves again
   let journal = storage.journal(); // { time, message: u16 type, then the payload as relayed }, on disk too
   const record = (type, payload) => {
     if (!storage.worldInfo()) return;
@@ -1151,6 +1158,20 @@ tests=1` : ''));
         case M.OBJECT_SPAWN:
         case M.OBJECT_STATE:
         case M.SCRIPT_EVENT:
+          if ((type === M.ITEM_PARENT || type === M.OBJECT_RELEASE) && payload.length >= 3) {
+            const item = payload.readUInt16LE(0);
+            const at = payload.indexOf(0, 2) + 1;
+            const taken = takes.get(item);
+            if (type === M.ITEM_PARENT && at > 0 && payload[at] === PLACE_SENDER_ACTOR) {
+              const now = Date.now();
+              if (taken && taken.by !== id && clients.has(taken.by) && now - taken.at < TAKE_RACE_MS) {
+                log(`[${id}] '${client.name}' took item ${item} that '${clients.get(taken.by).name}' took ${now - taken.at} ms before: not passed on`);
+                break;
+              }
+              takes.set(item, { by: id, at: now });
+              if (takes.size > 4096) for (const [k, t] of takes) if (now - t.at >= TAKE_RACE_MS) takes.delete(k);
+            } else takes.delete(item);
+          }
           if (type === M.SCRIPT_EVENT) {
             const name = readStringZ(payload, 0);
             if (name === ADMIN_EVENT) break; // the server's own: a game may not send it
