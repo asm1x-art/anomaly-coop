@@ -50,6 +50,8 @@ snd_open_start = trader_door_locked
 tip_open = st_jup_b41_door_locked
 on_info = {=coop_door_in(yan_smart_terrain_6_4_ph_door_outer:ph_door@entered) =actor_in_zone(yan_smart_terrain_6_4_sr_steam)} ph_door@steam %=coop_airlock_steam%
 on_info2 = {=coop_door_in(yan_smart_terrain_6_4_ph_door_outer:ph_door@closed:ph_door@locked)} ph_door@closed
+; a use asks again: the authority opens it once the other door is shut (never a door nobody can open)
+on_use = ph_door@ask
 
 ; Anomaly's own sections of this door (a save from before): the airlock's closed door
 [ph_door@locked_alarm]

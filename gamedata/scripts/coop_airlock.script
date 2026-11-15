@@ -74,11 +74,65 @@ local function update_steam()
 	end
 end
 
+-- The safety net (the level's authority, which runs the doors' logic): a player between the doors with both of them
+-- shut and nothing moving for stuck_s ([coop_airlock]) gets the inner door opened, whatever the doors' logic came to
+local next_look, still_since, still_pair = 0, nil, nil
+local SHUT_OUTER = { ["ph_door@closed"] = true, ["ph_door@locked"] = true, ["ph_door@entered"] = true }
+local SHUT_INNER = { ["ph_door@closed"] = true, ["ph_door@locked"] = true }
+
+local function player_between(zone)
+	if db.actor and zone:inside(db.actor:position()) then
+		return true
+	end
+	if coop and coop.stand_in_peer then
+		for i = 1, #db.OnlineStalkers do
+			local id = db.OnlineStalkers[i]
+			local o = db.storage[id] and db.storage[id].object
+			if o and coop.stand_in_peer(id) ~= 0 and zone:inside(o:position()) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function safety_net()
+	local now = time_global()
+	if now < next_look then
+		return
+	end
+	next_look = now + 1000
+	if coop and coop.connected and coop.connected() and not coop.is_authority(level.name()) then
+		still_since = nil
+		return
+	end
+	local outer = door(ini_sys:r_string_ex(S, "outer_door") or "")
+	local inner = door(ini_sys:r_string_ex(S, "inner_door") or "")
+	local zone = db.zone_by_name[ini_sys:r_string_ex(S, "zone") or ""]
+	local so = outer and db.storage[outer:id()] and db.storage[outer:id()].active_section
+	local si = inner and db.storage[inner:id()] and db.storage[inner:id()].active_section
+	if not (zone and SHUT_OUTER[so] and SHUT_INNER[si] and player_between(zone)) then
+		still_since = nil
+		return
+	end
+	local pair = so .. "|" .. si
+	if still_pair ~= pair or not still_since then
+		still_pair, still_since = pair, now
+		return
+	end
+	if now - still_since >= (ini_sys:r_float_ex(S, "stuck_s") or 10) * 1000 then
+		still_since = nil
+		printf("[coop] airlock: a player stuck between the doors (%s, %s): the inner door opens", so, si)
+		xr_logic.switch_to_section(inner, db.storage[inner:id()].ini, "ph_door@open")
+	end
+end
+
 function on_game_start()
 	xr_effects.coop_airlock_steam = function()
 		play_steam()
 	end
 	RegisterScriptCallback("actor_on_update", update_steam)
+	RegisterScriptCallback("actor_on_update", safety_net)
 	xr_conditions.coop_door_in = function(actor, npc, p)
 		local obj = p and p[1] and door(p[1])
 		local st = obj and db.storage[obj:id()]
