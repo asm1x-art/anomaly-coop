@@ -36,21 +36,49 @@ end
 
 ------------------------------------------------------------------------------------------------
 -- Weather: "weather" = "<hour>|<cycle>|<preset>|<mode>|<file>": mode n (normal), t (the hour of a change of
--- cycle), p (before a surge); file the weather set on an outdoor level, "" when the master is indoors.
+-- cycle), p (before a surge); file the weather set on an outdoor level, the master's own pick or, when the master is
+-- indoors, the one it would pick outdoors (outdoor_file).
 
 local function parse_weather(value)
 	local hour, cycle, preset, mode, file = string.match(value or "", "^(%d+)|([^|]*)|([^|]*)|(%a)|(.*)$")
 	return hour and { hour = tonumber(hour), cycle = cycle, preset = preset, mode = mode, file = file }
 end
 
+-- An indoor level's select_weather picks nothing for outdoors (its file is "indoor"), leaves a change of cycle's and
+-- a coming surge's hour standing (they are put off only outdoors) and keeps a preset that isn't of the cycle: with
+-- the master underground, the others picked their weather themselves. Here the master's manager picks for outdoors
+-- as level_weathers' atmosfear branch does: a cycle's own preset (one of its presets once it has none of them), the
+-- cloudy one of a change of cycle, one of the surge's; once an hour (pub: what we published this hour, nil none)
+local function outdoor_file(wm, mode, pub)
+	if pub and pub.file ~= "" and pub.mode == mode then
+		return pub.file
+	end
+	local file
+	if mode == "p" then
+		file = wm.presets_pre_blowout and random_key_table(wm.presets_pre_blowout)
+	else
+		local list = wm.presets and wm.presets[mode == "t" and "cloudy" or (wm.cycle or "clear")]
+		if list then
+			if not (wm.preset and list[wm.preset]) then
+				wm.preset = random_key_table(list)
+			end
+			file = wm.preset
+		end
+	end
+	wm.transition_period = false
+	wm.pre_blowout_period = false
+	return file or ""
+end
+
 -- mode nil: as published this hour, else normal
 local function publish_weather(wm, mode)
 	local hour = level.get_time_hours()
+	local w = parse_weather(published.weather)
+	w = w and w.hour == hour and w or nil
 	if not mode then
-		local w = parse_weather(published.weather)
-		mode = w and w.hour == hour and w.mode or "n"
+		mode = w and w.mode or "n"
 	end
-	local file = wm.weatherType == "atmosfear" and wm.weather_file or ""
+	local file = wm.weatherType == "atmosfear" and wm.weather_file or outdoor_file(wm, mode, w)
 	publish("weather", table.concat({ hour, wm.cycle or "", wm.preset or "", mode, file or "" }, "|"))
 end
 
