@@ -230,6 +230,231 @@ check("5: a door with a motor is its logic's, not the engine's rests", all(w.G(n
 w.lua('A', 'db.storage[700].ph_door = { no_force = true }; xr_logic.switch_to_section(G.objects[700], db.storage[700].ini, "ph_door@open")')
 check("5: a door swinging free is the engine's rests", w.G('A').by_logic[700] == False)
 
+# 7. a door whose logic asks about the player: the level's authority runs it, for all the level's players
+def place(w, pos, ages=None, levels=None):
+    # pos: game -> (x, y, z) of its player; each game has its own actor there and the others as peers
+    for n in w.games:
+        x, y, z = pos[n]
+        peers = []
+        for m, (px, py, pz) in pos.items():
+            if m == n:
+                continue
+            age = (ages or {}).get(m, 0)
+            lvl = (levels or {}).get(m, 'l01_escape')
+            peers.append(f'{{ id = {ord(m)}, name = "{m}", level = "{lvl}", position = {{ x = {px}, y = {py}, z = {pz} }}, age = {age} }}')
+        w.lua(n, f'G.actor_pos = {{ x = {x}, y = {y}, z = {z} }}; G.peers = {{ {", ".join(peers)} }}; G.now = G.now + 1')
+
+def sec(w, n, door):
+    return w.lua(n, f'return section_of({door})')
+
+def fx(w, n):
+    g = w.G(n)
+    return [g.fx[i] for i in range(1, len(g.fx) + 1)]
+
+def clear_fx(w):
+    for n in w.games:
+        w.lua(n, 'G.fx = {}; G.door_hits = 0')
+
+KNOCK = '''{
+    ["ph_door@horror_knock"] = { { "on_info", "{=dist_to_actor_le(8)} ph_door@horror_wait %=hit_npc(warlab_point_knock_1:door:0:1500) =play_particle_on_path(hit_fx:warlab_knock_points_1:70) =play_sound(trader_door_close_stop) =spawn_thing(x)%, ph_door@horror_silence" } },
+    ["ph_door@horror_wait"] = { { "on_timer", 5000, "ph_door@horror_knock" } },
+    ["ph_door@horror_silence"] = { { "on_timer", 5000, "ph_door@horror_knock" } },
+}'''
+
+w = setup(['A', 'B', 'C'])
+for n in 'ABC':
+    w.lua(n, f'make_logic_door(710, "warlab_door_1", "ph_door@horror_knock", {KNOCK})')
+w.tick(100)
+place(w, {'A': (100, 0, 0), 'B': (5, 0, 0), 'C': (60, 0, 0)})
+for n in 'BC':
+    w.lua(n, 'door_update(710)')
+w.pump()
+check('7: B (its player 5 m from the door) and C run no such logic of their own',
+      sec(w, 'B', 710) == sec(w, 'C', 710) == 'ph_door@horror_knock' and not w.G('B').evaluated and not w.G('C').evaluated
+      and 'door:warlab_door_1' not in w.server_facts)
+w.lua('A', 'door_update(710)')
+check("7: the authority (its own player 100 m away) takes B's 5 m: the door knocks", sec(w, 'A', 710) == 'ph_door@horror_wait')
+check('7: the knock plays at the authority as Anomaly has it', fx(w, 'A') == ['hit_npc:warlab_door_1', 'play_particle_on_path:warlab_door_1', 'play_sound:warlab_door_1', 'spawn_thing:warlab_door_1'] and w.G('A').door_hits == 1)
+w.pump()
+check('7: every game has the door as the authority told', sec(w, 'B', 710) == sec(w, 'C', 710) == 'ph_door@horror_wait'
+      and w.server_facts['door:warlab_door_1'].split('|')[0] == 'ph_door@horror_wait')
+check('7: the others play the knock too (sound, particles, the hit), not what changes the world',
+      fx(w, 'B') == fx(w, 'C') == ['hit_npc:warlab_door_1', 'play_particle_on_path:warlab_door_1', 'play_sound:warlab_door_1'])
+check("7: the knock played there is no hit of theirs (the door's hit callback isn't run)", not w.G('B').door_hits and not w.G('C').door_hits)
+fact_before = w.server_facts['door:warlab_door_1']
+for _ in range(5):
+    for n in 'ABC':
+        w.lua(n, 'door_update(710)')
+    w.pump()
+    w.tick(100)
+check('7: no back and forth: rounds of every game later, one door, one fact',
+      sec(w, 'A', 710) == sec(w, 'B', 710) == sec(w, 'C', 710) == 'ph_door@horror_wait' and w.server_facts['door:warlab_door_1'] == fact_before)
+
+# the nearest of all, whoever he is
+def knock_again(w, decider='A'):
+    w.lua(decider, 'xr_logic.switch_to_section(G.objects[710], db.storage[710].ini, "ph_door@horror_knock")')
+    w.pump()
+    clear_fx(w)
+
+knock_again(w)
+place(w, {'A': (6, 0, 0), 'B': (100, 0, 0), 'C': (60, 0, 0)})
+w.lua('A', 'door_update(710)')
+w.pump()
+check("7: the authority's own player near: the same knock", all(sec(w, n, 710) == 'ph_door@horror_wait' for n in 'ABC'))
+knock_again(w)
+place(w, {'A': (50, 0, 0), 'B': (30, 0, 0), 'C': (9, 0, 0)})
+for n in 'BCA':
+    w.lua(n, 'door_update(710)')
+w.pump()
+check('7: nobody within 8 m (nearest 9 m): silence everywhere', all(sec(w, n, 710) == 'ph_door@horror_silence' for n in 'ABC'))
+
+# the authority moves to B: the same answer from the same players
+knock_again(w)
+for n in 'ABC':
+    w.lua(n, 'G.authority["l01_escape"] = ' + ('true' if n == 'B' else 'false'))
+place(w, {'A': (7, 0, 0), 'B': (100, 0, 0), 'C': (60, 0, 0)})
+w.lua('A', 'door_update(710)')
+w.pump()
+check('7: A is no authority any more: its near player is for B to tell', all(sec(w, n, 710) == 'ph_door@horror_knock' for n in 'ABC'))
+w.lua('B', 'door_update(710)')
+w.pump()
+check("7: the new authority (B, 100 m away) tells it by A's 7 m", all(sec(w, n, 710) == 'ph_door@horror_wait' for n in 'ABC'))
+
+# a stale player or one on another level is no player here
+knock_again(w, 'B')
+place(w, {'A': (5, 0, 0), 'B': (100, 0, 0), 'C': (4, 0, 0)}, ages={'A': 20000}, levels={'C': 'l02_garbage'})
+w.lua('B', 'door_update(710)')
+check('7: a player not heard from for 20 s or on another level counts for nothing', sec(w, 'B', 710) == 'ph_door@horror_silence')
+
+# xr_logic's own distance conditions (on_actor_dist_le_nvis): the nearest player too
+w = setup(['A', 'B'])
+for n in 'AB':
+    w.lua(n, '''make_logic_door(740, "dist_door", "ph_door@close", {
+        ["ph_door@close"] = { { "on_actor_dist_le_nvis", 4, "ph_door@open" } },
+        ["ph_door@open"] = { { "on_actor_dist_ge_nvis", 10, "ph_door@close" } } })''')
+w.tick(100)
+place(w, {'A': (50, 0, 0), 'B': (3, 0, 0)})
+w.lua('A', 'door_update(740)')
+w.pump()
+check('7: on_actor_dist_le_nvis: the nearest player (B at 3 m)', sec(w, 'A', 740) == sec(w, 'B', 740) == 'ph_door@open')
+w.lua('A', 'door_update(740)')
+check('7: on_actor_dist_ge_nvis: closes only when every player is farther (B still at 3 m)', sec(w, 'A', 740) == 'ph_door@open')
+place(w, {'A': (50, 0, 0), 'B': (30, 0, 0)})
+w.lua('A', 'door_update(740)')
+check('7: ... and closes once all are', sec(w, 'A', 740) == 'ph_door@close')
+
+# 8. zones: any player in it is "in", none in it is "out"
+w = setup(['A', 'B', 'C'])
+for n in 'ABC':
+    w.lua(n, '''make_zone("trader_into", 0, 0, 0, 3); make_zone("red_forester_restr", 200, 0, 0, 10); make_zone("jup_zone", -200, 0, 0, 10)
+    make_logic_door(720, "esc_trader_door", "ph_door@close", {
+        ["ph_door@close"] = { { "on_actor_in_zone", "trader_into", "ph_door@near" } },
+        ["ph_door@near"] = {},
+        ["ph_door@open"] = { { "on_actor_not_in_zone", "trader_into", "ph_door@close" } } })
+    make_logic_door(721, "red_forester_door", "ph_door@open", {
+        ["ph_door@open"] = { { "on_info", "{=actor_out_zone(red_forester_restr)} ph_door@close" } },
+        ["ph_door@close"] = {} })
+    make_logic_door(722, "jup_b1_door", "ph_door@locked", {
+        ["ph_door@locked"] = { { "on_info", "{=actor_in_zone(jup_zone)} ph_door@close" } },
+        ["ph_door@close"] = { { "on_info", "{!actor_in_zone(jup_zone)} ph_door@locked" } } })''')
+w.tick(100)
+place(w, {'A': (50, 0, 0), 'B': (1, 0, 0), 'C': (40, 0, 0)})
+w.lua('B', 'db.actor_inside_zones["trader_into"] = db.zone_by_name["trader_into"]') # the restrictor told B's game
+w.lua('B', 'door_update(720)')
+w.lua('A', 'door_update(720)')
+w.pump()
+check('8: on_actor_in_zone: B in the zone, the authority outside: near, everywhere', all(sec(w, n, 720) == 'ph_door@near' for n in 'ABC'))
+w.lua('A', 'xr_logic.switch_to_section(G.objects[720], db.storage[720].ini, "ph_door@open")')
+w.pump()
+w.lua('A', 'door_update(720)')
+check('8: on_actor_not_in_zone: B still in it, the door stays open', sec(w, 'A', 720) == 'ph_door@open')
+place(w, {'A': (50, 0, 0), 'B': (20, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(720)')
+w.pump()
+check('8: ... closes once nobody is in it', all(sec(w, n, 720) == 'ph_door@close' for n in 'ABC'))
+place(w, {'A': (50, 0, 0), 'B': (20, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'db.actor_inside_zones["trader_into"] = db.zone_by_name["trader_into"]') # the authority's own player, as its restrictor tells
+w.lua('A', 'door_update(720)')
+check("8: the authority's own player in the zone counts as its restrictor tells", sec(w, 'A', 720) == 'ph_door@near')
+
+place(w, {'A': (50, 0, 0), 'B': (201, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(721)')
+check('8: =actor_out_zone: B is in the forester\'s zone, the door stays open', sec(w, 'A', 721) == 'ph_door@open')
+place(w, {'A': (50, 0, 0), 'B': (220, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(721)')
+w.pump()
+check('8: ... closes when nobody is', all(sec(w, n, 721) == 'ph_door@close' for n in 'ABC'))
+
+place(w, {'A': (50, 0, 0), 'B': (20, 0, 0), 'C': (-205, 0, 0)})
+w.lua('A', 'door_update(722)')
+w.pump()
+check('8: =actor_in_zone: C in the zone opens the lock for all', all(sec(w, n, 722) == 'ph_door@close' for n in 'ABC'))
+w.lua('A', 'door_update(722)')
+check('8: !actor_in_zone: locks again only when nobody is in it (C still is)', sec(w, 'A', 722) == 'ph_door@close')
+place(w, {'A': (50, 0, 0), 'B': (20, 0, 0), 'C': (-150, 0, 0)})
+w.lua('A', 'door_update(722)')
+check('8: ... C out: locked', sec(w, 'A', 722) == 'ph_door@locked')
+
+# 9. items: each game tells what its player carries of what doors ask about; any player carrying it counts
+w = setup(['A', 'B', 'C'])
+for n in 'ABC':
+    w.lua(n, '''make_logic_door(730, "warlab_pod_room_door", "ph_door@locked", {
+        ["ph_door@locked"] = { { "on_info", "{=actor_has_item(decoder)} ph_door@coded" } },
+        ["ph_door@coded"] = { { "on_info", "{!actor_has_item(decoder)} ph_door@locked" } } })
+    make_logic_door(731, "lab_door", "ph_door@closed", {
+        ["ph_door@closed"] = { { "on_info", "{=actor_has_item(lab_key)} ph_door@open" } },
+        ["ph_door@open"] = {} })''')
+w.tick(100)
+place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)})
+w.lua('B', 'G.inv.decoder = {}')
+w.tick(1000)
+check('9: B tells it carries a decoder (carry_items)', w.server_facts.get('carry:B') == 'decoder' and w.lua('A', 'return coop.fact("carry:B")') == 'decoder')
+w.lua('A', 'door_update(730)')
+w.pump()
+check('9: B, far on the level, has the decoder: coded for everyone', all(sec(w, n, 730) == 'ph_door@coded' for n in 'ABC'))
+w.lua('A', 'door_update(730)')
+check('9: !actor_has_item: it stays coded while B has it', sec(w, 'A', 730) == 'ph_door@coded')
+w.lua('B', 'G.inv.decoder = nil')
+w.tick(1000)
+w.lua('A', 'door_update(730)')
+w.pump()
+check('9: B drops it: locked again', w.server_facts.get('carry:B', 'x') == '' and all(sec(w, n, 730) == 'ph_door@locked' for n in 'ABC'))
+w.lua('A', 'G.inv.decoder = {}')
+w.lua('A', 'door_update(730)')
+check("9: the authority's own player's decoder counts from its inventory", sec(w, 'A', 730) == 'ph_door@coded')
+w.lua('A', 'G.inv.decoder = nil; xr_logic.switch_to_section(G.objects[730], db.storage[730].ini, "ph_door@locked")')
+w.lua('C', 'G.inv.decoder = {}')
+w.tick(1000)
+place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)}, levels={'C': 'l02_garbage'})
+w.lua('A', 'door_update(730)')
+check('9: a decoder on another level opens nothing here', sec(w, 'A', 730) == 'ph_door@locked')
+w.lua('C', 'G.inv.decoder = nil')
+w.tick(1000)
+# an item not in carry_items: the logic of a door online in a game adds it to what that game tells
+w.lua('B', 'G.inv.lab_key = {}')
+w.tick(1000)
+check('9: an item no door here asked about yet is not told', w.server_facts.get('carry:B', '') == '')
+w.lua('B', 'door_update(731)')
+w.tick(1000)
+check('9: once a door online in B asks about it, B tells it', w.server_facts.get('carry:B') == 'lab_key')
+place(w, {'A': (50, 0, 0), 'B': (500, 0, 0), 'C': (40, 0, 0)})
+w.lua('A', 'door_update(731)')
+w.pump()
+check("9: and the authority opens the door by B's key", all(sec(w, n, 731) == 'ph_door@open' for n in 'ABC'))
+# the headless host has no player: its own actor counts for nothing, and it tells nothing it carries
+w.lua('A', 'coop.is_host = function() return true end; G.inv.decoder = {}; G.now = G.now + 1')
+w.lua('A', 'door_update(730)')
+w.tick(1000)
+check('9: the headless host: its own actor is no player', sec(w, 'A', 730) == 'ph_door@locked' and 'carry:A' not in w.server_facts)
+
+# 10. single player: Anomaly's own, its own actor only
+w = setup(['A'])
+w.lua('A', f'G.connected = false; make_logic_door(710, "warlab_door_1", "ph_door@horror_knock", {KNOCK})')
+place(w, {'A': (100, 0, 0)})
+w.lua('A', 'G.peers = { { id = 66, name = "B", level = "l01_escape", position = { x = 1, y = 0, z = 0 }, age = 0 } }')
+w.lua('A', 'door_update(710)')
+check('10: without co-op the door asks about our actor alone', sec(w, 'A', 710) == 'ph_door@horror_silence' and w.G('A').door_hits in (None, 0))
+
 for n in 'ABC':
     if n in w.games:
         for line in list(w.G(n).log.values()):

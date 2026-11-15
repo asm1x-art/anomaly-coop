@@ -31,6 +31,8 @@ function V:set(x, y, z)
 	self.x, self.y, self.z = x or 0, y or 0, z or 0
 	return self
 end
+function V:distance_to_sqr(o) return (self.x - o.x) ^ 2 + (self.y - o.y) ^ 2 + (self.z - o.z) ^ 2 end
+function V:distance_to(o) return math.sqrt(self:distance_to_sqr(o)) end
 function vector() return setmetatable({ x = 0, y = 0, z = 0 }, V) end
 
 -- hits
@@ -207,19 +209,101 @@ end
 -- xr_logic and ph_door
 xr_logic = {}
 function xr_logic.switch_to_section(obj, ini, section)
+	if section == "" or section == nil then return false end
 	local st = db.storage[obj:id()]
 	if st.active_section == section then return false end
 	st.active_section = section
 	st.active_scheme = string.match(section, "^([^@]+)")
 	G.switches = (G.switches or 0) + 1
+	local per = G.section_logic and G.section_logic[obj:id()]
+	if per and per[section] then
+		st.ph_door = { no_force = false, logic = per[section]() } -- xr_logic makes a section's logic anew
+	end
 	return true
 end
 
--- the door's logic as xr_logic runs it each update: rolls math.random(100) (a ~prob of its condlist)
+-- the door's logic as xr_logic runs it each update: rolls math.random(100) (a ~prob of its condlist), then the
+-- switch conditions doors use, as vanilla's try_switch_to_another_section
 function xr_logic.try_switch_to_another_section(npc, st, actor)
 	G.rolls = G.rolls or {}
 	G.rolls[#G.rolls + 1] = math.random(100)
-	return false
+	if not actor then return end
+	G.evaluated = (G.evaluated or 0) + 1
+	local switched = false
+	for _, c in pairs(st.logic or {}) do
+		local go
+		if c.name == "on_info" then go = true
+		elseif c.name == "on_actor_dist_le_nvis" then go = distance_between(actor, npc) <= c.v1
+		elseif c.name == "on_actor_dist_ge_nvis" then go = distance_between(actor, npc) > c.v1
+		elseif c.name == "on_actor_in_zone" then go = db.actor_inside_zones[c.v1]
+		elseif c.name == "on_actor_not_in_zone" then go = not db.actor_inside_zones[c.v1]
+		end
+		if go then
+			switched = xr_logic.switch_to_section(npc, st.ini, xr_logic.pick_section_from_condlist(actor, npc, c.condlist))
+		end
+		if switched == true then break end
+	end
+	return switched
+end
+
+-- vanilla's pick_section_from_condlist, the parts doors use (infos as G.infos)
+function xr_logic.pick_section_from_condlist(actor, npc, condlist)
+	for i = 1, #condlist do
+		local cond, met = condlist[i], true
+		for _, infop in ipairs(cond[2] or {}) do
+			if infop[2] == 1 then if not G.infos[infop[1]] then met = false break end
+			elseif infop[2] == 2 then if G.infos[infop[1]] then met = false break end
+			elseif infop[2] == 3 then if not xr_conditions[infop[1]](actor, npc, infop[3]) then met = false break end
+			elseif infop[2] == 4 then if xr_conditions[infop[1]](actor, npc, infop[3]) then met = false break end
+			elseif infop[2] == 5 then if infop[3] and infop[3] < math.random(100) then met = false break end
+			end
+		end
+		if met then
+			for _, e in ipairs(cond[3] or {}) do
+				if e[2] == 3 or e[2] == 4 then xr_effects[e[1]](actor, npc, e[3]) end
+			end
+			return cond[1] or ""
+		end
+	end
+end
+
+-- vanilla's parse_condlist / extract_conditions
+local function extract_conditions(c, lst, n, index)
+	for sign, infop in c:gmatch("([=%-%+!~]+)([^=%-%+!~%s]+)") do
+		lst[n][index] = lst[n][index] or {}
+		if sign == "+" then table.insert(lst[n][index], { infop, 1 })
+		elseif sign == "-" then table.insert(lst[n][index], { infop, 2 })
+		elseif sign == "=" or sign == "!" then
+			local a = string.find(infop, "(", 1, true)
+			if a then
+				local b = string.find(infop, ")", 1, true)
+				local params = infop:sub(a + 1, b - 1)
+				infop = infop:sub(1, a - 1)
+				local t
+				for p in params:gmatch("%s*([^:]+)%s*") do
+					t = t or {}
+					table.insert(t, tonumber(p) or p)
+				end
+				table.insert(lst[n][index], { infop, sign == "=" and 3 or 4, t })
+			else
+				table.insert(lst[n][index], { infop, sign == "=" and 3 or 4 })
+			end
+		elseif sign == "~" then table.insert(lst[n][index], { infop, 5, tonumber(infop) })
+		end
+	end
+end
+function parse_condlist(src)
+	local lst, n = {}, 0
+	for fld in src:gmatch("%s*([^,]+)%s*") do
+		n = n + 1
+		lst[n] = {}
+		local a, b, c = string.find(fld, "{%s*(.*)%s*}")
+		if c then fld = string.sub(fld, 1, a - 1) .. string.sub(fld, b + 1); extract_conditions(c, lst, n, 2) end
+		a, b, c = string.find(fld, "%%%s*(.*)%s*%%")
+		if c then fld = string.sub(fld, 1, a - 1) .. string.sub(fld, b + 1); extract_conditions(c, lst, n, 3) end
+		lst[n][1] = fld:match("^%s*(.-)%s*$")
+	end
+	return lst
 end
 
 ph_door = { action_door = {} }
@@ -228,7 +312,7 @@ function ph_door.action_door.use_callback(self)
 	local to = st.active_section == "ph_door@open" and "ph_door@close" or "ph_door@open"
 	xr_logic.switch_to_section(self.object, st.ini, to)
 end
-function ph_door.action_door.hit_callback(self) end
+function ph_door.action_door.hit_callback(self) G.door_hits = (G.door_hits or 0) + 1 end
 function ph_door.try_to_open_door(npc, opened)
 	G.npc_door_calls = (G.npc_door_calls or 0) + 1
 end
@@ -258,3 +342,87 @@ function use_door(id)
 end
 
 function section_of(id) return db.storage[id].active_section end
+
+-- the level's players, zones, the actor's conditions and the effects doors play (as vanilla's xr_conditions,
+-- xr_effects, _g, utils_obj)
+G.section_logic = {}
+G.infos = {}
+G.peers = {}
+G.actor_pos = { x = 0, y = 0, z = 0 }
+G.inv = {}
+G.fx = {}
+db.actor = {
+	id = function() return 0 end,
+	position = function() return vector():set(G.actor_pos) end,
+	object = function(self, sec) return G.inv[sec] end,
+}
+db.zone_by_name = {}
+db.actor_inside_zones = {}
+function coop.peers() return G.peers end
+
+function distance_between(a, b) return a:position():distance_to(b:position()) end
+utils_obj = {}
+function utils_obj.npc_in_zone(npc, zone)
+	zone = type(zone) == "string" and db.zone_by_name[zone] or zone
+	return npc and zone and zone.inside and zone:inside(npc:position())
+end
+xr_conditions = {}
+function xr_conditions.dist_to_actor_le(actor, npc, p)
+	return p[1] and npc:position():distance_to_sqr(actor:position()) <= tonumber(p[1]) ^ 2
+end
+function xr_conditions.dist_to_actor_ge(actor, npc, p)
+	return p[1] and npc:position():distance_to_sqr(actor:position()) >= tonumber(p[1]) ^ 2
+end
+function xr_conditions.actor_in_zone(actor, npc, p)
+	for i = 1, #p do
+		local zone = db.zone_by_name[p[i]]
+		if zone and zone:inside(db.actor:position()) then return true end
+	end
+	return false
+end
+function xr_conditions.actor_out_zone(actor, npc, p) return not utils_obj.npc_in_zone(db.actor, p[1]) end
+function xr_conditions.actor_has_item(actor, npc, p) return p[1] ~= nil and db.actor:object(p[1]) ~= nil end
+
+xr_effects = {}
+for _, name in ipairs({ "play_sound", "play_particle_on_path", "spawn_thing" }) do
+	xr_effects[name] = function(actor, obj, p) G.fx[#G.fx + 1] = name .. ":" .. obj:name() end
+end
+function xr_effects.hit_npc(actor, obj, p)
+	G.fx[#G.fx + 1] = "hit_npc:" .. obj:name()
+	ph_door.action_door.hit_callback({ object = obj }) -- the engine's hit callback of the door
+end
+
+-- a zone: a sphere
+function make_zone(name, x, y, z, r)
+	db.zone_by_name[name] = { name = function() return name end,
+		inside = function(self, pos) return vector():set(x, y, z):distance_to_sqr(pos) <= r * r end }
+end
+
+-- a door with its sections' logic, online: sections = { section = { { condition, "condlist" }
+-- or { condition, v1, "condlist" }... } }
+function make_logic_door(id, name, section, sections)
+	make_door(id, name, section, false)
+	db.storage[id].ini = { section_exist = function(self, s) return sections[s] ~= nil end }
+	local per = {}
+	for sec, list in pairs(sections) do
+		per[sec] = function()
+			local logic = {}
+			for _, c in ipairs(list) do
+				if c[3] then
+					logic[#logic + 1] = { name = c[1], v1 = c[2], condlist = parse_condlist(c[3]) }
+				else
+					logic[#logic + 1] = { name = c[1], condlist = parse_condlist(c[2]) }
+				end
+			end
+			return logic
+		end
+	end
+	G.section_logic[id] = per
+	db.storage[id].ph_door = { no_force = false, logic = per[section]() }
+	door_online(id)
+end
+
+-- the door's update: its logic, as ph_door's update runs it
+function door_update(id)
+	return xr_logic.try_switch_to_another_section(G.objects[id], db.storage[id].ph_door, db.actor)
+end
