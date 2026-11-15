@@ -63,6 +63,8 @@ class Game:
         coop['is_host'] = lambda: game.host
         coop['my_name'] = lambda: name
         coop['clock'] = lambda: game.clock
+        self.utc = 1800000000.0 # the server's real time, s (shared by the tests' clocks)
+        coop['server_time'] = lambda: game.utc
         g.coop = coop
         self.lua.execute('peer_list = {}; coop.peers = function() return peer_list end')
 
