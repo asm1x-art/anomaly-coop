@@ -4,12 +4,11 @@
 [coop_crows]
 min_distance = 100 ; m: a crow appears no nearer than this to any player on the level (Anomaly's 100, to its actor)
 
-; pulse anomalies, the lightning out of the sky (coop_pulse_anomaly.script): the level's authority rolls them for
-; every player on the level as Anomaly does for its actor (bind_anomaly_field: every 2 min, by level and weather);
-; every game strikes the same ones at the same points and seconds
+; pulse anomalies, the lightning out of the sky (coop_pulse_anomaly.script): the level's authority makes one roll for
+; the level as Anomaly does for its one actor (bind_anomaly_field: every 2 min, by level and weather), each around the
+; next player on the level in turn; every game strikes the same ones at the same points and seconds
 [coop_pulse_anomaly]
-distance_max = 150 ; m: a pulse this near a player counts as theirs (Anomaly's farthest from the actor, 150)
 keep_s       = 30  ; real s: how long a pulse stays in the server's fact (its blow comes at 11.5 s)
 late_s       = 5   ; real s: a pulse older than this when it reaches us (a join, a level change) isn't struck
-peer_stale_s = 10  ; real s: a player not heard from for this long gets no pulses of their own
+peer_stale_s = 10  ; real s: a player not heard from for this long has no turn
 look_ms      = 250 ; real ms: how often the fact is looked at

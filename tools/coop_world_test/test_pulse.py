@@ -46,12 +46,16 @@ check(A.lua.globals().own_spawned is None and B.lua.globals().own_spawned is Non
 tick([A, B], 120)
 check(len(list(B.lua.globals().struck.values())) == 2, 'together: the second one 2 min later, once')
 
-# apart: one each, around each player
+# apart: still one roll for the level, every 2 min, around the players in turn
 facts, A, B = setup(1000)
 tick([A, B], 125)
 sa = sorted(s.split('|')[0] for s in A.lua.globals().struck.values()); sb = sorted(s.split('|')[0] for s in B.lua.globals().struck.values())
-check(len(sa) == 2 and sa == sb, 'apart: two pulses, the same two in both games (%s / %s)' % (sa, sb))
-check('10,60,0' in sa and '1010,60,0' in sa, 'apart: one around each player')
+check(len(sa) == 1 and sa == sb, 'apart: one pulse in 125 s, the same in both games (%s / %s)' % (sa, sb))
+check(sa == ['10,60,0'], 'apart: the first around the first player by name (%s)' % sa)
+tick([A, B], 120)
+sa = sorted(s.split('|')[0] for s in A.lua.globals().struck.values()); sb = sorted(s.split('|')[0] for s in B.lua.globals().struck.values())
+check(len(sa) == 2 and sa == sb and '1010,60,0' in sa, 'apart: the second 2 min later around the other player (%s / %s)' % (sa, sb))
+check(A.lua.globals().rolls == 2, 'apart: two rolls in 245 s, as for one player (%s)' % A.lua.globals().rolls)
 
 # a late one (a join) is not struck; the authority changes: the other rolls on
 facts, A, B = setup(50)
