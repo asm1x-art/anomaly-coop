@@ -539,9 +539,28 @@ int opt_dynamic = 2;
 #include "../xrRenderDX10/StateManager/dx10SamplerStateCache.h"
 #endif	//	USE_DX10
 
+// The textures' mip bias has one source at a time, never both added up:
+// - the world drawn smaller (DLSS, r__render_scale) with r__upscale_mipbias 1: only the automatic bias, r__tf_mipbias is
+//   not added (GRA-style presets' -0.5 on top of DLSS made the textures grainy and shimmering);
+// - otherwise (full size, or r__upscale_mipbias 0): only r__tf_mipbias, as before.
+bool r_texture_mip_bias_auto()
+{
+	return ps_r__upscale_mipbias && r__upscale_mip_bias != 0.f;
+}
+
 float r_texture_mip_bias()
 {
-	return ps_r__tf_Mipbias + (ps_r__upscale_mipbias ? r__upscale_mip_bias : 0.f);
+	return r_texture_mip_bias_auto() ? r__upscale_mip_bias : ps_r__tf_Mipbias;
+}
+
+void r_log_texture_mip_bias()
+{
+	if (r_texture_mip_bias_auto())
+		Msg("* textures' mip bias %.2f: automatic for the smaller world (r__tf_mipbias %.2f not added)", r_texture_mip_bias(),
+		    ps_r__tf_Mipbias);
+	else
+		Msg("* textures' mip bias %.2f: r__tf_mipbias (automatic %.2f, r__upscale_mipbias %d)", r_texture_mip_bias(),
+		    r__upscale_mip_bias, ps_r__upscale_mipbias);
 }
 
 void r_apply_texture_mip_bias()
@@ -575,6 +594,8 @@ public:
 	{
 		CCC_Integer::Execute(args);
 		r_apply_texture_mip_bias();
+		if (HW.pDevice)
+			r_log_texture_mip_bias();
 	}
 };
 
@@ -698,6 +719,10 @@ public:
 	{
 		CCC_Float::Execute(args);
 		apply();
+#if defined(USE_DX10) || defined(USE_DX11)
+		if (HW.pDevice)
+			r_log_texture_mip_bias();
+#endif
 	}
 
 	virtual void Status(TStatus& S)
@@ -1390,7 +1415,9 @@ void xrRender_initconsole()
 
 	CMD3(CCC_Mask, "r__no_ram_textures", &ps_r__common_flags, RFLAG_NO_RAM_TEXTURES);
 	CMD2(CCC_tf_Aniso, "r__tf_aniso", &ps_r__tf_Anisotropic); //	{1..16}
-	CMD2(CCC_tf_MipBias, "r__tf_mipbias", &ps_r__tf_Mipbias); // {-3 +3}
+	// {-3 +3}; the player's bias for the full-size picture only: while DLSS or r__render_scale draws the world smaller and
+	// r__upscale_mipbias is on, the automatic bias replaces it (r_texture_mip_bias)
+	CMD2(CCC_tf_MipBias, "r__tf_mipbias", &ps_r__tf_Mipbias);
 	CMD4(CCC_Float, "r2_sun_cascade_min_fov", &ps_r2_sun_cascade_min_fov, 1.f, 120.f); // the sun cascades fitted to at least this fov; 1 = off
 	CMD4(CCC_Float, "r__render_scale", &ps_r__render_scale, 0.5f, 1.f); // the world at this share of the screen's size; vid_restart
 	CMD2(CCC_upscale_mipbias, "r__upscale_mipbias", &ps_r__upscale_mipbias); // textures as sharp as at the screen's size when the world is drawn smaller
