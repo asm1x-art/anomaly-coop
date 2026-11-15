@@ -371,7 +371,7 @@ local function send_weapon(id, w)
 	w.now = wpn and wpn:condition() or w.now
 	w.cond = w.now
 	if coop.send_item_state(id) then
-		dbg("[coop dbg] the state of NPC %s's weapon %s sent: condition %.3f", w.npc, id, w.now)
+		dbg("[coop dbg] the state of NPC %s's weapon %s sent: condition %s", w.npc, id, string.format("%.3f", w.now))
 	end
 end
 
