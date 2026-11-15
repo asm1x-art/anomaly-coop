@@ -96,6 +96,38 @@ local function player_between(zone)
 	return false
 end
 
+-- NPCs: the engine's doors keep who walks through them, and an NPC's use reaches the door's logic once, when he first
+-- comes to it. When the logic left the door shut then (the other door was open: locked), he stood at it for good once
+-- it was free again. An airlock door shut (closed, locked, entered) that an NPC wants open for npc_wait_s gets his use again
+local wanted = {} -- door id -> time_global() since an NPC wants it open while it is shut
+local NPC_SHUT = { ["ph_door@closed"] = true, ["ph_door@locked"] = true, ["ph_door@entered"] = true }
+
+local function wants_open(obj)
+	if type(obj.is_door_wanted_open_by_npc) == "function" then
+		return obj:is_door_wanted_open_by_npc()
+	end
+	return obj:is_door_blocked_by_npc() -- an engine before it: someone keeps the door as he wants it
+end
+
+local function npcs_through(now, obj, section)
+	local id = obj:id()
+	if not (NPC_SHUT[section] and wants_open(obj)) then
+		wanted[id] = nil
+		return
+	end
+	wanted[id] = wanted[id] or now
+	if now - wanted[id] < (ini_sys:r_float_ex(S, "npc_wait_s") or 4) * 1000 then
+		return
+	end
+	wanted[id] = now
+	local st = db.storage[id]
+	local action = st and st.ph_door and st.ph_door.door_action
+	if action then
+		printf("[coop] airlock: an NPC waits at %s (%s): his use again", obj:name(), section)
+		action:use_callback(obj, nil)
+	end
+end
+
 local function safety_net()
 	local now = time_global()
 	if now < next_look then
@@ -111,6 +143,12 @@ local function safety_net()
 	local zone = db.zone_by_name[ini_sys:r_string_ex(S, "zone") or ""]
 	local so = outer and db.storage[outer:id()] and db.storage[outer:id()].active_section
 	local si = inner and db.storage[inner:id()] and db.storage[inner:id()].active_section
+	if outer then
+		npcs_through(now, outer, so)
+	end
+	if inner then
+		npcs_through(now, inner, si)
+	end
 	if not (zone and SHUT_OUTER[so] and SHUT_INNER[si] and player_between(zone)) then
 		still_since = nil
 		return

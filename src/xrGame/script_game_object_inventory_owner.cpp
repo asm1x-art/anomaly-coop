@@ -2286,6 +2286,15 @@ bool CScriptGameObject::is_door_blocked_by_npc() const
 	return ai().doors().is_door_blocked(m_door);
 }
 
+// Co-op: an NPC walking through the door wants it open (it is one of the door's initiators and they keep it open):
+// the door's logic took that NPC's use once and may have left the door shut (coop_airlock.script asks it again)
+bool CScriptGameObject::is_door_wanted_open_by_npc() const
+{
+	if (!m_door)
+		return false;
+	return m_door->is_blocked(doors::door_state_closed);
+}
+
 //Alundaio: Methods for exporting the ability to detach/attach addons for magazined weapons
 #ifdef GAME_OBJECT_EXTENDED_EXPORTS
 void CScriptGameObject::Weapon_AddonAttach(CScriptGameObject* item)

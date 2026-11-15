@@ -57,6 +57,9 @@ snd_open_start = trader_door_locked
 tip_open = st_jup_b41_door_locked
 on_info = {!actor_in_zone(yan_smart_terrain_6_4_sr_steam)} ph_door@closed
 on_info2 = {!coop_door_in(yan_smart_terrain_6_4_ph_door_inner:ph_door@closed:ph_door@locked)} ph_door@locked
+; a use from between the doors asks to go out again (one who changed his mind, an NPC on his way out): never a shut
+; door nobody between them can open
+on_use = {=actor_in_zone(yan_smart_terrain_6_4_sr_steam)} ph_door@ask_out
 snd_close_start = trader_door_close_start
 snd_close_stop = trader_door_close_stop
 
