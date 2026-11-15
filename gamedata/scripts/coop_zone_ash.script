@@ -1191,6 +1191,23 @@ local function find_cover(npc)
 	return false
 end
 
+-- mutant_ignore_enemies: the front's mutants go for nobody (players and NPCs alike) on their way to cover and in it;
+-- one hit from within mutant_defend_m goes for whoever hit it for mutant_defend_s
+local calm = {}     -- id -> true: its enemy callback is ours
+local provoked = {} -- id -> { who = the hitter's id, till = time_global() }
+
+local function calm_enemy(npc, enemy)
+	local p = provoked[npc:id()]
+	return p ~= nil and enemy ~= nil and enemy:id() == p.who and time_global() < p.till
+end
+
+local function on_mutant_hit(npc, amount, dir, who)
+	if npc and calm[npc:id()] and who and who:id() ~= npc:id()
+		and who:position():distance_to(npc:position()) <= num("mutant_defend_m", 5) then
+		provoked[npc:id()] = { who = who:id(), till = time_global() + num("mutant_defend_s", 20) * 1000 }
+	end
+end
+
 local function mutants_hide()
 	local now = time_global()
 	if now < next_mutants then
@@ -1204,6 +1221,10 @@ local function mutants_hide()
 	for id, st in pairs(db.storage) do
 		local npc = st.object
 		if npc and IsMonster(npc) and npc:alive() then
+			if not calm[id] and ini_sys:r_bool_ex(S, "mutant_ignore_enemies", true) then
+				calm[id] = true
+				npc:set_enemy_callback(calm_enemy)
+			end
 			local m = mutants[id]
 			-- looked for again when it is far from where none was found
 			if budget > 0 and (not m or not m.lv and m.pos:distance_to(npc:position()) > again) then
@@ -1238,7 +1259,14 @@ local function mutants_free()
 			end
 		end
 	end
-	mutants = {}
+	for id in pairs(calm) do
+		local st = db.storage[id]
+		local npc = st and st.object
+		if npc and npc:alive() then
+			npc:set_enemy_callback()
+		end
+	end
+	mutants, calm, provoked = {}, {}, {}
 	ZE.dbg("ash: the mutants go out again")
 end
 
@@ -1714,7 +1742,7 @@ local function update(ev)
 	end
 	if on_here and authority(ev.level) and ini_sys:r_bool_ex(S, "mutant_hide", true) then
 		mutants_hide()
-	elseif next(mutants) then
+	elseif next(mutants) or next(calm) then
 		mutants_free()
 	end
 end
@@ -1776,6 +1804,7 @@ function on_game_start()
 		dose(here() ~= nil)
 	end)
 	RegisterScriptCallback("actor_on_item_use", on_item_use)
+	RegisterScriptCallback("monster_on_hit_callback", on_mutant_hit)
 	-- the shelter's people kept in its covers take no notice of anyone outside them (no fight through the door, no
 	-- shots from inside): they sit the front out. One who has come into the covers is fought as ever
 	RegisterScriptCallback("on_enemy_eval", function(npc, enemy, flags)
