@@ -28,6 +28,7 @@ namespace coop
 		ePropRest,    // u8 the world's, u16 id, stringZ section, its place and elements: a thing lies still (coop_props.cpp)
 		eGlassBreak,  // u16 id, stringZ section: a pane broke (coop_props.cpp)
 		eHeliShot,    // u16 helicopter id, u8 kind, its data: the authority's helicopter fired (coop_heli.cpp)
+		eHeliBreak,   // u16 helicopter id, vec3: the authority's broke into pieces there, the world's (coop_heli.cpp)
 	};
 
 	// names of the actor motions a puppet can play (as SActorMotions makes them); the same list on every

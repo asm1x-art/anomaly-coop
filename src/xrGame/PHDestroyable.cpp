@@ -159,6 +159,18 @@ void CPHDestroyable::Destroy(u16 source_id/*=u16(-1)*/, LPCSTR section/*="ph_ske
 	return;
 }
 
+void CPHDestroyable::coop_expect_parts()
+{
+	if (!CanDestroy())return;
+	m_notificate_objects.clear();
+	CPhysicsShellHolder* obj = PPhysicsShellHolder();
+	if (CPHSkeleton* phs = obj->PHSkeleton())phs->SetNotNeedSave();
+	obj->processing_activate();
+	m_flags.set(fl_released,FALSE);
+	m_depended_objects = u16(m_destroyed_obj_visual_names.size());
+	m_flags.set(fl_destroyed,TRUE);
+}
+
 void CPHDestroyable::Load(CInifile* ini, LPCSTR section)
 {
 	m_flags.set(fl_destroyable,FALSE);

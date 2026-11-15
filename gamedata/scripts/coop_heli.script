@@ -9,11 +9,15 @@
 -- player who hits the helicopter is flagged as our actor would be, actor_always_enemy counts for every player, a
 -- player of the helicopter's own faction or lying wounded is left be.
 --
+-- What its pilots say on the radio is the authority's too (event heli_voice). Anomaly's double combat altitude (the
+-- level's top added twice) is put right: the helicopter comes down to attack.
+--
 -- Scripted helicopter events: spawn the helicopter once for the world (coop.begin_shared / coop.end_shared in the
 -- level authority's game) and drive it only where coop_heli.runs(obj) is true.
 
 local stand_ins = {} -- stand-in id -> { object, heli_enemy_flag }: its db.storage entry while a helicopter thinks
 local thinking = 0   -- > 0 while a helicopter's logic runs here
+local helis = {}     -- id -> true: helicopters this game has had online (their pilots' voice is the authority's)
 
 -- this game flies that helicopter (no co-op: always)
 function runs(obj)
@@ -111,6 +115,7 @@ local function patch_binder()
 	local on_point = thinks(binder.on_point)
 
 	binder.update = function(self, delta)
+		helis[self.object:id()] = true
 		if coop.connected() and coop.heli_puppet(self.object:id()) then
 			-- another game flies it: no logic of its own; burning, and brought down when the authority's death comes
 			object_binder.update(self, delta)
@@ -130,8 +135,55 @@ local function patch_binder()
 	binder.on_point = on_point
 end
 
+-- Anomaly's heli_combat adds the level's top twice to the combat altitude when the logic gives none of its own
+-- (default_safe_altitude has it already): its helicopters circled about 190 m up on Cordon, too high for the machine
+-- gun to bear on anyone. The altitude is the section's safe_altitude (configs/creatures/helicopter.ltx) over the
+-- level's top, or the logic's combat_safe_altitude over it, as meant.
+local function patch_altitude(combat)
+	local initialize = combat.initialize
+	combat.initialize = function(self, ...)
+		local r = initialize(self, ...)
+		if not self.coop_custom_altitude then
+			self.safe_altitude = self.default_safe_altitude
+		end
+		return r
+	end
+	local read_custom_data = combat.read_custom_data
+	combat.read_custom_data = function(self, ini, section, ...)
+		local r = read_custom_data(self, ini, section, ...)
+		local custom = ini:r_float_ex(section, "combat_safe_altitude")
+		self.coop_custom_altitude = custom ~= nil
+		self.safe_altitude = custom and custom + self.level_max_y or self.default_safe_altitude
+		return r
+	end
+end
+
+-- The pilots' voice (hit, damaged, going down: bind_heli, xr_sound) is the authority's: what its helicopter says goes to
+-- the others (event heli_voice), whose puppet says nothing of its own
+local function patch_voice()
+	local play = xr_sound.set_sound_play
+	xr_sound.set_sound_play = function(npc_id, sound, ...)
+		if not (helis[npc_id] and coop.connected()) then
+			return play(npc_id, sound, ...)
+		end
+		if coop.heli_puppet(npc_id) then
+			return -- heard from the authority's game
+		end
+		coop_sync.send_event("heli_voice", level.name(), npc_id, sound)
+		return play(npc_id, sound, ...)
+	end
+	coop_sync.on_event("heli_voice", function(sender, payload)
+		local f = str_explode(payload or "", "	")
+		local id = tonumber(f[2])
+		if db.actor and f[1] == level.name() and id and f[3] and coop.heli_puppet(id) then
+			play(id, f[3])
+		end
+	end)
+end
+
 local function patch_combat()
 	local combat = heli_combat.heli_combat
+	patch_altitude(combat)
 	combat.fastcall = thinks(combat.fastcall)
 
 	local is_enemy = combat.is_enemy
@@ -177,10 +229,12 @@ local function patch_heli_data()
 end
 
 function on_game_start()
-	if not (coop and coop.heli_puppet and coop.send_object_state and bind_heli and heli_combat and db) then
+	if not (coop and coop.heli_puppet and coop.send_object_state and bind_heli and heli_combat and db and xr_sound
+		and coop_sync) then
 		return -- not the co-op engine
 	end
 	patch_heli_data()
+	patch_voice()
 	patch_storage()
 	patch_binder()
 	patch_combat()

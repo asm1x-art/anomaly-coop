@@ -55,7 +55,19 @@ function save_var(_, k, v) actor_vars[k] = v end
 local callbacks = {}
 function SendScriptCallback(name, ...) callbacks[#callbacks + 1] = { name = name, args = { ... } } end
 xr_combat_ignore = { ignore_enemy_by_overrides = function() return false end, safe_zone_npcs = {} }
-xr_sound = { update = function() end, set_sound_play = function() end }
+local voices = {}
+xr_sound = { update = function() end, set_sound_play = function(id, snd) voices[#voices + 1] = id .. ":" .. snd end }
+local sent_events, event_handlers = {}, {}
+coop_sync = {
+	send_event = function(name, ...) sent_events[#sent_events + 1] = { name = name, args = { ... } } end,
+	on_event = function(name, f) event_handlers[name] = f end,
+}
+function str_explode(s, sep)
+	local t = {}
+	for part in string.gmatch(s .. sep, "(.-)" .. sep) do t[#t + 1] = part end
+	return t
+end
+ui_options = { get = function() return true end }
 xr_logic = { initialized = 0, issued = 0 }
 function xr_logic.initialize_obj() xr_logic.initialized = xr_logic.initialized + 1 end
 function xr_logic.issue_event() xr_logic.issued = xr_logic.issued + 1 end
@@ -90,6 +102,7 @@ local heli_obj = {
 	isVisible = function() return true end,
 	GetRealAltitude = function() return 50 end,
 	StartFlame = function(self) self.m_flame_started = true end,
+	TurnEngineSound = function() end,
 }
 local heli = make_object(500, { kind = "heli", get_helicopter = function() return heli_obj end,
 	section = function() return "helicopter" end, set_fastcall = function() end })
@@ -200,7 +213,39 @@ function run(load)
 	check("error: db.heli_enemies clean", #db.heli_enemies == 0)
 	check("error: db.storage clean", db.storage[900] == nil)
 
-	-- 6. no co-op: as vanilla
+	-- 6. pilots' voice: the authority's goes to the others, a puppet says nothing of its own
+	voices = {}
+	xr_sound.set_sound_play(500, "heli_hit")
+	local ev = sent_events[#sent_events]
+	check("voice: the authority plays it and sends it", voices[1] == "500:heli_hit" and ev and ev.name == "heli_voice"
+		and ev.args[2] == 500 and ev.args[3] == "heli_hit")
+	puppet = true
+	voices = {}
+	xr_sound.set_sound_play(500, "heli_down")
+	check("voice: a puppet's own is not played", #voices == 0)
+	event_handlers["heli_voice"]("Friend", "l01_escape	500	heli_down")
+	check("voice: the authority's is played on the puppet", voices[1] == "500:heli_down")
+	xr_sound.set_sound_play(42, "some_npc")
+	check("voice: an NPC's is not touched", voices[2] == "42:some_npc")
+	puppet = false
+
+	-- 7. combat altitude: the level's top once, not twice
+	local c2 = heli_combat.heli_combat(heli, heli_obj)
+	check("vanilla __init doubles it", c2.safe_altitude == c2.default_safe_altitude + c2.level_max_y)
+	c2:initialize()
+	check("altitude: section's over the level's top once", c2.safe_altitude == c2.default_safe_altitude,
+		tostring(c2.safe_altitude))
+	local ini = { r_bool_ex = function() return nil end, r_string_to_condlist = function() return nil end,
+		r_string_ex = function() return nil end, r_float_ex = function(_, _, key) return nil end }
+	c2:read_custom_data(ini, "logic")
+	check("altitude: no logic value - the section's", c2.safe_altitude == c2.default_safe_altitude)
+	ini.r_float_ex = function(_, _, key) if key == "combat_safe_altitude" then return 20 end end
+	c2:read_custom_data(ini, "logic")
+	check("altitude: the logic's over the level's top", c2.safe_altitude == 20 + c2.level_max_y)
+	c2:initialize()
+	check("altitude: the logic's kept on initialize", c2.safe_altitude == 20 + c2.level_max_y)
+
+	-- 8. no co-op: as vanilla
 	coop.connected = function() return false end
 	heli_alife.update = function() seen_inside = db.storage[900] ~= nil end
 	binder:update(10)

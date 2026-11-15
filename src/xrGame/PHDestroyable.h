@@ -59,6 +59,9 @@ public:
 	void RespawnInit();
 	void SetFatalHit(const SHit& hit);
 	void Destroy(u16 ref_id = u16(-1), LPCSTR section = "ph_skeleton_object");
+	// co-op: another game breaks the original of this copy (coop_heli.h): the pieces come from there, made once for the
+	// world, and as they come online they notify this copy, which then goes as if it had made them itself
+	void coop_expect_parts();
 	SHit& FatalHit() { return m_fatal_hit; }
 	void Load(LPCSTR section);
 	void Load(CInifile* ini, LPCSTR section);

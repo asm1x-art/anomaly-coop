@@ -13,6 +13,7 @@
 #include "coop_puppet.h"
 #include "coop_props.h"
 #include "coop_combat.h"
+#include "coop_heli.h"
 #include "Helicopter.h"
 #include "PhysicsShellHolder.h"
 #include "../xrPhysics/PhysicsShell.h"
@@ -1026,7 +1027,11 @@ namespace coop
 		CSE_ALifeDynamicObject* parent = ai().alife().objects().object(object->ID_Parent, true);
 		const bool parent_shared = !parent || !local_objects().count(parent->ID);
 		if (is_actor(parent) || (g_shared_scope && parent_shared))
+		{
 			send_spawn(object);
+			if (heli_breaking())
+				note_moved(object->ID); // a helicopter's piece: where it comes to rest is the world's (coop_heli.h)
+		}
 		else
 			local_objects().insert(object->ID);
 	}

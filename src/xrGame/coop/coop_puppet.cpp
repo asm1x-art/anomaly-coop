@@ -770,6 +770,8 @@ namespace coop
 			return apply_glass_break(P);
 		if (action == eHeliShot)
 			return play_heli_shot(sender, P);
+		if (action == eHeliBreak)
+			return play_heli_break(sender, P);
 		auto it = g_puppets.find(sender);
 		if (it == g_puppets.end())
 			return; // not on our level: nothing to see or hear

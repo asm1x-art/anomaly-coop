@@ -111,7 +111,12 @@ void CHelicopter::ExplodeHelicopter()
 		CParticlesObject::Destroy(m_pParticle);
 	}
 	if (CPHDestroyable::CanDestroy())
+	{
+		// co-op: its pieces are the world's, made here once; the others' copies break into them (coop_heli.h)
+		coop::begin_heli_break(*this);
 		CPHDestroyable::Destroy(ID(), "physic_destroyable_object");
+		coop::end_heli_break();
+	}
 
 	CExplosive::SetInitiator(ID());
 	CExplosive::GenExplodeEvent(Position(), Fvector().set(0.f, 1.f, 0.f));

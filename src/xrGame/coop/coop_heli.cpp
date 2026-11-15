@@ -3,6 +3,7 @@
 #include "coop_net.h"
 #include "coop_puppet.h"
 #include "coop_world.h"
+#include "coop_props.h"
 #include "Level.h"
 #include "helicopter.h"
 #include "ParticlesObject.h"
@@ -57,6 +58,7 @@ namespace coop
 	static xr_map<u16, SHeliPuppet> g_puppets;
 	static u32 g_last_list = 0;                // when the authority's list last came
 	static u32 g_shots = 0, g_rockets = 0;     // shown since the last coop_debug line
+	static u16 g_breaking = u16(-1);           // ours breaking into pieces right now
 
 	// [coop_heli] in mod_system_coop.ltx
 	struct SHeliSettings
@@ -257,8 +259,12 @@ namespace coop
 				heli.m_pParticle->Stop();
 				CParticlesObject::Destroy(heli.m_pParticle);
 			}
+			// its pieces are the authority's, the world's: they come from there and notify this copy as they come online
 			if (heli.CPHDestroyable::CanDestroy())
-				heli.CPHDestroyable::Destroy(heli.ID(), "physic_destroyable_object");
+			{
+				heli.CPHDestroyable::coop_expect_parts();
+				release_theirs(heli.ID()); // the original goes with the authority's release, ours isn't sent
+			}
 			heli.m_brokenSound.stop();
 			heli.m_layered_sounds.PlaySound("sndExplode", heli.Position(), &heli, false);
 		}
@@ -342,6 +348,34 @@ namespace coop
 		P.w_u8(eHeliRocket);
 		P.w_vec3(position);
 		send(P);
+	}
+
+	void begin_heli_break(CHelicopter& heli)
+	{
+		if (!is_connected() || !g_pGameLevel || is_heli_puppet(&heli) || is_local_object(heli.ID()))
+			return;
+		g_breaking = heli.ID();
+		begin_shared_spawns();
+		// before the pieces: the others' copies wait for them
+		NET_Packet P;
+		P.w_begin(M_ACTOR_ACTION);
+		P.w_u8(eHeliBreak);
+		P.w_u16(heli.ID());
+		P.w_vec3(heli.Position());
+		send(P);
+	}
+
+	void end_heli_break()
+	{
+		if (g_breaking == u16(-1))
+			return;
+		g_breaking = u16(-1);
+		end_shared_spawns();
+	}
+
+	bool heli_breaking()
+	{
+		return g_breaking != u16(-1);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -439,6 +473,20 @@ namespace coop
 			SHeliAccess::rocket(*heli, position);
 			++g_rockets;
 		}
+	}
+
+	void play_heli_break(u32 sender, NET_Packet& P)
+	{
+		const u16 id = P.r_u16();
+		Fvector position;
+		P.r_vec3(position);
+		if (!world_ready())
+			return;
+		CHelicopter* heli = smart_cast<CHelicopter*>(Level().Objects.net_Find(id));
+		if (heli && is_heli_puppet(heli))
+			SHeliAccess::explode(*heli, position);
+		if (debug_mode)
+			Msg("[coop heli] %u broke in peer %u's game: %s", id, sender, heli ? "our copy waits for its pieces" : "not here");
 	}
 
 	void on_heli_exploded(CHelicopter& heli, const Fvector& position)
