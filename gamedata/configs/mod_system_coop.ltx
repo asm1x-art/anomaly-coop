@@ -443,3 +443,9 @@ escape_distance     = 150 ; m: "away" is farther than this from every living one
                           ; out of the game count as away too)
 contact_refresh_min = 10  ; game min: while the player stays near, the time of the last contact is noted this often
 check_s             = 5   ; real s between checks
+
+; Co-op: which layer of an artefact zone's anomalies is on (coop_anom_layers.script): a hash of the zone's name and its
+; level's seed, the server's fact "anom_layer:<level>", rolled by the level's authority after a surge, a psi storm or a
+; Dead calm
+[coop_anom_layers]
+min_gap_s = 60 ; real s: a level's seed is rolled again by the same game no sooner (a surge's end comes more than once)
