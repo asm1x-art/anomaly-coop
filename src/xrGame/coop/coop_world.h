@@ -62,6 +62,11 @@ namespace coop
 
 	// sends an object to the others as a whole, as when our actor takes something new
 	void share_object(CSE_ALifeDynamicObject* object);
+	// made here this session and not the others' yet (shared once our actor takes it, or share_local)
+	bool is_local_object(u16 id);
+	// Lua: one of ours goes to the others now (a box's loot the world gave us, coop_physics.script); false when it is
+	// gone or theirs already
+	bool share_local(u16 id);
 	// an item our actor carries goes to another player (trading): false when it can't
 	bool give_item(u16 id, u32 peer);
 

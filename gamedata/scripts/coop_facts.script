@@ -30,10 +30,15 @@ function on_game_start()
 	end
 
 	_G.coop_on_fact = function(fact, value)
-		for prefix, handler in pairs(handlers) do
-			if string.sub(fact, 1, #prefix) == prefix then
-				return handler(fact, value)
+		-- the longest prefix that fits: "once:box:" (coop_physics) before "once:" (coop_story)
+		local best
+		for prefix in pairs(handlers) do
+			if string.sub(fact, 1, #prefix) == prefix and (not best or #prefix > #best) then
+				best = prefix
 			end
+		end
+		if best then
+			return handlers[best](fact, value)
 		end
 		local faction, faction_to = string.match(fact, "^rel:([^:]+):(.+)$")
 		local num = tonumber(value)

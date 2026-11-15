@@ -6,6 +6,7 @@
 #include "coop_puppet.h"
 #include "coop_progress.h"
 #include "coop_facts.h"
+#include "coop_props.h"
 #include "coop_time.h"
 #include "coop_npc.h"
 #include "ai_space.h"
@@ -190,6 +191,9 @@ namespace coop
 			def("end_shared", &end_shared_spawns),
 			def("send_item_state", &send_world_item_state), // (id) an item no player holds, as we have it: the others take it
 			def("send_event", &script_send_event),
+			def("share", &share_local),                // (id) one of ours, made here, goes to the others now
+			def("release_theirs", &release_theirs),    // (id) another game broke it: its release is theirs, ours isn't sent
+			def("prop_by_logic", &set_by_logic),       // (id, on) a door its logic puts: its rests aren't sent (coop_props.h)
 
 			def("group", &script_group),
 			def("group_invite", &script_group_invite),   // (peer id, from the PDA)
