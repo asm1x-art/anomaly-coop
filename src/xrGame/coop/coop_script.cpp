@@ -8,6 +8,8 @@
 #include "coop_facts.h"
 #include "coop_time.h"
 #include "coop_npc.h"
+#include "coop_heli.h"
+#include "helicopter.h"
 #include "ai_space.h"
 #include "script_engine.h"
 #include "Level.h"
@@ -122,6 +124,12 @@ namespace coop
 
 	static u32 script_stand_in_peer(u16 object) { return peer_of_stand_in(object); }
 
+	// coop.heli_puppet(id): that helicopter is another game's to fly, here it only shows it (coop_heli.h)
+	static bool script_heli_puppet(u16 id)
+	{
+		return g_pGameLevel && is_heli_puppet(smart_cast<CHelicopter*>(Level().Objects.net_Find(id)));
+	}
+
 	// coop.last_shot(id) -> { weapon, ammo, age = ms } of the last shot that shooter (a stand-in, an NPC puppet) fired
 	// here from another game, nil for none
 	static ::luabind::object script_last_shot(u16 shooter)
@@ -205,6 +213,7 @@ namespace coop
 			def("downed", &is_downed),                   // (peer id) a player lying wounded
 			def("set_climbing", &set_climbing),          // our player climbs onto a ledge (climb_rules.script)
 			def("stand_in_peer", &script_stand_in_peer), // (object id) whose stand-in it is, 0 for none
+			def("heli_puppet", &script_heli_puppet),     // (id) a helicopter another game flies: its logic stays off here
 			def("last_shot", &script_last_shot)          // (shooter id) { weapon, ammo, age } fired here from another game
 		];
 	}

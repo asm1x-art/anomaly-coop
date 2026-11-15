@@ -25,6 +25,7 @@ namespace coop
 		eProjectile,  // a thrown grenade or a rocket in flight (coop_projectiles.cpp)
 		eExplosion,   // something blew up (coop_projectiles.cpp)
 		eBodyRest,    // u16 id, vec3, u16 game vertex, u32 level vertex: a body of a death we sent lies still (coop_world.cpp)
+		eHeliShot,    // u16 helicopter id, u8 kind, its data: the authority's helicopter fired (coop_heli.cpp)
 	};
 
 	// names of the actor motions a puppet can play (as SActorMotions makes them); the same list on every

@@ -12,6 +12,7 @@
 #include "../xrEngine/LightAnimLibrary.h"
 //#include "physicscommon.h"
 #include "ui_base.h"
+#include "coop/coop_heli.h"
 //50fps fixed
 float STEP = 0.02f;
 
@@ -401,6 +402,8 @@ void CHelicopter::UpdateCL()
 {
 	inherited::UpdateCL();
 	CExplosive::UpdateCL();
+	if (coop::drive_heli_puppet(*this))
+		return; // another co-op game flies it: it goes where that game has it (coop_heli.h)
 	if (PPhysicsShell() && (state() == CHelicopter::eDead))
 	{
 		PPhysicsShell()->InterpolateGlobalTransform(&XFORM());
@@ -465,6 +468,8 @@ void CHelicopter::shedule_Update(u32 time_delta)
 		for (u32 i = getRocketCount(); i < 4; ++i)
 			CRocketLauncher::SpawnRocket(*m_sRocketSection, this);
 	}
+	if (m_ready_explode && coop::is_heli_puppet(this))
+		m_ready_explode = false; // it blows up when the game flying it says so
 	if (m_ready_explode)ExplodeHelicopter();
 }
 

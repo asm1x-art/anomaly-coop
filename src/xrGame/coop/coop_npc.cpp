@@ -4,6 +4,7 @@
 #include "coop_puppet.h"
 #include "coop_combat.h"
 #include "coop_world.h"
+#include "coop_heli.h"
 #include "Level.h"
 #include "ai/stalker/ai_stalker.h"
 #include "ai/monsters/basemonster/base_monster.h"
@@ -398,8 +399,10 @@ namespace coop
 				npcs.push_back(npc);
 		}
 
-		for (u32 first = 0; first < npcs.size(); first += MAX_PER_PACKET)
+		const u32 packets = _max(u32(1), (u32(npcs.size()) + MAX_PER_PACKET - 1) / MAX_PER_PACKET);
+		for (u32 part = 0; part < packets; ++part)
 		{
+			const u32 first = part * MAX_PER_PACKET;
 			const u32 count = _min(MAX_PER_PACKET, u32(npcs.size()) - first);
 			NET_Packet P;
 			P.w_begin(M_NPC_STATES);
@@ -407,6 +410,9 @@ namespace coop
 			P.w_u16(u16(count));
 			for (u32 i = 0; i < count; ++i)
 				write_state(P, npcs[first + i]);
+			// the first ends with the level's helicopters (coop_heli.h); nothing at all to say: nothing is sent
+			if (!part && !write_heli_states(P) && npcs.empty())
+				return;
 			send(P);
 		}
 	}
@@ -586,6 +592,8 @@ namespace coop
 			const u16 id = P.r_u16();
 			read_state(P, g_states[id]);
 		}
+		if (P.r_elapsed() > 0) // the first packet: the helicopters after the NPCs
+			read_heli_states(P);
 	}
 
 	static void set_hidden(CCustomMonster* npc, bool hidden)
@@ -864,6 +872,7 @@ namespace coop
 
 	void clear_npc_sync()
 	{
+		clear_heli_sync();
 		show_all();
 		g_states.clear();
 		g_puppets.clear();

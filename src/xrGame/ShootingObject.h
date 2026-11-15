@@ -63,6 +63,9 @@ protected:
 	virtual void FireStart();
 	virtual void FireEnd();
 public:
+	// co-op: a bullet another game fired, as a blank here (no hits): the direction and ricochet seed it flew with there
+	void coop_blank_bullet(const Fvector& pos, const Fvector& dir, const CCartridge& cartridge, u16 parent_id,
+	                       u16 weapon_id, int shot_num, s32 seed);
 	IC BOOL IsWorking() const { return bWorking; }
 	virtual BOOL ParentMayHaveAimBullet() { return FALSE; }
 	virtual bool SOParentIsActor() { return false; }

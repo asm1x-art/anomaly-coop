@@ -5,11 +5,13 @@
 #include "coop_puppet.h"
 #include "coop_world.h"
 #include "coop_save.h"
+#include "coop_heli.h"
 #include "Level.h"
 #include "Level_Bullet_Manager.h"
 #include "Actor.h"
 #include "Hit.h"
 #include "CustomMonster.h"
+#include "helicopter.h"
 #include "ai/stalker/ai_stalker.h"
 #include "memory_manager.h"
 #include "enemy_manager.h"
@@ -560,15 +562,29 @@ namespace coop
 	{
 		if (!is_connected() || !g_pGameLevel)
 			return false;
+		if (CHelicopter* heli = smart_cast<CHelicopter*>(target))
+		{
+			if (!is_heli_puppet(heli))
+				return false;
+			// another game flies it (coop_heli.h): our player's hit goes there, the rest is that game's business
+			if (hit.who && hit.who == g_actor && heli->state() != CHelicopter::eDead)
+			{
+				send_hit(eHitNpc, heli->ID(), hit);
+				Msg("[coop] we hit %s (%.2f): sent to the level's authority", *heli->cName(), hit.damage());
+			}
+			return true;
+		}
 		CCustomMonster* npc = smart_cast<CCustomMonster*>(target);
 		if (!npc)
 			return false;
 
 		if (is_proxy(npc))
 		{
-			// whoever hits a player's stand-in here hits that player; the stand-in takes nothing
+			// whoever hits a player's stand-in here hits that player (a helicopter too: its bullets, rockets and crash);
+			// the stand-in takes nothing
 			const u32 peer = peer_of_proxy(npc->ID());
-			if (peer != u32(-1) && smart_cast<const CEntityAlive*>(hit.who) && hit.who != npc)
+			if (peer != u32(-1) && (smart_cast<const CEntityAlive*>(hit.who) || smart_cast<const CHelicopter*>(hit.who)) &&
+			    hit.who != npc)
 			{
 				send_hit(eHitPlayer, peer, hit);
 				Msg("[coop] %s hit the stand-in of peer %u (%.2f): sent", *hit.who->cName(), peer, hit.damage());
@@ -619,6 +635,24 @@ namespace coop
 		{
 			if (!is_authority(Level().name()))
 				return;
+			if (CHelicopter* heli = smart_cast<CHelicopter*>(Level().Objects.net_Find(u16(target))))
+			{
+				// a helicopter our game flies, hit by that player in theirs: it takes it from the player's stand-in, so
+				// it turns on that player (coop_heli.script)
+				CGameObject* proxy = proxy_of_peer(sender);
+				if (heli->state() == CHelicopter::eDead || !proxy)
+				{
+					Msg("! [coop] peer %u's hit on %s dropped: %s", sender, *heli->cName(),
+					    !proxy ? "no stand-in of that peer yet" : "down already");
+					return;
+				}
+				hit.who = proxy;
+				hit.whoID = proxy->ID();
+				hit.weaponID = proxy->ID();
+				heli->Hit(&hit);
+				Msg("[coop] peer %u hit %s (%.2f) through its stand-in", sender, *heli->cName(), hit.damage());
+				return;
+			}
 			CEntityAlive* npc = smart_cast<CEntityAlive*>(Level().Objects.net_Find(u16(target)));
 			CGameObject* proxy = proxy_of_peer(sender);
 			if (!npc || !npc->g_Alive() || !proxy)

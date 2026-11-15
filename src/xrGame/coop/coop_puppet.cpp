@@ -5,6 +5,7 @@
 #include "coop_npc.h"
 #include "coop_combat.h"
 #include "coop_projectiles.h"
+#include "coop_heli.h"
 #include "Level.h"
 #include "Actor.h"
 #include "Inventory.h"
@@ -762,6 +763,8 @@ namespace coop
 			return play_bullets(sender, P);
 		if (action == eBodyRest)
 			return apply_body_rest(P);
+		if (action == eHeliShot)
+			return play_heli_shot(sender, P);
 		auto it = g_puppets.find(sender);
 		if (it == g_puppets.end())
 			return; // not on our level: nothing to see or hear

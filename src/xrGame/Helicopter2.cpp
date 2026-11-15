@@ -9,6 +9,7 @@
 #include "script_callback_ex.h"
 #include "ai/stalker/ai_stalker.h"
 #include "coop/coop_world.h"
+#include "coop/coop_heli.h"
 #include "CustomZone.h"
 #include "../xrphysics/MathUtils.h"
 
@@ -42,6 +43,7 @@ void CHelicopter::TurnLighting(bool bOn)
 
 void CHelicopter::TurnEngineSound(bool bOn)
 {
+	m_engine_on = bOn;
 	if (bOn)
 		m_engineSound.set_volume(1.0f);
 	else
@@ -288,6 +290,8 @@ void CHelicopter::DieHelicopter()
 {
 	if (state() == CHelicopter::eDead)
 		return;
+	// another co-op game flies it down (coop_heli.h): its physics stays off here, it falls as it falls there
+	const bool puppet = coop::is_heli_puppet(this);
 	CEntity::Die(NULL);
 	coop::on_vehicle_death(this);
 
@@ -325,14 +329,18 @@ void CHelicopter::DieHelicopter()
 		lin_vel.div((Device.dwTimeGlobal - PositionStack.front().dwTime) / 1000.0f);
 
 	lin_vel.mul(m_death_lin_vel_k);
-	PPhysicsShell()->set_LinearVel(lin_vel);
-	PPhysicsShell()->set_AngularVel(m_death_ang_vel);
-	PPhysicsShell()->Enable();
+	if (!puppet)
+	{
+		PPhysicsShell()->set_LinearVel(lin_vel);
+		PPhysicsShell()->set_AngularVel(m_death_ang_vel);
+		PPhysicsShell()->Enable();
+	}
 	K->CalculateBones_Invalidate();
 	K->CalculateBones(TRUE);
 	setState(CHelicopter::eDead);
 	m_engineSound.stop();
-	processing_deactivate();
+	if (!puppet)
+		processing_deactivate(); // a puppet goes on following the stream as it falls
 	m_dead = true;
 }
 

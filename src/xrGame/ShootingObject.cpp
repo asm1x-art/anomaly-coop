@@ -563,6 +563,20 @@ void CShootingObject::FireBullet(const Fvector& pos,
 	                                  iShotNum);
 }
 
+void CShootingObject::coop_blank_bullet(const Fvector& pos, const Fvector& dir, const CCartridge& cartridge,
+                                        u16 parent_id, u16 weapon_id, int shot_num, s32 seed)
+{
+	m_vCurrentShootDir = dir;
+	m_vCurrentShootPos = pos;
+	m_iCurrentParentID = parent_id;
+	m_iCurrentBulletSeed = Level().BulletManager().AddBullet(pos, dir,
+	                                  m_fStartBulletSpeed * cur_silencer_koef.bullet_speed,
+	                                  fvHitPower[egdMaster] * cur_silencer_koef.hit_power,
+	                                  fHitImpulse * cur_silencer_koef.hit_impulse,
+	                                  parent_id, weapon_id, ALife::eHitTypeFireWound, fireDistance, cartridge,
+	                                  m_air_resistance_factor, false, false, shot_num, seed);
+}
+
 void CShootingObject::FireStart()
 {
 	bWorking = true;
