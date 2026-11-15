@@ -21,6 +21,13 @@
 --              to get in. Offline squads out of the shelter (farther than offline_shelter_radius from its smart) for
 --              offline_death_min real minutes are taken away. Story NPCs (the safety net: the story can't break),
 --              players' companions and stand-ins, immune_communities never
+--              The shelter's people in its covers are kept in them for the front (out restrictions): they shoot from
+--              inside, a fight doesn't take them out. One who is out again later (no walk-in time the second time) is hurt
+--              as anyone; the front's story NPCs (home, cond, shelter) too, never below service_min_health
+--   mutants    the level's online mutants go to the nearest covered spot (a roof above, a tree trunk beside) and stay
+--              there (a monster home) till the front is over (the authority)
+--   stop       an admin's stop clears it in seconds in every game: the sky in stop_blend_out_s, the ground in
+--              stop_clear_s, the falling ash at once
 --   service    the level's story and service NPCs (traders, technicians, medics...: [zone_event_ash_service_<level>],
 --              a line per story id) sit the front out in the shelter:
 --                home     his place is in the shelter's covers as it is
@@ -192,6 +199,14 @@ end
 -- the weather over the world's on this level (coop_time's pick of the weather asks it): the front's, from when this
 -- game began its blend in till it began the one back. A game that has not shown the front yet (it has just come
 -- onto the level) starts from what the others show past the blends: to_sky() then takes the rest of one
+-- the blend out of the ash after the front (ev: over): an admin's stop clears it in stop_blend_out_s
+function blend_out(ev)
+	if ev and ev.how == "stop" then
+		return secs("stop_blend_out_s", 10)
+	end
+	return secs("weather_blend_out_s", 300)
+end
+
 function weather()
 	if shown_lvl ~= level.name() then
 		shown = nil
@@ -206,7 +221,7 @@ function weather()
 	if ev.stage == "on" then
 		return ZE.now() - ev.from >= secs("weather_blend_in_s", 180) and ash_file() or nil
 	end
-	return ZE.now() - ev.till < secs("weather_blend_out_s", 300) and ash_file() or nil
+	return ZE.now() - ev.till < blend_out(ev) and ash_file() or nil
 end
 
 -- into the weather file over the blend begun since real s ago (a blend of blend_s, its rain in rain_s)
@@ -236,7 +251,7 @@ local function update_weather(ev)
 		return
 	end
 	local ended = mine and ev.stage == "end"
-	local out = secs("weather_blend_out_s", 300)
+	local out = blend_out(ended and ev or nil)
 	if not (shown == "ash" or shown == nil and ended and now - ev.till < out) then
 		return
 	end
@@ -248,7 +263,7 @@ local function update_weather(ev)
 		end
 		return
 	end
-	to_sky(wm.weather_file, ended and now - ev.till or 0, out, secs("weather_rain_out_s", 120))
+	to_sky(wm.weather_file, ended and now - ev.till or 0, out, math.min(out, secs("weather_rain_out_s", 120)))
 	wm:select_weather(false) -- the manager's own pick again (while the blend runs it only says what it ends into)
 end
 
@@ -417,7 +432,7 @@ end
 -- ash (to_sky): none at first, the rain of the world weather's frame nearest to the blend's end coming in over
 -- weather_rain_out_s, from that frame to the next one as the engine goes on, then the world's rain as usual (world)
 local function rain_after(ev, world)
-	local out = secs("weather_blend_out_s", 300)
+	local out = blend_out(ev)
 	local since = ZE.now() - ev.till
 	local file = string.match(in_coop() and coop.fact("weather") or "", "^%d+|[^|]*|[^|]*|%a|([^|]+)")
 	local list = file and frames_of(file)
@@ -479,6 +494,7 @@ local function ash_master(ev)
 	local ramp_in = math.max(1, fx_num("ramp_in_min", 1) * 60)
 	local ramp_out = math.max(1, fx_num("ramp_out_min", 10) * 60)
 	local ramp_stop = math.max(1, fx_num("ramp_stop_s", 30))
+	local stop_clear = math.max(1, num("stop_clear_s", 10))
 	for _, lvl in ipairs(ZE.levels(ID)) do
 		local s = ash_state[lvl]
 		if not s then
@@ -487,6 +503,8 @@ local function ash_master(ev)
 			ash_state[lvl] = s
 		end
 		local on = ev and ev.stage == "on" and ev.level == lvl
+		-- an admin's stop: the ash off the ground in stop_clear_s real seconds, in every game
+		local stopped = ev and ev.stage == "end" and ev.how == "stop" and ev.level == lvl
 		local ground = listed(lvl, "ground_levels")
 		local rain = ev and ev.stage == "end" and ev.level == lvl and rain_after(ev, world) or world
 		-- the rain that washes: none under the front's weather; after it, once on screen for the delay (seen: since
@@ -503,6 +521,8 @@ local function ash_master(ev)
 			s.c = 0
 		elseif on then
 			s.c = clamp01(s.c + s.cr * dt)
+		elseif stopped then
+			s.c = clamp01(s.c - dt / stop_clear)
 		else
 			s.c = clamp01(s.c - gdt / linger - (s.wet or 0) * dt / wash) -- the game's time: a sleep takes its share
 		end
@@ -518,10 +538,14 @@ local function ash_master(ev)
 		elseif s.f > 0 then
 			fr = -1 / ramp_stop
 		end
+		if stopped then
+			s.f = 0 -- the falling ash ends with the stop
+			fr = 0
+		end
 		if ground and on then
 			cr = s.c < 1 and s.f / full or 0
 		elseif ground and s.c > 0 then
-			cr = -(level.get_time_factor() / linger + wet / wash)
+			cr = stopped and -1 / stop_clear or -(level.get_time_factor() / linger + wet / wash)
 		end
 		local turned = sign(fr) ~= sign(s.fr) or sign(cr) ~= sign(s.cr) or sign(wet) ~= sign(s.wet or 0)
 		s.fr, s.cr, s.wet = fr, cr, wet
@@ -660,6 +684,14 @@ local function dose(on)
 	local now = time_global()
 	local pause = paused(now, on and not ghost())
 	local covered = on and not ghost() and in_cover(db.actor:position(), level.name())
+	if on and not ghost() and now >= next_dbg then
+		local why = sealed_suit() and "a sealed suit" or covered and "in cover" or pause and "the anti-rad's pause" or nil
+		if why then
+			next_dbg = now + 10000
+			local outfit = db.actor:item_in_slot(7)
+			ZE.dbg("ash: no dose, %s (outfit %s)", why, outfit and outfit:section() or "none")
+		end
+	end
 	if not on or ghost() or sealed_suit() or covered then
 		if covered and db.actor.radiation > 0 and last_dose then
 			-- the shelter's air: the radiation goes down
@@ -709,15 +741,22 @@ local function dose(on)
 	end
 	if now >= next_dbg then
 		next_dbg = now + 10000
-		ZE.dbg("%s", string.format("ash: radiation %.2f, health %.2f (lost %.4f by itself, %.4f more by the ash)", rad,
-			health, lost, math.max(0, extra)))
+		local outfit = db.actor:item_in_slot(7)
+		ZE.dbg("%s", string.format("ash: radiation %.2f, health %.2f (lost %.4f by itself, %.4f more by the ash), outfit %s",
+			rad, health, lost, math.max(0, extra), outfit and outfit:section() or "none"))
 	end
 end
 
 -------------------------------------------------------------------------------
 -- the NPCs (the level's authority: the NPCs it runs)
 
+local HIDE = "coop_ash_hide_" -- the hide jobs' section names and dynamic ltx (db.dynamic_ltx) per shelter smart
 local npc_since = {} -- npc id -> time_global() it was first out of cover
+local must_hide -- below: an NPC of the shelter who must go in
+local kept = {} -- npc id -> the covers he is kept in for the front (out restrictions, "a,b"): the shelter's people
+                -- don't go out of them, not even to a fight (they shoot from inside); taken off after
+local walked_in = {} -- npc id -> the shelter's walk-in time was his already this front (one who goes out again, to a
+                     -- fight, has none: he is hurt as anyone outside)
 local off_since = {} -- squad id -> real s (ZE.now) the offline squad was first seen out of the shelter
 local next_offline = 0
 
@@ -940,6 +979,47 @@ local function shelter_bound(squad, smart, lvl)
 		or squad.scripted_target == shelter_name(lvl)) or false
 end
 
+-- the level's shelter covers on line now, "a,b"
+local function cover_names(lvl)
+	local t = {}
+	for _, name in ipairs(ZE.ini_list(S, "shelter_covers_" .. lvl)) do
+		if db.zone_by_name[name] then
+			t[#t + 1] = name
+		end
+	end
+	return table.concat(t, ",")
+end
+
+-- the NPC can't leave the covers (each look: a change of his logic's section puts his restrictions as it has them)
+local function keep_in(npc, id, names)
+	if names == "" then
+		return
+	end
+	local has = {}
+	for name in string.gmatch(npc:out_restrictions() or "", "[^,%s]+") do
+		has[name] = true
+	end
+	for name in string.gmatch(names, "[^,]+") do
+		if not has[name] then
+			npc:add_restrictions(name, "")
+		end
+	end
+	kept[id] = names
+end
+
+local function let_out()
+	for id, names in pairs(kept) do
+		local npc = db.storage[id] and db.storage[id].object
+		if npc then
+			for name in string.gmatch(names, "[^,]+") do
+				npc:remove_restrictions(name, "")
+			end
+		end
+	end
+	kept = {}
+	ZE.dbg("ash: the shelter's people may go out again")
+end
+
 local function npc_dose(ev, rel_ids)
 	local now = time_global()
 	local lvl = ev.level
@@ -948,30 +1028,55 @@ local function npc_dose(ev, rel_ids)
 	local death = math.max(after + 1, num("npc_death_s", 210))
 	local walk_in = num("npc_walk_in_s", 180) * 1000
 	local seen, hurt, killed, walking = {}, 0, 0, 0
-	for i = 1, #db.OnlineStalkers do
+	local floor = num("service_min_health", 0.1)
+	local names = cover_names(lvl)
+	for i = 1, lvl == level.name() and #db.OnlineStalkers or 0 do
 		local id = db.OnlineStalkers[i]
 		local npc = db.storage[id] and db.storage[id].object
 		local se = npc and alife_object(id)
 		local squad = se and se.group_id and se.group_id ~= 65535 and alife_object(se.group_id)
-		if squad and squad.squad_members and IsStalker(npc) and npc:alive() and not get_object_story_id(id)
-			and not (in_coop() and coop.stand_in_peer(id) ~= 0) and not npc:invulnerable()
-			and not listed(npc:character_community(), "immune_communities") and not spared(squad) and not npc_sealed(npc) then
-			if not in_cover(npc:position(), lvl) then
+		-- a story NPC the front sends inside (home, cond, shelter) is hurt out of the covers too, never below
+		-- service_min_health: the story can't break. On a hide job he is invulnerable (coop_ash_service); out of the
+		-- covers (gone out to a fight) not
+		local e = get_object_story_id(id) and service_of(id)
+		local svc = e and e.how ~= "stay"
+		local on_hide = svc and string.find(db.storage[id].active_section or "", HIDE, 1, true) ~= nil
+		if squad and squad.squad_members and IsStalker(npc) and npc:alive()
+			and not (in_coop() and coop.stand_in_peer(id) ~= 0)
+			and not listed(npc:character_community(), "immune_communities") and not npc_sealed(npc)
+			and (svc and not (axr_companions and axr_companions.companion_squads[squad.id])
+				and (on_hide or not npc:invulnerable())
+				or not get_object_story_id(id) and not npc:invulnerable() and not spared(squad)) then
+			if in_cover(npc:position(), lvl) then
+				if on_hide and not npc:invulnerable() then
+					npc:invulnerable(true)
+				end
+				if svc or must_hide(se) then
+					keep_in(npc, id, names)
+				end
+			else
+				if on_hide and npc:invulnerable() then
+					npc:invulnerable(false)
+				end
 				seen[id] = true
 				local since = npc_since[id]
 				if not since then
-					-- the shelter's people walk in (their jobs are in the covers now): the clock starts after
-					since = shelter_bound(squad, smart, lvl) and now + walk_in or now
+					-- the shelter's people walk in (their jobs are in the covers now): the clock starts after, once
+					since = not walked_in[id] and shelter_bound(squad, smart, lvl) and now + walk_in or now
+					walked_in[id] = true
 					npc_since[id] = since
 				end
 				local t = (now - since) / 1000
 				if t < 0 then
 					walking = walking + 1
-				elseif t >= death then
+				elseif t >= death and not svc then
 					killed = killed + 1
 					npc:kill(npc)
 				elseif t > after then
 					local cap = 1 - (t - after) / (death - after)
+					if svc then
+						cap = math.max(cap, floor)
+					end
 					if npc.health > cap then
 						hurt = hurt + 1
 						npc:set_health_ex(cap)
@@ -1025,13 +1130,123 @@ local function npc_dose(ev, rel_ids)
 end
 
 -------------------------------------------------------------------------------
+-- the mutants (the level's authority): each online one goes to a covered spot near it for the front - a roof above it
+-- (a building) or a tree's trunk beside it - kept there by a monster home; its own home (mob_home) again after
+
+local mutants = {} -- id -> { lv = the covered spot's level vertex (false: none near), pos = where it was looked for }
+local next_mutants = 0
+
+local function under_roof(pos)
+	local rp = ray_pick(vector():set(pos.x, pos.y + 0.5, pos.z), vector():set(0, 1, 0), num("mutant_roof_m", 25),
+		rq_target.rqtStatic, nil)
+	return rp:query()
+end
+
+local function by_tree(pos)
+	local reach = num("mutant_tree_m", 1.5)
+	local from = vector():set(pos.x, pos.y + 1, pos.z)
+	for k = 0, 7 do
+		local a = k * math.pi / 4
+		local rp = ray_pick(from, vector():set(math.sin(a), 0, math.cos(a)), reach, rq_target.rqtStatic, nil)
+		if rp:query() then
+			local res = rp:get_result()
+			if res and has_part(res.material_name or "", "mutant_tree_materials") then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function covered_spot(pos)
+	return under_roof(pos) or by_tree(pos)
+end
+
+-- the nearest covered spot around: rings mutant_cover_step apart up to mutant_cover_radius, mutant_cover_dirs each
+local function find_cover(npc)
+	local lv = npc:level_vertex_id()
+	if not (lv and lv < 4294967295) then
+		return false
+	end
+	local pos = level.vertex_position(lv)
+	if covered_spot(pos) then
+		return lv
+	end
+	local step = math.max(1, num("mutant_cover_step", 5))
+	local dirs = math.max(4, num("mutant_cover_dirs", 12))
+	for d = step, num("mutant_cover_radius", 40), step do
+		for k = 0, dirs - 1 do
+			local a = 2 * math.pi * k / dirs
+			local v = level.vertex_in_direction(lv, vector():set(math.sin(a), 0, math.cos(a)), d)
+			if v and v ~= lv and v < 4294967295 then
+				local p = level.vertex_position(v)
+				if p:distance_to(pos) > d * 0.5 and covered_spot(p) then
+					return v
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function mutants_hide()
+	local now = time_global()
+	if now < next_mutants then
+		return
+	end
+	next_mutants = now + num("mutant_check_s", 5) * 1000
+	local r = num("mutant_home_radius", 4)
+	local again = num("mutant_cover_radius", 40)
+	local budget = num("mutant_per_look", 4) -- searches a look: they cost rays
+	local found, none, there = 0, 0, 0
+	for id, st in pairs(db.storage) do
+		local npc = st.object
+		if npc and IsMonster(npc) and npc:alive() then
+			local m = mutants[id]
+			-- looked for again when it is far from where none was found
+			if budget > 0 and (not m or not m.lv and m.pos:distance_to(npc:position()) > again) then
+				budget = budget - 1
+				m = { lv = find_cover(npc), pos = vector():set(npc:position()) }
+				mutants[id] = m
+			end
+			if m and m.lv then
+				found = found + 1
+				if npc:position():distance_to(level.vertex_position(m.lv)) <= r * 2 then
+					there = there + 1
+				end
+				npc:set_home(m.lv, r, r * 3, false, r * 2) -- each look: its logic (mob_home) may have set its own
+			elseif m then
+				none = none + 1
+			end
+		end
+	end
+	if found + none > 0 then
+		ZE.dbg("ash: %s mutant(s) sent to a covered spot (%s of them there), %s with none near", found, there, none)
+	end
+end
+
+local function mutants_free()
+	for id, m in pairs(mutants) do
+		local st = db.storage[id]
+		local npc = st and st.object
+		if m.lv and npc and npc:alive() then
+			npc:remove_home()
+			if st.active_scheme == "mob_home" and st.mob_home then
+				xr_logic.issue_event(npc, st.mob_home, "reset_scheme", false)
+			end
+		end
+	end
+	mutants = {}
+	ZE.dbg("ash: the mutants go out again")
+end
+
+-------------------------------------------------------------------------------
 -- going in (the level's authority: its smart jobs, as Anomaly's emission does it)
 
 local hide = nil -- while the front is on our level and we run its NPCs: { smart = the shelter's id, lvl = level }
 local hides_of = {} -- npc id -> { until (time_global), must hide }
 local job_covered = setmetatable({}, { __mode = "k" }) -- job -> its place is in a cover
 local SURGE_JOBS = { [2] = true, [8] = true, [14] = true } -- gulag_general: surge, animpoint_surge, beh_surge
-local HIDE = "coop_ash_hide_" -- the hide jobs' section names and dynamic ltx (db.dynamic_ltx) per shelter smart
 
 -- a service NPC sent into the shelter (shelter): he takes a hide job there
 local function service_hides(obj)
@@ -1041,7 +1256,7 @@ end
 
 -- an NPC of the shelter who must go in: not story, not a stand-in, not immune, not in a spared squad or a sealed suit;
 -- or a service NPC sent in
-local function must_hide(se_obj)
+function must_hide(se_obj)
 	local id = se_obj.id
 	local now = time_global()
 	local c = hides_of[id]
@@ -1433,8 +1648,16 @@ local function update(ev)
 		if on_here then
 			service_look(ev.level)
 		end
-	elseif next(npc_since) or next(off_since) then
-		npc_since, off_since = {}, {}
+	elseif next(npc_since) or next(off_since) or next(walked_in) then
+		npc_since, off_since, walked_in = {}, {}, {}
+	end
+	if next(kept) and not (on_here and authority(ev.level)) then
+		let_out()
+	end
+	if on_here and authority(ev.level) and ini_sys:r_bool_ex(S, "mutant_hide", true) then
+		mutants_hide()
+	elseif next(mutants) then
+		mutants_free()
 	end
 end
 
