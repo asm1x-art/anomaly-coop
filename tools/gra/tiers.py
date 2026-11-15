@@ -7,10 +7,11 @@ order, a few mods switched. The tiers below are those three profiles, less every
 different from player to player made the same for all: level.details (grass hides from AI sight by it) and models.
 """
 
+# gra_profile: the Mod Organizer profile of GRA the tier follows (`build_tiers.py check` compares with it)
 TIERS = [
-    {"id": "low", "title": "4 ГБ", "vram_gb": [4, 5]},
-    {"id": "mid", "title": "6–8 ГБ", "vram_gb": [6, 8]},
-    {"id": "high", "title": "10–12 ГБ", "vram_gb": [10, 12]},
+    {"id": "low", "title": "4 ГБ", "vram_gb": [4, 5], "gra_profile": "3v2(DX11) (v_4gb) 2.5, Средние настройки (162)"},
+    {"id": "mid", "title": "6–8 ГБ", "vram_gb": [6, 8], "gra_profile": "2v2(DX11) (v_6gb) 2.5, Высокие настройки (167)"},
+    {"id": "high", "title": "10–12 ГБ", "vram_gb": [10, 12], "gra_profile": "1v2(DX11) (v_12gb) 2.5, Все включено (168)"},
 ]
 ALL = "low mid high"
 
@@ -47,6 +48,10 @@ YIELD_TO = [
     # ours already (db\mods\gra_*.db, build_pack.py)
     "[Модели] Dux's Character Kit 2.0.7",
     "[Модели] FVM_Nosorog_Overhaul",
+    # first-person hands per suit, the same as GRA's: in the base for every player since the weapons pack; no tier
+    # mod has their paths today, this keeps it so
+    "[Руки] T.H.A.P. Rework 2.3.0 (Light)",
+    "[Руки] I.W.P. exos and animations",
     # the shader and weather branch (gra-shaders) brings these with their textures
     "[Шейдеры] ScreenSpaceShaders 23.5",
     "[Погода] Atmospherics 2.68.93_h3",

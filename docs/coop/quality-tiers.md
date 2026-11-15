@@ -103,6 +103,31 @@ Cinematic VFX — один `particles.xr` вместо ванильного (256
 игроков безопасны. Свои `.pe/.pg` россыпью (`gamedata/particles/coop/`) сильнее библиотеки и работают с обеими. Конфиг
 патронов из мода (`weapon_ammo.ltx`: трассеры, урон) не взят.
 
+### Руки от первого лица
+
+Руки GRA — `[Руки] T.H.A.P. Rework 2.3.0 (Light)` (161 модель `meshes\anomaly_weapons\hands\*.ogf`, по рукам на
+костюм, и их текстуры в `textures\act\`) и поверх него `[Руки] I.W.P. exos and animations` (17 моделей экзо-рук).
+Оба мода уже в базе у всех игроков с оружейным пакетом (`tools/gra/build_pack.py`, 2026-10-29): модели и текстуры —
+в `db\mods\gra_*.db` (640 файлов, 1,39 ГиБ, размеры совпадают с файлами модов байт в байт), конфиги THAP россыпью
+в `gamedata` (`configs\creatures\actor_hud_hand_animations.ltx`, `configs\mod_system_thap_rework.ltx` — те же, что
+в моде). Порядок как в GRA: I.W.P. выше THAP, других модов на путях THAP в профилях GRA нет. Поэтому в ступени руки
+не входят и одинаковы во всех ступенях; оба мода стоят в `YIELD_TO`, чтобы пак ступени никогда не перекрыл их пути.
+
+Конфиг THAP — тот же ванильный `actor_hud_hand_animations.ltx` (у `[actor_hud]` те же `position`/`orientation`,
+привязки `lead_gun`/`l_hand`), меняются только `visual` рук и добавлены секции для костюмов модов; DLTX
+`mod_system_thap_rework.ltx` ставит костюмам только `player_hud_section`. Все 160 значений `player_hud_section`
+(ваниль + репозиторий) находят свою секцию. Оружие садится в руки так же, как с ванильными: смещения оружия заданы
+от костей рук, скелет у моделей THAP ванильный. Колесо, инвентарь, анимации оружия и смещения оружия от третьего лица
+эти файлы не трогают.
+
+Руки видит только сам игрок: движок грузит `player_hud_section` костюма лишь для `Level().CurrentViewEntity()`
+(`CustomOutfit.cpp`), в сеть это не идёт, хосту не нужно. Других игроков видно моделью сталкера (Dux / FVM).
+
+`[Анимации] Better_hands_for_PDA_reanim` — не часть рук: это положение рук для анимаций КПК из
+`[Анимации] PDA_reanim` (вариант «Further Zoom»: `hud_fov 0.78` и `hands_position` у `device_pda_1..3`). Без
+PDA_reanim он не нужен. PDA_reanim меняет анимации `[pda_hud]` (`items_anim.ltx` целиком, `kyky_smoke_pda_*`) и
+кладёт свою `.omf` и звуки — это анимация, не картинка, ей место в базовом пакете, не в ступени. Не взяты оба.
+
 ## Что не взято
 
 | Мод GRA | Почему |
@@ -145,6 +170,7 @@ Cinematic VFX — один `particles.xr` вместо ванильного (256
 ```
 python tools/gra/build_tiers.py plan  [--loose <gamedata релиза вне git>] [--files список.tsv]
 python tools/gra/build_tiers.py build <stage> <out> [--loose ...] [--only <компонент>] [--sample <МБ>]
+python tools/gra/build_tiers.py check [--loose ...]
 ```
 
 Папка модов GRA и `converter.exe` — `--mo2`, `--converter` или переменные `GRA_MO2`, `GRA_CONVERTER`. `build` кладёт
@@ -158,6 +184,12 @@ python tools/gra/build_tiers.py build <stage> <out> [--loose ...] [--only <ко�
 ```
 
 `--sample 40` пакует первые 40 МБ каждого компонента (проверка конвейера, в `tiers.json` пометка `"sample": true`).
+
+`check` сверяет каждый файл ступени с тем, чей файл на этом пути у профиля GRA этой ступени (`gra_profile` в
+`tiers.py`, папка `profiles` рядом с модами), и печатает расхождения по парам «наш мод — мод GRA». На 2026-11-15
+расхождения только задуманные: трава PanceRide у всех, модели мутантов KynesPeace Medium у всех, текстуры крови
+Cinematic VFX там, где в GRA стоит невзятый Painter of the Zone. Если бы пак ступени перекрыл файл оружейного пакета
+(базы), который GRA ставит выше, строка помечается `!` и команда завершается с ошибкой; таких нет.
 
 ## Моды и авторы
 
