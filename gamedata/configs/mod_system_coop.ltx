@@ -437,3 +437,10 @@ escape_distance     = 150 ; m: "away" is farther than this from every living one
                           ; out of the game count as away too)
 contact_refresh_min = 10  ; game min: while the player stays near, the time of the last contact is noted this often
 check_s             = 5   ; real s between checks
+
+; Co-op: helicopters (src/xrGame/coop/coop_heli.h, gamedata/scripts/coop_heli.script). The level's authority flies
+; them; the others' are puppets that follow it.
+[coop_heli]
+follow_rate   = 6    ; 1/s: how fast a puppet closes in on where the authority's helicopter is
+snap_distance = 30   ; m: a puppet farther off than this is put there at once
+fly_on_s      = 0.5  ; s: how long a puppet flies on with the last speed heard before it waits for the next state

@@ -1,0 +1,172 @@
+-- Co-op: helicopters (src/xrGame/coop/coop_heli.h). The level's authority runs a helicopter: its scripts here choose
+-- the way and the targets, its engine flies and fires. In the other players' games it is a puppet the engine moves as
+-- the authority's: its logic (xr_logic schemes, heli_alife, heli_combat, heli_fire) stays off there; only its health
+-- check runs, for the flames and for the death the authority sends.
+--
+-- The authority's helicopter fights the other players as it fights our actor: through their stand-ins
+-- (src/xrGame/coop/coop_combat.h), which its scripts don't know. While a helicopter's logic runs, db.storage has an
+-- entry for each stand-in (its object and its heli_enemy_flag, as an actor's) and db.heli_enemies lists them; a
+-- player who hits the helicopter is flagged as our actor would be, actor_always_enemy counts for every player, a
+-- player of the helicopter's own faction or lying wounded is left be.
+--
+-- Scripted helicopter events: spawn the helicopter once for the world (coop.begin_shared / coop.end_shared in the
+-- level authority's game) and drive it only where coop_heli.runs(obj) is true.
+
+local stand_ins = {} -- stand-in id -> { object, heli_enemy_flag }: its db.storage entry while a helicopter thinks
+local thinking = 0   -- > 0 while a helicopter's logic runs here
+
+-- this game flies that helicopter (no co-op: always)
+function runs(obj)
+	return not (coop.connected() and coop.heli_puppet(obj:id()))
+end
+
+local function stand_in_entry(id)
+	if type(id) ~= "number" or coop.stand_in_peer(id) == 0 then
+		return nil
+	end
+	local obj = level.object_by_id(id)
+	if not obj then
+		stand_ins[id] = nil
+		return nil
+	end
+	local st = stand_ins[id]
+	if not st then
+		st = {}
+		stand_ins[id] = st
+	end
+	st.object = obj
+	return st
+end
+
+-- the stand-ins on our level, for the helicopter's look round db.heli_enemies
+local function list_stand_ins()
+	local added = {}
+	local listed = {}
+	for _, id in ipairs(db.heli_enemies) do
+		listed[id] = true
+	end
+	local level_name = level.name()
+	for _, peer in ipairs(coop.peers()) do
+		local id = peer.stand_in
+		if id and id ~= 0 and peer.level == level_name and not listed[id] and stand_in_entry(id) then
+			db.heli_enemies[#db.heli_enemies + 1] = id
+			added[id] = true
+		end
+	end
+	return added
+end
+
+local function unlist(added)
+	if not next(added) then
+		return
+	end
+	for i = #db.heli_enemies, 1, -1 do
+		if added[db.heli_enemies[i]] then
+			table.remove(db.heli_enemies, i)
+		end
+	end
+end
+
+-- f as a helicopter's thinking: the stand-ins are there for it meanwhile
+local function thinks(f)
+	return function(...)
+		if not coop.connected() then
+			return f(...)
+		end
+		local added = thinking == 0 and list_stand_ins() or {}
+		thinking = thinking + 1
+		local ok, a, b, c = pcall(f, ...)
+		thinking = thinking - 1
+		unlist(added)
+		if not ok then
+			error(a, 0)
+		end
+		return a, b, c
+	end
+end
+
+local function patch_storage()
+	local mt = getmetatable(db.storage) or {}
+	local index = mt.__index
+	mt.__index = function(t, id)
+		if thinking > 0 then
+			local st = stand_in_entry(id)
+			if st then
+				return st
+			end
+		end
+		if type(index) == "function" then
+			return index(t, id)
+		elseif index then
+			return index[id]
+		end
+	end
+	setmetatable(db.storage, mt)
+end
+
+local function patch_binder()
+	local binder = bind_heli.heli_binder
+	local update = thinks(binder.update)
+	local on_hit = thinks(binder.on_hit)
+	local on_point = thinks(binder.on_point)
+
+	binder.update = function(self, delta)
+		if coop.connected() and coop.heli_puppet(self.object:id()) then
+			-- another game flies it: no logic of its own; burning, and brought down when the authority's death comes
+			object_binder.update(self, delta)
+			self:check_health()
+			xr_sound.update(self.object:id())
+			return
+		end
+		if not self.coop_callbacks then
+			-- the callbacks set before this script got in still call the old ones
+			self.coop_callbacks = true
+			self.object:set_callback(callback.helicopter_on_hit, self.on_hit, self)
+			self.object:set_callback(callback.helicopter_on_point, self.on_point, self)
+		end
+		return update(self, delta)
+	end
+	binder.on_hit = on_hit
+	binder.on_point = on_point
+end
+
+local function patch_combat()
+	local combat = heli_combat.heli_combat
+	combat.fastcall = thinks(combat.fastcall)
+
+	local is_enemy = combat.is_enemy
+	combat.is_enemy = function(self, obj)
+		local peer = obj and coop.connected() and coop.stand_in_peer(obj:id()) or 0
+		if peer == 0 then
+			return is_enemy(self, obj)
+		end
+		-- a player's stand-in: as heli_combat judges our actor, by what that player did to the helicopter
+		if not obj:alive() or coop.downed(peer) then
+			return false
+		end
+		if xr_combat_ignore.ignore_enemy_by_overrides(self.object, obj) then
+			return false
+		end
+		local se_obj = alife_object(self.object:id())
+		if not (se_obj and se_obj.community) then
+			return false
+		end
+		if string.find(character_community(obj), se_obj.community, 1, true) then
+			return false
+		end
+		local st = stand_in_entry(obj:id())
+		if st and st.heli_enemy_flag then
+			return true
+		end
+		return self.actor_always_enemy or false
+	end
+end
+
+function on_game_start()
+	if not (coop and coop.heli_puppet and bind_heli and heli_combat and db) then
+		return -- not the co-op engine
+	end
+	patch_storage()
+	patch_binder()
+	patch_combat()
+end
