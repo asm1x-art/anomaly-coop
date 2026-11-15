@@ -178,7 +178,12 @@ local function recover()
 	db.actor.radiation = 0
 	db.actor.psy_health = 1
 	-- a death that took the controls and the HUD away (a surge's wave, the psi death scene)
-	xr_effects.enable_ui(db.actor, nil)
+	-- (its last step, the night vision a scene took away, fails on the actor when Beef's goggles hold the flag: the rest
+	-- is done by then)
+	local ok, err = pcall(xr_effects.enable_ui, db.actor, nil)
+	if not ok then
+		printf("! [coop] recover: enable_ui: %s", tostring(err))
+	end
 end
 
 -- everything a death leaves put right, health aside: the admin window's "heal" (coop_admin_do.script)

@@ -865,11 +865,20 @@ local function service_of(obj)
 	return e or nil
 end
 
--- a squad with a service NPC sent into the shelter
+-- an NPC in a sealed suit, by his game object or his server object
+local function obj_sealed(obj)
+	if type(obj.get_visual_name) == "function" then
+		return visual_sealed(obj:get_visual_name())
+	end
+	return obj.visual_name and visual_sealed(obj:visual_name()) or false
+end
+
+-- a squad with a service NPC sent into the shelter (one in a sealed suit keeps his post)
 local function shelter_service(squad, lvl)
 	for m in squad:squad_members() do
 		local e = service_on(lvl, m.id)
-		if e and e.how == "shelter" then
+		local se = alife_object(m.id)
+		if e and e.how == "shelter" and not (se and obj_sealed(se)) then
 			return true
 		end
 	end
@@ -1164,14 +1173,55 @@ local function covered_spot(pos)
 	return under_roof(pos) or by_tree(pos)
 end
 
--- the nearest covered spot around: rings mutant_cover_step apart up to mutant_cover_radius, mutant_cover_dirs each
+-- not a place of people: the front's shelter (its covers, within mutant_avoid_m of its smart), a base (a smart with
+-- props base, within mutant_avoid_m), behind a door (within mutant_avoid_door_m of one)
+local bases, bases_lvl = {}, nil -- the level's bases' positions
+local function people_place(p)
+	local lvl = level.name()
+	if in_cover(p, lvl) then
+		return true
+	end
+	local far = num("mutant_avoid_m", 30)
+	local shelter = shelter_smart(lvl)
+	if shelter and p:distance_to(shelter.position) <= far then
+		return true
+	end
+	if bases_lvl ~= lvl then
+		bases_lvl, bases = lvl, {}
+		for _, s in pairs(SIMBOARD.smarts) do
+			local smart = s.smrt
+			if smart and smart.props and (smart.props.base or 0) > 0 and smart_level_of(smart) == lvl then
+				bases[#bases + 1] = smart.position
+			end
+		end
+	end
+	for _, b in ipairs(bases) do
+		if p:distance_to(b) <= far then
+			return true
+		end
+	end
+	local door_m = num("mutant_avoid_door_m", 8)
+	for _, dp in pairs(db.level_doors or {}) do
+		if p:distance_to(dp) <= door_m then
+			return true
+		end
+	end
+	return false
+end
+
+local function mutant_spot(p)
+	return not people_place(p) and covered_spot(p) -- the cheap look first: the cover's costs rays
+end
+
+-- the nearest covered spot around that is no place of people: rings mutant_cover_step apart up to
+-- mutant_cover_radius, mutant_cover_dirs each
 local function find_cover(npc)
 	local lv = npc:level_vertex_id()
 	if not (lv and lv < 4294967295) then
 		return false
 	end
 	local pos = level.vertex_position(lv)
-	if covered_spot(pos) then
+	if mutant_spot(pos) then
 		return lv
 	end
 	local step = math.max(1, num("mutant_cover_step", 5))
@@ -1182,13 +1232,30 @@ local function find_cover(npc)
 			local v = level.vertex_in_direction(lv, vector():set(math.sin(a), 0, math.cos(a)), d)
 			if v and v ~= lv and v < 4294967295 then
 				local p = level.vertex_position(v)
-				if p:distance_to(pos) > d * 0.5 and covered_spot(p) then
+				if p:distance_to(pos) > d * 0.5 and mutant_spot(p) then
 					return v
 				end
 			end
 		end
 	end
 	return false
+end
+
+-- mutant_ignore_enemies: the front's mutants go for nobody (players and NPCs alike) on their way to cover and in it;
+-- one hit from within mutant_defend_m goes for whoever hit it for mutant_defend_s
+local calm = {}     -- id -> true: its enemy callback is ours
+local provoked = {} -- id -> { who = the hitter's id, till = time_global() }
+
+local function calm_enemy(npc, enemy)
+	local p = provoked[npc:id()]
+	return p ~= nil and enemy ~= nil and enemy:id() == p.who and time_global() < p.till
+end
+
+local function on_mutant_hit(npc, amount, dir, who)
+	if npc and calm[npc:id()] and who and who:id() ~= npc:id()
+		and who:position():distance_to(npc:position()) <= num("mutant_defend_m", 5) then
+		provoked[npc:id()] = { who = who:id(), till = time_global() + num("mutant_defend_s", 20) * 1000 }
+	end
 end
 
 local function mutants_hide()
@@ -1204,6 +1271,10 @@ local function mutants_hide()
 	for id, st in pairs(db.storage) do
 		local npc = st.object
 		if npc and IsMonster(npc) and npc:alive() then
+			if not calm[id] and ini_sys:r_bool_ex(S, "mutant_ignore_enemies", true) then
+				calm[id] = true
+				npc:set_enemy_callback(calm_enemy)
+			end
 			local m = mutants[id]
 			-- looked for again when it is far from where none was found
 			if budget > 0 and (not m or not m.lv and m.pos:distance_to(npc:position()) > again) then
@@ -1238,7 +1309,14 @@ local function mutants_free()
 			end
 		end
 	end
-	mutants = {}
+	for id in pairs(calm) do
+		local st = db.storage[id]
+		local npc = st and st.object
+		if npc and npc:alive() then
+			npc:set_enemy_callback()
+		end
+	end
+	mutants, calm, provoked = {}, {}, {}
 	ZE.dbg("ash: the mutants go out again")
 end
 
@@ -1251,9 +1329,10 @@ local job_covered = setmetatable({}, { __mode = "k" }) -- job -> its place is in
 local SURGE_JOBS = { [2] = true, [8] = true, [14] = true } -- gulag_general: surge, animpoint_surge, beh_surge
 
 -- a service NPC sent into the shelter (shelter): he takes a hide job there
+-- (one in a sealed suit keeps his post: the ash can't hurt him)
 local function service_hides(obj)
 	local e = service_of(obj)
-	return e ~= nil and e.how == "shelter"
+	return e ~= nil and e.how == "shelter" and not obj_sealed(obj)
 end
 
 -- an NPC of the shelter who must go in: not story, not a stand-in, not immune, not in a spared squad or a sealed suit;
@@ -1586,7 +1665,8 @@ local function gather(lvl, known)
 					rel[#rel + 1] = id .. ":" .. own
 				end
 			elseif theirs(squad) then
-				if target then
+				-- all in sealed suits: they keep their jobs, guards their posts
+				if target and not squad_sealed(squad) then
 					rel[#rel + 1] = id .. ":" .. own
 				end
 			elseif squad.player_id ~= "zombied" and not squad_sealed(squad) then
@@ -1714,7 +1794,7 @@ local function update(ev)
 	end
 	if on_here and authority(ev.level) and ini_sys:r_bool_ex(S, "mutant_hide", true) then
 		mutants_hide()
-	elseif next(mutants) then
+	elseif next(mutants) or next(calm) then
 		mutants_free()
 	end
 end
@@ -1776,10 +1856,16 @@ function on_game_start()
 		dose(here() ~= nil)
 	end)
 	RegisterScriptCallback("actor_on_item_use", on_item_use)
+	RegisterScriptCallback("monster_on_hit_callback", on_mutant_hit)
 	-- the shelter's people kept in its covers take no notice of anyone outside them (no fight through the door, no
 	-- shots from inside): they sit the front out. One who has come into the covers is fought as ever
+	-- and nobody goes for a mutant of the front that goes for nobody (npc_ignore_mutants): a guard chasing a snork across
+	-- the level in the ash. One the mutant goes for (it was hit by him) fights back
 	RegisterScriptCallback("on_enemy_eval", function(npc, enemy, flags)
 		if kept[npc:id()] and service_lvl and not in_cover(enemy:position(), service_lvl) then
+			flags.override = true
+			flags.result = false
+		elseif calm[enemy:id()] and not calm_enemy(enemy, npc) and ini_sys:r_bool_ex(S, "npc_ignore_mutants", true) then
 			flags.override = true
 			flags.result = false
 		end

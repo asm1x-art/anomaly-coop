@@ -463,6 +463,7 @@ class_<CScriptGameObject> script_register_game_object1(class_<CScriptGameObject>
 		.def("unlock_door_for_npc", &CScriptGameObject::unlock_door_for_npc)
 		.def("is_door_locked_for_npc", &CScriptGameObject::is_door_locked_for_npc)
 		.def("is_door_blocked_by_npc", &CScriptGameObject::is_door_blocked_by_npc)
+		.def("is_door_wanted_open_by_npc", &CScriptGameObject::is_door_wanted_open_by_npc)
 		.def("is_weapon_going_to_be_strapped", SAFE_WRAP(&CScriptGameObject::is_weapon_going_to_be_strapped))
 
 		.def("g_fireParams", SAFE_WRAP(&CScriptGameObject::g_fireParams))

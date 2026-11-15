@@ -716,6 +716,13 @@ local function put_door(obj, value, quiet)
 	if not (st and st.ini and st.active_section and section ~= "") then
 		return
 	end
+	-- older than what the door is here: the echo of one of our own switches the server passes back after a newer one
+	-- of ours (a door's logic may switch it several times in a moment, the airlock's does), or a change another game
+	-- made before ours. Taken, it put the door back for a moment and its logic went on from there, out of order
+	if act and st.coop_act and act < st.coop_act then
+		dbg("door %s: %s of %s ignored, older than its %s of %s", obj:name(), section, act, st.active_section, st.coop_act)
+		return
+	end
 	if section == st.active_section then
 		if act and st.coop_act ~= act then
 			set_activation(obj, act) -- the same door, timed from the world's moment
