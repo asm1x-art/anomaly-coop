@@ -1292,6 +1292,8 @@ public:
 	::luabind::object GetDefaultShaders(bool bHud = false);
 	void SetShaderTexture(int id, LPCSTR shader, LPCSTR texture, bool bHud = false);
 	void ResetShaderTexture(int id, bool bHud = false);
+	// a second shader drawn over child id (id < 1: every child), "" takes it off (IRenderVisual::SetOverlayShader)
+	void SetOverlayShader(int id, LPCSTR shader, bool bHud = false);
 	::luabind::object GetHudMotionItemShaders();
 	void SetHudMotionItemShader(int id, LPCSTR shader, LPCSTR texture);
 	void ResetHudMotionItemShader(int id);

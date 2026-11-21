@@ -44,6 +44,10 @@ public:
 	virtual void ResetShaderTexture() {};
 	virtual void MarkAsHot(bool is_hot) {};				//--DSR-- HeatVision
 	virtual void MarkAsGlowing(bool is_glowing) {};		//--DSR-- SilencerOverheat
+	// a second shader drawn over this visual, its own shader untouched: its first element in the emissive pass (light
+	// added on top), a distortion l_special in the distortion pass; null or "" takes it off (artefact_fx.script)
+	virtual void SetOverlayShader(LPCSTR shader) {};
+	virtual bool HasOverlayShader() { return false; }
 
 	virtual IRenderVisual* _BCL dcast_RenderVisual() { return this; }
 	virtual IKinematics* _BCL dcast_PKinematics() { return 0; }
