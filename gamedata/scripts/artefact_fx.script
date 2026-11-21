@@ -78,6 +78,7 @@ function settings()
 		surfaces = names(r("surfaces", "models\\model")),
 		surfaces_shell = names(r("surfaces_shell", "")),
 		shell_strength = C():r_float_ex(S, "shell_strength") or 0.35,
+		shell_inner = C():r_float_ex(S, "shell_inner") or 0,
 		rare_tier = C():r_float_ex(S, "rare_tier") or 4,
 		rare_grade = C():r_float_ex(S, "rare_grade") or 5,
 		dim_as_common = C():r_bool_ex(S, "dim_as_common", true),
@@ -257,7 +258,8 @@ end
 local function lanes(obj, st, p)
 	local w = p.strength * st.boost * (st.shell and settings().shell_strength or 1)
 	shader_bus.set_object(tok.fx, obj, p.r, p.g, p.b, w)
-	shader_bus.set_object(tok.fx2, obj, p.rim, p.rim_power, p.inner, p.pulse_depth)
+	local inner = st.shell and p.inner * settings().shell_inner or p.inner
+	shader_bus.set_object(tok.fx2, obj, p.rim, p.rim_power, inner, p.pulse_depth)
 	shader_bus.set_object(tok.fx3, obj, p.pulse_speed, p.phase, p.flicker, p.flicker_rate)
 	local hz = p.haze or { 0, 0, 0 }
 	shader_bus.set_object(tok.fx4, obj, hz[1], hz[2], hz[3], p.rim_start)
