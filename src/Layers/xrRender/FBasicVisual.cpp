@@ -23,6 +23,24 @@ IRender_Mesh::~IRender_Mesh()
 	_RELEASE(p_rm_Indices);
 }
 
+// An overlay's element may still sit in a sorted map from the frame before (a map filled by another view and drawn
+// with the next frame's): a shader taken off is kept alive a few frames before it may go.
+// (never freed: the engine's shaders are gone by the time statics would be destroyed)
+static xr_vector<std::pair<u32, ref_shader>>& g_overlay_graveyard = *new xr_vector<std::pair<u32, ref_shader>>();
+
+static void overlay_bury(ref_shader& sh)
+{
+	if (!sh._get())
+		return;
+	g_overlay_graveyard.push_back(std::make_pair(Device.dwFrame, sh));
+	sh = 0;
+	u32 keep = 0;
+	for (u32 i = 0; i < g_overlay_graveyard.size(); ++i)
+		if (g_overlay_graveyard[i].first + 4 > Device.dwFrame)
+			g_overlay_graveyard[keep++] = g_overlay_graveyard[i];
+	g_overlay_graveyard.resize(keep);
+}
+
 dxRender_Visual::dxRender_Visual()
 {
 	Type = 0;
@@ -32,6 +50,7 @@ dxRender_Visual::dxRender_Visual()
 
 dxRender_Visual::~dxRender_Visual()
 {
+	overlay_bury(shader_fx);
 }
 
 void dxRender_Visual::Release()
@@ -158,12 +177,26 @@ void dxRender_Visual::ResetShaderTexture()
 		SetShaderTexture(*dbg_shader_def, *dbg_texture_def);
 }
 
+// the overlay takes the visual's own texture: its shader may read it (the inner glow follows the surface)
+void dxRender_Visual::SetOverlayShader(LPCSTR s_shader)
+{
+	overlay_bury(shader_fx);
+	if (!s_shader || !s_shader[0])
+		return;
+	::Render->m_skinning = skinning;
+	bool prev_hud = ::Render->hud_loading;
+	::Render->hud_loading = hud;
+	shader_fx.create(s_shader, *dbg_texture);
+	::Render->hud_loading = prev_hud;
+}
+
 #define PCOPY(a)	a = pFrom->a
 
 void dxRender_Visual::Copy(dxRender_Visual* pFrom)
 {
 	PCOPY(Type);
 	PCOPY(shader);
+	PCOPY(shader_fx);
 	PCOPY(vis);
 #ifdef _EDITOR
 	PCOPY(desc);

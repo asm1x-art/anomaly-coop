@@ -49,6 +49,39 @@ void R_dsgraph_structure::r_dsgraph_insert_dynamic(dxRender_Visual* pVisual, Fve
 	float SSA = CalcSSA(distSQ, Center, pVisual);
 	if (SSA <= r_ssaDISCARD) return;
 
+#if RENDER!=R_R1
+	// an overlay (dxRender_Visual::SetOverlayShader) over the visual's own drawing, in the main view only: its first
+	// element adds light in the emissive pass (into the accumulator and SSS bloom, so tone mapping, fog, DOF and DLSS
+	// take it as part of the lit surface; the G-buffer and its motion vectors stay the visual's own), a distortion
+	// l_special goes to the distortion pass
+	if (pVisual->shader_fx._get() && RI.phase == CRender::PHASE_NORMAL && !RI.val_bInvisible)
+	{
+		ShaderElement* fx = &*pVisual->shader_fx->E[0];
+		if (fx)
+		{
+			mapSorted_Node* N = RI.val_bHUD
+				? (RI.val_bCamAttached ? mapCamAttachedEmissive.insertInAnyWay(distSQ) : mapHUDEmissive.insertInAnyWay(distSQ))
+				: mapEmissive.insertInAnyWay(distSQ);
+			N->val.ssa = SSA;
+			N->val.pObject = RI.val_pObject;
+			N->val.pVisual = pVisual;
+			N->val.Matrix = *RI.val_pTransform;
+			N->val.se = fx;
+		}
+		ShaderElement* fx_d = &*pVisual->shader_fx->E[4];
+		if (fx_d && fx_d->flags.bDistort && RImplementation.o.distortion)
+		{
+			mapSorted_T& test = RI.val_bHUD ? mapHUDDistort : mapDistort;
+			mapSorted_Node* N = test.insertInAnyWay(distSQ);
+			N->val.ssa = SSA;
+			N->val.pObject = RI.val_pObject;
+			N->val.pVisual = pVisual;
+			N->val.Matrix = *RI.val_pTransform;
+			N->val.se = fx_d;
+		}
+	}
+#endif
+
 	// Distortive geometry should be marked and R2 special-cases it
 	// a) Allow to optimize RT order
 	// b) Should be rendered to special distort buffer in another pass

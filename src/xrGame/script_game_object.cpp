@@ -1650,6 +1650,42 @@ void CScriptGameObject::ResetShaderTexture(int id, bool bHud)
 	reset_shader_tex(k->dcast_RenderVisual(), id);
 }
 
+static void set_overlay_shader(IRenderVisual* vis, int id, LPCSTR shader)
+{
+	xr_vector<IRenderVisual*>* children = vis->get_children();
+	xr_vector<IRenderVisual*>* children_invisible = vis->get_children_invisible();
+	if (!children && !children_invisible)
+	{
+		vis->SetOverlayShader(shader);
+		return;
+	}
+	for (xr_vector<IRenderVisual*>* list : {children, children_invisible})
+	{
+		if (!list) continue;
+		for (auto* child : *list)
+			if (id < 1 || child->getID() == u32(id))
+				child->SetOverlayShader(shader);
+	}
+}
+
+void CScriptGameObject::SetOverlayShader(int id, LPCSTR shader, bool bHud)
+{
+	IKinematics* k = nullptr;
+	if (bHud)
+	{
+		CHudItem* itm = smart_cast<CHudItem*>(&object());
+		if (!itm || !itm->HudItemData())
+			return;
+		k = itm->HudItemData()->m_model;
+	}
+	else if (object().Visual())
+		k = object().Visual()->dcast_PKinematics();
+	if (k)
+		set_overlay_shader(k->dcast_RenderVisual(), id, shader);
+	else if (!bHud && object().Visual())
+		set_overlay_shader(object().Visual(), id, shader);
+}
+
 ::luabind::object CScriptGameObject::GetHudMotionItemShaders()
 {
 	CActor* act = smart_cast<CActor*>(&object());

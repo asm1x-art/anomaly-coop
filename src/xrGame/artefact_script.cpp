@@ -17,6 +17,9 @@
 
 using namespace luabind;
 
+// shown: not hidden until a detector finds it (SArtefactDetectorsSupport::SetVisible), artefact_fx.script
+static bool artefact_is_visible(CArtefact* self) { return !!self->getVisible(); }
+
 #pragma optimize("s",on)
 void CArtefact::script_register(lua_State* L)
 {
@@ -36,7 +39,8 @@ void CArtefact::script_register(lua_State* L)
 		.def_readwrite("m_additional_weight", &CArtefact::m_additional_weight)
 		.def("FollowByPath", &CArtefact::FollowByPath)
 		.def("SwitchVisibility", &CArtefact::SwitchVisibility)
-		.def("GetAfRank", &CArtefact::GetAfRank),
+		.def("GetAfRank", &CArtefact::GetAfRank)
+		.def("IsVisible", &artefact_is_visible),
 
 		class_<CMercuryBall       , CArtefact>("CMercuryBall").def(constructor<>()),
 		class_<CBlackDrops        , CArtefact>("CBlackDrops").def(constructor<>()),

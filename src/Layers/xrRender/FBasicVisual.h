@@ -66,6 +66,7 @@ public:
 	u32 Type; // visual's type
 	vis_data vis; // visibility-data
 	ref_shader shader; // pipe state, shared
+	ref_shader shader_fx; // the overlay drawn over it (SetOverlayShader), empty for none
 	s32 skinning;
     bool hud;
 
@@ -90,6 +91,8 @@ public:
 
 	virtual void SetShaderTexture(LPCSTR shader, LPCSTR texture);
 	virtual void ResetShaderTexture();
+	virtual void SetOverlayShader(LPCSTR shader);
+	virtual bool HasOverlayShader() { return !!shader_fx._get(); }
 
 	virtual vis_data& _BCL getVisData() { return vis; }
 	virtual u32 getType() { return Type; }
