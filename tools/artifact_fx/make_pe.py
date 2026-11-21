@@ -3,7 +3,7 @@ format of gamedata/particles/coop/ash_embers.pe, read by the engine over particl
 
 One effect a family (artefact_fx.script, [artefact_fx_family_*] in mod_system_artefact_fx.ltx picks it by name), three
 densities each (1 sparse, 2 normal, 3 dense: the .ltx's particles_density): only the birth rate and the cap change.
-Everything sits round the emitter, which the script keeps on the artefact: a few cheap sprites within half a metre.
+Soft dots are textures\pfx\coop\afx_dot.dds (tools/artifact_fx/make_dot.py). Soft dots: textures\pfx\coop\afx_dot.dds (tools/artifact_fx/make_dot.py). Everything sits round the emitter, which the script keeps on the artefact: a few cheap sprites within half a metre.
 
   python tools/artifact_fx/make_pe.py            writes the files
   python tools/artifact_fx/make_pe.py --check    exits 1 if a written file differs from what this script makes
@@ -41,24 +41,24 @@ FAMILIES = {
     # chemical: green, radiation-like motes rising slowly and swaying
     "chem": dict(
         note="chemical: green motes rising slowly, swaying",
-        texture="pfx\\snowo", frames=(0.5, 0.5, 2, 4, 6),
-        rate=7, age=2.6, size=(0.02, 0.045), color=(0.35, 1.0, 0.3), alpha=1.0, scale=3.0,
+        texture="pfx\\coop\\afx_dot", frames=(1, 1, 1, 1, 0),
+        rate=7, age=2.6, size=(0.03, 0.06), color=(0.35, 1.0, 0.3), alpha=1.0, scale=3.0,
         source=(5, (0, 0.03, 0), (0.05, 0.35, 0)),
         velocity=(4, (-0.03, 0.06, -0.03), (0.03, 0.2, 0.03)),
         turbulence=(0.8, 0.35), orbit=None),
     # gravitational: dust pulled in round it
     "gravi": dict(
         note="gravitational: dust motes pulled in and circling",
-        texture="pfx\\snowo", frames=(0.5, 0.5, 2, 4, 6),
-        rate=9, age=2.0, size=(0.018, 0.035), color=(0.85, 0.7, 1.0), alpha=1.0, scale=2.5,
+        texture="pfx\\coop\\afx_dot", frames=(1, 1, 1, 1, 0),
+        rate=9, age=2.0, size=(0.025, 0.045), color=(0.85, 0.7, 1.0), alpha=1.0, scale=2.5,
         source=(5, (0, 0.1, 0), (0.3, 0.6, 0)),
         velocity=(4, (-0.05, -0.02, -0.05), (0.05, 0.08, 0.05)),
         turbulence=None, orbit=(0.25, 0.6)),
     # everything else (no nature, junk): faint pale motes
     "plain": dict(
         note="no nature: a few faint pale motes",
-        texture="pfx\\snowo", frames=(0.5, 0.5, 2, 4, 6),
-        rate=3, age=2.2, size=(0.015, 0.03), color=(0.8, 0.9, 1.0), alpha=0.8, scale=2.0,
+        texture="pfx\\coop\\afx_dot", frames=(1, 1, 1, 1, 0),
+        rate=3, age=2.2, size=(0.02, 0.04), color=(0.8, 0.9, 1.0), alpha=0.8, scale=2.0,
         source=(5, (0, 0.05, 0), (0.08, 0.3, 0)),
         velocity=(4, (-0.02, 0.04, -0.02), (0.02, 0.12, 0.02)),
         turbulence=(0.6, 0.2), orbit=None),
