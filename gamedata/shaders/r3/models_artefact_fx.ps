@@ -1,0 +1,58 @@
+// Artefact glow overlay (models_artefact_fx.s): added into the light accumulator in the emissive pass, so it is
+// tone-mapped, fogged, bloomed (SSS bloom draws the emissive pass again into its own target) and DLSS takes it as the
+// surface's own light (the motion vectors are the artefact's own G-buffer ones). Everything comes from the shader bus,
+// per object (artefact_fx.script, numbers in mod_system_artefact_fx.ltx); an object without values adds nothing.
+//   rgb: the rim, a fresnel glow in the family's colour, added as light
+//   a:   the inner glow, light times the surface's own colour (combine: L.rgb += L.a * albedo)
+#include "common.h"
+
+uniform float4 bus_obj_artefact_fx;		// rgb: colour (linear), w: strength, 0 = off
+uniform float4 bus_obj_artefact_fx2;	// x: rim, y: rim power, z: inner glow, w: pulse depth 0..1
+uniform float4 bus_obj_artefact_fx3;	// x: pulses a second, y: phase 0..1, z: flicker 0..1, w: flicker rate a second
+uniform float4 bus_artefact_fx_clock;	// x: seconds, the same in every game of a co-op world (the server's clock)
+
+struct v2p_afx
+{
+	float2 tc0	: TEXCOORD0;
+	float3 nv	: TEXCOORD1;
+	float3 pv	: TEXCOORD2;
+};
+
+float afx_hash(float n)
+{
+	return frac(sin(n * 12.9898f) * 43758.5453f);
+}
+
+float4 main(v2p_afx I) : SV_Target
+{
+	float4 C = bus_obj_artefact_fx;
+	if (C.w <= 0.f)
+		return float4(0.f, 0.f, 0.f, 0.f);
+
+	float4 P2 = bus_obj_artefact_fx2;
+	float4 P3 = bus_obj_artefact_fx3;
+	float t = bus_artefact_fx_clock.x;
+
+	float3 N = normalize(I.nv);
+	float3 V = normalize(-I.pv);
+	float ndv = saturate(abs(dot(N, V)));
+	float rim = pow(1.f - ndv, max(P2.y, 0.5f));
+
+	// a slow breath: 1 at its top, 1 - depth at its bottom
+	float ph = t * P3.x + P3.y;
+	float pulse = 1.f - P2.w * (0.5f - 0.5f * cos(6.2831853f * ph));
+
+	// electric: now and then a short dip/flash, stepped at w a second
+	float fl = 1.f;
+	if (P3.z > 0.f)
+	{
+		float n = afx_hash(floor(t * max(P3.w, 1.f)) + P3.y * 113.f);
+		fl = lerp(1.f, n > 0.6f ? 1.6f : 0.55f, P3.z);
+	}
+
+	float k = C.w * pulse * fl;
+	float alpha = s_base.Sample(smp_base, I.tc0).a;	// cut-out parts stay dark
+	float3 rgb = C.rgb * (P2.x * rim) * k;
+	float inner = P2.z * k * (0.35f + 0.65f * ndv);
+	return float4(rgb, inner) * saturate(alpha * 4.f);
+}

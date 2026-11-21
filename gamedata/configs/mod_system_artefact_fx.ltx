@@ -1,0 +1,190 @@
+; Artefacts' look (artefact_fx.script): a glow over every artefact (the shader models_artefact_fx: a rim in its family's
+; colour and a slow inner breath), little particles round it on the ground, a weak pulsing light by the rare ones, all
+; stronger while a detector is out. Models, balance and spawns are untouched. Every number here can be changed while
+; testing; the game reads this file at start (a new game or a load is enough after editing, no rebuild).
+;
+; What decides the look of one artefact, the same in every game of a co-op world: its section (family, rarity) and its
+; grade (af_quality.script, the roll every game shares). Nothing is random per game; the breath runs on the server's
+; clock, so it even beats in time for two players looking at one artefact.
+;
+; Strength = family strength x grade strength x preset strength (x detector_boost while a detector is out near it).
+
+[artefact_fx]
+enabled            = true
+; the look: a [artefact_fx_preset_<name>] below (subtle, medium, strong)
+preset             = medium
+; junk artefacts (kind i_arty_junk) get the glow too, as a common one of their family, without particles or light
+junk               = true
+; the surfaces of an artefact's model that get the glow, by their own shader (the rest: distortion, light planes, webs
+; are effects already and stay as they are)
+surfaces           = models\model, models\artefact, models\artefact2, models\selflight, models\selflightl, models\model_aref, models\window, models\weapons
+; an artefact that has none of those (only a coloured distortion shell, as the Flash) gets it on these
+surfaces_shell     = models\xdistortcolor, models\xdistortcolorl
+; rarity: the item config's tier (1 common .. 5 legendary); rare = tier >= rare_tier, or a grade >= rare_grade
+; (1 unstable, 2 dim, 3 common, 4 good, 5 excellent, 6 perfect)
+rare_tier          = 4
+rare_grade         = 5
+; the shown grade: a dim one looks common (as its tooltip says without an expert), an unstable one flickers
+dim_as_common      = true
+; distances (m) from the camera: particles only nearer than this, the light nearer than that
+particles_distance = 20
+light_distance     = 30
+; the most lights at once (the nearest rare ones get them)
+max_lights         = 4
+; a rare artefact whose own config already has a light (lights_enabled) gets one of ours too: true / false
+light_over_own     = false
+; a detector in hand (any) within this many metres makes artefacts glow stronger
+detector_distance  = 15
+detector_boost     = 1.4
+; how often (ms) the list of artefacts round the player is looked at (particles on/off, lights, grade changes)
+update_ms          = 250
+; the heat haze round rare ones (fire family by default: haze = in its family section); off = no haze anywhere
+haze               = true
+
+; Grades 1..6 (unstable, dim, common, good, excellent, perfect)
+[artefact_fx_grade]
+strength           = 0.55, 0.7, 0.85, 1.0, 1.25, 1.55
+; the breath's speed (x the family's) and depth (x the family's)
+pulse_speed        = 1.6, 1.15, 1.0, 1.0, 0.9, 0.8
+pulse_depth        = 1.3, 1.0, 1.0, 1.0, 1.0, 1.1
+; flicker: an unstable one now and then dips and flares (0 none .. 1 strong), steps a second
+flicker            = 0.6, 0, 0, 0, 0, 0
+flicker_rate       = 9, 0, 0, 0, 0, 0
+; ground particles' density by grade: 0 none, 1 sparse, 2 normal, 3 dense (x the preset's particles on/off)
+particles_density  = 1, 1, 2, 2, 3, 3
+
+; Presets: three looks (rim_power x the family's: higher = thinner edge) to choose from (preset = above), and off (the old look: no glow, particles or light; the
+; vanilla particles and lights of the artefacts stay). Multipliers over everything below.
+[artefact_fx_preset_off]
+strength           = 0
+rim                = 0
+rim_power          = 1
+inner              = 0
+particles          = false
+light              = 0
+
+[artefact_fx_preset_subtle]
+strength           = 0.35
+rim                = 0.7
+rim_power          = 1.6
+inner              = 0.5
+particles          = false
+light              = 0.6
+
+[artefact_fx_preset_medium]
+strength           = 0.55
+rim                = 1.0
+rim_power          = 1.25
+inner              = 1.0
+particles          = true
+light              = 1.0
+
+[artefact_fx_preset_strong]
+strength           = 0.9
+rim                = 1.2
+rim_power          = 1.0
+inner              = 1.6
+particles          = true
+light              = 1.5
+
+; Families: an artefact's nature (af_quality.nature_of: items\settings\artefacts.ltx af_class_*, plus nature_extra in
+; mod_system_af_quality.ltx), [artefact_fx_sections] below can set another one for a section.
+;   color          the glow's colour, linear (can go over 1 for a hotter look)
+;   strength       the glow overall
+;   rim, rim_power the edge glow (fresnel): how bright, how thin (higher = thinner)
+;   inner          the slow inner glow, in the artefact's own colours
+;   pulse_speed    breaths a second, pulse_depth how deep (0 steady .. 1 out at the bottom)
+;   flicker, flicker_rate   always-on flicker (electric), on top of the grade's
+;   particles      the ground effect, particles\coop\artefact_fx\<particles>_<density>.pe; "" none
+;   light_color, light_range, light_strength   the rare ones' light (m); light_pulse 0 steady .. 1 out at the bottom
+;   haze           rare ones only: how far out (m), strength, speed; 0 = none
+[artefact_fx_family_thermo]
+color              = 1.0, 0.32, 0.05
+strength           = 1.0
+rim                = 1.2
+rim_power          = 3.5
+inner              = 0.35
+pulse_speed        = 0.35
+pulse_depth        = 0.5
+flicker            = 0
+flicker_rate       = 0
+particles          = thermo
+light_color        = 1.0, 0.45, 0.15
+light_range        = 2.2
+light_strength     = 0.7
+light_pulse        = 0.5
+haze               = 0.05, 0.6, 0.35
+
+[artefact_fx_family_electro]
+color              = 0.2, 0.5, 1.0
+strength           = 1.0
+rim                = 1.4
+rim_power          = 4.0
+inner              = 0.3
+pulse_speed        = 0.6
+pulse_depth        = 0.35
+flicker            = 0.25
+flicker_rate       = 12
+particles          = electro
+light_color        = 0.45, 0.65, 1.0
+light_range        = 2.0
+light_strength     = 0.7
+light_pulse        = 0.6
+haze               = 0
+
+[artefact_fx_family_chem]
+color              = 0.25, 1.0, 0.15
+strength           = 0.9
+rim                = 1.1
+rim_power          = 3.5
+inner              = 0.4
+pulse_speed        = 0.25
+pulse_depth        = 0.55
+flicker            = 0
+flicker_rate       = 0
+particles          = chem
+light_color        = 0.4, 1.0, 0.35
+light_range        = 2.0
+light_strength     = 0.6
+light_pulse        = 0.5
+haze               = 0
+
+[artefact_fx_family_gravi]
+color              = 0.55, 0.25, 1.0
+strength           = 0.9
+rim                = 1.1
+rim_power          = 3.5
+inner              = 0.3
+pulse_speed        = 0.2
+pulse_depth        = 0.45
+flicker            = 0
+flicker_rate       = 0
+particles          = gravi
+light_color        = 0.7, 0.55, 1.0
+light_range        = 2.0
+light_strength     = 0.55
+light_pulse        = 0.4
+haze               = 0.04, 0.35, 0.2
+
+[artefact_fx_family_plain]
+color              = 0.55, 0.75, 1.0
+strength           = 0.6
+rim                = 0.9
+rim_power          = 3.5
+inner              = 0.25
+pulse_speed        = 0.3
+pulse_depth        = 0.4
+flicker            = 0
+flicker_rate       = 0
+particles          = plain
+light_color        = 0.8, 0.9, 1.0
+light_range        = 1.8
+light_strength     = 0.45
+light_pulse        = 0.4
+haze               = 0
+
+; A section's own family, instead of its nature (section = family), or a section's own numbers: a section
+; [artefact_fx_<artefact section>] with any key of a family section overrides the family's for it. For example:
+;[artefact_fx_af_compass]
+;color = 0.9, 0.8, 0.4
+[artefact_fx_sections]

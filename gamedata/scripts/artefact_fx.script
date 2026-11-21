@@ -1,0 +1,540 @@
+-- Artefacts' look: a glow over every artefact, ground particles round it, a weak pulsing light by the rare ones, all of
+-- it stronger while a detector is out. Numbers: mod_system_artefact_fx.ltx. Models, balance and spawns stay as they are.
+--
+-- The glow: the shader models_artefact_fx (models_artefact_fx_haze for a rare one with a heat haze) put OVER the
+-- artefact's own surfaces with game_object:set_overlay_shader (an engine addition: the visual keeps its own shader and
+-- G-buffer, so DLSS motion vectors, the ash and the DOF see the artefact as before; the overlay adds light in the
+-- emissive pass). Its colour and strength go to the shader per object through the shader bus (lanes obj_artefact_fx,
+-- obj_artefact_fx2..4); the breath runs on artefact_fx_clock, the server's clock in co-op.
+--
+-- Co-op: everything here is worked out in each game from what every game has alike, the artefact's section and its
+-- grade (af_quality.script, the one roll all games share); no random numbers. The headless host draws nothing and
+-- skips it all.
+
+local S = "artefact_fx"
+local GRADES = 6
+
+local cfg            -- settings(), read once
+local tok            -- shader bus tokens
+local list = {}      -- [id] = state of an artefact online here
+local lights = {}    -- [id] = script_light
+local nlights = 0
+local tmr = 0
+local clock = { srv = nil, tg = 0 }
+local has_visible    -- the exe knows CArtefact:IsVisible
+local fresh_ini      -- reload(): the .ltx read again, else the game's system ini
+
+-- this script's own sections (the artefacts' own lines always come from ini_sys)
+local function C()
+	return fresh_ini or ini_sys
+end
+
+local function dbg(fmt, ...)
+	local ok, on = pcall(function() return get_console():get_integer("coop_debug") == 1 end)
+	if ok and on then
+		printf("%s", "[artefact_fx] " .. string.format(fmt, ...))
+	end
+end
+
+local function nums(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,%s]+") do
+		t[#t + 1] = tonumber(v) or 0
+	end
+	return t
+end
+
+local function names(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,]+") do
+		v = string.match(v, "^%s*(.-)%s*$")
+		if v ~= "" then
+			t[v] = true
+		end
+	end
+	return t
+end
+
+local function per_grade(s, def)
+	local t = nums(s)
+	for g = 1, GRADES do
+		t[g] = t[g] or def
+	end
+	return t
+end
+
+-------------------------------------------------------------------------------
+-- settings
+
+function settings()
+	if cfg then
+		return cfg
+	end
+	local r = function(k, d) return C():r_string_ex(S, k) or d end
+	cfg = {
+		enabled = C():r_bool_ex(S, "enabled", true),
+		preset = r("preset", "medium"),
+		junk = C():r_bool_ex(S, "junk", true),
+		surfaces = names(r("surfaces", "models\\model")),
+		surfaces_shell = names(r("surfaces_shell", "")),
+		rare_tier = C():r_float_ex(S, "rare_tier") or 4,
+		rare_grade = C():r_float_ex(S, "rare_grade") or 5,
+		dim_as_common = C():r_bool_ex(S, "dim_as_common", true),
+		particles_distance = C():r_float_ex(S, "particles_distance") or 20,
+		light_distance = C():r_float_ex(S, "light_distance") or 30,
+		max_lights = C():r_float_ex(S, "max_lights") or 4,
+		light_over_own = C():r_bool_ex(S, "light_over_own", false),
+		detector_distance = C():r_float_ex(S, "detector_distance") or 15,
+		detector_boost = C():r_float_ex(S, "detector_boost") or 1.5,
+		update_ms = C():r_float_ex(S, "update_ms") or 250,
+		haze = C():r_bool_ex(S, "haze", true),
+		grade = {
+			strength = per_grade(C():r_string_ex("artefact_fx_grade", "strength"), 1),
+			pulse_speed = per_grade(C():r_string_ex("artefact_fx_grade", "pulse_speed"), 1),
+			pulse_depth = per_grade(C():r_string_ex("artefact_fx_grade", "pulse_depth"), 1),
+			flicker = per_grade(C():r_string_ex("artefact_fx_grade", "flicker"), 0),
+			flicker_rate = per_grade(C():r_string_ex("artefact_fx_grade", "flicker_rate"), 0),
+			particles_density = per_grade(C():r_string_ex("artefact_fx_grade", "particles_density"), 2),
+		},
+		sections = {},
+		params = {}, -- cache: [sec .. grade] = params
+	}
+	if C():section_exist("artefact_fx_sections") then
+		local n = C():line_count("artefact_fx_sections")
+		for i = 0, n - 1 do
+			local _, k, v = C():r_line_ex("artefact_fx_sections", i, "", "")
+			if k and v then
+				cfg.sections[k] = v
+			end
+		end
+	end
+	return cfg
+end
+
+local function preset()
+	local c = settings()
+	local p = "artefact_fx_preset_" .. c.preset
+	return {
+		strength = C():r_float_ex(p, "strength") or 1,
+		rim = C():r_float_ex(p, "rim") or 1,
+		rim_power = C():r_float_ex(p, "rim_power") or 1,
+		inner = C():r_float_ex(p, "inner") or 1,
+		particles = C():r_bool_ex(p, "particles", true),
+		light = C():r_float_ex(p, "light") or 1,
+	}
+end
+
+local function reapply_all()
+	for id, st in pairs(list) do
+		st.p = nil -- applied again on the next pass
+		st.shader = nil
+	end
+	tmr = 0
+end
+
+-- the look: a [artefact_fx_preset_<name>] (subtle, medium, strong, off); for tests and the screenshots of variants
+function set_preset(name)
+	if not C():section_exist("artefact_fx_preset_" .. tostring(name)) then
+		return false
+	end
+	settings().preset = name
+	cfg.params = {}
+	reapply_all()
+	return true
+end
+
+-- mod_system_artefact_fx.ltx read again (numbers changed while the game runs), everything applied again
+function reload()
+	fresh_ini = ini_file("mod_system_artefact_fx.ltx")
+	cfg = nil
+	settings()
+	reapply_all()
+	return true
+end
+
+function family_of(sec)
+	local c = settings()
+	local f = c.sections[sec]
+	if not f then
+		f = af_quality and af_quality.nature_of and af_quality.nature_of(sec)
+	end
+	if not (f and C():section_exist("artefact_fx_family_" .. f)) then
+		f = "plain"
+	end
+	return f
+end
+
+-- a section's own value, else its family's
+local function val(sec, fam, key)
+	local own = "artefact_fx_" .. sec
+	if C():section_exist(own) and C():line_exist(own, key) then
+		return C():r_string_ex(own, key)
+	end
+	return C():r_string_ex("artefact_fx_family_" .. fam, key)
+end
+
+local function fval(sec, fam, key, def)
+	return tonumber(val(sec, fam, key)) or def
+end
+
+-- the same number from the same text in every game
+local function hash01(s)
+	local h = 5381
+	for i = 1, #s do
+		h = (h * 33 + string.byte(s, i)) % 2147483647
+	end
+	return (h % 1000) / 1000
+end
+
+-- the grade the artefact shows: 1..6, junk and ungraded ones as common
+local function shown_grade(obj, junk)
+	if junk then
+		return 3
+	end
+	local d = af_quality and af_quality.info and af_quality.info(obj)
+	local g = d and d.grade or 3
+	if g == 2 and settings().dim_as_common then
+		g = 3
+	end
+	return g
+end
+
+local function params(sec, grade, junk)
+	local c = settings()
+	local key = sec .. "|" .. grade
+	local p = c.params[key]
+	if p then
+		return p
+	end
+	local pr = preset()
+	local fam = family_of(sec)
+	local G = c.grade
+	local col = nums(val(sec, fam, "color") or "1,1,1")
+	local tier = ini_sys:r_float_ex(sec, "tier") or 1
+	local rare = not junk and (tier >= c.rare_tier or grade >= c.rare_grade)
+	p = {
+		fam = fam,
+		rare = rare,
+		r = col[1] or 1, g = col[2] or 1, b = col[3] or 1,
+		strength = fval(sec, fam, "strength", 1) * G.strength[grade] * pr.strength,
+		rim = fval(sec, fam, "rim", 1) * pr.rim,
+		rim_power = fval(sec, fam, "rim_power", 2.5) * pr.rim_power,
+		inner = fval(sec, fam, "inner", 0.3) * pr.inner,
+		pulse_speed = fval(sec, fam, "pulse_speed", 0.3) * G.pulse_speed[grade],
+		pulse_depth = math.min(1, fval(sec, fam, "pulse_depth", 0.4) * G.pulse_depth[grade]),
+		phase = hash01(sec),
+		flicker = math.min(1, fval(sec, fam, "flicker", 0) + G.flicker[grade]),
+		flicker_rate = math.max(fval(sec, fam, "flicker_rate", 0), G.flicker_rate[grade]),
+	}
+	local pname = val(sec, fam, "particles")
+	local dens = G.particles_density[grade]
+	if not junk and pr.particles and pname and pname ~= "" and dens >= 1 then
+		p.particles = string.format("coop\\artefact_fx\\%s_%d", pname, math.min(3, math.floor(dens)))
+	end
+	if rare and pr.light > 0 and (c.light_over_own or not ini_sys:r_bool_ex(sec, "lights_enabled", false)) then
+		local lc = nums(val(sec, fam, "light_color") or "1,1,1")
+		local ls = fval(sec, fam, "light_strength", 0.5) * pr.light * G.strength[grade]
+		p.light = {
+			r = (lc[1] or 1) * ls, g = (lc[2] or 1) * ls, b = (lc[3] or 1) * ls,
+			range = fval(sec, fam, "light_range", 2),
+			pulse = math.min(1, fval(sec, fam, "light_pulse", 0.5)),
+		}
+	end
+	local hz = nums(val(sec, fam, "haze") or "0")
+	if rare and c.haze and (hz[1] or 0) > 0 and (hz[2] or 0) > 0 then
+		p.haze = { hz[1], hz[2], hz[3] or 0.3 }
+	end
+	c.params[key] = p
+	return p
+end
+
+-------------------------------------------------------------------------------
+-- one artefact
+
+local function lanes(obj, st, p)
+	local w = p.strength * st.boost
+	shader_bus.set_object(tok.fx, obj, p.r, p.g, p.b, w)
+	shader_bus.set_object(tok.fx2, obj, p.rim, p.rim_power, p.inner, p.pulse_depth)
+	shader_bus.set_object(tok.fx3, obj, p.pulse_speed, p.phase, p.flicker, p.flicker_rate)
+	if p.haze then
+		shader_bus.set_object(tok.fx4, obj, p.haze[1], p.haze[2], p.haze[3], 0)
+	end
+end
+
+local function stop_particles(st)
+	if st.pobj then
+		if st.pobj:playing() then
+			st.pobj:stop_deffered()
+		end
+		st.pobj = nil
+	end
+end
+
+local function apply(obj, st)
+	local p = params(st.sec, st.grade, st.junk)
+	local shader = p.haze and "models\\artefact_fx_haze" or "models\\artefact_fx"
+	if st.shader ~= shader then
+		local ok, sh = pcall(function() return obj:get_default_shaders() end)
+		local n = 0
+		if ok and type(sh) == "table" then
+			local c = settings()
+			for _, set in ipairs({ c.surfaces, c.surfaces_shell }) do
+				for cid, t in pairs(sh) do
+					if t.shader and set[t.shader] then
+						obj:set_overlay_shader(cid, shader, false)
+						n = n + 1
+					end
+				end
+				if n > 0 then
+					break
+				end
+			end
+		end
+		st.shader = shader
+		dbg("%s (%s) family %s grade %s: %d surfaces, %s", st.sec, obj:id(), p.fam, st.grade, n, shader)
+	end
+	if st.particles ~= p.particles then
+		stop_particles(st)
+		st.particles = p.particles
+	end
+	st.p = p
+	lanes(obj, st, p)
+end
+
+local function add(obj)
+	local c = settings()
+	if not (c.enabled and tok) then
+		return
+	end
+	local sec = obj:section()
+	local kind = ini_sys:r_string_ex(sec, "kind")
+	local junk = kind == "i_arty_junk"
+	if not (kind == "i_arty" or (junk and c.junk)) then
+		return
+	end
+	local st = { sec = sec, junk = junk, boost = 1, boost_to = 1 }
+	st.grade = shown_grade(obj, junk)
+	list[obj:id()] = st
+	apply(obj, st)
+end
+
+local function light_off(id)
+	local l = lights[id]
+	if l then
+		l.enabled = false
+		lights[id] = nil
+		nlights = nlights - 1
+	end
+end
+
+local function remove(id)
+	local st = list[id]
+	if st then
+		stop_particles(st)
+		list[id] = nil
+	end
+	light_off(id)
+end
+
+-------------------------------------------------------------------------------
+-- every frame and every update_ms
+
+-- seconds the same in every game of a world: the server's clock, else our own
+local function seconds()
+	local tg = time_global()
+	if coop and coop.connected and coop.connected() then
+		local s = coop.server_time()
+		if s and s > 0 then
+			if s ~= clock.srv then
+				clock.srv, clock.tg = s, tg
+			end
+			return (clock.srv % 3600) + (tg - clock.tg) / 1000
+		end
+	end
+	return (tg / 1000) % 3600
+end
+
+local function is_visible(obj)
+	if has_visible == nil then
+		local c = obj:cast_Artefact()
+		has_visible = c and pcall(function() return c:IsVisible() end) or false
+	end
+	if not has_visible then
+		return true
+	end
+	local c = obj:cast_Artefact()
+	return c and c:IsVisible() or false
+end
+
+local function pass()
+	local c = settings()
+	local cam = device().cam_pos
+	local actor = db.actor
+	local det = actor and actor:active_detector()
+	local want = {}
+	for id, st in pairs(list) do
+		local obj = level.object_by_id(id)
+		if not obj then
+			remove(id)
+		else
+			-- the grade can come later (another game's roll) or change (stabilisation)
+			local g = shown_grade(obj, st.junk)
+			if g ~= st.grade or not st.p then
+				st.grade = g
+				apply(obj, st)
+			end
+			local free = obj:parent() == nil
+			local d = free and obj:position():distance_to(cam) or 1e9
+			local shown = free and is_visible(obj)
+			-- detector out near it: stronger, easing in and out over a second
+			st.boost_to = (det and d < c.detector_distance) and c.detector_boost or 1
+			if math.abs(st.boost - st.boost_to) > 0.01 then
+				st.boost = st.boost + (st.boost_to - st.boost) * math.min(1, c.update_ms / 500)
+				lanes(obj, st, st.p)
+			end
+			-- particles
+			if shown and st.particles and d < c.particles_distance then
+				local pos = obj:position()
+				if not st.pobj then
+					st.pobj = particles_object(st.particles)
+					st.pobj:play_at_pos(pos)
+					st.ppos = vector():set(pos)
+				elseif st.ppos:distance_to_sqr(pos) > 0.0004 then
+					st.pobj:move_to(pos, vector())
+					st.ppos:set(pos)
+				end
+			else
+				stop_particles(st)
+			end
+			-- light: the nearest rare ones
+			if shown and st.p.light and d < c.light_distance then
+				want[#want + 1] = { id = id, d = d, obj = obj, st = st }
+			end
+		end
+	end
+	table.sort(want, function(a, b) return a.d < b.d end)
+	local keep = {}
+	for i = 1, math.min(#want, c.max_lights) do
+		keep[want[i].id] = want[i]
+	end
+	for id in pairs(lights) do
+		if not keep[id] then
+			light_off(id)
+		end
+	end
+	for id, w in pairs(keep) do
+		local l = lights[id]
+		if not l then
+			l = script_light()
+			l.shadow = false
+			l.volumetric = false
+			l.range = w.st.p.light.range
+			lights[id] = l
+			nlights = nlights + 1
+		end
+		local pos = w.obj:position()
+		l:set_position(vector():set(pos.x, pos.y + 0.15, pos.z))
+		l.enabled = true
+	end
+end
+
+local function pulse_lights(t)
+	for id, l in pairs(lights) do
+		local st = list[id]
+		local L = st and st.p and st.p.light
+		if L then
+			local k = 1 - L.pulse * (0.5 - 0.5 * math.cos(6.2831853 * (t * st.p.pulse_speed + st.p.phase)))
+			k = k * st.boost
+			l.color = fcolor():set(L.r * k, L.g * k, L.b * k, 1)
+		end
+	end
+end
+
+local function actor_on_update()
+	local t = seconds()
+	shader_bus.set(tok.clock, t, 0, 0, 0)
+	if nlights > 0 then
+		pulse_lights(t)
+	end
+	local tg = time_global()
+	if tg >= tmr then
+		tmr = tg + settings().update_ms
+		pass()
+	end
+end
+
+local function actor_on_net_destroy()
+	for id in pairs(lights) do
+		light_off(id)
+	end
+	for id, st in pairs(list) do
+		stop_particles(st)
+	end
+end
+
+-------------------------------------------------------------------------------
+-- hooks
+
+local function wrap_binder()
+	local B = item_artefact and item_artefact.artefact_binder
+	if not B then
+		return
+	end
+	local spawn, destroy = B.net_spawn, B.net_destroy
+	function B:net_spawn(se_abstract)
+		local r = spawn(self, se_abstract)
+		if r then
+			local ok, err = pcall(add, self.object)
+			if not ok then
+				printf("! [artefact_fx] %s: %s", self.object:name(), tostring(err))
+			end
+		end
+		return r
+	end
+	function B:net_destroy(se_abstract)
+		remove(self.object:id())
+		return destroy(self, se_abstract)
+	end
+end
+
+function on_game_start()
+	if not settings().enabled or not shader_bus then
+		return
+	end
+	if coop and coop.is_host and coop.is_host() then
+		return -- the headless host draws nothing
+	end
+	local owner, what = "artefact_fx", "artefacts' glow (artefact_fx.script, mod_system_artefact_fx.ltx)"
+	tok = {
+		fx = shader_bus.register("obj_artefact_fx", owner, what .. ": colour, strength"),
+		fx2 = shader_bus.register("obj_artefact_fx2", owner, what .. ": rim, rim power, inner, pulse depth"),
+		fx3 = shader_bus.register("obj_artefact_fx3", owner, what .. ": pulse speed, phase, flicker, flicker rate"),
+		fx4 = shader_bus.register("obj_artefact_fx4", owner, what .. ": heat haze shell, strength, speed"),
+		clock = shader_bus.register("artefact_fx_clock", owner, what .. ": seconds by the server's clock"),
+	}
+	for k, v in pairs(tok) do
+		if not v then
+			printf("! [artefact_fx] shader bus lane %s refused, artefacts stay plain", k)
+			tok = nil
+			return
+		end
+	end
+	wrap_binder()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
+end
+
+-- for tests: what is going on, one line an artefact
+function dump()
+	local n = 0
+	for id, st in pairs(list) do
+		local obj = level.object_by_id(id)
+		local p = st.p or {}
+		printf("%s", string.format("[artefact_fx] %s %s fam=%s grade=%s rare=%s shader=%s particles=%s light=%s boost=%.2f pos=%s parent=%s",
+			id, st.sec, tostring(p.fam), st.grade, tostring(p.rare), tostring(st.shader), tostring(st.pobj and st.particles),
+			tostring(lights[id] ~= nil), st.boost, obj and vec_to_str(obj:position()) or "-", tostring(obj and obj:parent() and obj:parent():id() or "-")))
+		n = n + 1
+	end
+	printf("%s", string.format("[artefact_fx] %d artefacts, %d lights, preset %s", n, nlights, settings().preset))
+	return n
+end
