@@ -2,13 +2,16 @@
 // tone-mapped, fogged, bloomed (SSS bloom draws the emissive pass again into its own target) and DLSS takes it as the
 // surface's own light (the motion vectors are the artefact's own G-buffer ones). Everything comes from the shader bus,
 // per object (artefact_fx.script, numbers in mod_system_artefact_fx.ltx); an object without values adds nothing.
-//   rgb: the rim, a fresnel glow in the family's colour, added as light
-//   a:   the inner glow, light times the surface's own colour (combine: L.rgb += L.a * albedo)
+//   the rim:   the family's colour, only where the surface turns away from the eye (a window on 1 - N.V, so the
+//              middle of the artefact gets none of it)
+//   the inner: the artefact's own texture colour, squared (deeper, never towards white), breathing
+// Only the accumulator's colour is written: its alpha is the specular light (combine_1), which would lay a white film.
 #include "common.h"
 
 uniform float4 bus_obj_artefact_fx;		// rgb: colour (linear), w: strength, 0 = off
 uniform float4 bus_obj_artefact_fx2;	// x: rim, y: rim power, z: inner glow, w: pulse depth 0..1
 uniform float4 bus_obj_artefact_fx3;	// x: pulses a second, y: phase 0..1, z: flicker 0..1, w: flicker rate a second
+uniform float4 bus_obj_artefact_fx4;	// (the haze); here: z unused, w: where the rim starts on 1 - N.V (0 = 0.55)
 uniform float4 bus_artefact_fx_clock;	// x: seconds, the same in every game of a co-op world (the server's clock)
 
 struct v2p_afx
@@ -35,8 +38,9 @@ float4 main(v2p_afx I) : SV_Target
 
 	float3 N = normalize(I.nv);
 	float3 V = normalize(-I.pv);
-	float ndv = saturate(abs(dot(N, V)));
-	float rim = pow(1.f - ndv, max(P2.y, 0.5f));
+	float edge = 1.f - saturate(abs(dot(N, V)));
+	float start = bus_obj_artefact_fx4.w > 0.f ? bus_obj_artefact_fx4.w : 0.55f;
+	float rim = pow(smoothstep(start, 1.f, edge), max(P2.y, 0.5f));
 
 	// a slow breath: 1 at its top, 1 - depth at its bottom
 	float ph = t * P3.x + P3.y;
@@ -51,8 +55,10 @@ float4 main(v2p_afx I) : SV_Target
 	}
 
 	float k = C.w * pulse * fl;
-	float alpha = s_base.Sample(smp_base, I.tc0).a;	// cut-out parts stay dark
-	float3 rgb = C.rgb * (P2.x * rim) * k;
-	float inner = P2.z * k * (0.35f + 0.65f * ndv);
-	return float4(rgb, inner) * saturate(alpha * 4.f);
+	float4 base = s_base.Sample(smp_base, I.tc0);
+	float3 albedo = SRGBToLinear(base.rgb);
+	float cut = saturate(base.a * 4.f);	// cut-out parts stay dark
+	float3 rgb = C.rgb * (P2.x * rim * k);
+	rgb += albedo * albedo * (P2.z * k);
+	return float4(rgb * cut, 0.f);
 }

@@ -77,6 +77,7 @@ function settings()
 		junk = C():r_bool_ex(S, "junk", true),
 		surfaces = names(r("surfaces", "models\\model")),
 		surfaces_shell = names(r("surfaces_shell", "")),
+		shell_strength = C():r_float_ex(S, "shell_strength") or 0.35,
 		rare_tier = C():r_float_ex(S, "rare_tier") or 4,
 		rare_grade = C():r_float_ex(S, "rare_grade") or 5,
 		dim_as_common = C():r_bool_ex(S, "dim_as_common", true),
@@ -118,6 +119,7 @@ local function preset()
 		strength = C():r_float_ex(p, "strength") or 1,
 		rim = C():r_float_ex(p, "rim") or 1,
 		rim_power = C():r_float_ex(p, "rim_power") or 1,
+		rim_start = C():r_float_ex(p, "rim_start") or 1,
 		inner = C():r_float_ex(p, "inner") or 1,
 		particles = C():r_bool_ex(p, "particles", true),
 		light = C():r_float_ex(p, "light") or 1,
@@ -218,7 +220,8 @@ local function params(sec, grade, junk)
 		r = col[1] or 1, g = col[2] or 1, b = col[3] or 1,
 		strength = fval(sec, fam, "strength", 1) * G.strength[grade] * pr.strength,
 		rim = fval(sec, fam, "rim", 1) * pr.rim,
-		rim_power = fval(sec, fam, "rim_power", 2.5) * pr.rim_power,
+		rim_power = fval(sec, fam, "rim_power", 1.5) * pr.rim_power,
+		rim_start = math.min(0.95, fval(sec, fam, "rim_start", 0.55) * pr.rim_start),
 		inner = fval(sec, fam, "inner", 0.3) * pr.inner,
 		pulse_speed = fval(sec, fam, "pulse_speed", 0.3) * G.pulse_speed[grade],
 		pulse_depth = math.min(1, fval(sec, fam, "pulse_depth", 0.4) * G.pulse_depth[grade]),
@@ -252,13 +255,12 @@ end
 -- one artefact
 
 local function lanes(obj, st, p)
-	local w = p.strength * st.boost
+	local w = p.strength * st.boost * (st.shell and settings().shell_strength or 1)
 	shader_bus.set_object(tok.fx, obj, p.r, p.g, p.b, w)
 	shader_bus.set_object(tok.fx2, obj, p.rim, p.rim_power, p.inner, p.pulse_depth)
 	shader_bus.set_object(tok.fx3, obj, p.pulse_speed, p.phase, p.flicker, p.flicker_rate)
-	if p.haze then
-		shader_bus.set_object(tok.fx4, obj, p.haze[1], p.haze[2], p.haze[3], 0)
-	end
+	local hz = p.haze or { 0, 0, 0 }
+	shader_bus.set_object(tok.fx4, obj, hz[1], hz[2], hz[3], p.rim_start)
 end
 
 local function stop_particles(st)
@@ -278,7 +280,7 @@ local function apply(obj, st)
 		local n = 0
 		if ok and type(sh) == "table" then
 			local c = settings()
-			for _, set in ipairs({ c.surfaces, c.surfaces_shell }) do
+			for i, set in ipairs({ c.surfaces, c.surfaces_shell }) do
 				for cid, t in pairs(sh) do
 					if t.shader and set[t.shader] then
 						obj:set_overlay_shader(cid, shader, false)
@@ -286,6 +288,7 @@ local function apply(obj, st)
 					end
 				end
 				if n > 0 then
+					st.shell = i == 2 -- layered see-through shells add up: they get shell_strength of it
 					break
 				end
 			end
@@ -509,7 +512,7 @@ function on_game_start()
 		fx = shader_bus.register("obj_artefact_fx", owner, what .. ": colour, strength"),
 		fx2 = shader_bus.register("obj_artefact_fx2", owner, what .. ": rim, rim power, inner, pulse depth"),
 		fx3 = shader_bus.register("obj_artefact_fx3", owner, what .. ": pulse speed, phase, flicker, flicker rate"),
-		fx4 = shader_bus.register("obj_artefact_fx4", owner, what .. ": heat haze shell, strength, speed"),
+		fx4 = shader_bus.register("obj_artefact_fx4", owner, what .. ": heat haze shell, strength, speed; rim start"),
 		clock = shader_bus.register("artefact_fx_clock", owner, what .. ": seconds by the server's clock"),
 	}
 	for k, v in pairs(tok) do
