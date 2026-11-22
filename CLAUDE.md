@@ -63,6 +63,11 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - A save only loads with the spawn overlay packs and levels it was made with ("Saved game doesn't correspond to the spawn: DELETE SAVED GAME!"). When a stand's packs or levels change, its old saves die: check a save's spawn GUID before launching (`tools/spectrum_x/save_guid.py` reads it from the `.scop`) and re-make test saves from one that matches, instead of `ignore_save_incompatibility`.
 - After every scripted launch watch the log for `FATAL` / `[error]` and end the crashed game yourself: a FATAL dialog otherwise stays on the screen, and the `fatal_ctd_save_N` it writes must be deleted before the next auto-load.
 - A background test script stopped from the harness can leave its `bash` children running (still sending commands to the game): check for leftover processes before the next launch.
+- A hand pose taken from a vanilla animation only fits a device of that device's size: before solving fingers on another device, search its placement in the hand (move + tilt) for a clear, natural thumb and the knuckles off it (`tools/spectrum_x/hud_rig.py` `TAB_GRIP`). A pure depth test passes a finger that wraps round an edge onto the device's face: test the face too.
+- Solve and check HUD grips against every arms model a player may wear, the thick exoskeleton sleeves included (`hud_rig.HAND_SETS`, `check_hud.py --hands`); render previews with them and at both hud_fov values in use (console default 0.64, players often 0.45).
+- A hand mirrored from the other one about a device is only as good as the device's symmetry: keep parts the fingers reach (sockets, ports) on its middle line.
+- Low-poly HUD meshes shaded all-smooth streak dark across big flat faces: mark edges over ~40° sharp (blender-xray exports the split normals) and bake the normal map on the same normals.
+- Blender's bundled Python has no PIL: draw textures in a system-Python step and call it from the Blender script (`tablet_prints.py`).
 
 ## Git
 - Commit as the configured git user. No AI attribution anywhere: no Co-Authored-By trailers, no "Generated with" lines, no AI mention in messages, PRs or branch names.

@@ -1,10 +1,10 @@
 r"""Spectrum-X: render helpers for the HUD scene (Workbench, textured): the HUD camera at the hud_fov, extra close-up
 cameras, the hands' texture (act_arm_1 from the game's archives, a PNG in <assets>\hud\tex) and the devices'."""
-import bpy, math, os
+import bpy, math, os, re
 from mathutils import Matrix, Vector
 
 TEX = {"dev_spectrum_x_probe": r"bake\pistol_blender\pistol_color.png",
-       "dev_spectrum_x_tablet": r"bake\tablet_blender\tablet_color.png",
+       "dev_spectrum_x_tablet": r"bake\tablet_v2\tablet_color.png",
        "dev_spectrum_x_screen": r"hud\tex\screen.png",
        "dev_spectrum_x_cable": r"hud\tex\cable.png",
        "act_arm": r"hud\tex\act_arm_1.png"}
@@ -34,6 +34,11 @@ def texture_all(A, objs):
                 if n.type != "TEX_IMAGE": continue
                 key = " ".join([n.name, n.label, m.name, n.image.name if n.image else "",
                                 {"probe": "dev_spectrum_x_probe", "tablet": "dev_spectrum_x_tablet"}.get(o.name, "")])
+                arm = re.search(r"act_arm\w*", key)
+                if arm and os.path.exists(os.path.join(A, "hud", "tex", arm.group(0) + ".png")):
+                    k = arm.group(0)
+                    if k not in imgs: imgs[k] = bpy.data.images.load(os.path.join(A, "hud", "tex", k + ".png"))
+                    n.image = imgs[k]; continue
                 for k, p in TEX.items():
                     if k in key:
                         if k not in imgs: imgs[k] = bpy.data.images.load(os.path.join(A, p))

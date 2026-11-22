@@ -1,6 +1,6 @@
 """Render the exported HUD files (round trip: what the game gets) through the HUD camera at chosen frames.
 blender -b -P preview_hud.py -- <vanilla meshes> <gamedata> <out_dir> <motion>:<frame>[,<frame>...] ...
-        [--fov 0.45] [--res 960x540] [--ui <png>] [--cam ex,ey,ez,tx,ty,tz,fov_deg] [--tag name]
+        [--fov 0.45] [--res 960x540] [--ui <png>] [--cam ex,ey,ez,tx,ty,tz,fov_deg] [--tag name] [--hands wpn_hand_exo.ogf]
 Loads wpn_hand_01.ogf + dev_hand_spectrum_x_hud_animation.omf and dev_spectrum_x_hud.ogf (with its motions), places
 the item as the engine does (hands offset of the hud section, lead_gun, item offset). The hands get their game
 texture (act_arm_1, a PNG in <assets>\hud\tex), the devices their bakes. --ui: a picture put where the engine draws
@@ -17,7 +17,8 @@ A = r"X:\coop\assets\spectrum-x"
 fov = float(a[a.index("--fov") + 1]) if "--fov" in a else 0.45
 res = a[a.index("--res") + 1] if "--res" in a else "960x540"
 ui_png = a[a.index("--ui") + 1] if "--ui" in a else None
-skip = {a[i + 1] for i, x in enumerate(a) if x in ("--ui", "--cam", "--tag", "--fov", "--res")}
+HANDS = a[a.index("--hands") + 1] if "--hands" in a else "wpn_hand_01.ogf"
+skip = {a[i + 1] for i, x in enumerate(a) if x in ("--ui", "--cam", "--tag", "--fov", "--res", "--hands")}
 jobs = [x for x in a[3:] if ":" in x and not x.startswith("--") and x not in skip]
 bpy.ops.wm.read_homefile(use_empty=True)
 from io_scene_xray.formats.motions.const import MATRIX_BONE_INVERTED
@@ -32,7 +33,7 @@ def imp_ogf(p):
     return [o for o in bpy.data.objects if o not in before]
 
 
-hands = imp_ogf(G + r"\anomaly_weapons\hands\wpn_hand_01.ogf")
+hands = imp_ogf(G + "\\anomaly_weapons\\hands\\" + HANDS)
 H = next(o for o in hands if o.type == "ARMATURE")
 bpy.context.view_layer.objects.active = H
 acts0 = set(bpy.data.actions)

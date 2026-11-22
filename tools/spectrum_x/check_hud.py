@@ -41,6 +41,9 @@ def imp_ogf(p):
 
 hobjs = imp_ogf(G + "\\anomaly_weapons\\hands\\" + HANDS)
 H = next(o for o in hobjs if o.type == "ARMATURE"); HM = [o for o in hobjs if o.type == "MESH"]
+if len(HM) > 1:       # hands made of several meshes (the exoskeleton's): one object
+    for o in bpy.context.scene.objects: o.select_set(o in HM)
+    bpy.context.view_layer.objects.active = HM[0]; bpy.ops.object.join(); HM = [HM[0]]
 bpy.context.view_layer.objects.active = H
 acts0 = set(bpy.data.actions)
 bpy.ops.xray_import.omf(directory=GD + r"\meshes\anomaly_weapons\hud_hands_animation", files=[{"name": "dev_hand_spectrum_x_hud_animation.omf"}],
@@ -78,6 +81,7 @@ for v in hm.data.vertices:
     dom.append(gname[g.group] if g else "")
 dom = np.array(dom)
 htris = np.array([tuple(p.vertices) for p in hm.data.polygons if len(p.vertices) == 3])
+if os.path.isdir(os.path.dirname(REPORT)) is False: os.makedirs(os.path.dirname(REPORT))
 
 
 def assign(obj, act):

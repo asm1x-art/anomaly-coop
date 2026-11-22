@@ -1,13 +1,18 @@
 r"""Spectrum-X first-person HUD: hands animations (.omf) + item model with its own animations (.ogf), from
-the baked low-poly probe and tablet (retopo_blender.py + bake.py), in one Blender scene.
+the baked low-poly probe (retopo_blender.py + bake.py) and the landscape tablet (make_tablet.py), in one Blender scene.
 
-blender -b -P build_hud.py -- --meshes <vanilla meshes dir> --assets <X:\coop\assets\spectrum-x> --out <gamedata>
+blender -b -P build_hud.py -- --meshes <vanilla meshes dir> --assets <X:\coop\assets\spectrum-x> --out <gamedata> [--poses]
+--poses: only three still poses (spectrum_x_pose_hold / _switch / _menu: one hand; the thumb on P1; both hands, the
+probe put away out of view) for the look check (pose_check.sh); the numbers and the .blend then go into --out too.
 
-The rig (hud_rig.py): the hands' base pose comes from vanilla (right arm = the PM's idle, left arm = the Veles'
-idle, both at our hud section's offsets, the PM's); the probe sits on lead_gun where the PM sits, the tablet on
-l_hand where the Veles sits, each moved a few mm so the palm lies on it and not through it. The grips are solved
-against the meshes: each finger opened until it is out of the device, then closed until it touches; the left
-thumb rests on the front left bumper by the menu button and has a second pose on the button (the press).
+The rig (hud_rig.py): the hands' base pose comes from vanilla (right arm = the PM's idle, left arm = the PDA's
+idle, both at our hud section's offsets, the PM's); the probe sits on lead_gun where the PM sits, the tablet in the
+left hand where the PDA sits, then moved in the hand (hud_rig.TAB_GRIP) so the thumb lies on the left bezel. The
+grips are solved against the meshes of every arms model (hud_rig.HAND_SETS): each finger turned until it is out of
+the device, then closed until it touches; the left thumb by a search over its anatomical angles: over P1 (rest) and
+on it (the press). The two-handed hold: the right hand mirrored from the left about the tablet's middle.
+The item's bones: wpn_body (on lead_gun), probe (on wpn_body; moves off only when the probe is put away), tablet,
+cable_NN.
 The animations (hud_anims.py) say where each hand goes over time; two-bone IK puts the arms there.
 The coiled cable is a chain of CABLE_BONES bones; every frame the cable's curve is worked out again between the
 probe's plug and the tablet's socket (a sag picked so the cable keeps clear of the hands and the devices) and the
@@ -34,6 +39,7 @@ from xr_space import S as XS
 argv = sys.argv[sys.argv.index("--") + 1:]
 opt = lambda k, d=None: argv[argv.index(k) + 1] if k in argv else d
 G = opt("--meshes"); A = opt("--assets"); OUT = opt("--out")
+POSES_ONLY = "--poses" in argv     # only the still poses for the look check (pose_hold / pose_switch / pose_menu)
 FPS = ha.FPS
 NAME = "spectrum_x"
 CABLE_BONES = 12
@@ -98,9 +104,11 @@ def bez(p0, p1, p2, p3, t):
 L_REST = (conn_i - R.plug_p).length * 1.12
 
 
-def cable_curve(conn, conn_d, down, phi, n):
-    """item space: points from the probe's plug to the tablet's socket; phi turns the sag about the line between"""
+def cable_curve(conn, conn_d, down, phi, n, prel=None):
+    """item space: points from the probe's plug to the tablet's socket; phi turns the sag about the line between;
+    prel: the probe bone's place in the item (None: at rest)"""
     p0, d0 = R.plug_p, R.plug_d
+    if prel is not None: p0, d0 = prel @ p0, (prel.to_3x3() @ d0).normalized()
     dist = (conn - p0).length
     a = 0.32 * dist + 0.12 * max(0.0, L_REST - dist)
     ax = (conn - p0).normalized()
@@ -180,7 +188,7 @@ for b in list(eb):
     if b.name != "wpn_body": eb.remove(b)
 root = eb["wpn_body"]
 TAB0 = T0.copy()
-for nm, F in [("tablet", TAB0)] + list(zip(CNAMES, CB0)):
+for nm, F in [("tablet", TAB0), ("probe", Matrix.Identity(4))] + list(zip(CNAMES, CB0)):
     e = eb.new(nm); e.head = (0, 0, 0); e.tail = (0, 0.02, 0); e.matrix = F @ KI; e.length = 0.02; e.parent = root
 bpy.ops.object.mode_set(mode="OBJECT")
 REST = {b.name: b.matrix_local.copy() for b in IA.data.bones}
@@ -189,7 +197,7 @@ for pb in IA.pose.bones:
 for c in list(IA.data.collections): IA.data.collections.remove(c)
 _bc = IA.data.collections.new("default")
 for b in IA.data.bones: _bc.assign(b)
-ITEM_BONES = ["wpn_body", "tablet"] + CNAMES
+ITEM_BONES = ["wpn_body", "tablet", "probe"] + CNAMES
 
 
 def bind(obj, weights):
@@ -207,7 +215,7 @@ def cable_w(t):
     return {CNAMES[i]: 1 - u, CNAMES[i + 1]: u}
 
 
-bind(probe, [{"wpn_body": 1.0}] * len(probe.data.vertices))
+bind(probe, [{"probe": 1.0}] * len(probe.data.vertices))
 bind(tablet, [{"tablet": 1.0}] * len(tablet.data.vertices))
 bind(screen, [{"tablet": 1.0}] * len(screen.data.vertices))
 bind(cable, [cable_w(t) for t in cable_t])
@@ -228,7 +236,7 @@ def make_mat(name, tex, img_path=None, color=None):
 
 
 for obj, mat in ((probe, make_mat("probe", r"dev\dev_spectrum_x_probe", os.path.join(A, "bake", "pistol_blender", "pistol_color.png"))),
-                 (tablet, make_mat("tablet", r"dev\dev_spectrum_x_tablet", os.path.join(A, "bake", "tablet_blender", "tablet_color.png"))),
+                 (tablet, make_mat("tablet", r"dev\dev_spectrum_x_tablet", os.path.join(hr.TABLET_DIR, "tablet_color.png"))),
                  (screen, make_mat("screen", r"dev\dev_spectrum_x_screen", os.path.join(A, "hud", "tex", "screen.png"))),
                  (cable, make_mat("cable", r"dev\dev_spectrum_x_cable", os.path.join(A, "hud", "tex", "cable.png")))):
     obj.data.materials.clear(); obj.data.materials.append(mat)
@@ -237,27 +245,43 @@ for obj, mat in ((probe, make_mat("probe", r"dev\dev_spectrum_x_probe", os.path.
 # ---------------------------------------------------------------- animations: poses per frame
 P = ha.Poses(R); AN = ha.Anims(P)
 Oi = OURS.inverted()
-plans = []      # name, frames [(pose, w)], params
+I4 = Matrix.Identity(4)
+plans = []      # name, frames [(pose, the probe bone in the item)], params, loop
 P_LOOP = dict(speed=1.0, accrue=2.0, falloff=2.0, power=1.0, flags=0, bonepart=65535)
 P_ONCE = dict(P_LOOP, flags=2)
 R.clamped = 0
-for nm in AN.table:
-    D, loop, _ = AN.table[nm]
-    seq = []; c0 = R.clamped
-    for Hr, Hl, w in AN.frames(nm):
-        seq.append(R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)))
-    plans.append((nm, seq, P_LOOP if loop else P_ONCE, loop))
-    if R.clamped > c0: print("IK reach limit: %s, %d hand-frames (the hand stops short at full reach)" % (nm, R.clamped - c0))
+if POSES_ONLY:
+    hold = R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=rest_f)
+    L_menu = Oi @ P.L_menu
+    r_menu, menu_f = hr.setup_two_hand(R, L_menu, rest_f)
+    menu = R.pose_of(r_menu, L_menu, fingers=menu_f)
+    # the probe holstered out of view: its hold place moved by PROBE_AWAY, kept on the item's root (the right hand)
+    away = ha.moved(item_world(hold), ha.PROBE_AWAY, tuple(R.grip_item))
+    still = {"pose_hold": (hold, I4), "pose_switch": (R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=press_f), I4),
+             "pose_menu": (menu, item_world(menu).inverted() @ away)}
+    for nm, (pose, prel) in still.items():
+        plans.append((nm, [(pose, prel)] * 3, P_LOOP, True))
+else:
+    for nm in AN.table:
+        D, loop, _ = AN.table[nm]
+        seq = []; c0 = R.clamped
+        for Hr, Hl, w in AN.frames(nm):
+            seq.append((R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)), I4))
+        plans.append((nm, seq, P_LOOP if loop else P_ONCE, loop))
+        if R.clamped > c0: print("IK reach limit: %s, %d hand-frames (the hand stops short at full reach)" % (nm, R.clamped - c0))
 print("IK clamped frames:", R.clamped)
 
 
 # ---------------------------------------------------------------- the cable: a sag clear of hands and devices
 def hand_bvh_item(pose):
-    hv = hr.apply_m((R.item_arm(pose)).inverted(), R.skin(pose))
-    return BVHTree.FromPolygons([Vector(v) for v in hv], [tuple(t) for t in R.htris], all_triangles=True)
+    """every hands set's mesh in item space, one BVH"""
+    Mi = R.item_arm(pose).inverted(); vs, ts, n0 = [], [], 0
+    for s_ in R.sets:
+        v = hr.apply_m(Mi, s_.skin(pose)); vs.append(v); ts.append(s_.htris + n0); n0 += len(v)
+    return BVHTree.FromPolygons([Vector(v) for v in np.vstack(vs)], [tuple(t) for t in np.vstack(ts)], all_triangles=True)
 
 
-def cable_cost(pts, hb, tab_inv):
+def cable_cost(pts, hb, tab_inv, probe_inv):
     c = 0.0; n = len(pts) - 1
     for i, p in enumerate(pts):
         t = i / n
@@ -272,9 +296,10 @@ def cable_cost(pts, hb, tab_inv):
                 sd = d if (q - loc).dot(nrm) >= 0 else -d
                 if sd < CABLE_R: c += (CABLE_R - sd) ** 2
         if t > 0.1:
-            loc, nrm, idx, d = R.probe_bvh.find_nearest(p, 0.05)
+            q = probe_inv @ p
+            loc, nrm, idx, d = R.probe_bvh.find_nearest(q, 0.05)
             if loc is not None:
-                sd = d if (p - loc).dot(nrm) >= 0 else -d
+                sd = d if (q - loc).dot(nrm) >= 0 else -d
                 if sd < CABLE_R: c += (CABLE_R - sd) ** 2
     return c
 
@@ -287,18 +312,18 @@ def solve_cable(seq, loop):
     """per frame: the item-space socket, its direction, down, and the best sag angle (smoothed over the frames)"""
     data, phis = [], []
     prev = 0.0
-    for pose in seq:
+    for pose, prel in seq:
         iw = item_world(pose).inverted()
         tab = iw @ tablet_world(pose, Matrix.Identity(4))         # detector -> item
         conn = tab @ R.A_tab @ R.conn_t
         cd = (tab.to_3x3() @ conn_dl).normalized()
         down = (iw.to_3x3() @ Vector((0, 0, -1))).normalized()
-        hb = hand_bvh_item(pose); tab_inv = tab.inverted()
+        hb = hand_bvh_item(pose); tab_inv = tab.inverted(); pinv = prel.inverted()
         best = None
         for ph in PHIS:
-            c = cable_cost(cable_curve(conn, cd, down, ph, 48), hb, tab_inv) + 2e-6 * (ph - prev) ** 2
+            c = cable_cost(cable_curve(conn, cd, down, ph, 48, prel), hb, tab_inv, pinv) + 2e-6 * (ph - prev) ** 2
             if best is None or c < best[0]: best = (c, ph)
-        prev = best[1]; phis.append(best[1]); data.append((conn, cd, down, hb, tab_inv))
+        prev = best[1]; phis.append(best[1]); data.append((conn, cd, down, hb, tab_inv, prel))
     n = len(phis); sm = []
     for i in range(n):
         acc = []
@@ -307,8 +332,8 @@ def solve_cable(seq, loop):
             elif 0 <= j < n: acc.append(phis[j])
         sm.append(sum(acc) / len(acc))
     if loop and n > 1: sm[-1] = sm[0]
-    res = [cable_cost(cable_curve(c, cd, dn, ph, 48), hb, ti) for (c, cd, dn, hb, ti), ph in zip(data, sm)]
-    return [(c, cd, dn, ph) for (c, cd, dn, hb, ti), ph in zip(data, sm)], max(res)
+    res = [cable_cost(cable_curve(c, cd, dn, ph, 48, pr), hb, ti, pr.inverted()) for (c, cd, dn, hb, ti, pr), ph in zip(data, sm)]
+    return [(c, cd, dn, ph, pr) for (c, cd, dn, hb, ti, pr), ph in zip(data, sm)], max(res)
 
 
 # ---------------------------------------------------------------- bake
@@ -318,7 +343,7 @@ def bake_action(name, frames, params):
         assert pb.rotation_mode != "QUATERNION", pb.name
     act = bpy.data.actions.new(name)
     H.animation_data_create(); H.animation_data.action = act
-    for f, pose in enumerate(frames):
+    for f, (pose, _) in enumerate(frames):
         bas = R.basis_of(pose)
         for pb in H.pose.bones:
             pb.matrix_basis = bas[pb.name]
@@ -333,10 +358,10 @@ def bake_action(name, frames, params):
 def bake_item_action(name, frames, cab, params):
     act = bpy.data.actions.new(name + "@item")
     IA.animation_data_create(); IA.animation_data.action = act
-    for f, (pose, (conn, cd, down, ph)) in enumerate(zip(frames, cab)):
+    for f, ((pose, _), (conn, cd, down, ph, prel)) in enumerate(zip(frames, cab)):
         iw = item_world(pose).inverted()
-        want = {"tablet": iw @ tablet_world(pose, Matrix.Identity(4))}
-        for k, M in enumerate(bone_frames(cable_curve(conn, cd, down, ph, N_SEG))):
+        want = {"tablet": iw @ tablet_world(pose, Matrix.Identity(4)), "probe": prel}
+        for k, M in enumerate(bone_frames(cable_curve(conn, cd, down, ph, N_SEG, prel))):
             want[CNAMES[k]] = M
         for bn in ITEM_BONES:
             pbn = IA.pose.bones[bn]
@@ -379,7 +404,7 @@ chk = _hpb(*[math.radians(a) for a in ui_rot]).to_3x3()
 ui_pos = list(S3 @ tl_det)
 size = [(y1 - y0) * hr.TABLET_SCALE, (x1 - x0) * hr.TABLET_SCALE]
 # the menu pose: the screen's corners in HUD camera space (X-Ray axes: x right, y up, z forward)
-mi = dict((nm, seq) for nm, seq, par, loop in plans)["menu_idle"][0]
+mi = dict((nm, seq) for nm, seq, par, loop in plans)["pose_menu" if POSES_ONLY else "menu_idle"][0][0]
 corners = []
 for p in ((x0, y0, z), (x0, y1, z), (x1, y1, z), (x1, y0, z)):          # TL, TR, BR, BL
     c = tablet_world(mi, R.A_tab) @ Vector(p)
@@ -388,7 +413,8 @@ nums = {"custom_ui_bone": "tablet", "custom_ui_pos": ui_pos, "custom_ui_rot": ui
         "ui_rot_check": max(abs(a - b) for a, b in zip([x for r in chk for x in r], [x for r in Mui for x in r])),
         "screen_size": size, "menu_screen_corners": corners, "lengths": lengths, "cable_residual": cable_log,
         "ik_clamped": R.clamped, "probe_shift": list(R.P_probe.translation)}
-json.dump(nums, open(os.path.join(A, "hud", "build_numbers.json"), "w"), indent=1)
+NUMS_DIR = OUT if POSES_ONLY else os.path.join(A, "hud")     # the pose check does not touch the game's numbers
+json.dump(nums, open(os.path.join(NUMS_DIR, "build_numbers.json"), "w"), indent=1)
 print("NUMBERS", json.dumps(nums))
 
 # ---------------------------------------------------------------- export
@@ -415,7 +441,7 @@ bpy.ops.xray_export.ogf_file(filepath=os.path.join(dev_dir, "dev_spectrum_x_hud.
 for a in item_acts: a.name = a.name + "@item"
 for a in hand_acts: a.name = a.name.replace("@hands", "")
 print("EXPORTED")
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(A, "hud", "spectrum_x_hud.blend"), compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT if POSES_ONLY else os.path.join(A, "hud"), "spectrum_x_hud.blend"), compress=True)
 
 # ---------------------------------------------------------------- world model: the same meshes in the bind pose, one bone
 for obj in (probe, tablet, screen, cable):

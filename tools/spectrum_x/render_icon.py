@@ -38,7 +38,7 @@ for nm, rot, e in (("key", (55, 0, -40), 4.0), ("rim", (60, 0, 150), 2.5)):
 for m in bpy.data.materials:      # baked normals + roughness for a nicer icon
     if m.name in ("probe", "tablet"):
         nt = m.node_tree; bs = nt.nodes["Principled BSDF"]
-        base = r"X:\coop\assets\spectrum-x\bake\%s\%s" % (("pistol_blender", "pistol") if m.name == "probe" else ("tablet_blender", "tablet"))
+        base = r"X:\coop\assets\spectrum-x\bake\%s\%s" % (("pistol_blender", "pistol") if m.name == "probe" else ("tablet_v2", "tablet"))
         tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = bpy.data.images.load(base + "_normal.png"); tn.image.colorspace_settings.name = "Non-Color"
         nm_ = nt.nodes.new("ShaderNodeNormalMap"); nt.links.new(tn.outputs[0], nm_.inputs["Color"]); nt.links.new(nm_.outputs[0], bs.inputs["Normal"])
         rn = nt.nodes.new("ShaderNodeTexImage"); rn.image = bpy.data.images.load(base + "_rough.png"); rn.image.colorspace_settings.name = "Non-Color"

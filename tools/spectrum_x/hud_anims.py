@@ -64,15 +64,23 @@ def blend(Ha, Hb, k, pv_local):
 
 
 # ---------------------------------------------------------------- the key poses
+# where the tablet is held, HUD camera space (Blender axes: x right, y forward, z up): the screen's centre (m) and
+# its turn from square-on (degrees): pitch < 0 = top away from the eye, yaw > 0 = screen turned toward the right,
+# roll > 0 = turned clockwise as seen
+HOLD = dict(centre=(-0.108, 0.47, -0.066), pitch=-30.0, yaw=15.0, roll=-5.0)     # one hand, the probe in the right
+MENU = dict(centre=(0.0, 0.34, -0.022), pitch=-8.0, yaw=0.0, roll=0.0)          # both hands, raised for reading
+PROBE_AWAY = (0.10, -0.12, -0.36, -70.0, 10.0, 25.0)   # the probe holstered out of view in the menu (offset as in moved())
+
+
 class Poses:
-    def __init__(self, rig, menu_dist=0.20, aim_point=(0.045, 0.58, 0.0)):
+    def __init__(self, rig, aim_point=(0.045, 0.58, 0.0)):
         R = rig; B = R.base; O = hr.OURS
         self.rig = R
-        self.R0 = O @ B["r_hand"]; self.L0 = O @ B["l_hand"]
-        # pivots in the hands' own frames
+        self.R0 = O @ B["r_hand"]
+        self.L0 = self.tablet_hand(**HOLD)
+        # pivots in the hands' own frames: the probe's grip, the tablet's centre (in the base pose)
         self.pvR = tuple(B["r_hand"].inverted() @ (R.item_arm(B) @ R.grip_item))
-        tab_c = R.det_arm(B) @ R.tab_point((-0.17, 0.0, 0.0))
-        self.pvL = tuple(B["l_hand"].inverted() @ tab_c)
+        self.pvL = tuple(B["l_hand"].inverted() @ (R.tab_arm(B) @ Vector((0.0, 0.0, 0.013))))
         # measuring (RMB): the lens ahead, a bit right of centre and low, pointing forward
         iw = O @ R.item_arm(B)
         lens = iw @ R.lens_item; fwd = (iw.to_3x3() @ Vector((0, 1, 0))).normalized()
@@ -80,9 +88,9 @@ class Poses:
         T = Matrix.Translation(Vector(aim_point)) @ rot.to_matrix().to_4x4() @ Matrix.Translation(-lens)
         self.R_aim = T @ self.R0
         self.L_aim = moved(self.L0, (-0.012, 0.0, -0.014, 5, 0, 4), self.pvL)
-        # probe lowered out of the way (menu), tablet up to the face: the screen square to the eye at menu_dist
+        # probe lowered out of the way, tablet up for reading in both hands
         self.R_low = moved(self.R0, (0.07, -0.05, -0.23, -48, 10, 18), self.pvR)
-        self.L_menu = self.menu_hand(menu_dist)
+        self.L_menu = self.tablet_hand(**MENU)
         # sprint: both held low and turned in
         self.R_spr = moved(self.R0, (0.03, -0.05, -0.11, -32, 14, 10), self.pvR)
         self.L_spr = moved(self.L0, (-0.02, -0.04, -0.08, -24, -10, -8), self.pvL)
@@ -90,23 +98,22 @@ class Poses:
         self.L_bore = moved(self.L0, (0.04, -0.07, 0.05, 20, 0, -10), self.pvL)
         self.R_bore = moved(self.R0, (0.01, -0.01, -0.02, 0, 22, -14), self.pvR)
 
+    def tablet_cam(self, centre, pitch, yaw, roll):
+        """the tablet's own coords -> HUD camera space, for a wanted screen centre and turn"""
+        M = Matrix(((0, 1, 0), (0, 0, -1), (-1, 0, 0)))        # columns: x (down) -> -z, y (right) -> +x, z (out) -> -y
+        Rm = (Matrix.Rotation(math.radians(yaw), 3, "Z") @ Matrix.Rotation(math.radians(pitch), 3, "X")
+              @ Matrix.Rotation(math.radians(-roll), 3, "Y") @ M).to_4x4()
+        x0, x1, y0, y1, z = hr.SCREEN
+        c = Rm @ Vector(((x0 + x1) / 2, (y0 + y1) / 2, z))
+        return Matrix.Translation(Vector(centre) - c) @ Rm
+
+    def tablet_hand(self, centre, pitch, yaw, roll):
+        """the left hand (camera space) that puts the tablet there: tablet = hand @ L2T @ A_tab"""
+        R = self.rig
+        return self.tablet_cam(centre, pitch, yaw, roll) @ R.A_tab.inverted() @ R.L2T.inverted()
+
     def menu_hand(self, dist):
-        R = self.rig; B = R.base; O = hr.OURS
-        # wanted tablet frame in camera space: raw x (down the screen) -> -z, raw y (right) -> +x, raw z (out) -> -y,
-        # then a small tilt (top away) and roll so it does not look glued to the camera
-        cols = (Vector((0, 0, -1)), Vector((1, 0, 0)), Vector((0, -1, 0)))
-        M = Matrix((cols[0], cols[1], cols[2])).transposed()
-        tilt = Euler((math.radians(-7), math.radians(-2.5), 0), "XYZ").to_matrix()
-        Rm = (tilt @ M).to_4x4()
-        sc = (-0.17, 0.0, hr.SCREEN[4])
-        S = Matrix.Scale(hr.TABLET_SCALE, 4)
-        # place: the screen's centre (raw sc) at (0, dist, 0)
-        tab_cam = Rm @ S
-        p = tab_cam @ Vector(sc)
-        tab_cam = Matrix.Translation(Vector((0.0, dist, -0.011)) - p) @ tab_cam
-        # tab_cam = O @ det_arm @ A_tab ; det_arm = l_hand @ K @ DET_OFF
-        det_cam = tab_cam @ R.A_tab.inverted()
-        return det_cam @ (hr.K @ hr.DET_OFF).inverted()
+        return self.tablet_hand(**dict(MENU, centre=(MENU["centre"][0], dist, MENU["centre"][2])))
 
 
 # ---------------------------------------------------------------- the animations

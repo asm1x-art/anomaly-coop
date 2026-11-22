@@ -81,6 +81,6 @@ def flat(name, png):
 
 
 full("dev_spectrum_x_probe", os.path.join(a.assets, "bake", "pistol_blender"), "pistol")
-full("dev_spectrum_x_tablet", os.path.join(a.assets, "bake", "tablet_blender"), "tablet")
+full("dev_spectrum_x_tablet", os.path.join(a.assets, "bake", "tablet_v2"), "tablet")
 flat("dev_spectrum_x_screen", os.path.join(a.assets, "hud", "tex", "screen.png"))
 flat("dev_spectrum_x_cable", os.path.join(a.assets, "hud", "tex", "cable.png"))
