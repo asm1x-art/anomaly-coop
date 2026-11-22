@@ -168,6 +168,9 @@ CNAMES = ["cable_%02d" % k for k in range(CABLE_BONES)]
 for o in R.pm_objs:
     if o.type == "MESH": bpy.data.objects.remove(o)
 IA = R.pm_arm; IA.name = "spectrum_x_hud"; IA.data.name = "spectrum_x_hud"
+# the PM's import brings its motion refs (wpn_pm_hud_animation): exported, they make the engine load the PM's motions
+# instead of ours ("model has no motion [idle]" on draw). Our motions are embedded: no refs.
+IA.xray.motionrefs_collection.clear()
 for c in list(IA.data.collections): IA.data.collections.remove(c)
 bpy.context.view_layer.objects.active = IA
 for o in scn.objects: o.select_set(o == IA)

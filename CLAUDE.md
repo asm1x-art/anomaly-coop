@@ -45,6 +45,9 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - Never call `getFS():file_list_open_ex` on a recursive path (`$game_data$`, `$game_meshes$`, `$game_shaders$`, `$game_textures$`...): it rescans and drops all loose subfolders from the FS. `fs:exist` is safe.
 - An anomaly zone made by `alife_create` alone has no shape and crashes in `CCustomZone::CalcDistanceTo`. Give it a shape via `utils_stpk.get_anom_zone_data` / `set_anom_zone_data` (as `bind_anomaly_field.dyn_anomalies_spawn`), outside `coop.begin_shared`.
 - After a crash Anomaly writes `fatal_ctd_save_N` as the newest save: don't load it, load the last real save.
+- A HUD item model built in Blender from an imported vanilla armature inherits its motion refs (`OGF_S_MOTION_REFS`): the engine then loads the refs and ignores the embedded motions → FATAL "model has no motion [idle]" on draw. Clear `obj.xray.motionrefs_collection` before export; before launching, check that every `anm_*` motion of the hud section exists in the deployed `.omf` and item `.ogf` (`tools/spectrum_x/check_motions.py`).
+- Bones made with `edit_bones.new()` come in quaternion rotation mode: keying `rotation_euler` after setting `matrix_basis` keys stale zeros and the exported bone never turns. Set `pose_bone.rotation_mode` (the imported rigs use `ZXY`) before baking.
+- Text (`CGameFont`) is not drawn in an item's 3D UI (`custom_ui_func`): fonts are flushed later in screen space. Draw text there as textured glyph statics.
 
 ## Testing
 - Lua syntax without the game: compile each `.script` with `lupa.luajit21` `loadstring` (decode cp1251).
@@ -55,6 +58,9 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - Logs are buffered: run `flush` in the console, or close the game with CloseMainWindow, not by killing it.
 - A game that finished loading in the background can stick on "Пауза": Esc twice.
 - Never close or overwrite a game instance or saves the user is playing with; back up saves before tests.
+- A save only loads with the spawn overlay packs and levels it was made with ("Saved game doesn't correspond to the spawn: DELETE SAVED GAME!"). When a stand's packs or levels change, its old saves die: check a save's spawn GUID before launching (`tools/spectrum_x/save_guid.py` reads it from the `.scop`) and re-make test saves from one that matches, instead of `ignore_save_incompatibility`.
+- After every scripted launch watch the log for `FATAL` / `[error]` and end the crashed game yourself: a FATAL dialog otherwise stays on the screen, and the `fatal_ctd_save_N` it writes must be deleted before the next auto-load.
+- A background test script stopped from the harness can leave its `bash` children running (still sending commands to the game): check for leftover processes before the next launch.
 
 ## Git
 - Commit as the configured git user. No AI attribution anywhere: no Co-Authored-By trailers, no "Generated with" lines, no AI mention in messages, PRs or branch names.
