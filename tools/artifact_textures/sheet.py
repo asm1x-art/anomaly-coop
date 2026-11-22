@@ -17,6 +17,7 @@ ap.add_argument("--src", default=r"X:\coop\yantar-tools\work\gamedata\textures")
 ap.add_argument("--new", default=os.path.join(ROOT, "gamedata", "textures"))
 ap.add_argument("--out", required=True)
 ap.add_argument("--cell", type=int, default=420)
+ap.add_argument("--per", type=int, default=0, help="rows per sheet; more than that -> <out>_01.png, _02.png...")
 a = ap.parse_args()
 
 
@@ -50,32 +51,36 @@ ini.optionxform = str
 ini.read(os.path.join(HERE, "textures.ini"), encoding="utf-8")
 C = a.cell
 cols = ["before (vanilla)", "after", "after: bump normal", "close-up before", "close-up after"]
-rows = ini.sections()
-W, H = C * len(cols) + 10 * (len(cols) + 1), 40 + len(rows) * (C + 70)
-sheet = Image.new("RGB", (W, H), (24, 24, 28))
-d = ImageDraw.Draw(sheet)
-for i, c in enumerate(cols):
-    d.text((10 + i * (C + 10), 8), c, font=font, fill=(230, 230, 230))
-for r, name in enumerate(rows):
-    rel = name.replace("\\", os.sep)
-    y = 40 + r * (C + 70)
-    old_p, new_p = os.path.join(a.src, rel + ".dds"), os.path.join(a.new, rel + ".dds")
-    old, new = load(old_p), load(new_p)
-    cells = [on_checker(old, C, Image.NEAREST), on_checker(new, C, Image.LANCZOS)]
-    bump_p = os.path.join(a.new, rel + "_bump.dds")
-    if os.path.exists(bump_p):
-        b = np.asarray(load(bump_p))
-        cells.append(Image.fromarray(np.dstack([b[..., 3], b[..., 2], b[..., 1]])).resize((C, C), Image.LANCZOS))
-    else:
-        cells.append(Image.new("RGB", (C, C), (40, 40, 44)))
-    # a quarter of the texture, the same area from both
-    q = lambda im: im.crop((0, 0, im.width // 4, im.height // 4))
-    cells += [on_checker(q(old), C, Image.NEAREST), on_checker(q(new), C, Image.LANCZOS)]
-    for i, im in enumerate(cells):
-        sheet.paste(im, (10 + i * (C + 10), y + 52))
-    users = ini[name].get("users", "")
-    d.text((10, y + 6), "%s   %s  ->  %s" % (name, info(old_p), info(new_p)), font=font, fill=(255, 210, 120))
-    d.text((10, y + 32), "used by: " + users, font=small, fill=(180, 180, 190))
+names = ini.sections()
+per = a.per or len(names)
+pages = [names[i:i + per] for i in range(0, len(names), per)]
 os.makedirs(os.path.dirname(a.out), exist_ok=True)
-sheet.save(a.out)
-print(a.out)
+for pg, rows in enumerate(pages):
+    W, H = C * len(cols) + 10 * (len(cols) + 1), 40 + len(rows) * (C + 70)
+    sheet = Image.new("RGB", (W, H), (24, 24, 28))
+    d = ImageDraw.Draw(sheet)
+    for i, c in enumerate(cols):
+        d.text((10 + i * (C + 10), 8), c, font=font, fill=(230, 230, 230))
+    for r, name in enumerate(rows):
+        rel = name.replace("\\", os.sep)
+        y = 40 + r * (C + 70)
+        old_p, new_p = os.path.join(a.src, rel + ".dds"), os.path.join(a.new, rel + ".dds")
+        old, new = load(old_p), load(new_p)
+        cells = [on_checker(old, C, Image.NEAREST), on_checker(new, C, Image.LANCZOS)]
+        bump_p = os.path.join(a.new, rel + "_bump.dds")
+        if os.path.exists(bump_p):
+            b = np.asarray(load(bump_p))
+            cells.append(Image.fromarray(np.dstack([b[..., 3], b[..., 2], b[..., 1]])).resize((C, C), Image.LANCZOS))
+        else:
+            cells.append(Image.new("RGB", (C, C), (40, 40, 44)))
+        # a quarter of the texture, the same area from both
+        q = lambda im: im.crop((0, 0, im.width // 4, im.height // 4))
+        cells += [on_checker(q(old), C, Image.NEAREST), on_checker(q(new), C, Image.LANCZOS)]
+        for i, im in enumerate(cells):
+            sheet.paste(im, (10 + i * (C + 10), y + 52))
+        users = ini[name].get("users", "")
+        d.text((10, y + 6), "%s   %s  ->  %s" % (name, info(old_p), info(new_p)), font=font, fill=(255, 210, 120))
+        d.text((10, y + 32), "used by: " + users, font=small, fill=(180, 180, 190))
+    out = a.out if len(pages) == 1 else "%s_%02d%s" % (os.path.splitext(a.out)[0], pg + 1, os.path.splitext(a.out)[1])
+    sheet.save(out)
+    print(out)
