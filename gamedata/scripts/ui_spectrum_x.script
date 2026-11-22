@@ -1,0 +1,612 @@
+-- Spectrum-X's screen and settings window (the device's logic: spectrum_x.script; numbers: mod_system_spectrum_x.ltx).
+--
+-- The screen: a script window the engine draws on the HUD model's "tablet" bone every frame (custom_ui_func of the
+-- item: CHudItem's script 3D UI), so it stays on the tablet's glass through every animation and sway. Its units are
+-- metres in the bone's frame; it is laid out here in units of a hundredth of the screen's width. A text window is not
+-- drawn there (fonts go out later, in screen space), so the letters too are parts: one atlas
+-- (tools/spectrum_x/make_screen_atlas.py: glyphs of cp1251 and shapes), each part cut out by its texture rect and
+-- tinted by its colour (the friendly_indicator shader: texture times colour; hud\p3d would drop the colour). The parts
+-- are a pool made once and set again only where something changed.
+--
+-- The settings window: a 2D window over the tablet's screen as the menu pose (anm_menu_idle) shows it: the screen's
+-- corners in the HUD camera's space ([spectrum_x] menu_screen_corners) seen with the item's HUD fov. The look of the
+-- shelter's computers (ui_shelter_style.script; clicks found by the cursor), changes go on the device at once.
+
+local C = ui_shelter_style.C
+local TOP = ui_shelter_style.TITLE_H + 10
+local GRADE_COLOR = { -- as af_quality's tooltip
+	{ 240, 98, 88 }, { 150, 150, 150 }, { 225, 225, 225 }, { 92, 210, 128 }, { 90, 160, 255 }, { 255, 200, 60 },
+}
+local GRADE_SHAPE = { "tri_up", "dot_small", "disc", "diamond", "diamond", "target" }
+local GRADE_SIZE = { 4.6, 3.6, 4.2, 5.0, 5.4, 6.4 }
+
+local screen -- the one screen window (every Spectrum-X draws with it)
+local gui    -- the settings window while it is up
+
+local function tr(id, ...)
+	return select("#", ...) > 0 and string.format(game.translate_string(id), ...) or game.translate_string(id)
+end
+
+local function inside(p, r)
+	return p.x >= r[1] and p.x < r[1] + r[3] and p.y >= r[2] and p.y < r[2] + r[4]
+end
+
+-- cp1251 upper case (string.upper knows only Latin)
+local function upper(s)
+	return (string.gsub(s, "[%z\1-\255]", function(ch)
+		local b = string.byte(ch)
+		if b >= 224 then
+			return string.char(b - 32)
+		elseif b == 184 then
+			return string.char(168)
+		end
+		return string.upper(ch)
+	end))
+end
+
+-------------------------------------------------------------------------------
+-- the atlas
+
+local A -- { glyph = { [byte] = { r, adv, vis } }, pad, base, shape = { [name] = r } }
+
+local function atlas()
+	if A then
+		return A
+	end
+	local ini = ini_file("misc\\spectrum_x_glyphs.ltx")
+	local S = "spectrum_x_glyphs"
+	local cell = ini:r_float_ex(S, "cell") or 64
+	A = { glyph = {}, shape = {}, pad = (ini:r_float_ex(S, "pad") or 6) / cell }
+	local i = 0
+	for v in string.gmatch(ini:r_string_ex(S, "adv") or "", "[^,%s]+") do
+		local code = 32 + i
+		local x, y = (i % 16) * cell, math.floor(i / 16) * cell
+		local adv = tonumber(v) or 0
+		A.glyph[code] = { r = Frect():set(x, y, x + cell, y + cell), adv = adv, vis = adv > 0 and code ~= 32 and code ~= 160 }
+		i = i + 1
+	end
+	i = 0
+	for name in string.gmatch(ini:r_string_ex(S, "shapes") or "", "[^,%s]+") do
+		local x, y = (i % 8) * cell, 896 + math.floor(i / 8) * cell
+		-- the solid one is cut inside its cell: the filtering at the edge would show
+		A.shape[name] = name == "solid" and Frect():set(x + 8, y + 8, x + cell - 8, y + cell - 8)
+			or Frect():set(x, y, x + cell, y + cell)
+		i = i + 1
+	end
+	i = 0
+	for name in string.gmatch(ini:r_string_ex(S, "big") or "", "[^,%s]+") do
+		local x = 512 + i * 128
+		A.shape[name] = Frect():set(x, 896, x + 128, 1024)
+		i = i + 1
+	end
+	return A
+end
+
+local function text_width(str, size)
+	local g = atlas().glyph
+	local w = 0
+	for i = 1, #str do
+		local e = g[string.byte(str, i)]
+		w = w + (e and e.adv or 0) * size
+	end
+	return w
+end
+
+-- the string cut to fit maxw, with ".." at the end
+local function fit(str, size, maxw)
+	if not maxw or text_width(str, size) <= maxw then
+		return str
+	end
+	while #str > 1 and text_width(str .. "..", size) > maxw do
+		str = string.sub(str, 1, -2)
+	end
+	return str .. ".."
+end
+
+-------------------------------------------------------------------------------
+-- the screen
+
+class "UISpectrumXScreen" (CUIScriptWnd)
+
+function UISpectrumXScreen:__init() super()
+	self:Show(true)
+	self:Enable(true)
+	local c = spectrum_x.settings()
+	self.w, self.h = c.size[1] or 0.0684, c.size[2] or 0.085
+	self.u = self.w / 100
+	self.hu = self.h / self.u
+	self:SetWndRect(Frect():set(0, 0, self.w, self.h))
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile("ui_spectrum_x.xml")
+	self.pool = {}
+	self.n = 0
+	self.next_draw = 0
+	self.bri, self.night = 1, false
+end
+
+function UISpectrumXScreen:__finalize()
+	screen = nil
+end
+
+-- a colour of the screen: its brightness, and night mode's dim red (nothing blue or white to spoil night vision)
+function UISpectrumXScreen:col(c, a)
+	local r, g, b = c[1], c[2], c[3]
+	if self.night then
+		local l = 0.3 * r + 0.59 * g + 0.11 * b
+		r, g, b = l, l * 0.3, l * 0.1
+	end
+	local k = self.bri
+	return GetARGB(math.floor(math.min(math.max(a or 255, 0), 255)), math.floor(r * k), math.floor(g * k), math.floor(b * k))
+end
+
+-- the next part of the pool: rect of the atlas, place and size in units, colour
+function UISpectrumXScreen:part(r, x, y, w, h, color)
+	self.n = self.n + 1
+	local p = self.pool[self.n]
+	if not p then
+		local c = spectrum_x.settings()
+		local st = self.xml:InitStatic("part", self)
+		st:InitTextureEx(c.texture, c.shader)
+		st:SetStretchTexture(true)
+		p = { st = st }
+		self.pool[self.n] = p
+	end
+	local st, u = p.st, self.u
+	if p.r ~= r then
+		st:SetTextureRect(r)
+		p.r = r
+	end
+	if p.x ~= x or p.y ~= y then
+		st:SetWndPos(vector2():set(x * u, y * u))
+		p.x, p.y = x, y
+	end
+	if p.w ~= w or p.h ~= h then
+		st:SetWndSize(vector2():set(w * u, h * u))
+		p.w, p.h = w, h
+	end
+	if p.c ~= color then
+		st:SetTextureColor(color)
+		p.c = color
+	end
+	if not p.on then
+		st:Show(true)
+		p.on = true
+	end
+end
+
+function UISpectrumXScreen:shape(name, cx, cy, size, color)
+	local r = atlas().shape[name]
+	if r then
+		self:part(r, cx - size / 2, cy - size / 2, size, size, color)
+	end
+end
+
+function UISpectrumXScreen:rect(x, y, w, h, color)
+	self:part(atlas().shape.solid, x, y, w, h, color)
+end
+
+-- a line of text: size = its cell's height in units (the capitals are about half of it), align "l", "c", "r";
+-- returns its width
+function UISpectrumXScreen:text(str, x, y, size, color, align, maxw)
+	local a = atlas()
+	str = fit(str or "", size, maxw)
+	local w = text_width(str, size)
+	if align == "c" then
+		x = x - w / 2
+	elseif align == "r" then
+		x = x - w
+	end
+	local pen = x
+	for i = 1, #str do
+		local g = a.glyph[string.byte(str, i)]
+		if g then
+			if g.vis then
+				self:part(g.r, pen - a.pad * size, y, size, size, color)
+			end
+			pen = pen + g.adv * size
+		end
+	end
+	return w
+end
+
+function UISpectrumXScreen:finish()
+	for i = self.n + 1, #self.pool do
+		local p = self.pool[i]
+		if p.on then
+			p.st:Show(false)
+			p.on = false
+		end
+	end
+end
+
+-- a distance rounded to the level's step, as text
+local function dist_str(d, step)
+	local v = math.floor(d / step + 0.5) * step
+	return v == math.floor(v) and string.format("%d", v) or string.format("%.1f", v)
+end
+
+local function hash01(id)
+	return math.fmod(id * 2654435761, 4294967296) / 4294967296
+end
+
+function UISpectrumXScreen:draw_battery(x, y, size, charge, color)
+	self:shape("battery", x + size / 2, y + size / 2, size, color)
+	-- the fill inside the icon's body (make_screen_atlas.py: body inside 9..47 x 23..41 of 64)
+	local k = size / 64
+	local w = (47 - 9) * k * math.min(math.max(charge, 0), 1)
+	if w > 0.05 then
+		self:rect(x + 9 * k, y + 23 * k, w, (41 - 23) * k, color)
+	end
+end
+
+function UISpectrumXScreen:draw(obj, tg)
+	local c = spectrum_x.settings()
+	local rec = spectrum_x.device(obj:id())
+	if not rec then
+		return
+	end
+	self.bri = c.brightness[rec.bri] or 1
+	self.night = rec.night and true or false
+	local H = self.hu
+	local charge = obj:condition()
+	if not spectrum_x.powered(obj) then
+		-- dead: the glass stays dark, a blinking empty battery
+		self:rect(0, 0, 100, H, GetARGB(235, 6, 7, 8))
+		if math.floor(tg / 600) % 2 == 0 then
+			self:draw_battery(38, H / 2 - 18, 24, 0, self:col(C.bad))
+		end
+		self:text(upper(tr("st_spx_no_power")), 50, H / 2 + 4, 8, self:col(C.bad), "c", 92)
+		return
+	end
+	-- background and the top bar: the profile, the charge
+	self:rect(0, 0, 100, H, self:col(C.field, 245))
+	self:rect(0, 0, 100, 13, self:col(C.bar))
+	self:rect(0, 13, 100, 0.5, self:col(C.accent, 200))
+	self:text(upper(spectrum_x.profile_name(rec.p)), 4, 1.6, 10, self:col(C.text), "l", 56)
+	local low = charge < c.low_battery
+	local bcol = low and C.bad or charge < 0.4 and C.warn or C.good
+	self:draw_battery(88, 2, 9, charge, self:col(bcol))
+	self:text(string.format("%d%%", math.floor(charge * 100 + 0.5)), 87, 2.6, 8, self:col(low and C.bad or C.dim), "r")
+	-- the radar: up = where the actor looks
+	local cx, R = 50, 44
+	local half = R * 64 / 62
+	local cy = 15 + half
+	self:shape("cone", cx, cy, half * 2, self:col(C.accent, 70))
+	self:shape("radar", cx, cy, half * 2, self:col(C.faint, 140))
+	local scan = spectrum_x.last_scan()
+	if scan and scan.id ~= obj:id() then
+		scan = nil
+	end
+	local lv = spectrum_x.level_of(rec)
+	local near
+	if scan then
+		local cam = device().cam_pos
+		local dir = device().cam_dir
+		local hd = math.atan2(dir.x, dir.z)
+		local sh, ch = math.sin(hd), math.cos(hd)
+		local k = R / math.max(scan.radius, 1)
+		local t = tg / 1000
+		local n = math.min(#scan.shown, c.max_blips)
+		for i = n, 1, -1 do -- the nearest on top
+			local e = scan.shown[i]
+			local dx, dz = e.pos.x - cam.x, e.pos.z - cam.z
+			-- the wider the search, the more the blip wanders off the true place
+			local ang = hash01(e.id) * 6.2832 + t * 0.4
+			local jr = lv.jitter * (0.55 + 0.45 * math.sin(t * 0.7 + e.id))
+			local fwd = dx * sh + dz * ch + math.sin(ang) * jr
+			local right = dx * ch - dz * sh + math.cos(ang) * jr
+			local bx, by = right * k, -fwd * k
+			local l = math.sqrt(bx * bx + by * by)
+			if l > R then
+				bx, by = bx * R / l, by * R / l
+			end
+			bx, by = cx + bx, cy + by
+			local g = e.grade
+			local color = e.junk and C.faint or g and GRADE_COLOR[g] or C.text
+			local size = e.junk and 3.6 or g and GRADE_SIZE[g] or 4.2
+			if g and g >= 5 then
+				local pulse = g == 6 and (0.6 + 0.4 * math.sin(t * 5)) or 0.7
+				self:shape("glow", bx, by, size * 2.8, self:col(color, 170 * pulse))
+			end
+			self:shape(e.junk and "ring" or g and GRADE_SHAPE[g] or "plus", bx, by, size, self:col(color))
+			local dy = e.pos.y - cam.y
+			if math.abs(dy) > c.height_mark then
+				self:shape(dy > 0 and "tri_up" or "tri_down", bx + size * 0.75, by - size * 0.55, 2.6, self:col(color, 220))
+			end
+			if i <= c.labels then
+				local code = e.junk and tr("st_spx_junk_short") or g and tr("st_spx_grade_" .. g) or "?"
+				local s = code .. " " .. dist_str(e.d, lv.step)
+				if bx > 66 then
+					self:text(s, bx - size * 0.8, by - 3.3, 6.4, self:col(color), "r")
+				else
+					self:text(s, bx + size * 0.8, by - 3.3, 6.4, self:col(color), "l")
+				end
+			end
+		end
+		near = scan.shown[1]
+	end
+	self:shape("chevron", cx, cy, 5.5, self:col(C.accent))
+	-- what there is to say over the radar
+	if not scan then
+		self:text(upper(tr("st_spx_searching")), cx, cy + 26, 6.5, self:col(C.faint), "c")
+	elseif scan.det == 0 then
+		self:text(upper(tr("st_spx_no_signal")), cx, cy + 26, 6.5, self:col(C.faint), "c")
+	elseif #scan.shown == 0 then
+		self:rect(10, cy - 9, 80, 18, self:col(C.bar, 235))
+		self:rect(10, cy - 9, 0.8, 18, self:col(C.warn))
+		self:text(upper(tr("st_spx_all_hidden")), cx + 0.4, cy - 7, 7, self:col(C.warn), "c", 76)
+		self:text(tr("st_spx_detected", scan.det), cx + 0.4, cy + 1.2, 6, self:col(C.dim), "c", 76)
+	end
+	-- the bottom lines: the nearest shown one; how many shown, the radius, the sound
+	local y1 = cy + half + 1.2
+	if near then
+		local g = near.grade
+		local what = near.junk and tr("st_spx_junk") or g and af_quality.grade_name(g) or "?"
+		local s = string.format("%s · %s · %s %s", tr("st_spx_nature_" .. near.nature), what, dist_str(near.d, lv.step),
+			tr("st_spx_m"))
+		self:text(upper(s), 4, y1, 6.6, self:col(near.junk and C.dim or g and GRADE_COLOR[g] or C.text), "l", 92)
+	end
+	local y2 = y1 + 7.4
+	if scan then
+		self:text(tr("st_spx_shown", #scan.shown, scan.det), 4, y2, 6, self:col(C.dim), "l", 56)
+	end
+	self:text(dist_str(lv.radius, 1) .. " " .. tr("st_spx_m"), 88, y2, 6, self:col(C.dim), "r")
+	self:shape(rec.mute and "speaker_off" or "speaker", 93.5, y2 + 3, 5.2, self:col(rec.mute and C.faint or C.dim))
+	-- a profile switch: its name over the screen for a moment
+	local fl = spectrum_x.flash_of(obj:id())
+	if fl then
+		local a = math.min(1, (fl.till - tg) / 400)
+		self:rect(8, cy - 11, 84, 22, self:col(C.raised, 240 * a))
+		self:rect(8, cy - 11, 84, 0.8, self:col(C.accent, 255 * a))
+		self:text(upper(fl.text), cx, cy - 7.5, 11, self:col(C.text, 255 * a), "c", 80)
+	end
+end
+
+function UISpectrumXScreen:Update()
+	CUIScriptWnd.Update(self)
+	local tg = time_global()
+	if tg < self.next_draw then
+		return -- each Spectrum-X calls this every frame: drawn once a screen_ms
+	end
+	self.next_draw = tg + spectrum_x.settings().screen_ms
+	self.n = 0
+	local obj = spectrum_x.active()
+	if obj then
+		self:draw(obj, tg)
+	end
+	self:finish()
+end
+
+-- custom_ui_func of dev_spectrum_x
+function get_screen()
+	if not screen then
+		screen = UISpectrumXScreen()
+	end
+	return screen
+end
+
+-------------------------------------------------------------------------------
+-- the settings window
+
+-- the tablet's screen at the menu pose, in the interface's units (1024 x 768): x0, y0, x1, y1, nil without corners
+local function menu_rect(sec)
+	local k = spectrum_x.settings().corners
+	if #k < 12 then
+		return nil
+	end
+	local fov = ini_sys:r_float_ex(sec, "hud_fov") or get_console():get_float("hud_fov")
+	local t = math.tan(math.rad(fov * 83) / 2)
+	local asp = device().width / device().height
+	local x0, y0, x1, y1 = 1e9, 1e9, -1e9, -1e9
+	for i = 0, 3 do
+		local x, y, z = k[i * 3 + 1], k[i * 3 + 2], math.max(k[i * 3 + 3], 0.01)
+		local ux = (x / (z * t * asp) * 0.5 + 0.5) * 1024
+		local uy = (0.5 - y / (z * t) * 0.5) * 768
+		x0, y0, x1, y1 = math.min(x0, ux), math.min(y0, uy), math.max(x1, ux), math.max(y1, uy)
+	end
+	return x0, y0, x1, y1
+end
+
+class "UISpectrumXMenu" (CUIScriptWnd)
+ui_shelter_style.apply(UISpectrumXMenu)
+
+function UISpectrumXMenu:__init(id) super()
+	self.id = id
+	self.k = utils_xml.screen_ratio()
+	self:SetWndRect(Frect():set(0, 0, 1024, 768))
+	self:SetAutoDelete(true)
+	self.xml = CScriptXmlInit()
+	self.xml:ParseFile("ui_shelter_laptop.xml")
+	-- the window's place (square units) over the tablet's screen
+	local c = spectrum_x.settings()
+	local obj = level.object_by_id(id)
+	local sw = math.floor(1024 / self.k + 0.5)
+	local x0, y0, x1, y1 = menu_rect(obj and obj:section() or "dev_spectrum_x")
+	local X, Y, W, H
+	if x0 then
+		X, Y = x0 / self.k + c.margin, y0 + c.margin
+		W, H = (x1 - x0) / self.k - 2 * c.margin, (y1 - y0) - 2 * c.margin
+	else
+		X, Y, W, H = 0, 0, 0, 0
+	end
+	local mw, mh = c.min_size[1] or 400, c.min_size[2] or 500
+	if W < mw then
+		X, W = X - (mw - W) / 2, mw
+	end
+	if H < mh then
+		Y, H = Y - (mh - H) / 2, mh
+	end
+	W, H = math.min(W, sw), math.min(H, 768)
+	self.x0 = math.floor(math.min(math.max(X, 0), sw - W))
+	self.y0 = math.floor(math.min(math.max(Y, 0), 768 - H))
+	self.W, self.H = math.floor(W), math.floor(H)
+	self.page = "filters"
+	self:draw()
+end
+
+function UISpectrumXMenu:cursor()
+	local p = GetCursorPosition()
+	return vector2():set(p.x / self.k - self.x0, p.y - self.y0)
+end
+
+-- a row of toggles: items = { {text, on, f} }, laid in rows of per
+function UISpectrumXMenu:toggles(y, items, per, win)
+	local gap = 6
+	local w = (self.W - 32 - gap * (per - 1)) / per
+	for i, it in ipairs(items) do
+		local col, row = (i - 1) % per, math.floor((i - 1) / per)
+		self:button(16 + col * (w + gap), y + row * 40, w, 34, it[1], it[3], self.clicks, win, 0, 0, it[2] and "on" or "normal")
+	end
+	return y + math.ceil(#items / per) * 40
+end
+
+function UISpectrumXMenu:label(y, str, win)
+	self:text(16, y, self.W - 32, 22, str, C.dim, win, nil, "s")
+	return y + 24
+end
+
+function UISpectrumXMenu:draw()
+	if self.win then
+		self:DetachChild(self.win)
+	end
+	self.clicks = {}
+	local rec = spectrum_x.device(self.id)
+	local win = self:chrome(self.x0, self.y0, self.W, self.H, tr("st_spx_menu_title"), nil, self, self.clicks, 0, 0,
+		function() self:Close() end)
+	self.win = win
+	if not rec then
+		return
+	end
+	local redraw = function() self:draw() end
+	-- the pages
+	local pages = { "filters", "device", "log" }
+	local tw = (self.W - 32 - 2 * 6) / 3
+	for i, pg in ipairs(pages) do
+		self:button(16 + (i - 1) * (tw + 6), TOP, tw, 34, tr("st_spx_tab_" .. pg), function()
+			self.page = pg
+			redraw()
+		end, self.clicks, win, 0, 0, self.page == pg and "on" or "normal")
+	end
+	self:rect(16, TOP + 42, self.W - 32, 1, C.line, win)
+	local y = TOP + 52
+	if self.page == "filters" then
+		local c = spectrum_x.settings()
+		local p = rec.prof[rec.p]
+		y = self:label(y, tr("st_spx_profile"), win)
+		local items = {}
+		for i = 1, #c.profiles do
+			items[#items + 1] = { spectrum_x.profile_name(i), i == rec.p, function() rec.p = i redraw() end }
+		end
+		y = self:toggles(y, items, math.max(#items, 1), win) + 6
+		y = self:label(y, tr("st_spx_natures"), win)
+		items = {}
+		for _, nat in ipairs(spectrum_x.NATURES) do
+			items[#items + 1] = { tr("st_spx_nature_" .. nat), p.n[nat], function() p.n[nat] = not p.n[nat] or nil redraw() end }
+		end
+		y = self:toggles(y, items, 5, win) + 6
+		y = self:label(y, tr("st_spx_grades"), win)
+		items = {}
+		for g = 1, spectrum_x.GRADES do
+			items[#items + 1] = { af_quality.grade_name(g), p.g[g], function() p.g[g] = not p.g[g] or nil redraw() end }
+		end
+		y = self:toggles(y, items, 3, win) + 6
+		y = self:label(y, tr("st_spx_junk_title"), win)
+		self:toggles(y, { { tr(p.j and "st_spx_junk_on" or "st_spx_junk_off"), p.j, function() p.j = not p.j redraw() end } }, 1, win)
+	elseif self.page == "device" then
+		local c = spectrum_x.settings()
+		y = self:label(y, tr("st_spx_sensitivity"), win)
+		local items = {}
+		for i, lv in ipairs(c.levels) do
+			items[#items + 1] = { tr("st_spx_level_line", game.translate_string(lv.name), lv.radius), i == rec.lvl,
+				function() rec.lvl = i redraw() end }
+		end
+		y = self:toggles(y, items, math.max(#items, 1), win)
+		local lv = spectrum_x.level_of(rec)
+		self:text(16, y, self.W - 32, 22, tr("st_spx_level_info", lv.minutes, lv.jitter), C.faint, win, nil, "s")
+		y = y + 30
+		y = self:label(y, tr("st_spx_sound"), win)
+		items = { { tr("st_spx_silent"), rec.mute, function() rec.mute = true redraw() end } }
+		for i = 1, #c.volumes do
+			items[#items + 1] = { tostring(i), not rec.mute and i == rec.vol, function() rec.mute, rec.vol = false, i redraw() end }
+		end
+		y = self:toggles(y, items, #items, win) + 6
+		y = self:label(y, tr("st_spx_brightness"), win)
+		items = {}
+		for i = 1, #c.brightness do
+			items[#items + 1] = { tostring(i), i == rec.bri, function() rec.bri = i redraw() end }
+		end
+		y = self:toggles(y, items, #items, win) + 6
+		y = self:label(y, tr("st_spx_night_title"), win)
+		y = self:toggles(y, { { tr(rec.night and "st_spx_night_on" or "st_spx_night_off"), rec.night,
+			function() rec.night = not rec.night redraw() end } }, 1, win) + 6
+		local obj = level.object_by_id(self.id)
+		if obj then
+			self:text(16, y, self.W - 32, 22, tr("st_spx_charge", math.floor(obj:condition() * 100 + 0.5)), C.dim, win, nil, "s")
+		end
+	else
+		if #rec.log == 0 then
+			self:text(16, y, self.W - 32, 30, tr("st_spx_log_empty"), C.faint, win, nil, "s")
+		end
+		local row = math.min(44, math.floor((self.H - y - 40) / math.max(#rec.log, 1)))
+		for i, e in ipairs(rec.log) do
+			local ry = y + (i - 1) * row
+			self:round(16, ry, self.W - 32, row - 4, C.field, win, 6)
+			local g = e.g
+			local grade = g == -1 and tr("st_spx_junk") or (g and g > 0) and af_quality.grade_text(g) or "?"
+			local name = ini_sys:section_exist(e.s or "") and ui_item.get_sec_name(e.s) or tostring(e.s)
+			self:text(24, ry, (self.W - 48) * 0.6, row - 4, name .. "  " .. grade, C.text, win, nil, "s")
+			self:text(16 + (self.W - 32) * 0.6, ry, (self.W - 32) * 0.4 - 8, row - 4,
+				tr("st_spx_log_when", e.d or 0, string.format("%02d:%02d", e.h or 0, e.m or 0), game.translate_string(e.l or "")),
+				C.dim, win, CGameFont.alRight, "s")
+		end
+	end
+	self:text(16, self.H - 32, self.W - 32, 24, tr("st_spx_close_hint"), C.faint, win, CGameFont.alCenter, "s")
+end
+
+function UISpectrumXMenu:Update()
+	CUIScriptWnd.Update(self)
+	self:hovers(self:cursor(), { self.clicks })
+end
+
+function UISpectrumXMenu:OnKeyboard(dik, keyboard_action)
+	local res = CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+	if res == false and keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+		if dik == DIK_keys.MOUSE_1 then
+			local p = self:cursor()
+			for i = #self.clicks, 1, -1 do
+				if inside(p, self.clicks[i]) then
+					self.clicks[i][5]()
+					return true
+				end
+			end
+			return true
+		elseif dik == spectrum_x.settings().key or dik_to_bind(dik) == key_bindings.kQUIT then
+			self:Close()
+			return true
+		end
+	end
+	return res
+end
+
+function UISpectrumXMenu:Close()
+	self:HideDialog()
+	gui = nil
+	spectrum_x.on_menu_closed()
+end
+
+-- spectrum_x.script: the menu pose is reached
+function open_menu(id)
+	if not (gui and gui:IsShown()) then
+		gui = UISpectrumXMenu(id)
+		gui:ShowDialog(true)
+	end
+end
+
+-- spectrum_x.script: the device left the hands
+function close_menu()
+	if gui then
+		local g = gui
+		gui = nil
+		g:HideDialog()
+	end
+end

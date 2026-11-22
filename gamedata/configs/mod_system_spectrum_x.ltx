@@ -2,7 +2,11 @@
 ; Probe-pistol in the right hand, tablet in the left, a coiled cable between them. Built like the binoculars: a weapon-
 ; slot item of the binoculars' class, one HUD model (dev_spectrum_x_hud.ogf: bones wpn_body, tablet, cable_mid) on the
 ; hands' lead_gun bone; its "tablet" bone follows the left hand in every animation. RMB (or LMB) = point the probe ahead
-; and measure: the binoculars' zoom with no magnification and no scope picture. No detector logic and no screen UI yet.
+; and measure: the binoculars' zoom with no magnification and no scope picture.
+; The device (spectrum_x.script): it finds the artefacts on the ground in its radius and shows on the tablet's screen
+; those its filter profile lets through, with their exact grade (af_quality). MMB short = next profile, MMB long = the
+; settings window over the raised tablet (ui_spectrum_x.script). Settings live on the device (se var "spx"), the
+; battery is the device's condition (batteries go on it as on any device). Numbers: [spectrum_x] and below.
 ; Models, animations and textures: tools/spectrum_x (Blender scripts), sources in X:\coop\assets\spectrum-x.
 
 [dev_spectrum_x]:wpn_binoc
@@ -32,6 +36,15 @@ vision_present              = false        ; no binocular frames around NPCs
 zoom_rotate_time            = 0.30         ; s, how fast the HUD goes into / out of the measuring pose
 snd_zoomin                  = detectors\DA-2_beep1
 snd_zoomout                 = $no_sound
+spectrum_x                  = true         ; spectrum_x.script runs this item as the Spectrum-X
+power_critical              = 0.05         ; condition (= battery) under which the device is dead (item_device too)
+; the screen: a script window drawn on the HUD model's bone (the engine's custom 3D UI of hud items), in metres in the
+; bone's frame: its top left at custom_ui_pos, x to the screen's right, y down the screen (pos and rot set by
+; tools/spectrum_x/build_hud.py; the screen's size is screen_size in [spectrum_x])
+custom_ui_func              = ui_spectrum_x.get_screen
+custom_ui_bone              = tablet
+custom_ui_pos               = -0.004199, 0.040831, 0.055304
+custom_ui_rot               = 0.000, 90.000, -0.000
 
 [dev_spectrum_x_hud]:hud_base
 item_visual                 = dynamics\devices\dev_spectrum_x\dev_spectrum_x_hud
@@ -66,3 +79,157 @@ anm_idle_aim_start          = spectrum_x_aim_start
 anm_idle_aim                = spectrum_x_aim
 anm_idle_aim_end            = spectrum_x_aim_end
 anm_bore                    = spectrum_x_bore
+; played by spectrum_x.script: the settings menu (the probe down, the tablet raised near full screen), a profile switch
+anm_menu_open               = spectrum_x_menu_open
+anm_menu_idle               = spectrum_x_menu_idle
+anm_menu_close              = spectrum_x_menu_close
+anm_switch_profile          = spectrum_x_switch
+
+; ---------------------------------------------------------------------------------------------------------------------
+; The device (spectrum_x.script: the search, the battery, the keys; ui_spectrum_x.script: the screen and the window)
+[spectrum_x]
+key                         = MOUSE_3      ; DIK_keys name: short press = next profile, long press = the settings window
+long_press_ms               = 350          ; held this long = a long press
+scan_ms                     = 250          ; how often the artefacts in the radius are looked for (and the battery drained)
+screen_ms                   = 33           ; how often the screen is drawn again (the radar turns with the view)
+reveal_radius               = 4            ; m: a hidden artefact (in a field) shows itself this close, as with the Veles
+height_mark                 = 2            ; m: an artefact this much above / below gets an arrow by its blip
+levels                      = spectrum_x_level_near, spectrum_x_level_mid, spectrum_x_level_wide
+default_level               = 2
+profiles                    = spectrum_x_profile_all, spectrum_x_profile_rare, spectrum_x_profile_electro
+volumes                     = 0.25, 0.5, 0.75, 1.0   ; the sound's steps (the window also has "silent": the screen only)
+default_volume              = 3
+brightness                  = 0.35, 0.55, 0.8, 1.0   ; the screen's steps
+default_brightness          = 3
+log_size                    = 10           ; finds in the log: an artefact goes in the first time it shows on the screen
+max_blips                   = 24           ; artefacts drawn at most (the nearest)
+labels                      = 3            ; the nearest this many get their grade and distance by the blip
+low_battery                 = 0.15         ; under this charge the battery shows red
+flash_ms                    = 1300         ; the profile's name over the screen after a switch
+snd_new                     = detectors\da-2_beep1   ; an artefact shows on the screen
+snd_tick                    = detectors\art_beep1    ; the tick, faster the nearer the nearest shown one
+snd_switch                  = detectors\art_beep1    ; a profile switch
+tick_ms                     = 300, 1800    ; the tick's interval at the nearest .. at the edge of the radius
+; the screen: its size in metres (width, height; set by tools/spectrum_x/build_hud.py), the shader of its parts
+; (friendly_indicator: the texture times the colour, blended, depth tested; hud\p3d would drop the colours)
+screen_size                 = 0.0684, 0.0850
+screen_shader               = friendly_indicator
+screen_texture              = ui\ui_spectrum_x_screen
+; the settings window goes over the tablet's screen as the menu pose shows it: the screen's corners (top left, top
+; right, bottom right, bottom left) in the HUD camera's space (x right, y up, z ahead, m; set by
+; tools/spectrum_x/build_hud.py), seen with this item's hud_fov (else the console's) and the screen's aspect
+menu_screen_corners         = -0.0357, 0.0298, 0.2052, 0.0326, 0.0327, 0.2052, 0.0362, -0.0516, 0.1948, -0.0322, -0.0545, 0.1948
+menu_margin                 = 4            ; interface units inside the screen's edge
+menu_min_size               = 400, 500     ; the window is never smaller than this (square units), centred on the screen
+
+; Sensitivity: the radius against the battery. minutes = a full battery's life at it in the hands (x the game's
+; battery_consumption factor); jitter = m the blip wanders off the true place; dist_step = m the distance is rounded to
+[spectrum_x_level_near]
+name                        = st_spx_level_near
+radius                      = 20
+minutes                     = 60
+jitter                      = 0.4
+dist_step                   = 1
+
+[spectrum_x_level_mid]
+name                        = st_spx_level_mid
+radius                      = 35
+minutes                     = 40
+jitter                      = 1.5
+dist_step                   = 1
+
+[spectrum_x_level_wide]
+name                        = st_spx_level_wide
+radius                      = 60
+minutes                     = 25
+jitter                      = 4
+dist_step                   = 5
+
+; Filter profiles as a new device has them: natures (gravi, thermo, chem, electro; other = none of these), grades
+; (1 unstable .. 6 perfect; an ungraded artefact always passes), junk (the spectrum_x_junk ones). A filter only hides
+; from the screen, the search goes on.
+[spectrum_x_profile_all]
+name                        = st_spx_profile_all
+natures                     = gravi, thermo, chem, electro, other
+grades                      = 1, 2, 3, 4, 5, 6
+junk                        = true
+
+[spectrum_x_profile_rare]
+name                        = st_spx_profile_rare
+natures                     = gravi, thermo, chem, electro, other
+grades                      = 4, 5, 6
+junk                        = false
+
+[spectrum_x_profile_electro]
+name                        = st_spx_profile_electro
+natures                     = electro
+grades                      = 1, 2, 3, 4, 5, 6
+junk                        = false
+
+; Group spotting, not built yet (spectrum_x.mark_artefact is a stub): one mark on one artefact, seen by the group while
+; the spotter holds the device on and stays in the radius, with a grace against blinking; the server decides.
+[spectrum_x_mark]
+radius                      = 35
+grace_s                     = 2.5
+marks                       = 1
+
+; Junk: artefacts without properties that still have a nature (items\settings\artefacts.ltx, af_class_*_musor). The
+; device signals them only with the profile's junk on; their nature comes from those lists.
+![af_ear]
+spectrum_x_junk             = true
+![af_signet]
+spectrum_x_junk             = true
+![af_fountain]
+spectrum_x_junk             = true
+![af_lighthouse]
+spectrum_x_junk             = true
+![af_cell]
+spectrum_x_junk             = true
+![af_sun]
+spectrum_x_junk             = true
+![af_chelust]
+spectrum_x_junk             = true
+![af_repei]
+spectrum_x_junk             = true
+![af_zhelch]
+spectrum_x_junk             = true
+![af_cocoon]
+spectrum_x_junk             = true
+![af_fire_loop]
+spectrum_x_junk             = true
+![af_spaika]
+spectrum_x_junk             = true
+![af_sandstone]
+spectrum_x_junk             = true
+![af_dragon_eye]
+spectrum_x_junk             = true
+![af_skull_miser]
+spectrum_x_junk             = true
+![af_peas]
+spectrum_x_junk             = true
+![af_black_angel]
+spectrum_x_junk             = true
+![af_medallion]
+spectrum_x_junk             = true
+![af_star_phantom]
+spectrum_x_junk             = true
+![af_grapes]
+spectrum_x_junk             = true
+![af_kislushka]
+spectrum_x_junk             = true
+![af_ball]
+spectrum_x_junk             = true
+![af_moh]
+spectrum_x_junk             = true
+![af_fonar]
+spectrum_x_junk             = true
+![af_tapeworm]
+spectrum_x_junk             = true
+![af_generator]
+spectrum_x_junk             = true
+![af_elektron]
+spectrum_x_junk             = true
+![af_serofim]
+spectrum_x_junk             = true
+![af_kogot]
+spectrum_x_junk             = true

@@ -1,0 +1,578 @@
+-- Spectrum-X, the two-handed artefact spectrometer (branch spectrum-x; design: Notion, STALKER > Детекторы. Rework. >
+-- Spectrum-X, "Решение 22.11.2026"). The device's logic: the search, the battery, the sound, the keys, the menu pose,
+-- the finds log. The screen and the settings window are ui_spectrum_x.script; numbers: mod_system_spectrum_x.ltx.
+--
+-- The search: every artefact online here is listed as it comes online (the artefact binder, as artefact_fx.script
+-- does). While a Spectrum-X is the active item and has charge, those on the ground within its radius are "detected";
+-- the active filter profile decides which of them the screen shows. A filter only hides: the search goes on, and when
+-- everything detected is hidden the screen says so. The grade shown is the exact one (af_quality: no dim-as-common;
+-- the lore: Western scientists' tech). Junk is what the .ltx flags spectrum_x_junk; its nature is from the musor lists.
+--
+-- The settings live on the device, as its se var "spx" (m_data.se_object[id]): saved with the game, kept through a
+-- drop and a pick-up, and in co-op sent with the item when it changes hands (coop_sync.item_lua).
+--
+-- Battery: the device's condition, as for every device (item_device.script charges it with a battery dragged onto it).
+-- It drains while the device is in the hands, by the sensitivity level's minutes.
+--
+-- Keys: the menu key (MMB) short = the next profile (the thumb presses a tablet button), long = the settings menu: the
+-- probe goes down and the tablet comes up near full screen (anm_menu_open), then the window opens over its screen;
+-- closing it plays anm_menu_close. While the menu is up every idle the engine plays for the item becomes anm_menu_idle.
+
+local S = "spectrum_x"
+NATURES = { "gravi", "thermo", "chem", "electro", "other" }
+GRADES = 6
+
+local cfg
+local list = {}        -- [id] = { sec, junk, nature } artefacts online here
+local scan = nil       -- the last search: { id, det = n, shown = { {id, sec, grade, nature, junk, pos, d} }, radius }
+local scan_tmr = 0
+local last_drain = nil
+local press = nil      -- { t, id } the menu key is down
+local menu = nil       -- { id, phase = "opening" | "open", show_at }
+local tick_at = 0
+local shown_before = {} -- [id] = true: on the screen at the last search (a new one beeps)
+local logged = {}      -- [device id] = { [artefact id] = true } logged this session (the log has the rest)
+local flash = nil      -- { id, text, till }
+local snds = {}
+local junk_nature
+
+local function dbg(fmt, ...)
+	local ok, on = pcall(function() return get_console():get_integer("coop_debug") == 1 end)
+	if ok and on then
+		printf("[spectrum_x] %s", string.format(fmt, ...))
+	end
+end
+
+local function nums(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,%s]+") do
+		t[#t + 1] = tonumber(v) or 0
+	end
+	return t
+end
+
+local function names(s)
+	local t = {}
+	for v in string.gmatch(s or "", "[^,%s]+") do
+		t[#t + 1] = v
+	end
+	return t
+end
+
+-------------------------------------------------------------------------------
+-- settings
+
+function settings()
+	if cfg then
+		return cfg
+	end
+	local r = function(k, d) return ini_sys:r_string_ex(S, k) or d end
+	local f = function(k, d) return ini_sys:r_float_ex(S, k) or d end
+	cfg = {
+		key = DIK_keys[r("key", "MOUSE_3")] or DIK_keys.MOUSE_3,
+		long_ms = f("long_press_ms", 350),
+		scan_ms = f("scan_ms", 250),
+		screen_ms = f("screen_ms", 33),
+		reveal = f("reveal_radius", 4),
+		height_mark = f("height_mark", 2),
+		levels = {},
+		default_level = f("default_level", 2),
+		profiles = {},
+		volumes = nums(r("volumes", "0.25, 0.5, 0.75, 1")),
+		default_volume = f("default_volume", 3),
+		brightness = nums(r("brightness", "0.35, 0.55, 0.8, 1")),
+		default_brightness = f("default_brightness", 3),
+		log_size = f("log_size", 10),
+		max_blips = f("max_blips", 24),
+		labels = f("labels", 3),
+		low_battery = f("low_battery", 0.15),
+		flash_ms = f("flash_ms", 1300),
+		snd_new = r("snd_new"),
+		snd_tick = r("snd_tick"),
+		snd_switch = r("snd_switch"),
+		tick_ms = nums(r("tick_ms", "300, 1800")),
+		size = nums(r("screen_size", "0.0684, 0.085")),
+		shader = r("screen_shader", "friendly_indicator"),
+		texture = r("screen_texture", "ui\\ui_spectrum_x_screen"),
+		corners = nums(r("menu_screen_corners")),
+		margin = f("menu_margin", 4),
+		min_size = nums(r("menu_min_size", "400, 500")),
+	}
+	for _, sec in ipairs(names(r("levels"))) do
+		cfg.levels[#cfg.levels + 1] = {
+			name = ini_sys:r_string_ex(sec, "name") or sec,
+			radius = ini_sys:r_float_ex(sec, "radius") or 30,
+			minutes = ini_sys:r_float_ex(sec, "minutes") or 30,
+			jitter = ini_sys:r_float_ex(sec, "jitter") or 0,
+			step = math.max(ini_sys:r_float_ex(sec, "dist_step") or 1, 0.1),
+		}
+	end
+	for _, sec in ipairs(names(r("profiles"))) do
+		local n, g = {}, {}
+		for _, v in ipairs(names(ini_sys:r_string_ex(sec, "natures"))) do
+			n[v] = true
+		end
+		for _, v in ipairs(nums(ini_sys:r_string_ex(sec, "grades"))) do
+			g[v] = true
+		end
+		cfg.profiles[#cfg.profiles + 1] = { name = ini_sys:r_string_ex(sec, "name") or sec, n = n, g = g,
+			j = ini_sys:r_bool_ex(sec, "junk", false) }
+	end
+	return cfg
+end
+
+function is_spectrum(sec)
+	return sec and ini_sys:r_bool_ex(sec, "spectrum_x", false) or false
+end
+
+-- the Spectrum-X in the hands, nil for none
+function active()
+	local obj = db.actor and db.actor:active_item()
+	return obj and is_spectrum(obj:section()) and obj or nil
+end
+
+function critical(sec)
+	return item_device and item_device.get_power_critical and item_device.get_power_critical(sec)
+		or ini_sys:r_float_ex(sec, "power_critical") or 0.05
+end
+
+function powered(obj)
+	return obj and obj:condition() > critical(obj:section()) or false
+end
+
+-------------------------------------------------------------------------------
+-- the device's own settings (se var "spx")
+
+local function copy_profile(p)
+	local n, g = {}, {}
+	for k, v in pairs(p.n) do
+		n[k] = v
+	end
+	for k, v in pairs(p.g) do
+		g[k] = v
+	end
+	return { n = n, g = g, j = p.j }
+end
+
+-- the settings of a device by id (made with the .ltx defaults on first use), nil for a device not in the world
+function device(id)
+	if not id then
+		return nil
+	end
+	local c = settings()
+	local rec = se_load_var(id, nil, "spx")
+	if type(rec) ~= "table" then
+		local se = alife_object(id)
+		if not se then
+			return nil
+		end
+		rec = { p = 1, prof = {}, lvl = c.default_level, vol = c.default_volume, mute = false,
+			bri = c.default_brightness, night = false, log = {} }
+		se_save_var(id, se:name(), "spx", rec)
+		rec = se_load_var(id, nil, "spx") or rec
+	end
+	-- profiles the .ltx has added since, and anything an older record lacks
+	rec.prof = rec.prof or {}
+	for i, p in ipairs(c.profiles) do
+		if type(rec.prof[i]) ~= "table" then
+			rec.prof[i] = copy_profile(p)
+		end
+		rec.prof[i].n = rec.prof[i].n or {}
+		rec.prof[i].g = rec.prof[i].g or {}
+	end
+	rec.p = math.min(math.max(tonumber(rec.p) or 1, 1), math.max(#c.profiles, 1))
+	rec.lvl = math.min(math.max(tonumber(rec.lvl) or c.default_level, 1), math.max(#c.levels, 1))
+	rec.vol = math.min(math.max(tonumber(rec.vol) or c.default_volume, 1), math.max(#c.volumes, 1))
+	rec.bri = math.min(math.max(tonumber(rec.bri) or c.default_brightness, 1), math.max(#c.brightness, 1))
+	rec.log = rec.log or {}
+	return rec
+end
+
+function level_of(rec)
+	return settings().levels[rec and rec.lvl or 1] or { name = "", radius = 30, minutes = 30, jitter = 0, step = 1 }
+end
+
+function profile_name(i)
+	local p = settings().profiles[i]
+	return p and game.translate_string(p.name) or tostring(i)
+end
+
+-------------------------------------------------------------------------------
+-- artefacts
+
+local function nature_of_junk(sec)
+	if not junk_nature then
+		junk_nature = {}
+		local ini = ini_file("items\\settings\\artefacts.ltx")
+		for _, nature in ipairs({ "gravi", "thermo", "chem", "electro" }) do
+			local l = "af_class_" .. nature .. "_musor"
+			for i = 0, ini:section_exist(l) and ini:line_count(l) - 1 or -1 do
+				local _, name = ini:r_line(l, i, "", "")
+				junk_nature[name] = nature
+			end
+		end
+	end
+	return junk_nature[sec]
+end
+
+local function add(obj)
+	local sec = obj:section()
+	local junk = ini_sys:r_bool_ex(sec, "spectrum_x_junk", false)
+	if not (junk or ini_sys:r_string_ex(sec, "kind") == "i_arty") then
+		return
+	end
+	local nature = junk and nature_of_junk(sec) or (af_quality and af_quality.nature_of and af_quality.nature_of(sec))
+	list[obj:id()] = { sec = sec, junk = junk, nature = nature or "other" }
+end
+
+local function remove(id)
+	list[id] = nil
+end
+
+-- the grade the device reads: 1..6, nil for an ungraded one (and junk)
+local function grade_of(obj, st)
+	if st.junk then
+		return nil
+	end
+	local d = af_quality and af_quality.data and af_quality.data(obj:id(), st.sec, obj:name())
+	return d and d.grade or nil
+end
+
+local function passes(p, a)
+	if not p.n[a.nature] then
+		return false
+	end
+	if a.junk then
+		return p.j and true or false
+	end
+	return a.grade == nil or p.g[a.grade] and true or false
+end
+
+local function play(path, vol)
+	if not (path and vol and vol > 0) then
+		return
+	end
+	local s = snds[path]
+	if not s then
+		s = sound_object(path)
+		snds[path] = s
+	end
+	s:play(db.actor, 0, sound_object.s2d)
+	s.volume = vol
+end
+
+local function volume(rec)
+	return (rec and not rec.mute) and (settings().volumes[rec.vol] or 1) or 0
+end
+
+local function log_find(obj, rec, a)
+	local seen = logged[obj:id()]
+	if not seen then
+		seen = {}
+		logged[obj:id()] = seen
+	end
+	if seen[a.id] then
+		return
+	end
+	seen[a.id] = true
+	for _, e in ipairs(rec.log) do
+		if e.id == a.id then
+			return
+		end
+	end
+	local _, _, D, h, m = game.get_game_time():get(0, 0, 0, 0, 0, 0, 0)
+	table.insert(rec.log, 1, { id = a.id, s = a.sec, g = a.junk and -1 or a.grade or 0, d = D, h = h, m = m,
+		l = level.name() })
+	while #rec.log > settings().log_size do
+		table.remove(rec.log)
+	end
+end
+
+local function search(obj, rec)
+	local c = settings()
+	local lv = level_of(rec)
+	local p = rec.prof[rec.p]
+	local from = db.actor:position()
+	local det, shown = 0, {}
+	for id, st in pairs(list) do
+		local a = level.object_by_id(id)
+		if not a then
+			list[id] = nil
+		elseif a:parent() == nil then
+			local pos = a:position()
+			local d = pos:distance_to(from)
+			if d <= lv.radius then
+				det = det + 1
+				if d <= c.reveal then
+					local af = a:cast_Artefact()
+					if af and not af:IsVisible() then
+						af:SwitchVisibility(true)
+					end
+				end
+				local e = { id = id, sec = st.sec, junk = st.junk, nature = st.nature, pos = pos, d = d }
+				e.grade = grade_of(a, st)
+				if p and passes(p, e) then
+					shown[#shown + 1] = e
+				end
+			end
+		end
+	end
+	table.sort(shown, function(x, y) return x.d < y.d end)
+	-- new on the screen: a beep, and into the log
+	local now = {}
+	local fresh = false
+	for _, e in ipairs(shown) do
+		now[e.id] = true
+		if not shown_before[e.id] then
+			fresh = true
+			log_find(obj, rec, e)
+		end
+	end
+	shown_before = now
+	if fresh then
+		play(c.snd_new, volume(rec))
+	end
+	scan = { id = obj:id(), det = det, shown = shown, radius = lv.radius, t = time_global() }
+end
+
+-- what the screen shows: the last search of the device in the hands, nil before one
+function last_scan()
+	return scan
+end
+
+function flash_of(id)
+	return flash and flash.id == id and time_global() < flash.till and flash or nil
+end
+
+-------------------------------------------------------------------------------
+-- battery
+
+local function drain(obj, rec, dt)
+	local lv = level_of(rec)
+	local eco = game_difficulties and game_difficulties.get_eco_factor and game_difficulties.get_eco_factor("battery_consumption") or 1
+	local loss = dt / math.max(lv.minutes * 60, 1) * (eco or 1)
+	obj:set_condition(math.max(obj:condition() - loss, 0))
+end
+
+-------------------------------------------------------------------------------
+-- profile switch, menu
+
+local function safe(obj)
+	if obj:get_state() ~= 0 then -- eIdle
+		return false
+	end
+	local w = obj:cast_Weapon()
+	return not (w and (w:IsZoomed() or w:IsPending()))
+end
+
+local function switch_profile(obj)
+	local rec = device(obj:id())
+	if not rec then
+		return
+	end
+	rec.p = rec.p % #settings().profiles + 1
+	flash = { id = obj:id(), text = profile_name(rec.p), till = time_global() + settings().flash_ms }
+	shown_before = {}
+	scan_tmr = 0
+	obj:play_hud_motion("anm_switch_profile", true, 0, 1, 0)
+	play(settings().snd_switch, volume(rec) * 0.6)
+end
+
+local function open_menu(obj)
+	local ms = obj:play_hud_motion("anm_menu_open", true, 0, 1, 0) or 0
+	menu = { id = obj:id(), phase = "opening", show_at = time_global() + ms }
+	dbg("menu opening (%d ms)", ms)
+end
+
+-- the window has closed (ui_spectrum_x.script): the tablet goes back down
+function on_menu_closed()
+	if not menu then
+		return
+	end
+	local id = menu.id
+	menu = nil
+	local obj = active()
+	if obj and obj:id() == id then
+		obj:play_hud_motion("anm_menu_close", true, 0, 1, 0)
+	end
+end
+
+function menu_up()
+	return menu ~= nil
+end
+
+-- the menu key goes to the device while it is in the hands (the companions' wheel is on the same key by default)
+function owns_key(dik)
+	return dik == settings().key and active() ~= nil
+end
+
+local function on_key_press(dik)
+	if dik ~= settings().key or menu then
+		return
+	end
+	local obj = active()
+	if obj and safe(obj) then
+		press = { t = time_global(), id = obj:id() }
+	end
+end
+
+local function on_key_release(dik)
+	if dik ~= settings().key or not press then
+		return
+	end
+	local p = press
+	press = nil
+	local obj = active()
+	if obj and obj:id() == p.id and safe(obj) then
+		switch_profile(obj)
+	end
+end
+
+-- while the menu is up the engine's idles (standing, walking, sprinting, crouching, bored) are the menu's idle
+local function actor_on_hud_animation_play(anm_table, obj)
+	if not (menu and obj and obj:id() == menu.id) then
+		return
+	end
+	local n = anm_table.anm_name or ""
+	if string.find(n, "^anm_idle") or n == "anm_bore" then
+		anm_table.anm_name = "anm_menu_idle"
+		anm_table.anm_mixin = true
+	end
+end
+
+-------------------------------------------------------------------------------
+-- group spotting: a stub
+
+-- One group mark on one artefact (decided 22.11.2026, not built: it needs two games to test). The spotter asks the
+-- server to mark an artefact the device shows; the server keeps at most [spectrum_x_mark] marks per spotter and sends
+-- the mark to the spotter's group only (other players never see it). Everyone in the group then sees that artefact
+-- fully, with its grade, while the spotter holds the device switched on and stays within [spectrum_x_mark] radius
+-- (no line of sight needed); the mark goes when the spotter puts the device away, walks out of the radius, runs out
+-- of battery or dies, after grace_s so it doesn't blink; it goes for everyone when the artefact is picked up. The
+-- server decides all of it, the games only draw. Open: which button marks (LMB on the device, or a menu item).
+-- Returns false: nothing is sent yet.
+function mark_artefact(id)
+	dbg("mark_artefact(%s): group spotting is not built yet", tostring(id))
+	return false
+end
+
+-------------------------------------------------------------------------------
+-- every frame
+
+local function actor_on_update()
+	local tg = time_global()
+	local obj = active()
+	if menu and not (obj and obj:id() == menu.id) then
+		menu = nil
+		ui_spectrum_x.close_menu()
+	end
+	if not obj then
+		scan, press, last_drain = nil, nil, nil
+		return
+	end
+	if press and tg - press.t >= settings().long_ms then
+		press = nil
+		if safe(obj) then
+			open_menu(obj)
+		end
+	end
+	if menu and menu.phase == "opening" and tg >= menu.show_at then
+		menu.phase = "open"
+		ui_spectrum_x.open_menu(obj:id())
+	end
+	local rec = device(obj:id())
+	if not rec then
+		return
+	end
+	if tg >= scan_tmr then
+		scan_tmr = tg + settings().scan_ms
+		if last_drain and obj:get_state() ~= 3 then
+			drain(obj, rec, (tg - last_drain) / 1000)
+		end
+		last_drain = tg
+		if powered(obj) then
+			search(obj, rec)
+		else
+			scan, shown_before = nil, {}
+		end
+	end
+	-- the tick, faster the nearer the nearest shown artefact
+	local near = scan and scan.id == obj:id() and scan.shown[1]
+	if near and tg >= tick_at then
+		local c = settings()
+		local k = math.min(near.d / math.max(scan.radius, 1), 1)
+		tick_at = tg + (c.tick_ms[1] or 300) + ((c.tick_ms[2] or 1800) - (c.tick_ms[1] or 300)) * k
+		play(c.snd_tick, volume(rec))
+	end
+end
+
+local function actor_on_net_destroy()
+	list, scan, press, menu, shown_before = {}, nil, nil, nil, {}
+end
+
+-------------------------------------------------------------------------------
+-- hooks
+
+local function wrap_binder()
+	local B = item_artefact and item_artefact.artefact_binder
+	if not B then
+		return
+	end
+	local spawn, destroy = B.net_spawn, B.net_destroy
+	function B:net_spawn(se_abstract)
+		local r = spawn(self, se_abstract)
+		if r then
+			local ok, err = pcall(add, self.object)
+			if not ok then
+				printf("! [spectrum_x] %s: %s", self.object:name(), tostring(err))
+			end
+		end
+		return r
+	end
+	function B:net_destroy(se_abstract)
+		remove(self.object:id())
+		return destroy(self, se_abstract)
+	end
+end
+
+-- the companions' wheel opens on the same key's release (axr_companions): not while the device is in the hands
+local function wrap_companions()
+	local m = axr_companions
+	if not (m and m.start_CW) then
+		return
+	end
+	local start = m.start_CW
+	m.start_CW = function(...)
+		if owns_key(settings().key) and dik_to_bind(settings().key) == key_bindings.kCUSTOM18 then
+			return
+		end
+		return start(...)
+	end
+end
+
+function on_game_start()
+	if coop and coop.is_host and coop.is_host() then
+		return -- the headless host has no hands
+	end
+	wrap_binder()
+	wrap_companions()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("actor_on_net_destroy", actor_on_net_destroy)
+	RegisterScriptCallback("on_key_press", on_key_press)
+	RegisterScriptCallback("on_key_release", on_key_release)
+	RegisterScriptCallback("actor_on_hud_animation_play", actor_on_hud_animation_play)
+end
+
+-- for tests: the device in the hands and what it finds
+function dump()
+	local obj = active()
+	local rec = obj and device(obj:id())
+	local n = 0
+	for _ in pairs(list) do
+		n = n + 1
+	end
+	printf("[spectrum_x] %d artefacts online; device %s, charge %s, profile %s, level %s, shown %s of %s", n,
+		tostring(obj and obj:id()), tostring(obj and obj:condition()), tostring(rec and rec.p), tostring(rec and rec.lvl),
+		tostring(scan and #scan.shown), tostring(scan and scan.det))
+	return n
+end

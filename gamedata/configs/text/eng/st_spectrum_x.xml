@@ -10,8 +10,158 @@
 	<string id="st_dev_spectrum_x_descr">
 		<text>A two-handed artefact spectrometer put together by the Radar-1 engineers from a Veles housing, Western chips and parts of Monolith emitters. The probe-pistol goes in the right hand, the tablet with the screen in the left, a coiled cable between them.
 
-While it is in your hands there is no weapon and no bolts: either you take the risk alone or your partner covers you. RMB: point the probe and take a reading.
+The screen shows every artefact in its radius that the filter profile lets through, with its exact grade. A filter only hides from the screen, the search goes on. The settings are kept in the device itself.
 
-Prototype: the screen and the detector part are not connected yet.</text>
+RMB: point the probe and take a reading. MMB short: the next profile, MMB long: the settings menu (Esc or MMB closes it). It runs on batteries like any device: a wide search drains them faster.
+
+While it is in your hands there is no weapon and no bolts: either you take the risk alone or your partner covers you.</text>
+	</string>
+	<!-- the device's screen and settings window (spectrum_x.script, ui_spectrum_x.script) -->
+	<string id="st_spx_profile_all">
+		<text>All</text>
+	</string>
+	<string id="st_spx_profile_rare">
+		<text>Rare only</text>
+	</string>
+	<string id="st_spx_profile_electro">
+		<text>Electro</text>
+	</string>
+	<string id="st_spx_level_near">
+		<text>Near</text>
+	</string>
+	<string id="st_spx_level_mid">
+		<text>Medium</text>
+	</string>
+	<string id="st_spx_level_wide">
+		<text>Wide</text>
+	</string>
+	<string id="st_spx_nature_gravi">
+		<text>Gravi</text>
+	</string>
+	<string id="st_spx_nature_thermo">
+		<text>Thermal</text>
+	</string>
+	<string id="st_spx_nature_chem">
+		<text>Chemical</text>
+	</string>
+	<string id="st_spx_nature_electro">
+		<text>Electro</text>
+	</string>
+	<string id="st_spx_nature_other">
+		<text>Other</text>
+	</string>
+	<string id="st_spx_grade_1">
+		<text>UNST</text>
+	</string>
+	<string id="st_spx_grade_2">
+		<text>DULL</text>
+	</string>
+	<string id="st_spx_grade_3">
+		<text>COMM</text>
+	</string>
+	<string id="st_spx_grade_4">
+		<text>GOOD</text>
+	</string>
+	<string id="st_spx_grade_5">
+		<text>EXC</text>
+	</string>
+	<string id="st_spx_grade_6">
+		<text>PERF</text>
+	</string>
+	<string id="st_spx_junk_short">
+		<text>JUNK</text>
+	</string>
+	<string id="st_spx_junk">
+		<text>junk</text>
+	</string>
+	<string id="st_spx_no_signal">
+		<text>no signal</text>
+	</string>
+	<string id="st_spx_searching">
+		<text>searching</text>
+	</string>
+	<string id="st_spx_all_hidden">
+		<text>all hidden by the filter</text>
+	</string>
+	<string id="st_spx_detected">
+		<text>detected: %s</text>
+	</string>
+	<string id="st_spx_shown">
+		<text>shown %s of %s</text>
+	</string>
+	<string id="st_spx_no_power">
+		<text>no power</text>
+	</string>
+	<string id="st_spx_m">
+		<text>m</text>
+	</string>
+	<string id="st_spx_menu_title">
+		<text>Spectrum-X · settings</text>
+	</string>
+	<string id="st_spx_tab_filters">
+		<text>Filters</text>
+	</string>
+	<string id="st_spx_tab_device">
+		<text>Device</text>
+	</string>
+	<string id="st_spx_tab_log">
+		<text>Log</text>
+	</string>
+	<string id="st_spx_profile">
+		<text>Profile (MMB short: the next one)</text>
+	</string>
+	<string id="st_spx_natures">
+		<text>Nature</text>
+	</string>
+	<string id="st_spx_grades">
+		<text>Grade</text>
+	</string>
+	<string id="st_spx_junk_title">
+		<text>Junk artefacts (no properties)</text>
+	</string>
+	<string id="st_spx_junk_on">
+		<text>Signal junk: yes</text>
+	</string>
+	<string id="st_spx_junk_off">
+		<text>Signal junk: no</text>
+	</string>
+	<string id="st_spx_sensitivity">
+		<text>Sensitivity</text>
+	</string>
+	<string id="st_spx_level_line">
+		<text>%s · %s m</text>
+	</string>
+	<string id="st_spx_level_info">
+		<text>Battery ~%s min · accuracy ±%s m</text>
+	</string>
+	<string id="st_spx_sound">
+		<text>Sound</text>
+	</string>
+	<string id="st_spx_silent">
+		<text>Silent</text>
+	</string>
+	<string id="st_spx_brightness">
+		<text>Screen brightness</text>
+	</string>
+	<string id="st_spx_night_title">
+		<text>Night mode (for night vision)</text>
+	</string>
+	<string id="st_spx_night_on">
+		<text>Night mode: on</text>
+	</string>
+	<string id="st_spx_night_off">
+		<text>Night mode: off</text>
+	</string>
+	<string id="st_spx_charge">
+		<text>Charge: %s%%</text>
+	</string>
+	<string id="st_spx_log_empty">
+		<text>Nothing found yet</text>
+	</string>
+	<string id="st_spx_log_when">
+		<text>day %s, %s · %s</text>
+	</string>
+	<string id="st_spx_close_hint">
+		<text>MMB or Esc: close</text>
 	</string>
 </string_table>

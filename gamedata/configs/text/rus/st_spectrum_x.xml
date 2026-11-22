@@ -10,8 +10,158 @@
 	<string id="st_dev_spectrum_x_descr">
 		<text>Двуручный спектрометр артефактов, собранный инженерами «Радара-1» из корпуса «Велеса», западных микросхем и деталей монолитовских излучателей. Щуп-пистолет в правой руке, планшет с экраном в левой, между ними витой провод.
 
-Пока прибор в руках, ни оружия, ни болтов: либо рискуешь сам, либо напарник прикрывает. ПКМ — навести щуп и сделать замер.
+На экране — все артефакты в радиусе, которые пропускает профиль фильтров, с точным сортом. Фильтр только прячет с экрана, поиск идёт дальше. Настройки хранятся в самом приборе.
 
-Опытный образец: экран и детекторная часть ещё не подключены.</text>
+ПКМ — навести щуп и сделать замер. СКМ коротко — следующий профиль, СКМ долго — меню настроек (Esc или СКМ — закрыть). Питается от батарей, как любой прибор: широкий поиск садит их быстрее.
+
+Пока прибор в руках, ни оружия, ни болтов: либо рискуешь сам, либо напарник прикрывает.</text>
+	</string>
+	<!-- the device's screen and settings window (spectrum_x.script, ui_spectrum_x.script) -->
+	<string id="st_spx_profile_all">
+		<text>Всё</text>
+	</string>
+	<string id="st_spx_profile_rare">
+		<text>Только редкие</text>
+	</string>
+	<string id="st_spx_profile_electro">
+		<text>Электра</text>
+	</string>
+	<string id="st_spx_level_near">
+		<text>Ближний</text>
+	</string>
+	<string id="st_spx_level_mid">
+		<text>Средний</text>
+	</string>
+	<string id="st_spx_level_wide">
+		<text>Широкий</text>
+	</string>
+	<string id="st_spx_nature_gravi">
+		<text>Грави</text>
+	</string>
+	<string id="st_spx_nature_thermo">
+		<text>Термо</text>
+	</string>
+	<string id="st_spx_nature_chem">
+		<text>Хим</text>
+	</string>
+	<string id="st_spx_nature_electro">
+		<text>Электро</text>
+	</string>
+	<string id="st_spx_nature_other">
+		<text>Прочие</text>
+	</string>
+	<string id="st_spx_grade_1">
+		<text>НЕСТ</text>
+	</string>
+	<string id="st_spx_grade_2">
+		<text>ТУСК</text>
+	</string>
+	<string id="st_spx_grade_3">
+		<text>ОБЫЧ</text>
+	</string>
+	<string id="st_spx_grade_4">
+		<text>ХОР</text>
+	</string>
+	<string id="st_spx_grade_5">
+		<text>ОТЛ</text>
+	</string>
+	<string id="st_spx_grade_6">
+		<text>ИДЕАЛ</text>
+	</string>
+	<string id="st_spx_junk_short">
+		<text>МУСОР</text>
+	</string>
+	<string id="st_spx_junk">
+		<text>мусор</text>
+	</string>
+	<string id="st_spx_no_signal">
+		<text>нет сигнала</text>
+	</string>
+	<string id="st_spx_searching">
+		<text>поиск</text>
+	</string>
+	<string id="st_spx_all_hidden">
+		<text>всё скрыто фильтром</text>
+	</string>
+	<string id="st_spx_detected">
+		<text>найдено: %s</text>
+	</string>
+	<string id="st_spx_shown">
+		<text>на экране %s из %s</text>
+	</string>
+	<string id="st_spx_no_power">
+		<text>нет питания</text>
+	</string>
+	<string id="st_spx_m">
+		<text>м</text>
+	</string>
+	<string id="st_spx_menu_title">
+		<text>Spectrum-X · настройки</text>
+	</string>
+	<string id="st_spx_tab_filters">
+		<text>Фильтры</text>
+	</string>
+	<string id="st_spx_tab_device">
+		<text>Прибор</text>
+	</string>
+	<string id="st_spx_tab_log">
+		<text>Журнал</text>
+	</string>
+	<string id="st_spx_profile">
+		<text>Профиль (СКМ коротко — следующий)</text>
+	</string>
+	<string id="st_spx_natures">
+		<text>Природа</text>
+	</string>
+	<string id="st_spx_grades">
+		<text>Сорт</text>
+	</string>
+	<string id="st_spx_junk_title">
+		<text>Мусорные артефакты (без свойств)</text>
+	</string>
+	<string id="st_spx_junk_on">
+		<text>Сигналить о мусорных: да</text>
+	</string>
+	<string id="st_spx_junk_off">
+		<text>Сигналить о мусорных: нет</text>
+	</string>
+	<string id="st_spx_sensitivity">
+		<text>Чувствительность</text>
+	</string>
+	<string id="st_spx_level_line">
+		<text>%s · %s м</text>
+	</string>
+	<string id="st_spx_level_info">
+		<text>Батарея ~%s мин · точность ±%s м</text>
+	</string>
+	<string id="st_spx_sound">
+		<text>Звук</text>
+	</string>
+	<string id="st_spx_silent">
+		<text>Тихо</text>
+	</string>
+	<string id="st_spx_brightness">
+		<text>Яркость экрана</text>
+	</string>
+	<string id="st_spx_night_title">
+		<text>Ночной режим (под ПНВ)</text>
+	</string>
+	<string id="st_spx_night_on">
+		<text>Ночной режим: вкл</text>
+	</string>
+	<string id="st_spx_night_off">
+		<text>Ночной режим: выкл</text>
+	</string>
+	<string id="st_spx_charge">
+		<text>Заряд: %s%%</text>
+	</string>
+	<string id="st_spx_log_empty">
+		<text>Пока ничего не найдено</text>
+	</string>
+	<string id="st_spx_log_when">
+		<text>день %s, %s · %s</text>
+	</string>
+	<string id="st_spx_close_hint">
+		<text>СКМ или Esc — закрыть</text>
 	</string>
 </string_table>

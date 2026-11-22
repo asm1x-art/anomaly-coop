@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Spectrum-X's screen (ui_spectrum_x.script): one part, made again and again. The screen hangs on the tablet bone
+     (custom_ui_func of dev_spectrum_x), so its units are metres; the script sizes, places, cuts and tints each part.
+     The texture and shader are set again by the script from [spectrum_x] screen_texture / screen_shader. -->
+<w>
+	<part x="0" y="0" width="0.001" height="0.001" stretch="1">
+		<texture shader="friendly_indicator">ui\ui_spectrum_x_screen</texture>
+	</part>
+</w>
