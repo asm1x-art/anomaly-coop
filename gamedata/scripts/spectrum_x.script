@@ -71,6 +71,7 @@ function settings()
 	cfg = {
 		key = DIK_keys[r("key", "MOUSE_3")] or DIK_keys.MOUSE_3,
 		long_ms = f("long_press_ms", 350),
+		menu = ini_sys:r_bool_ex(S, "menu", false),
 		scan_ms = f("scan_ms", 250),
 		screen_ms = f("screen_ms", 33),
 		reveal = f("reveal_radius", 4),
@@ -92,7 +93,7 @@ function settings()
 		snd_switch = r("snd_switch"),
 		tick_ms = nums(r("tick_ms", "300, 1800")),
 		size = nums(r("screen_size", "0.0684, 0.085")),
-		shader = r("screen_shader", "friendly_indicator"),
+		shader = r("screen_shader", "spectrum_x_screen"),
 		texture = r("screen_texture", "ui\\ui_spectrum_x_screen"),
 		corners = nums(r("menu_screen_corners")),
 		margin = f("menu_margin", 4),
@@ -304,8 +305,9 @@ local function search(obj, rec)
 			if d <= lv.radius then
 				det = det + 1
 				if d <= c.reveal then
+					-- CArtefact:IsVisible is an engine addition (older exes lack it): without it, switch it on anyway
 					local af = a:cast_Artefact()
-					if af and not af:IsVisible() then
+					if af and not (af.IsVisible and af:IsVisible()) then
 						af:SwitchVisibility(true)
 					end
 				end
@@ -472,7 +474,9 @@ local function actor_on_update()
 	end
 	if press and tg - press.t >= settings().long_ms then
 		press = nil
-		if safe(obj) then
+		-- the 2D settings window is dropped (22.11.2026: the settings go on the device's own screen); until that is
+		-- built, menu = false in the .ltx makes a long press do nothing
+		if settings().menu and safe(obj) then
 			open_menu(obj)
 		end
 	end

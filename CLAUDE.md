@@ -47,6 +47,8 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - After a crash Anomaly writes `fatal_ctd_save_N` as the newest save: don't load it, load the last real save.
 - A HUD item model built in Blender from an imported vanilla armature inherits its motion refs (`OGF_S_MOTION_REFS`): the engine then loads the refs and ignores the embedded motions → FATAL "model has no motion [idle]" on draw. Clear `obj.xray.motionrefs_collection` before export; before launching, check that every `anm_*` motion of the hud section exists in the deployed `.omf` and item `.ogf` (`tools/spectrum_x/check_motions.py`).
 - Bones made with `edit_bones.new()` come in quaternion rotation mode: keying `rotation_euler` after setting `matrix_basis` keys stale zeros and the exported bone never turns. Set `pose_bone.rotation_mode` (the imported rigs use `ZXY`) before baking.
+- Script methods that are our engine additions (e.g. `CArtefact:IsVisible`) are missing in older exes a stand may run: calling one is a FATAL Lua error. Guard them (`af.IsVisible and af:IsVisible()`).
+- luabind userdata (`Frect`, `vector2`...) have no `==`: `a ~= b` on two of them is a FATAL Lua error in the game (script mocks with tables don't show it). Compare identity with `rawequal`, or the numbers.
 - Text (`CGameFont`) is not drawn in an item's 3D UI (`custom_ui_func`): fonts are flushed later in screen space. Draw text there as textured glyph statics.
 
 ## Testing

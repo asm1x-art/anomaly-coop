@@ -41,9 +41,11 @@ power_critical              = 0.05         ; condition (= battery) under which t
 ; the screen: a script window drawn on the HUD model's bone (the engine's custom 3D UI of hud items), in metres in the
 ; bone's frame: its top left at custom_ui_pos, x to the screen's right, y down the screen (pos and rot set by
 ; tools/spectrum_x/build_hud.py; the screen's size is screen_size in [spectrum_x])
-custom_ui_func              = ui_spectrum_x.get_screen
+; SWITCHED OFF (22.11.2026): the script-drawn screen shows atlas garbage in game (large parts get the wrong texture
+; region); the glass stays dark until the on-device interface is redone. Put this line back to draw it:
+;custom_ui_func              = ui_spectrum_x.get_screen
 custom_ui_bone              = tablet
-custom_ui_pos               = -0.004199, 0.040831, 0.055304
+custom_ui_pos               = -0.004199, 0.041591, 0.055304
 custom_ui_rot               = 0.000, 90.000, -0.000
 
 [dev_spectrum_x_hud]:hud_base
@@ -90,6 +92,8 @@ anm_switch_profile          = spectrum_x_switch
 [spectrum_x]
 key                         = MOUSE_3      ; DIK_keys name: short press = next profile, long press = the settings window
 long_press_ms               = 350          ; held this long = a long press
+menu                        = false        ; a long press opens the settings menu (off: the 2D window is dropped, the
+                                           ; menu moves onto the device's screen)
 scan_ms                     = 250          ; how often the artefacts in the radius are looked for (and the battery drained)
 screen_ms                   = 33           ; how often the screen is drawn again (the radar turns with the view)
 reveal_radius               = 4            ; m: a hidden artefact (in a field) shows itself this close, as with the Veles
@@ -111,9 +115,9 @@ snd_tick                    = detectors\art_beep1    ; the tick, faster the near
 snd_switch                  = detectors\art_beep1    ; a profile switch
 tick_ms                     = 300, 1800    ; the tick's interval at the nearest .. at the edge of the radius
 ; the screen: its size in metres (width, height; set by tools/spectrum_x/build_hud.py), the shader of its parts
-; (friendly_indicator: the texture times the colour, blended, depth tested; hud\p3d would drop the colours)
+; (spectrum_x_screen: shaders/r3/spectrum_x_screen.*, the texture times the colour, blended, depth tested; DX11)
 screen_size                 = 0.0684, 0.0850
-screen_shader               = friendly_indicator
+screen_shader               = spectrum_x_screen
 screen_texture              = ui\ui_spectrum_x_screen
 ; the settings window goes over the tablet's screen as the menu pose shows it: the screen's corners (top left, top
 ; right, bottom right, bottom left) in the HUD camera's space (x right, y up, z ahead, m; set by

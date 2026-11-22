@@ -5,7 +5,7 @@
 -- metres in the bone's frame; it is laid out here in units of a hundredth of the screen's width. A text window is not
 -- drawn there (fonts go out later, in screen space), so the letters too are parts: one atlas
 -- (tools/spectrum_x/make_screen_atlas.py: glyphs of cp1251 and shapes), each part cut out by its texture rect and
--- tinted by its colour (the friendly_indicator shader: texture times colour; hud\p3d would drop the colour). The parts
+-- tinted by its colour (the spectrum_x_screen shader: texture times colour; hud\p3d would drop the colour). The parts
 -- are a pool made once and set again only where something changed.
 --
 -- The settings window: a 2D window over the tablet's screen as the menu pose (anm_menu_idle) shows it: the screen's
@@ -152,7 +152,7 @@ function UISpectrumXScreen:part(r, x, y, w, h, color)
 		self.pool[self.n] = p
 	end
 	local st, u = p.st, self.u
-	if p.r ~= r then
+	if not rawequal(p.r, r) then -- the atlas' rects are kept, one userdata each: luabind has no == for Frect
 		st:SetTextureRect(r)
 		p.r = r
 	end

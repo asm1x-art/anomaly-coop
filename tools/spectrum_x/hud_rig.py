@@ -26,7 +26,7 @@ PROBE_SCALE = 0.20        # Tripo units -> metres: probe 20 cm long
 TABLET_SCALE = 0.20       # tablet 14 cm tall
 TABLET_SHIFT_X = 0.030    # in the Veles frame: toward the fingers, the thumb rests on the left bumper
 # the screen plane on the glass, tablet's own coords (x down, y right, z out of the glass): x0, x1, y0, y1, z
-SCREEN = (-0.383, 0.042, -0.171, 0.171, 0.0394 + 0.0012)
+SCREEN = (-0.383, 0.042, -0.171, 0.171, 0.0394 + 0.005)    # 1 mm over the glass: closer, the baked glass z-fights through
 # button tops, tablet's own coords (found on the high-poly's height map, as tablet_decal.py does)
 BUTTONS = {"menu": (0.1099, -0.1424, 0.0576), "back": (0.1568, -0.1036, 0.0599), "up": (0.1003, 0.0, 0.0587),
            "left": (0.1306, -0.0406, 0.0597), "right": (0.1306, 0.0404, 0.0596), "down": (0.1630, 0.0, 0.0605)}

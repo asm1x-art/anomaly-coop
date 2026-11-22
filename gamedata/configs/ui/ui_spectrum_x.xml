@@ -4,6 +4,6 @@
      The texture and shader are set again by the script from [spectrum_x] screen_texture / screen_shader. -->
 <w>
 	<part x="0" y="0" width="0.001" height="0.001" stretch="1">
-		<texture shader="friendly_indicator">ui\ui_spectrum_x_screen</texture>
+		<texture shader="spectrum_x_screen">ui\ui_spectrum_x_screen</texture>
 	</part>
 </w>
