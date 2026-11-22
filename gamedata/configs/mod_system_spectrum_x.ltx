@@ -1,0 +1,68 @@
+; Spectrum-X, first playable prototype (branch spectrum-x): the two-handed artefact spectrometer in the hands.
+; Probe-pistol in the right hand, tablet in the left, a coiled cable between them. Built like the binoculars: a weapon-
+; slot item of the binoculars' class, one HUD model (dev_spectrum_x_hud.ogf: bones wpn_body, tablet, cable_mid) on the
+; hands' lead_gun bone; its "tablet" bone follows the left hand in every animation. RMB (or LMB) = point the probe ahead
+; and measure: the binoculars' zoom with no magnification and no scope picture. No detector logic and no screen UI yet.
+; Models, animations and textures: tools/spectrum_x (Blender scripts), sources in X:\coop\assets\spectrum-x.
+
+[dev_spectrum_x]:wpn_binoc
+inv_name                    = st_dev_spectrum_x_name
+inv_name_short              = st_dev_spectrum_x_name_short
+description                 = st_dev_spectrum_x_descr
+visual                      = dynamics\devices\dev_spectrum_x\dev_spectrum_x.ogf
+hud                         = dev_spectrum_x_hud
+icons_texture               = ui\ui_icon_spectrum_x
+inv_grid_x                  = 0
+inv_grid_y                  = 0
+inv_grid_width              = 2
+inv_grid_height             = 2
+inv_weight                  = 1.6
+cost                        = 24000
+hand_dependence             = 2            ; both hands busy: a detector can't be out at the same time
+single_handed               = 0
+anim_item                   = true
+upgrades                    =
+installed_upgrades          =
+; the binoculars' zoom switched off by config:
+scope_texture               = none         ; no scope picture over the screen
+scope_zoom_factor           = 100          ; camera FOV while measuring = this * 0.75 (100 -> 75, the default fov):
+                                           ; set it to your fov / 0.75 for no zoom at all
+scope_dynamic_zoom          = false        ; the mouse wheel does not zoom
+vision_present              = false        ; no binocular frames around NPCs
+zoom_rotate_time            = 0.30         ; s, how fast the HUD goes into / out of the measuring pose
+snd_zoomin                  = detectors\DA-2_beep1
+snd_zoomout                 = $no_sound
+
+[dev_spectrum_x_hud]:hud_base
+item_visual                 = dynamics\devices\dev_spectrum_x\dev_spectrum_x_hud
+attach_place_idx            = 0
+; the animations are posed for these offsets (the PM's): move the whole device with hands_position / orientation
+item_position               = 0.000746, -0.000321, 0.003479
+item_orientation            = 1.239378, -0.134046, -2.052052
+hands_position              = -0.031, -0.17, 0
+hands_position_16x9         = -0.031, -0.17, 0
+hands_orientation           = -0.5, 1., 1.15
+hands_orientation_16x9      = -0.5, 1., 1.15
+; measuring is in the animation (the probe goes ahead): no extra offset while "aiming"
+aim_hud_offset_pos          = 0, 0, 0
+aim_hud_offset_pos_16x9     = 0, 0, 0
+aim_hud_offset_rot          = 0, 0, 0
+aim_hud_offset_rot_16x9     = 0, 0, 0
+gl_hud_offset_pos           = 0, 0, 0
+gl_hud_offset_rot           = 0, 0, 0
+lean_hud_offset_pos         = 0, 0, 0
+lean_hud_offset_rot         = 0, 0, 0
+zoom_hide_crosshair         = true
+freelook_z_offset_mul       = 0.75
+; animations (hands: dev_hand_spectrum_x_hud_animation.omf; the model plays the same names).
+; A third value is the speed: e.g. "spectrum_x_draw, spectrum_x_draw, 1.3" draws 30% faster.
+anm_show                    = spectrum_x_draw
+anm_hide                    = spectrum_x_holster
+anm_idle                    = spectrum_x_idle
+anm_idle_moving             = spectrum_x_idle_moving
+anm_idle_moving_crouch      = spectrum_x_idle_crouch
+anm_idle_sprint             = spectrum_x_idle_sprint
+anm_idle_aim_start          = spectrum_x_aim_start
+anm_idle_aim                = spectrum_x_aim
+anm_idle_aim_end            = spectrum_x_aim_end
+anm_bore                    = spectrum_x_bore

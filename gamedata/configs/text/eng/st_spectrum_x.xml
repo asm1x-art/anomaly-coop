@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Spectrum-X prototype (mod_system_spectrum_x.ltx) -->
+<string_table>
+	<string id="st_dev_spectrum_x_name">
+		<text>Spectrum-X spectrometer</text>
+	</string>
+	<string id="st_dev_spectrum_x_name_short">
+		<text>Spectrum-X</text>
+	</string>
+	<string id="st_dev_spectrum_x_descr">
+		<text>A two-handed artefact spectrometer put together by the Radar-1 engineers from a Veles housing, Western chips and parts of Monolith emitters. The probe-pistol goes in the right hand, the tablet with the screen in the left, a coiled cable between them.
+
+While it is in your hands there is no weapon and no bolts: either you take the risk alone or your partner covers you. RMB: point the probe and take a reading.
+
+Prototype: the screen and the detector part are not connected yet.</text>
+	</string>
+</string_table>

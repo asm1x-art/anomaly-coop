@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Spectrum-X prototype (mod_system_spectrum_x.ltx) -->
+<string_table>
+	<string id="st_dev_spectrum_x_name">
+		<text>Спектрометр «Спектр-X»</text>
+	</string>
+	<string id="st_dev_spectrum_x_name_short">
+		<text>Спектр-X</text>
+	</string>
+	<string id="st_dev_spectrum_x_descr">
+		<text>Двуручный спектрометр артефактов, собранный инженерами «Радара-1» из корпуса «Велеса», западных микросхем и деталей монолитовских излучателей. Щуп-пистолет в правой руке, планшет с экраном в левой, между ними витой провод.
+
+Пока прибор в руках, ни оружия, ни болтов: либо рискуешь сам, либо напарник прикрывает. ПКМ — навести щуп и сделать замер.
+
+Опытный образец: экран и детекторная часть ещё не подключены.</text>
+	</string>
+</string_table>
