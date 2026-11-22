@@ -453,6 +453,13 @@ for bn in ("tablet", "cable_mid"):
     IA.data.edit_bones.remove(IA.data.edit_bones[bn])
 bpy.ops.object.mode_set(mode="OBJECT")
 IA.xray.motions_collection.clear()
+# physics of the dropped item: one box around everything (X-Ray axes: x, z, y of Blender's), 1.6 kg
+allv = np.array([v.co[:] for o in (probe, tablet, cable) for v in o.data.vertices])
+lo_, hi_ = allv.min(0), allv.max(0); cen, hs = (lo_ + hi_) / 2, (hi_ - lo_) / 2
+sh = IA.data.bones["wpn_body"].xray.shape
+sh.type = "1"; sh.box_rot = (1, 0, 0, 0, 1, 0, 0, 0, 1)
+sh.box_trn = (cen[0], cen[2], cen[1]); sh.box_hsz = (hs[0], hs[2], hs[1]); sh.version_data = 1
+IA.data.bones["wpn_body"].xray.mass.value = 1.6
 for o in scn.objects: o.select_set(o == IA or o.parent == IA)
 bpy.ops.xray_export.ogf_file(filepath=os.path.join(dev_dir, "dev_spectrum_x.ogf"), fmt_version="cscop",
                              export_motions=False, hq_export=False, use_export_paths=False, texture_name_from_image_path=False)
