@@ -251,27 +251,33 @@ plans = []      # name, frames [(pose, the probe bone in the item)], params, loo
 P_LOOP = dict(speed=1.0, accrue=2.0, falloff=2.0, power=1.0, flags=0, bonepart=65535)
 P_ONCE = dict(P_LOOP, flags=2)
 R.clamped = 0
+hold = R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=rest_f)
+# both hands hold the tablet SLIDE_TWO_HAND lower on its edges, so the thumbs, laid out as at rest, lie on the
+# buttons: the tablet moved in the hand (D, detector space) for this pose only
+A0 = R.A_tab.copy(); R.use_slide(hr.SLIDE_TWO_HAND); D_menu = R.A_tab @ A0.inverted()
+L_menu = Oi @ P.tablet_hand(**ha.MENU)
+r_menu, menu_f = hr.setup_two_hand(R, L_menu, rest_f)     # the thumbs laid out as at rest: on the buttons now
+menu = R.pose_of(r_menu, L_menu, fingers=menu_f)
+R.use_slide(0.0)
+# the probe holstered out of view: its hold place moved by PROBE_AWAY, kept on the item's root (the right hand)
+away = ha.moved(item_world(hold), ha.PROBE_AWAY, tuple(R.grip_item))
+menu_fr = (menu, item_world(menu).inverted() @ away, D_menu)
 if POSES_ONLY:
-    hold = R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=rest_f)
-    # both hands hold the tablet SLIDE_TWO_HAND lower on its edges, so the thumbs, laid out as at rest, lie on the
-    # buttons: the tablet moved in the hand (D, detector space) for this pose only
-    A0 = R.A_tab.copy(); R.use_slide(hr.SLIDE_TWO_HAND); D = R.A_tab @ A0.inverted()
-    L_menu = Oi @ P.tablet_hand(**ha.MENU)
-    r_menu, menu_f = hr.setup_two_hand(R, L_menu, rest_f)     # the thumbs laid out as at rest: on the buttons now
-    menu = R.pose_of(r_menu, L_menu, fingers=menu_f)
-    R.use_slide(0.0)
-    # the probe holstered out of view: its hold place moved by PROBE_AWAY, kept on the item's root (the right hand)
-    away = ha.moved(item_world(hold), ha.PROBE_AWAY, tuple(R.grip_item))
     still = {"pose_hold": (hold, I4, I4), "pose_switch": (R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=press_f), I4, I4),
-             "pose_menu": (menu, item_world(menu).inverted() @ away, D)}
+             "pose_menu": menu_fr}
     for nm, fr in still.items():
         plans.append((nm, [fr] * 3, P_LOOP, True))
 else:
     for nm in AN.table:
-        D, loop, _ = AN.table[nm]
+        Dur, loop, _ = AN.table[nm]
         seq = []; c0 = R.clamped
-        for Hr, Hl, w in AN.frames(nm):
-            seq.append((R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)), I4, I4))
+        if nm.startswith("menu_"):
+            # the two-handed menu hold, still for now (the probe put away, both hands on the tablet's edges): the
+            # moves into and out of it come with the full animation pass
+            seq = [menu_fr] * (int(round(Dur * FPS)) + 1)
+        else:
+            for Hr, Hl, w in AN.frames(nm):
+                seq.append((R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)), I4, I4))
         plans.append((nm, seq, P_LOOP if loop else P_ONCE, loop))
         if R.clamped > c0: print("IK reach limit: %s, %d hand-frames (the hand stops short at full reach)" % (nm, R.clamped - c0))
 print("IK clamped frames:", R.clamped)

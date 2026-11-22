@@ -45,8 +45,8 @@ power_critical              = 0.05         ; condition (= battery) under which t
 ; region); the glass stays dark until the on-device interface is redone. Put this line back to draw it:
 ;custom_ui_func              = ui_spectrum_x.get_screen
 custom_ui_bone              = tablet
-custom_ui_pos               = -0.004199, 0.041591, 0.055304
-custom_ui_rot               = 0.000, 90.000, -0.000
+custom_ui_pos               = 0.020839, -0.004482, 0.048395
+custom_ui_rot               = -167.774, 53.965, 120.415
 
 [dev_spectrum_x_hud]:hud_base
 item_visual                 = dynamics\devices\dev_spectrum_x\dev_spectrum_x_hud
@@ -94,6 +94,8 @@ key                         = MOUSE_3      ; DIK_keys name: short press = next p
 long_press_ms               = 350          ; held this long = a long press
 menu                        = false        ; a long press opens the settings menu (off: the 2D window is dropped, the
                                            ; menu moves onto the device's screen)
+menu_pose                   = true         ; with menu = false: a long press still brings the tablet up in both hands
+                                           ; (the menu pose, no window); the key again puts it back down
 scan_ms                     = 250          ; how often the artefacts in the radius are looked for (and the battery drained)
 screen_ms                   = 33           ; how often the screen is drawn again (the radar turns with the view)
 reveal_radius               = 4            ; m: a hidden artefact (in a field) shows itself this close, as with the Veles
@@ -116,13 +118,13 @@ snd_switch                  = detectors\art_beep1    ; a profile switch
 tick_ms                     = 300, 1800    ; the tick's interval at the nearest .. at the edge of the radius
 ; the screen: its size in metres (width, height; set by tools/spectrum_x/build_hud.py), the shader of its parts
 ; (spectrum_x_screen: shaders/r3/spectrum_x_screen.*, the texture times the colour, blended, depth tested; DX11)
-screen_size                 = 0.0684, 0.0850
+screen_size                 = 0.1040, 0.0840
 screen_shader               = spectrum_x_screen
 screen_texture              = ui\ui_spectrum_x_screen
 ; the settings window goes over the tablet's screen as the menu pose shows it: the screen's corners (top left, top
 ; right, bottom right, bottom left) in the HUD camera's space (x right, y up, z ahead, m; set by
 ; tools/spectrum_x/build_hud.py), seen with this item's hud_fov (else the console's) and the screen's aspect
-menu_screen_corners         = -0.0357, 0.0298, 0.2052, 0.0326, 0.0327, 0.2052, 0.0362, -0.0516, 0.1948, -0.0322, -0.0545, 0.1948
+menu_screen_corners         = -0.0520, 0.0196, 0.3458, 0.0520, 0.0196, 0.3458, 0.0520, -0.0636, 0.3342, -0.0520, -0.0636, 0.3342
 menu_margin                 = 4            ; interface units inside the screen's edge
 menu_min_size               = 400, 500     ; the window is never smaller than this (square units), centred on the screen
 

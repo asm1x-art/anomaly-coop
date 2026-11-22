@@ -72,6 +72,7 @@ function settings()
 		key = DIK_keys[r("key", "MOUSE_3")] or DIK_keys.MOUSE_3,
 		long_ms = f("long_press_ms", 350),
 		menu = ini_sys:r_bool_ex(S, "menu", false),
+		menu_pose = ini_sys:r_bool_ex(S, "menu_pose", false),
 		scan_ms = f("scan_ms", 250),
 		screen_ms = f("screen_ms", 33),
 		reveal = f("reveal_radius", 4),
@@ -380,10 +381,10 @@ local function switch_profile(obj)
 	play(settings().snd_switch, volume(rec) * 0.6)
 end
 
-local function open_menu(obj)
+local function open_menu(obj, pose_only)
 	local ms = obj:play_hud_motion("anm_menu_open", true, 0, 1, 0) or 0
-	menu = { id = obj:id(), phase = "opening", show_at = time_global() + ms }
-	dbg("menu opening (%d ms)", ms)
+	menu = { id = obj:id(), phase = "opening", show_at = time_global() + ms, pose_only = pose_only }
+	dbg("menu opening (%d ms)%s", ms, pose_only and ", the pose only" or "")
 end
 
 -- the window has closed (ui_spectrum_x.script): the tablet goes back down
@@ -409,7 +410,14 @@ function owns_key(dik)
 end
 
 local function on_key_press(dik)
-	if dik ~= settings().key or menu then
+	if dik ~= settings().key then
+		return
+	end
+	if menu then
+		-- the menu pose without a window (menu_pose): the key puts the tablet back down
+		if menu.pose_only and menu.phase == "open" then
+			on_menu_closed()
+		end
 		return
 	end
 	local obj = active()
@@ -476,13 +484,15 @@ local function actor_on_update()
 		press = nil
 		-- the 2D settings window is dropped (22.11.2026: the settings go on the device's own screen); until that is
 		-- built, menu = false in the .ltx makes a long press do nothing
-		if settings().menu and safe(obj) then
-			open_menu(obj)
+		if (settings().menu or settings().menu_pose) and safe(obj) then
+			open_menu(obj, not settings().menu)
 		end
 	end
 	if menu and menu.phase == "opening" and tg >= menu.show_at then
 		menu.phase = "open"
-		ui_spectrum_x.open_menu(obj:id())
+		if not menu.pose_only then
+			ui_spectrum_x.open_menu(obj:id())
+		end
 	end
 	local rec = device(obj:id())
 	if not rec then

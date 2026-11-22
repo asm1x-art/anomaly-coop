@@ -69,6 +69,7 @@ Each branch is checked out as its own git worktree next to this folder (`xray-mo
 - Solve and check HUD grips against every arms model a player may wear, the thick exoskeleton sleeves included (`hud_rig.HAND_SETS`, `check_hud.py --hands`); render previews with them and at both hud_fov values in use (console default 0.64, players often 0.45).
 - A hand mirrored from the other one about a device is only as good as the device's symmetry: keep parts the fingers reach (sockets, ports) on its middle line.
 - Low-poly HUD meshes shaded all-smooth streak dark across big flat faces: mark edges over ~40° sharp (blender-xray exports the split normals) and bake the normal map on the same normals.
+- A near-black gradient in a DXT1 texture turns into big blue / green streaks in game (5:6:5 steps, then the HUD lighting brightens them); Blender previews don't show it. Keep near-black surfaces (a switched-off screen) one flat colour, and look at dark textures in game.
 - Blender's bundled Python has no PIL: draw textures in a system-Python step and call it from the Blender script (`tablet_prints.py`).
 
 ## Git
