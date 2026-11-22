@@ -6,11 +6,12 @@ blender -b -P build_hud.py -- --meshes <vanilla meshes dir> --assets <X:\coop\as
 probe put away out of view) for the look check (pose_check.sh); the numbers and the .blend then go into --out too.
 
 The rig (hud_rig.py): the hands' base pose comes from vanilla (right arm = the PM's idle, left arm = the PDA's
-idle, both at our hud section's offsets, the PM's); the probe sits on lead_gun where the PM sits, the tablet in the
-left hand where the PDA sits, then moved in the hand (hud_rig.TAB_GRIP) so the thumb lies on the left bezel. The
-grips are solved against the meshes of every arms model (hud_rig.HAND_SETS): each finger turned until it is out of
-the device, then closed until it touches; the left thumb by a search over its anatomical angles: over P1 (rest) and
-on it (the press). The two-handed hold: the right hand mirrored from the left about the tablet's middle.
+idle, both at our hud section's offsets, the PM's); the probe sits on lead_gun where the PM sits; the left hand holds
+the tablet round its left side edge (hud_rig.SIDE_GRIP: palm round the edge, fingers on the back, thumb straight up
+the bezel). The grips are solved against the meshes of every arms model (hud_rig.HAND_SETS): each finger turned until
+it is out of the device, then closed until it touches; the thumb laid out straight (rest), moved onto P1 for the
+press. The two-handed hold: both hands SLIDE_TWO_HAND lower on the edges (the tablet bone moved in the hand, D) so
+the straight thumbs lie on P1 and +, the right hand mirrored from the left about the tablet's middle.
 The item's bones: wpn_body (on lead_gun), probe (on wpn_body; moves off only when the probe is put away), tablet,
 cable_NN.
 The animations (hud_anims.py) say where each hand goes over time; two-bone IK puts the arms there.
@@ -51,7 +52,7 @@ scn = bpy.context.scene
 scn.render.fps = FPS
 R = hr.Rig(G, A)
 OURS, K, KI = hr.OURS, hr.K, hr.KI
-rest_f, press_f = hr.setup_grips(R)
+rest_f, press_f, on_f = hr.setup_grips(R)
 
 
 def fingers_at(w):
@@ -252,21 +253,25 @@ P_ONCE = dict(P_LOOP, flags=2)
 R.clamped = 0
 if POSES_ONLY:
     hold = R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=rest_f)
-    L_menu = Oi @ P.L_menu
-    r_menu, menu_f = hr.setup_two_hand(R, L_menu, rest_f)
+    # both hands hold the tablet SLIDE_TWO_HAND lower on its edges, so the thumbs, laid out as at rest, lie on the
+    # buttons: the tablet moved in the hand (D, detector space) for this pose only
+    A0 = R.A_tab.copy(); R.use_slide(hr.SLIDE_TWO_HAND); D = R.A_tab @ A0.inverted()
+    L_menu = Oi @ P.tablet_hand(**ha.MENU)
+    r_menu, menu_f = hr.setup_two_hand(R, L_menu, rest_f)     # the thumbs laid out as at rest: on the buttons now
     menu = R.pose_of(r_menu, L_menu, fingers=menu_f)
+    R.use_slide(0.0)
     # the probe holstered out of view: its hold place moved by PROBE_AWAY, kept on the item's root (the right hand)
     away = ha.moved(item_world(hold), ha.PROBE_AWAY, tuple(R.grip_item))
-    still = {"pose_hold": (hold, I4), "pose_switch": (R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=press_f), I4),
-             "pose_menu": (menu, item_world(menu).inverted() @ away)}
-    for nm, (pose, prel) in still.items():
-        plans.append((nm, [(pose, prel)] * 3, P_LOOP, True))
+    still = {"pose_hold": (hold, I4, I4), "pose_switch": (R.pose_of(Oi @ P.R0, Oi @ P.L0, fingers=press_f), I4, I4),
+             "pose_menu": (menu, item_world(menu).inverted() @ away, D)}
+    for nm, fr in still.items():
+        plans.append((nm, [fr] * 3, P_LOOP, True))
 else:
     for nm in AN.table:
         D, loop, _ = AN.table[nm]
         seq = []; c0 = R.clamped
         for Hr, Hl, w in AN.frames(nm):
-            seq.append((R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)), I4))
+            seq.append((R.pose_of(Oi @ Hr, Oi @ Hl, fingers=fingers_at(w)), I4, I4))
         plans.append((nm, seq, P_LOOP if loop else P_ONCE, loop))
         if R.clamped > c0: print("IK reach limit: %s, %d hand-frames (the hand stops short at full reach)" % (nm, R.clamped - c0))
 print("IK clamped frames:", R.clamped)
@@ -312,9 +317,9 @@ def solve_cable(seq, loop):
     """per frame: the item-space socket, its direction, down, and the best sag angle (smoothed over the frames)"""
     data, phis = [], []
     prev = 0.0
-    for pose, prel in seq:
+    for pose, prel, D in seq:
         iw = item_world(pose).inverted()
-        tab = iw @ tablet_world(pose, Matrix.Identity(4))         # detector -> item
+        tab = iw @ tablet_world(pose, Matrix.Identity(4)) @ D     # detector -> item (D: the tablet moved in the hand)
         conn = tab @ R.A_tab @ R.conn_t
         cd = (tab.to_3x3() @ conn_dl).normalized()
         down = (iw.to_3x3() @ Vector((0, 0, -1))).normalized()
@@ -343,7 +348,7 @@ def bake_action(name, frames, params):
         assert pb.rotation_mode != "QUATERNION", pb.name
     act = bpy.data.actions.new(name)
     H.animation_data_create(); H.animation_data.action = act
-    for f, (pose, _) in enumerate(frames):
+    for f, (pose, _, _) in enumerate(frames):
         bas = R.basis_of(pose)
         for pb in H.pose.bones:
             pb.matrix_basis = bas[pb.name]
@@ -358,9 +363,9 @@ def bake_action(name, frames, params):
 def bake_item_action(name, frames, cab, params):
     act = bpy.data.actions.new(name + "@item")
     IA.animation_data_create(); IA.animation_data.action = act
-    for f, ((pose, _), (conn, cd, down, ph, prel)) in enumerate(zip(frames, cab)):
+    for f, ((pose, _, D), (conn, cd, down, ph, prel)) in enumerate(zip(frames, cab)):
         iw = item_world(pose).inverted()
-        want = {"tablet": iw @ tablet_world(pose, Matrix.Identity(4)), "probe": prel}
+        want = {"tablet": iw @ tablet_world(pose, Matrix.Identity(4)) @ D, "probe": prel}
         for k, M in enumerate(bone_frames(cable_curve(conn, cd, down, ph, N_SEG, prel))):
             want[CNAMES[k]] = M
         for bn in ITEM_BONES:
@@ -404,10 +409,10 @@ chk = _hpb(*[math.radians(a) for a in ui_rot]).to_3x3()
 ui_pos = list(S3 @ tl_det)
 size = [(y1 - y0) * hr.TABLET_SCALE, (x1 - x0) * hr.TABLET_SCALE]
 # the menu pose: the screen's corners in HUD camera space (X-Ray axes: x right, y up, z forward)
-mi = dict((nm, seq) for nm, seq, par, loop in plans)["pose_menu" if POSES_ONLY else "menu_idle"][0][0]
+mi, _, mD = dict((nm, seq) for nm, seq, par, loop in plans)["pose_menu" if POSES_ONLY else "menu_idle"][0]
 corners = []
 for p in ((x0, y0, z), (x0, y1, z), (x1, y1, z), (x1, y0, z)):          # TL, TR, BR, BL
-    c = tablet_world(mi, R.A_tab) @ Vector(p)
+    c = tablet_world(mi, mD @ R.A_tab) @ Vector(p)
     corners += [c.x, c.z, c.y]
 nums = {"custom_ui_bone": "tablet", "custom_ui_pos": ui_pos, "custom_ui_rot": ui_rot,
         "ui_rot_check": max(abs(a - b) for a, b in zip([x for r in chk for x in r], [x for r in Mui for x in r])),

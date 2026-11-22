@@ -67,7 +67,7 @@ def blend(Ha, Hb, k, pv_local):
 # where the tablet is held, HUD camera space (Blender axes: x right, y forward, z up): the screen's centre (m) and
 # its turn from square-on (degrees): pitch < 0 = top away from the eye, yaw > 0 = screen turned toward the right,
 # roll > 0 = turned clockwise as seen
-HOLD = dict(centre=(-0.108, 0.47, -0.066), pitch=-30.0, yaw=15.0, roll=-5.0)     # one hand, the probe in the right
+HOLD = dict(centre=(-0.085, 0.47, -0.060), pitch=-30.0, yaw=15.0, roll=-5.0)     # one hand, the probe in the right
 MENU = dict(centre=(0.0, 0.34, -0.022), pitch=-8.0, yaw=0.0, roll=0.0)          # both hands, raised for reading
 PROBE_AWAY = (0.10, -0.12, -0.36, -70.0, 10.0, 25.0)   # the probe holstered out of view in the menu (offset as in moved())
 

@@ -20,7 +20,7 @@ for h in wpn_hand_01 wpn_hand_exo; do
       --res 1280x720 --fov $fov --hands $h.ogf --tag "${h}_fov${fov}_" > /dev/null 2>&1
   done
   # close-ups (HUD camera space): the thumb on P1, the left grip from below, the menu's fingers from behind
-  for c in "thumb:spectrum_x_pose_switch:-0.03,0.30,0.02,-0.12,0.47,-0.09,30" "menu_front:spectrum_x_pose_menu:-0.05,0.18,0.0,-0.08,0.34,-0.06,40" \
+  for c in "thumb:spectrum_x_pose_switch:-0.03,0.32,0.03,-0.13,0.47,-0.06,30" "hold_back:spectrum_x_pose_hold:-0.05,0.75,0.05,-0.10,0.47,-0.06,35" "menu_front:spectrum_x_pose_menu:-0.05,0.18,0.0,-0.08,0.34,-0.06,40" \
            "menu_behind:spectrum_x_pose_menu:-0.12,0.62,0.02,-0.06,0.34,-0.05,35" "menu_under:spectrum_x_pose_menu:0.0,0.25,-0.45,0.0,0.30,-0.15,50"; do
     IFS=: read n m cam <<< "$c"
     "$B" -b -P $T/preview_hud.py -- $V $O $P/frames $m:0 --res 960x720 --cam $cam --hands $h.ogf --tag "${h}_cu_${n}_" > /dev/null 2>&1
@@ -39,7 +39,7 @@ for h in ("wpn_hand_01", "wpn_hand_exo"):
         S = Image.new("RGB", (1280 * 2, 720 * 2), (40, 40, 40))
         for i, im in enumerate(ims): S.paste(im, ((i % 2) * 1280, (i // 2) * 720))
         cu = [lab(Image.open(os.path.join(F, "%s_cu_%s_spectrum_x_pose_%s_000.png" % (h, n, m))).convert("RGB").resize((480, 360)), n)
-              for n, m in (("thumb", "switch"), ("menu_front", "menu"), ("menu_behind", "menu"), ("menu_under", "menu"))]
+              for n, m in (("thumb", "switch"), ("hold_back", "hold"), ("menu_front", "menu"), ("menu_behind", "menu"))]
         for i, im in enumerate(cu): S.paste(im, (1280 + (i % 2) * 640 + 80, 720 + (i // 2) * 360))
         S.save(os.path.join(P, "poses_%s_fov%s.png" % (h.replace("wpn_hand_", "arms_"), fov)))
 print("sheets in", P)

@@ -42,7 +42,7 @@ sc.render.resolution_x, sc.render.resolution_y = w, h
 c = Vector((0, 0, 0.013))
 # tablet coords: x down, y right, z out: "up" on screen = -x
 views = [("front", (0, 0, 0.45), c, 30), ("three_q", (0.12, 0.2, 0.33), c, 32), ("back", (0.05, -0.08, -0.4), c, 32),
-         ("left_bezel", (0.07, -0.13, 0.12), Vector((0.038, -0.064, 0.023)), 22), ("bottom", (0.17, 0.05, 0.1), Vector((0.06, 0.01, 0.013)), 22)]
+         ("left_bezel", (0.03, -0.15, 0.12), Vector((-0.012, -0.078, 0.023)), 24), ("bottom", (0.17, 0.05, 0.1), Vector((0.06, 0.01, 0.013)), 22)]
 paths = []
 for nm, eye, tgt, fov in views:
     hud_view.look_at(cam, eye, tgt, up=(-1, 0, 0), fov_deg=fov)

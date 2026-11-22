@@ -5,12 +5,13 @@ What it holds:
     idle frame 0 (the probe-pistol's grip), left arm = the vanilla PDA's idle frame 0 (a landscape device held by its
     lower corners, thumbs on the side bezels; LEFT_GRIP), both moved to our hud section's offsets (the PM's);
   - the probe (on lead_gun, where the PM sits) and the landscape tablet (make_tablet.py), the tablet held in the left
-    hand in the PDA's frame (TAB_IN_GRIP), then moved in the hand by TAB_GRIP (searched: thumb on the bezel, clear);
+    hand round its left side edge (SIDE_GRIP: palm round the edge, fingers on the back, thumb up the front bezel);
   - more hands meshes for collisions (HAND_SETS: the thick-sleeved exoskeleton arms too), so the grips clear both;
   - pose building: two-bone IK for each arm (shoulder fixed, elbow on the base pose's side), the hand put exactly
     where an animation wants it, fingers kept relative to the hand with per-bone local rotations (the grips);
     the right hand mirrored from the left about the tablet's middle (the two-handed hold);
-  - the thumb by a small parametric search: anatomical axes (from vanilla animations), a cost on odd angles;
+  - the thumb laid out straight (thumb_aim / thumb_lay: anatomical axes from vanilla animations), moved onto a
+    button by a small search with a cost on odd angles (thumb_place);
   - numpy skinning of the hands meshes (the engine's linear blend), BVH helpers to measure how deep a point is inside
     the probe / tablet.
 Spaces: "arm" = the hands armature, "cam" = HUD camera space in Blender axes (x right, y forward, z up):
@@ -26,8 +27,8 @@ from io_scene_xray.formats.motions.const import MATRIX_BONE, MATRIX_BONE_INVERTE
 ASSETS = r"X:\coop\assets\spectrum-x"
 PM_HANDS = ((-0.031, -0.17, 0.0), (-0.5, 1.0, 1.15))          # [wpn_pm_hud] hands_position / orientation
 # the left hand's base grip: a vanilla device held in both hands, the tablet put in that device's frame.
-# The PDA (landscape, held by its lower corners, thumbs up the side bezels): its thumb is kept as it is and the
-# tablet placed so that thumb lies on the left bezel's front (TAB_GRIP, found by a search over placements).
+# The PDA's (landscape, held by its lower corners): its arm, fingers and thumb are the starting point; where the hand
+# sits on the tablet is SIDE_GRIP below.
 # (The binoculars' grip, turned a quarter, was tried too: forearms come in level from the sides like holding
 # binoculars, and the thumb has to hook its last joint ~70 degrees to reach the bezel.)
 LEFT_GRIP = dict(omf="wpn_hand_pda_hud_animation.omf", act="hands_idle",
@@ -38,17 +39,19 @@ PM_ITEM = ((0.000746, -0.000321, 0.003479), (1.239378, -0.134046, -2.052052))   
 PROBE_SCALE = 0.20        # Tripo units -> metres: probe 20 cm long
 TABLET_DIR = os.path.join(ASSETS, "bake", "tablet_v2")
 TABLET_SCALE = 1.0        # the tablet is modelled in metres
-TAB_IN_GRIP = (0.008, -0.011, 0.0035)  # the tablet in that frame: backs together, left edges together, 1.2 cm
-                                       # lower than the PDA
-# then moved in the hand, step by step (the tablet's own coords; found by searches over placements: the vanilla
-# thumb lies on the left bezel's front clear of it, the palm out of the back, the index's knuckle 9 mm off the
-# corner): each step moves it up the screen dx, to the left dy, out of the glass dz, turned about pivot by rx about
-# the tablet's x (down) and ry about its y (right), degrees
-TAB_GRIP = [dict(dx=0.022, dy=0.02, dz=-0.01, rx=-12.0, ry=16.0, pivot=(0.03, -0.089, 0.012)),
-            dict(dx=0.005, dy=0.015, dz=0.015, rx=-10.0, ry=0.0, pivot=(0.03, -0.089, 0.012)),
-            # turned in its plane about the thumb's pad (forearms apart under the tablet in the two-handed hold), and
-            # the thumb 3 mm further out (off the glass' edge)
-            dict(dx=0.0, dy=-0.003, dz=0.0, rx=0.0, ry=0.0, rz=42.0, pivot=(0.031, -0.062, 0.025))]
+# the one-hand grip, as one holds a book by its cover: the palm round the left side edge about mid-height, the four
+# fingers flat on the back pointing right and alpha degrees up, the thumb straight up the front left bezel. The hand's
+# own axes (wrist -> middle knuckle, the knuckle line, the palm's side) are measured on the base pose and turned onto
+# these; palm = where the palm's centre goes (tablet coords: x down, y right, z out of the glass; the back is z = 0);
+# wrap = degrees the palm is turned from the back toward the side edge (about the tablet's x).
+# (The PDA's own hold, the tablet put where the PDA sits, was tried first: it holds the lower corner, the fingers
+# curl under the bottom edge and the thumb only reaches a button by the corner bumper.)
+SIDE_GRIP = dict(alpha=60.0, wrap=30.0, palm=(0.015, -0.100, -0.018))
+# the thumb laid out straight up the bezel (thumb_aim): its root knuckle at mcp_y, lift over the bezel's front, the
+# phalanges up with lean (toward the screen per unit up), the last joint bent flex degrees. Found by a search: the
+# straightest thumb that clears the edge with the palm round it (the thumb then lies along the bezel's outer half).
+THUMB_LAY = dict(mcp_y=-0.104, lift=0.004, lean=0.45, flex=40.0)
+SLIDE_TWO_HAND = 0.017       # two hands: they hold the tablet this much lower on its edges (the thumbs then lie on P1, +)
 HAND_SETS = ("wpn_hand_01.ogf", "wpn_hand_exo.ogf")
 LAYOUT = json.load(open(os.path.join(TABLET_DIR, "tablet_layout.json")))
 SCREEN = tuple(LAYOUT["screen"])       # x0, x1, y0, y1, z in the tablet's coords (x down, y right, z out)
@@ -201,6 +204,7 @@ class Rig:
         self.vside = np.array(["l" if is_left(b) else "r" for b in self.dom])
         self._mirror_setup()
         self._items()
+        self._pad = self.thumb_pad()
 
     # ------------------------------------------------------------------ vanilla poses
     def sample(self, act, frame):
@@ -272,14 +276,7 @@ class Rig:
         # cable plug of the probe (end of the strain relief) and its direction, item space
         self.plug_p = self.P_probe @ Vector((0.0, 0.37, 0.325)); self.plug_d = (R180 @ Vector((0, 1, 0))).normalized()
         self.lens_item = self.P_probe @ Vector((0.0, -0.5, 0.29))
-        # the tablet: its coords -> the device's frame (LEFT_GRIP axes, TAB_IN_GRIP), then TAB_GRIP
-        steps = Matrix.Identity(4)
-        for g in TAB_GRIP:
-            pv = Vector(g["pivot"])
-            turn = Matrix.Rotation(math.radians(g["rx"]), 4, "X") @ Matrix.Rotation(math.radians(g["ry"]), 4, "Y") @                 Matrix.Rotation(math.radians(g.get("rz", 0.0)), 4, "Z")
-            steps = steps @ Matrix.Translation(Vector((-g["dx"], -g["dy"], g["dz"]))) @ \
-                Matrix.Translation(pv) @ turn @ Matrix.Translation(-pv)
-        self.A_tab = Matrix.Translation(Vector(TAB_IN_GRIP)) @ Matrix(LEFT_GRIP["axes"]).transposed().to_4x4() @ steps
+        self.A_tab = self.side_grip_tab()
         self.conn_t = Vector(LAYOUT["socket"])
         self.pv_item, self.ptris = mesh_arrays(self.probe)
         self.tv_raw, self.ttris = mesh_arrays(self.tablet)
@@ -287,12 +284,45 @@ class Rig:
         self.probe_bvh = bvh_of(self.pv_item, self.ptris)
         self.tablet_bvh = bvh_of(self.tv_det, self.ttris)
 
+    def hand_axes(self):
+        """the left hand's own axes in its bone frame (base pose): f wrist -> middle knuckle, l the knuckle line toward
+        the index, n the palm's side (where the curled fingers go), the palm's centre p; hand = +1 if f x l is n"""
+        B = self.base; Hi = B["l_hand"].inverted()
+        k = {i: Hi @ B["bip01_l_finger%d" % i].to_translation() for i in (1, 2, 4)}
+        f = k[2].normalized()
+        l = k[1] - k[4]; l = (l - f * l.dot(f)).normalized()
+        tip = Hi @ (B["bip01_l_finger22"] @ Vector((0, 0.02, 0)))
+        c = tip - k[2]; n = c - f * c.dot(f); n = (n - l * n.dot(l)).normalized()
+        s0 = self.sets[0]
+        p = Hi @ Vector(s0.skin(self.pose_of(fingers={}))[s0.dom == "l_hand"].mean(0))
+        return f, l, n, p, (1 if f.cross(l).dot(n) > 0 else -1)
+
+    def side_grip_tab(self):
+        """A_tab for SIDE_GRIP: the hand's axes turned onto the wanted ones, its palm's centre where SIDE_GRIP puts it"""
+        f, l, n, p, hand = self.hand_axes()
+        a = math.radians(SIDE_GRIP["alpha"])
+        fd = Vector((-math.sin(a), math.cos(a), 0.0)); nd = Vector((0.0, 0.0, 1.0))
+        wr = Matrix.Rotation(-math.radians(SIDE_GRIP.get("wrap", 0.0)), 3, "X")   # the palm turned round the edge
+        fd, nd = wr @ fd, wr @ nd
+        ld = nd.cross(fd) * hand                  # the knuckle line; the index (and the thumb) up the edge
+        Hm = Matrix((f, l, f.cross(l))).transposed(); D = Matrix((fd, ld, fd.cross(ld))).transposed()
+        Rr = (D @ Hm.transposed()).to_4x4()
+        Hr = Matrix.Translation(Vector(SIDE_GRIP["palm"]) - Rr @ p) @ Rr       # the hand bone in tablet coords
+        self.side_log = "hand axes: handedness %+d, palm side %s" % (hand, tuple(round(x, 2) for x in (Rr.to_3x3() @ n)))
+        return self.L2T.inverted() @ Hr.inverted()
+
     def shift_probe(self, off):
         """move the probe in item space (the grip into the palm, not through it)"""
         T = Matrix.Translation(Vector(off))
         self.P_probe = T @ self.P_probe; self.probe.data.transform(T)
         self.plug_p = T @ self.plug_p; self.lens_item = T @ self.lens_item; self.grip_item = T @ self.grip_item
         self.pv_item = apply_m(T, self.pv_item); self.probe_bvh = bvh_of(self.pv_item, self.ptris)
+
+    def use_slide(self, slide):
+        """the tablet held slide metres lower in the hand (along its edge; 0: as fitted): A_tab and the collision mesh"""
+        if not hasattr(self, "A_tab_fit"): self.A_tab_fit = self.A_tab.copy()
+        self.A_tab = self.A_tab_fit @ Matrix.Translation(Vector((-slide, 0.0, 0.0)))
+        self.tv_det = apply_m(self.A_tab, self.tv_raw); self.tablet_bvh = bvh_of(self.tv_det, self.ttris)
 
     def shift_tablet(self, off):
         """move the tablet in detector space"""
@@ -457,11 +487,11 @@ class Rig:
     def finger_depth(self, side, bones, fingers, other=None):
         """deepest point of the vertices of bones (every hands set) inside the hand's device. Fingers 1-4 on the
         tablet must also stay off its front: a vertex over its front half, inside its outline, counts as 1 m deep
-        (a finger wrapped round the bottom edge onto the bezel, or through to the glass)."""
+        (a finger wrapped round an edge onto the bezel, or through to the glass). The palm and the thumb may wrap."""
         pose = self.pose_of(*self.hands_at, fingers=fingers)
         dv = self.dev_of.get(side, side)
         Fi = self.device_frame(dv, pose).inverted(); bvh = self.device_bvh(dv)
-        front = dv == "l" and not any(b.endswith(("finger0", "finger01", "finger02")) for b in bones)
+        front = dv == "l" and all(b.startswith("bip01_") for b in bones)      # fingers 1-4 only (not the palm, thumb)
         if front:
             Ri = (self.det_arm(pose) @ self.A_tab).inverted()
             hh, hw = LAYOUT["half"]; fz = LAYOUT["front"]
@@ -535,92 +565,121 @@ class Rig:
 
     grip_log = []
 
-    def thumb_pad(self, fingers):
-        """the pad of the left thumb (the skin of its last bone facing the tablet's front), in that bone's frame"""
-        pose = self.pose_of(*self.hands_at, fingers=fingers)
-        s = self.sets[0]; hv = s.skin(pose)[s.dom == "l_finger02"]
-        raw = apply_m(self.tab_arm(pose).inverted(), hv)
-        k = np.argsort(raw[:, 2])[:8]
-        return pose["l_finger02"].inverted() @ Vector(hv[k].mean(0))
+    def thumb_pad(self, fingers=None):
+        """the pad of the left thumb, in its last bone's frame: the skin of that bone on the side its joint bends to
+        (the palmar side), in the bone's outer half. Anatomical, so it stays the pad however the thumb is turned."""
+        pose = self.pose_of(fingers={})
+        s = self.sets[0]; b = "l_finger02"
+        loc = apply_m(pose[b].inverted(), s.skin(pose)[s.dom == b])
+        d = np.array(self.thumb_axes[b][0].cross(Vector((0, 1, 0))).normalized())
+        y = loc[:, 1]; outer = loc[y > np.median(y)]
+        k = np.argsort(-(outer @ d))[:8]
+        return Vector(outer[k].mean(0))
 
-    def thumb_search(self, fingers, target_raw, tol=0.0012, label="thumb"):
-        """the left thumb's pad onto a point of the tablet (its own coords) by a search over its anatomical angles:
-        finger0 flexion / abduction, finger01 and finger02 hinges, about the base (the PDA's natural thumb). Cost:
-        the pad's miss (1.5 mm ~ 1) + odd angles (big turns, a hyperextended joint, the two hinges far apart); the best
-        that keeps every hands set's thumb out of the tablet wins. Returns the fingers with the thumb set."""
-        th = FINGERS["l"][0]; B = self.base
-        pose0 = self.pose_of(*self.hands_at, fingers=fingers)
-        tgt = self.tab_arm(pose0) @ Vector(target_raw)
-        pad = self.thumb_pad(fingers)
-        Hh = pose0["l_hand"]
-        rel = [B[self.parent[b]].inverted() @ B[b] for b in th]
-        base_lr = [fingers.get(b, Matrix.Identity(4)) for b in th]
-        ax = [self.thumb_axes[b] for b in th]
-        R = lambda a, v: Matrix.Rotation(math.radians(a), 4, v)
-        A0 = range(-30, 31, 5); B0 = range(-30, 31, 5); A1 = range(-15, 61, 5); A2 = range(-15, 76, 5)
-        P0s = {(a0, b0): Hh @ rel[0] @ base_lr[0] @ R(a0, ax[0][0]) @ R(b0, ax[0][1]) for a0 in A0 for b0 in B0}
-        L1 = {a1: rel[1] @ base_lr[1] @ R(a1, ax[1][0]) for a1 in A1}
-        L2 = {a2: rel[2] @ base_lr[2] @ R(a2, ax[2][0]) @ pad for a2 in A2}
+    def thumb_aim(self, fingers, mcp_raw, up_raw, palmar_raw=(0.0, 0.0, -1.0), flex2=8.0):
+        """the left thumb laid out straight: its first bone from the base joint to mcp_raw (the knuckle at its root),
+        the two phalanges along up_raw, the last one bent flex2 degrees; each bone rolled so its palmar side (the side
+        it bends to) faces palmar_raw (the tablet's front). Tablet coords. Returns the fingers with the thumb set."""
+        th = FINGERS["l"][0]; B = self.base; f = dict(fingers)
+        pose = self.pose_of(*self.hands_at, fingers=f); T = self.tab_arm(pose); T3 = T.to_3x3()
+        up = (T3 @ Vector(up_raw)).normalized(); pal = (T3 @ Vector(palmar_raw)).normalized()
+        for i, b in enumerate(th):
+            pose = self.pose_of(*self.hands_at, fingers=f); P = pose[b]; head = P.to_translation()
+            if i == 0:
+                want = ((T @ Vector(mcp_raw)) - head).normalized()
+                cur = (P.to_3x3() @ (B[b].inverted() @ B[th[1]].to_translation())).normalized()
+            else:
+                want = up if i == 1 else (Quaternion(up.cross(pal).normalized(), math.radians(flex2)) @ up)
+                nxt = (B[b].inverted() @ B[th[2]].to_translation()) if i == 1 else Vector((0, 1, 0))
+                cur = (P.to_3x3() @ nxt).normalized()
+            q1 = cur.rotation_difference(want)
+            # roll about the wanted direction: the bone's palmar side toward pal
+            pl = q1 @ (P.to_3x3() @ self.thumb_axes[b][0].cross(Vector((0, 1, 0)))).normalized()
+            pl = (pl - want * pl.dot(want)).normalized(); pw = (pal - want * pal.dot(want)).normalized()
+            ang = math.atan2(pl.cross(pw).dot(want), pl.dot(pw))
+            Q = (Quaternion(want, ang) @ q1).to_matrix().to_4x4()
+            Pn = Matrix.Translation(head) @ Q @ Matrix.Translation(-head) @ P
+            par = pose[self.parent[b]]
+            f[b] = (B[self.parent[b]].inverted() @ B[b]).inverted() @ par.inverted() @ Pn
+        return f
 
-        def odd(a0, b0, a1, a2):
-            c = (a0 / 25) ** 2 + (b0 / 25) ** 2 + (a1 / 30) ** 2 + (a2 / 35) ** 2 + 0.5 * ((a2 - a1) / 30) ** 2
-            for a in (a1, a2):
-                if a < 0: c += (a / 8) ** 2
-            return c
-        cand = []
-        for (a0, b0), P0 in P0s.items():
-            for a1, M1 in L1.items():
-                P1 = P0 @ M1
-                for a2, v2 in L2.items():
-                    d = ((P1 @ v2) - tgt).length
-                    if d > 0.012: continue
-                    cand.append(((d / 0.0015) ** 2 + odd(a0, b0, a1, a2), d, (a0, b0, a1, a2)))
-        cand.sort()
+    def thumb_lay(self, fingers, lay=None, turn=(0.0, 0.0)):
+        """the thumb laid out by THUMB_LAY (thumb_aim), its first bone turned by turn = (degrees toward the glass'
+        normal, degrees about it) from there; returns (fingers, the pad's place in tablet coords)"""
+        lay = lay or THUMB_LAY; th = FINGERS["l"][0]; B = self.base
+        pose = self.pose_of(*self.hands_at, fingers=fingers); Ti = self.tab_arm(pose).inverted()
+        c = Ti @ pose[th[0]].to_translation()
+        L0 = (B[th[1]].to_translation() - B[th[0]].to_translation()).length
+        zt = LAYOUT["front"] + lay["lift"]; r2 = max(L0 ** 2 - (lay["mcp_y"] - c.y) ** 2 - (zt - c.z) ** 2, 0.0)
+        d0 = (Vector((c.x - math.sqrt(r2), lay["mcp_y"], zt)) - c).normalized()
+        a1 = d0.cross(Vector((0, 0, 1))).normalized(); a2 = d0.cross(a1).normalized()
+        d = Quaternion(a2, math.radians(turn[1])) @ (Quaternion(a1, math.radians(turn[0])) @ d0)
+        f = self.thumb_aim(fingers, c + d * L0, (-1.0, lay["lean"], 0.0), flex2=lay["flex"])
+        pz = self.pose_of(*self.hands_at, fingers=f)
+        return f, self.tab_arm(pz).inverted() @ (pz[th[2]] @ self._pad)
 
-        def build(a):
-            f = dict(fingers)
-            f[th[0]] = base_lr[0] @ R(a[0], ax[0][0]) @ R(a[1], ax[0][1])
-            f[th[1]] = base_lr[1] @ R(a[2], ax[1][0]); f[th[2]] = base_lr[2] @ R(a[3], ax[2][0])
-            return f
-        for c, d, a in cand[:400]:
-            f = build(a)
+    def thumb_place(self, fingers, target_raw, tol=0.002, label="thumb"):
+        """the thumb moved from its laid-out rest onto a point (tablet coords): a search over the first bone's turn,
+        the lean and the last joint's bend; cost = the pad's miss (1.5 mm ~ 1) + how far it is from the rest layout;
+        the best that keeps every hands set's thumb out of the tablet wins. Returns (fingers, miss)"""
+        th = FINGERS["l"][0]; tgt = Vector(target_raw); cand = []
+        for t0 in range(-30, 31, 5):
+            for t1 in range(-30, 31, 5):
+                for lean in (0.3, 0.45, 0.55, 0.7, 0.85):
+                    for fl in (20.0, 35.0, 50.0, 65.0, 80.0):
+                        lay = dict(THUMB_LAY, lean=lean, flex=fl)
+                        f, q = self.thumb_lay(fingers, lay, (t0, t1))
+                        d = (q - tgt).length
+                        if d > 0.01: continue
+                        c = (d / 0.0015) ** 2 + (t0 / 20) ** 2 + (t1 / 20) ** 2 + ((lean - THUMB_LAY["lean"]) / 0.3) ** 2 +                             ((fl - THUMB_LAY["flex"]) / 30) ** 2
+                        cand.append((c, d, (t0, t1, lean, fl), f, q))
+        cand.sort(key=lambda x: x[0])
+        for i, (c, d, a, f, q) in enumerate(cand[:40]):
             if self.finger_depth("l", th, f) <= tol:
-                pz = self.pose_of(*self.hands_at, fingers=f)
-                got = self.tab_arm(pz).inverted() @ (pz[th[2]] @ pad)
-                self.grip_log.append("%s: miss %.1f mm (pad at %.4f %.4f %.4f), angles f0 %+d/%+d f01 %+d f02 %+d (cost %.2f, %d tried)"
-                                     % (label, d * 1000, got.x, got.y, got.z, a[0], a[1], a[2], a[3], c, cand.index((c, d, a)) + 1))
+                self.grip_log.append("%s: miss %.1f mm (pad at %.4f %.4f %.4f), turn %+d/%+d lean %.2f bend %d (cost %.2f, %d tried)"
+                                     % (label, d * 1000, q.x, q.y, q.z, a[0], a[1], a[2], a[3], c, i + 1))
                 return f, d
-        self.grip_log.append("%s: NO clear pose among %d candidates" % (label, len(cand)))
-        return build(cand[0][2]) if cand else fingers, (cand[0][1] if cand else 1.0)
+        if cand:
+            ds = sorted((self.finger_depth("l", th, x[3]), x[1], x[2]) for x in cand[:40])[0]
+            self.grip_log.append("%s: NO clear pose among %d candidates (least deep %.1f mm, miss %.1f mm, %s)"
+                                 % (label, len(cand), ds[0] * 1000, ds[1] * 1000, ds[2]))
+        else:
+            self.grip_log.append("%s: no candidate within 10 mm" % label)
+        return (cand[0][3], cand[0][1]) if cand else (fingers, 1.0)
 
 
 def setup_grips(R, log=print):
-    """fit the devices into the hands, then the grips: the left hand's fingers on the tablet's back, the thumb on
-    the front left bezel between P1 and P2 (rest) or on P1 (press); the right hand round the probe's grip.
-    Returns (fingers at rest, fingers with the thumb pressing P1)."""
+    """fit the devices into the hands, then the grips: the left hand round the tablet's left edge (SIDE_GRIP), its
+    fingers closed onto the back, the thumb straight up the front left bezel above the buttons (one hand; the same
+    thumb lies on P1 when both hands hold the tablet lower, SLIDE_TWO_HAND), and brought down onto P1 (the press);
+    the right hand round the probe's grip. Returns (fingers at rest, fingers pressing P1, fingers for two hands).""" 
     offp = R.fit_device("r", ["r_hand", "bip01_r_finger2", "bip01_r_finger3", "bip01_r_finger4"], span=0.016)
     R.shift_probe(offp or (0, 0, 0))
-    offt = R.fit_device("l", ["l_hand", "bip01_l_finger1"], tol=0.0015)   # the palm and the index's first bone (its knuckle
-    #                                     sits by the bottom left corner); TAB_GRIP was searched with the palm clear to 1.5 mm
+    offt = R.fit_device("l", ["l_hand"], tol=0.0015)
     R.shift_tablet(offt or (0, 0, 0))
-    log("FIT probe %s tablet %s" % (offp, offt))
+    log("FIT probe %s tablet %s | %s" % (offp, offt, R.side_log))
     log("THUMB AXES %s | %s" % (R.thumb_log, R.mirror_log))
     b0 = R.pose_of(fingers={})
-    tc = R.tab_arm(b0) @ Vector((0.0, -0.06, -0.03))      # behind the tablet's back, left half: fingers 1-4 close to it
+    px, py, pz = SIDE_GRIP["palm"]
+    tc = R.tab_arm(b0) @ Vector((px - 0.02, py + 0.06, 0.012))     # inside the tablet ahead of the fingers
     pg = R.item_arm(b0) @ R.grip_item
     f = {}
     for ch in FINGERS["l"][1:]:
-        f = R.solve_curl("l", ch, f, tc, reach_open=True)
-    p1, p2 = BUTTONS["p1"], BUTTONS["p2"]
-    rest, _ = R.thumb_search(f, (p1[0], p1[1], p1[2] + 0.0035), label="thumb rest")     # just over P1
-    press, _ = R.thumb_search(f, (p1[0], p1[1], p1[2] - 0.0003), tol=0.0015, label="thumb on P1")
+        f = R.solve_curl("l", ch, f, tc, lim=((-90, 85), (-60, 100), (-40, 80)), reach_open=True)
+    lay, nat = R.thumb_lay(f)
+    log("THUMB laid out: pad at %.4f %.4f %.4f, depth %.1f mm" % (nat.x, nat.y, nat.z, R.finger_depth("l", FINGERS["l"][0], lay) * 1000))
+    p1 = BUTTONS["p1"]
+    rest = lay                    # one hand: the thumb straight as laid out, above the buttons
+    on = lay                      # two hands: laid out the same, the hands lower on the edges (SLIDE_TWO_HAND)
+    press, _ = R.thumb_place(f, (p1[0], p1[1], p1[2] - 0.0002), label="thumb pressing P1")
     for ch in FINGERS["r"]:
         rest = R.solve_curl("r", ch, rest, pg)
-        press = dict(press); press.update({b: rest[b] for b in ch if b in rest})
+        for g in (press, on):
+            g.update({b: rest[b] for b in ch if b in rest})
     log("GRIP " + " | ".join(R.grip_log))
     log("GRIP depths (mm, every hands set; 1000 = on the tablet's front): " + " ".join(
         "%s %.1f" % (ch[0], R.finger_depth("l", ch, rest) * 1000) for ch in FINGERS["l"]))
-    return rest, press
+    return rest, press, on
 
 
 def setup_two_hand(R, l_arm, rest, log=print):
@@ -635,7 +694,7 @@ def setup_two_hand(R, l_arm, rest, log=print):
     tc = R.tab_arm(p) @ Vector((0.0, 0.06, -0.03))
     R.grip_log = []
     for ch in FINGERS["r"][1:]:
-        f = R.solve_curl("r", ch, f, tc, reach_open=True)
+        f = R.solve_curl("r", ch, f, tc, lim=((-90, 85), (-60, 100), (-40, 80)), reach_open=True)
     dth = R.finger_depth("r", FINGERS["r"][0], f)
     log("TWO-HAND right depths (mm): " + " ".join("%s %.1f" % (ch[0], R.finger_depth("r", ch, f) * 1000) for ch in FINGERS["r"]))
     R.hands_at = (None, None); R.dev_of = {}

@@ -334,7 +334,7 @@ nm = nt2.nodes.new("ShaderNodeNormalMap"); nt2.links.new(nodes["normal"].outputs
 nt2.links.new(nm.outputs[0], b2.inputs["Normal"])
 
 lay = {"screen": [WIN[0] + 0.001, WIN[1] - 0.001, WIN[2] + 0.001, WIN[3] - 0.001, GLASS_Z + 0.0008],
-       "buttons": BUTTONS, "socket": [HH + SOCK_LEN, SOCK[1], SOCK[2]], "socket_dir": [1, 0, 0],
+       "buttons": BUTTONS, "thumb_rest": THUMB_REST, "socket": [HH + SOCK_LEN, SOCK[1], SOCK[2]], "socket_dir": [1, 0, 0],
        "bounds": [list(map(float, np.min([v.co[:] for v in low.data.vertices], 0))),
                   list(map(float, np.max([v.co[:] for v in low.data.vertices], 0)))],
        "front": FRONT, "glass": GLASS_Z, "window": WIN, "bezel": [BEZ_L, BEZ_R, BEZ_T, BEZ_B], "half": [HH, HW],
