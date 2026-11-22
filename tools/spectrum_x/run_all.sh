@@ -16,12 +16,16 @@ python $T/tablet_decal.py $A/retopo/screen_height.npy $A/retopo/screen_decal.png
 "$B" -b $A/retopo/blender/pistol_low.blend -P $T/bake.py -- $A/bake/pistol_blender pistol --glb $A/bake/pistol_blender/pistol_blender.glb
 "$B" -b $A/retopo/blender/tablet_low.blend -P $T/bake.py -- $A/bake/tablet_blender tablet --decal $A/retopo/screen_decal.png \
     --decal-box "+y -x -0.20 -0.20 0.20 -0.07" --decal-normal +z --glb $A/bake/tablet_blender/tablet_blender.glb
-# 4. textures in X-Ray form (dds + bump pair + thm), screen / cable placeholders
+# 4. textures in X-Ray form (dds + bump pair + thm), screen / cable placeholders; the 3D screen's glyph atlas
 python $T/make_flat_textures.py $A/hud/tex
 python $T/make_xray_textures.py
-# 5. HUD scene: hands animations (.omf), HUD and world models (.ogf), previews of the exported files
+python $T/make_screen_atlas.py
+# 5. HUD scene: grips solved on the meshes, animations (hud_anims.py, IK in hud_rig.py), the cable's bone chain, export;
+#    the measured numbers into the .ltx; every frame checked for intersections; previews of the exported files
 "$B" -b -P $T/build_hud.py -- --meshes $V --assets $A --out $GD
-"$B" -b -P $T/preview_hud.py -- $V $GD $A/hud/previews spectrum_x_idle:0 spectrum_x_aim:0 spectrum_x_bore:45 spectrum_x_draw:0,8,16,22
+python $T/apply_numbers.py --assets $A
+"$B" -b -P $T/check_hud.py -- $V $GD $A/hud/previews/check_report.txt
+"$B" -b -P $T/preview_hud.py -- $V $GD $A/hud/previews/frames --ui $A/hud/tex/ui_mock_panel.png --res 640x360     spectrum_x_idle:0 spectrum_x_aim:30 spectrum_x_bore:44 spectrum_x_menu_idle:45 spectrum_x_switch:7 spectrum_x_draw:0,8,12,24
 # 6. inventory icon
 "$B" -b $A/hud/spectrum_x_hud.blend -P $T/render_icon.py -- $A/hud/icon/icon_512.png
 python $T/make_icon.py $A/hud/icon/icon_512.png
