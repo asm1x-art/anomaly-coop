@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--src", default=r"X:\yantar-tools\work\gamedata\textures", help="vanilla textures, unpacked")
+ap.add_argument("--src", default=r"X:\coop\yantar-tools\work\gamedata\textures", help="vanilla textures, unpacked")
 ap.add_argument("--out", default=os.path.join(ROOT, "gamedata", "textures"))
 ap.add_argument("--work", default=r"H:\stalker-test\aftex-work", help="intermediate PNGs")
 ap.add_argument("--tools", default=r"H:\stalker-test\tools-ext")

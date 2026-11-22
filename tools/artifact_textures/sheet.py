@@ -1,6 +1,6 @@
 r"""Flat before | after sheet of the reworked textures: vanilla (as the game shows it, stretched to the same size),
 the new one, the new bump's normal (as a usual RGB normal map) and a close-up crop of both, with names and sizes.
-  python tools/artifact_textures/sheet.py --out X:\artifact-fx\textures_pilot\textures_flat.png
+  python tools/artifact_textures/sheet.py --out X:\coop\artifact-fx\textures_pilot\textures_flat.png
 """
 import argparse
 import configparser
@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 ap = argparse.ArgumentParser()
-ap.add_argument("--src", default=r"X:\yantar-tools\work\gamedata\textures")
+ap.add_argument("--src", default=r"X:\coop\yantar-tools\work\gamedata\textures")
 ap.add_argument("--new", default=os.path.join(ROOT, "gamedata", "textures"))
 ap.add_argument("--out", required=True)
 ap.add_argument("--cell", type=int, default=420)

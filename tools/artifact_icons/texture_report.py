@@ -1,5 +1,5 @@
 r"""Which textures each artefact model uses, their size, format and bump map; which are shared between artefacts.
-  python tools/artifact_icons/texture_report.py [--meshes X:\artifact-fx\unpack\meshes] [--textures X:\yantar-tools\work\gamedata\textures]
+  python tools/artifact_icons/texture_report.py [--meshes X:\coop\artifact-fx\unpack\meshes] [--textures X:\coop\yantar-tools\work\gamedata\textures]
 Writes a tab-separated table to stdout. Models and textures as unpacked from the game's archives.
 """
 import argparse, collections, json, os, re, struct
@@ -7,8 +7,8 @@ import argparse, collections, json, os, re, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--meshes", default=r"X:\artifact-fx\unpack\meshes")
-ap.add_argument("--textures", default=r"X:\yantar-tools\work\gamedata\textures")
+ap.add_argument("--meshes", default=r"X:\coop\artifact-fx\unpack\meshes")
+ap.add_argument("--textures", default=r"X:\coop\yantar-tools\work\gamedata\textures")
 a = ap.parse_args()
 
 
